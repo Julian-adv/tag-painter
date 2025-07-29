@@ -70,7 +70,7 @@
   {:else if availableLoras.length === 0}
     <div class="text-sm text-gray-500">No LoRA models found</div>
   {:else}
-    <div class="lora-list max-h-32 space-y-1 overflow-y-auto">
+    <div class="lora-list max-h-24 space-y-1 overflow-y-auto">
       {#each availableLoras as lora (lora)}
         <label class="flex items-center space-x-2 text-xs">
           <input

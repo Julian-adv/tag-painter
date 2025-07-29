@@ -1,158 +1,46 @@
 <!-- Component for prompt input forms and checkpoint selection -->
 <script lang="ts">
-  import TextAreaInput from './TextAreaInput.svelte'
-  import CategoryManagerDialog from './CategoryManagerDialog.svelte'
-  import LoraSelector from './LoraSelector.svelte'
+  import LoraSelector from "./LoraSelector.svelte";
+  import CompositionSelector from "./CompositionSelector.svelte";
+  import TagZones from "./TagZones.svelte";
   import {
     promptsData,
-    updateCategoryValue,
-    updateCategoryValues,
     updateCheckpoint,
     updateUpscale,
     updateFaceDetailer,
     updateSelectedLoras,
     updateLoraWeight,
-    addCategory,
-    removeCategory,
-    updateCategory,
-    reorderCategories,
-    resolvedRandomValues
-  } from './stores/promptsStore'
-  import type { PromptCategory, OptionItem } from '$lib/types'
+  } from "./stores/promptsStore";
 
   interface Props {
-    availableCheckpoints: string[]
-    disabledCategoryIds: Set<string>
+    availableCheckpoints: string[];
   }
 
-  let { availableCheckpoints, disabledCategoryIds }: Props = $props()
+  let { availableCheckpoints }: Props = $props();
 
   function handleLoraChange(loras: string[]) {
-    updateSelectedLoras(loras)
+    updateSelectedLoras(loras);
   }
 
   function handleLoraWeightChange(weight: number) {
-    updateLoraWeight(weight)
-  }
-
-  // Dynamic category update functions
-  function handleCategoryValueChange(categoryId: string) {
-    return (value: OptionItem) => {
-      updateCategoryValue(categoryId, value)
-    }
-  }
-
-  function handleCategoryOptionsChange(categoryId: string) {
-    return (options: OptionItem[]) => {
-      updateCategoryValues(categoryId, options)
-    }
-  }
-
-  // Category management
-  let showCategoryManager = $state(false)
-  let draggedIndex = $state<number | null>(null)
-  let dragOverIndex = $state<number | null>(null)
-
-  function handleAddCategory(newCategory: PromptCategory) {
-    addCategory(newCategory)
-  }
-
-  function handleCategoryUpdate(updatedCategory: PromptCategory) {
-    updateCategory(updatedCategory.id, updatedCategory)
-  }
-
-  function handleCategoryDelete(categoryId: string) {
-    removeCategory(categoryId)
-  }
-
-  // Drag and drop handlers
-  function handleDragStart(event: DragEvent, index: number) {
-    draggedIndex = index
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move'
-      event.dataTransfer.setData('text/html', '')
-    }
-  }
-
-  function handleDragOver(event: DragEvent, index: number) {
-    event.preventDefault()
-    dragOverIndex = index
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = 'move'
-    }
-  }
-
-  function handleDragLeave() {
-    dragOverIndex = null
-  }
-
-  function handleDrop(event: DragEvent, index: number) {
-    event.preventDefault()
-    if (draggedIndex !== null && draggedIndex !== index) {
-      reorderCategories(draggedIndex, index)
-    }
-    draggedIndex = null
-    dragOverIndex = null
-  }
-
-  function handleDragEnd() {
-    draggedIndex = null
-    dragOverIndex = null
+    updateLoraWeight(weight);
   }
 </script>
 
 <div class="prompt-form">
-  <div class="category-header">
-    <h3>Prompt Categories</h3>
-    <button
-      type="button"
-      class="btn-add-category bg-sky-500"
-      onclick={() => (showCategoryManager = true)}
-    >
-      + Add Category
-    </button>
-  </div>
+  <CompositionSelector />
 
-  <div class="form-section" role="list" aria-label="Category list">
-    {#each $promptsData.categories as category, index (category.id)}
-      <div
-        class="category-item {draggedIndex === index ? 'dragging' : ''} {dragOverIndex === index
-          ? 'drag-over'
-          : ''}"
-        role="listitem"
-        aria-label="Category: {category.name}"
-        ondragover={(e) => handleDragOver(e, index)}
-        ondragleave={handleDragLeave}
-        ondrop={(e) => handleDrop(e, index)}
-        ondragend={handleDragEnd}
-      >
-        <TextAreaInput
-          id={category.id}
-          label={category.name}
-          placeholder={`${category.name} description...`}
-          bind:value={category.currentValue}
-          options={category.values}
-          onValueChange={handleCategoryValueChange(category.id)}
-          onOptionsChange={handleCategoryOptionsChange(category.id)}
-          resolvedRandomValue={$resolvedRandomValues[category.id]}
-          onDragStart={(e) => handleDragStart(e, index)}
-          onCategoryUpdate={handleCategoryUpdate}
-          onCategoryDelete={handleCategoryDelete}
-          allCategories={$promptsData.categories}
-          aliasOf={category.aliasOf}
-          isDisabled={disabledCategoryIds.has(category.id)}
-        />
-      </div>
-    {/each}
-  </div>
+  <TagZones />
+
 
   <div class="form-section">
     <div class="field">
       <label for="checkpoint">Checkpoint</label>
       <select
         id="checkpoint"
-        value={$promptsData.selectedCheckpoint || ''}
-        onchange={(e) => updateCheckpoint((e.target as HTMLSelectElement).value)}
+        value={$promptsData.selectedCheckpoint || ""}
+        onchange={(e) =>
+          updateCheckpoint((e.target as HTMLSelectElement).value)}
       >
         <option value="">Select checkpoint...</option>
         {#each availableCheckpoints as checkpoint (checkpoint)}
@@ -176,7 +64,8 @@
         <input
           type="checkbox"
           checked={$promptsData.useUpscale}
-          onchange={(e) => updateUpscale((e.target as HTMLInputElement).checked)}
+          onchange={(e) =>
+            updateUpscale((e.target as HTMLInputElement).checked)}
         />
         Use Upscale
       </label>
@@ -188,7 +77,8 @@
           type="checkbox"
           class="accent-sky-600"
           checked={$promptsData.useFaceDetailer}
-          onchange={(e) => updateFaceDetailer((e.target as HTMLInputElement).checked)}
+          onchange={(e) =>
+            updateFaceDetailer((e.target as HTMLInputElement).checked)}
         />
         Use Face Detailer
       </label>
@@ -196,11 +86,6 @@
   </div>
 </div>
 
-<CategoryManagerDialog
-  show={showCategoryManager}
-  onClose={() => (showCategoryManager = false)}
-  onAddCategory={handleAddCategory}
-/>
 
 <style>
   .prompt-form {
@@ -215,7 +100,7 @@
     flex-direction: column;
     gap: 0.2rem;
     overflow-y: auto;
-    max-height: calc(100vh - 480px);
+    max-height: calc(100vh - 630px);
     padding-right: 4px;
   }
 
@@ -277,59 +162,9 @@
     font-size: 13px;
   }
 
-  .checkbox-label input[type='checkbox'] {
+  .checkbox-label input[type="checkbox"] {
     margin: 0;
     cursor: pointer;
   }
 
-  .category-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #eee;
-  }
-
-  .category-header h3 {
-    margin: 0;
-    font-size: 1rem;
-    color: #333;
-  }
-
-  .btn-add-category {
-    padding: 0.25rem 0.5rem;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    transition: background 0.2s ease;
-  }
-
-  .btn-add-category:hover {
-    background: #1976d2;
-  }
-
-  .category-item {
-    position: relative;
-    transition: all 0.2s ease;
-    border: 2px solid transparent;
-    border-radius: 8px;
-  }
-
-  .category-item:active {
-    cursor: grabbing;
-  }
-
-  .category-item.dragging {
-    opacity: 0.5;
-    transform: scale(0.98);
-  }
-
-  .category-item.drag-over {
-    border-color: #4caf50;
-    background-color: #f8f9fa;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  }
 </style>

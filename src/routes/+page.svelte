@@ -3,8 +3,8 @@
 </script>
 
 <svelte:head>
-  <title>Toon Maker</title>
-  <meta name="description" content="Toon Maker" />
+  <title>Tag Painter</title>
+  <meta name="description" content="Tag Painter" />
 </svelte:head>
 
 <section>

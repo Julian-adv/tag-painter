@@ -189,7 +189,7 @@
 <main class="prompt-input">
   <div class="content-grid">
     <section class="form-section">
-      <PromptForm {availableCheckpoints} {disabledCategoryIds} />
+      <PromptForm {availableCheckpoints} />
 
       <GenerationControls
         {isLoading}
