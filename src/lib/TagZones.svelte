@@ -1,5 +1,7 @@
 <!-- Component for tag input zones -->
 <script lang="ts">
+  import TagInput from './TagInput.svelte'
+  
   let allTags = $state('')
   let firstZoneTags = $state('')
   let secondZoneTags = $state('')
@@ -12,40 +14,25 @@
 
   <!-- Tag zones input sections -->
   <div class="flex-1 space-y-4 p-2 overflow-y-auto">
-  <!-- All tags section -->
-  <div>
-    <label for="all-tags" class="block text-xs font-medium text-gray-700 mb-2 text-left">All</label>
-    <textarea 
+    <TagInput 
       id="all-tags"
-      bind:value={allTags}
-      class="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-      rows="6"
+      label="All" 
       placeholder="Enter tags for all zones..."
-    ></textarea>
-  </div>
-
-  <!-- First Zone section -->
-  <div>
-    <label for="first-zone-tags" class="block text-xs font-medium text-gray-700 mb-2 text-left">First Zone</label>
-    <textarea 
+      bind:value={allTags}
+    />
+    
+    <TagInput 
       id="first-zone-tags"
-      bind:value={firstZoneTags}
-      class="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-      rows="6"
+      label="First Zone" 
       placeholder="Enter tags for first zone..."
-    ></textarea>
-  </div>
-
-  <!-- Second Zone section -->
-  <div>
-    <label for="second-zone-tags" class="block text-xs font-medium text-gray-700 mb-2 text-left">Second Zone</label>
-    <textarea 
+      bind:value={firstZoneTags}
+    />
+    
+    <TagInput 
       id="second-zone-tags"
-      bind:value={secondZoneTags}
-      class="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-      rows="6"
+      label="Second Zone" 
       placeholder="Enter tags for second zone..."
-    ></textarea>
-  </div>
+      bind:value={secondZoneTags}
+    />
   </div>
 </div>

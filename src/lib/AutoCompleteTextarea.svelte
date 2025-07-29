@@ -11,6 +11,7 @@
     class?: string
     readonly?: boolean
     onValueChange?: (value: string) => void
+    onkeydown?: (event: KeyboardEvent) => void
   }
 
   let {
@@ -19,7 +20,8 @@
     placeholder = 'Enter text...',
     class: className = '',
     readonly = false,
-    onValueChange
+    onValueChange,
+    onkeydown
   }: Props = $props()
 
   let textareaElement: HTMLTextAreaElement
@@ -166,34 +168,6 @@
     }, 0)
   }
 
-  function handleKeydown(event: KeyboardEvent) {
-    if (!showSuggestions) return
-
-    switch (event.key) {
-      case 'ArrowDown':
-        event.preventDefault()
-        selectedSuggestionIndex = Math.min(selectedSuggestionIndex + 1, suggestions.length - 1)
-        break
-      case 'ArrowUp':
-        event.preventDefault()
-        selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, -1)
-        break
-      case 'Enter':
-      case 'Tab':
-        if (selectedSuggestionIndex >= 0) {
-          event.preventDefault()
-          insertSuggestion(suggestions[selectedSuggestionIndex])
-        } else if (suggestions.length > 0) {
-          event.preventDefault()
-          insertSuggestion(suggestions[0])
-        }
-        break
-      case 'Escape':
-        showSuggestions = false
-        selectedSuggestionIndex = -1
-        break
-    }
-  }
 
   function autoResize() {
     if (textareaElement) {
@@ -226,6 +200,35 @@
       showSuggestions = false
       selectedSuggestionIndex = -1
     }, 150)
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    // Handle suggestion navigation
+    if (showSuggestions && suggestions.length > 0) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        selectedSuggestionIndex = Math.min(selectedSuggestionIndex + 1, suggestions.length - 1)
+        return
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, -1)
+        return
+      } else if (event.key === 'Tab' || event.key === 'Enter') {
+        if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < suggestions.length) {
+          event.preventDefault()
+          insertSuggestion(suggestions[selectedSuggestionIndex])
+          return
+        }
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        showSuggestions = false
+        selectedSuggestionIndex = -1
+        return
+      }
+    }
+    
+    // Call custom onkeydown handler if provided
+    onkeydown?.(event)
   }
 </script>
 
