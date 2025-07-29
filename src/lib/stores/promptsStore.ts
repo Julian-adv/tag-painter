@@ -6,6 +6,7 @@ import { savePrompts, loadPrompts } from '../utils/fileIO'
 // Minimal default data for initial store state
 const defaultPromptsData: PromptsData = {
   categories: [],
+  tags: { all: [], zone1: [], zone2: [] },
   selectedCheckpoint: null,
   useUpscale: false,
   useFaceDetailer: false,
@@ -104,6 +105,17 @@ export function updateSelectedLoras(loras: string[]) {
 
 export function updateLoraWeight(weight: number) {
   promptsData.update(data => ({ ...data, loraWeight: weight }))
+}
+
+export function updateTags(allTags: string[], zone1Tags: string[], zone2Tags: string[]) {
+  promptsData.update(data => ({ 
+    ...data, 
+    tags: { 
+      all: allTags, 
+      zone1: zone1Tags, 
+      zone2: zone2Tags 
+    } 
+  }))
 }
 
 export function reorderCategories(fromIndex: number, toIndex: number) {

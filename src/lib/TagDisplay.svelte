@@ -7,7 +7,7 @@
     tags: string[];
     placeholder?: string;
     readonly?: boolean;
-    onTagsChange?: (tags: string[]) => void;
+    onTagsChange?: () => void;
   }
 
   let {
@@ -22,7 +22,7 @@
     if (readonly) return;
 
     tags = tags.filter((tag) => tag !== tagToRemove);
-    onTagsChange?.(tags);
+    onTagsChange?.();
   }
 
   function handleKeydown(event: KeyboardEvent) {

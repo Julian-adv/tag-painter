@@ -8,9 +8,10 @@
     label: string
     placeholder: string
     tags: string[]
+    onTagsChange?: () => void
   }
 
-  let { id, label, placeholder, tags = $bindable() }: Props = $props()
+  let { id, label, placeholder, tags = $bindable(), onTagsChange }: Props = $props()
 
   let quickTagInput = $state('')
 
@@ -22,6 +23,7 @@
     if (quickTagInput.trim()) {
       tags = [...tags, quickTagInput.trim()]
       quickTagInput = ''
+      onTagsChange?.()
     }
   }
 
@@ -35,7 +37,7 @@
 
 <div>
   <label for={id} class="block text-xs font-medium text-gray-700 mb-1 text-left">{label}</label>
-  <TagDisplay {id} bind:tags {placeholder} />
+  <TagDisplay {id} bind:tags {placeholder} {onTagsChange} />
 
   <!-- Quick tag input with autocomplete -->
   <div class="mt-1">

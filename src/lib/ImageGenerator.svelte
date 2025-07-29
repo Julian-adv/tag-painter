@@ -7,17 +7,14 @@
   import TagZones from './TagZones.svelte'
   import LoraSelector from './LoraSelector.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
-  import {
-    loadSettings,
-    saveSettings as saveSettingsToFile
-  } from './utils/fileIO'
+  import { loadSettings, saveSettings as saveSettingsToFile } from './utils/fileIO'
   import { fetchCheckpoints } from './utils/comfyui'
   import { generateImage } from './utils/imageGeneration'
   import { DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
-  import { 
-    promptsData, 
-    initializePromptsStore, 
-    savePromptsData, 
+  import {
+    promptsData,
+    initializePromptsStore,
+    savePromptsData,
     autoSaveCurrentValues,
     resolveRandomValues,
     updateCheckpoint,
@@ -31,7 +28,11 @@
   let isLoading = $state(false)
   let imageUrl: string | null = $state(null)
   let currentImageFileName = $state('')
-  let progressData: ProgressData = $state({ value: 0, max: 100, currentNode: '' })
+  let progressData: ProgressData = $state({
+    value: 0,
+    max: 100,
+    currentNode: ''
+  })
   let availableCheckpoints: string[] = $state([])
   let imageViewer: { updateFileList: () => Promise<void> } | undefined
   let isGeneratingForever = $state(false)
@@ -65,7 +66,7 @@
     const checkpoints = await fetchCheckpoints()
     if (checkpoints && checkpoints.length > 0) {
       availableCheckpoints = checkpoints
-      promptsData.update(data => {
+      promptsData.update((data) => {
         if (!data.selectedCheckpoint && checkpoints.length > 0) {
           return { ...data, selectedCheckpoint: checkpoints[0] }
         }
@@ -76,7 +77,6 @@
 
   // Event handlers
   async function handleGenerate() {
-
     // Add current values to options if they're not already there
     autoSaveCurrentValues()
 
@@ -87,8 +87,8 @@
     await savePromptsData()
 
     let currentPromptsData: PromptsData
-    promptsData.subscribe(data => currentPromptsData = data)()
-    
+    promptsData.subscribe((data) => (currentPromptsData = data))()
+
     await generateImage({
       promptsData: currentPromptsData!,
       settings,
@@ -118,7 +118,7 @@
       onError: (error) => {
         console.error('Generation error:', error)
         isLoading = false
-      },
+      }
     })
   }
 
@@ -129,19 +129,19 @@
     while (isGeneratingForever && !shouldStopGeneration) {
       try {
         await handleGenerate()
-        
+
         // Wait for current generation to complete
         while (isLoading && !shouldStopGeneration) {
-          await new Promise(resolve => setTimeout(resolve, 100))
+          await new Promise((resolve) => setTimeout(resolve, 100))
         }
-        
+
         // If user pressed stop during generation, break
         if (shouldStopGeneration) {
           break
         }
-        
+
         // Small delay between generations
-        await new Promise(resolve => setTimeout(resolve, 500))
+        await new Promise((resolve) => setTimeout(resolve, 500))
       } catch (error) {
         console.error('Forever generation error:', error)
         break
@@ -164,7 +164,6 @@
     imageUrl = `/api/image?path=${encodeURIComponent(filePath)}`
     currentImageFileName = filePath
   }
-
 
   async function handleSettingsChange(newSettings: Settings) {
     settings = { ...newSettings }
@@ -195,9 +194,11 @@
   })
 </script>
 
-<main class="h-screen w-screen m-0 p-4 bg-gradient-to-br from-gray-100 to-gray-200 box-border flex flex-col">
+<main
+  class="h-screen w-screen m-0 p-4 bg-gradient-to-br from-gray-100 to-gray-200 box-border flex flex-col"
+>
   <div class="grid grid-cols-[1fr_minmax(0,832px)] gap-4 w-full h-full max-lg:grid-cols-1">
-    <section class="min-w-0 h-full overflow-hidden flex flex-col">
+    <section class="min-w-0 h-full overflow-auto flex flex-col">
       <div class="flex flex-col gap-4 w-full h-full">
         <CompositionSelector />
 
@@ -207,12 +208,12 @@
 
         <div class="flex flex-col gap-1 overflow-y-auto pr-1">
           <div class="flex flex-col gap-2">
-            <label for="checkpoint" class="font-bold text-sm text-black text-left">Checkpoint</label>
+            <label for="checkpoint" class="font-bold text-sm text-black text-left">Checkpoint</label
+            >
             <select
               id="checkpoint"
-              value={$promptsData.selectedCheckpoint || ""}
-              onchange={(e) =>
-                updateCheckpoint((e.target as HTMLSelectElement).value)}
+              value={$promptsData.selectedCheckpoint || ''}
+              onchange={(e) => updateCheckpoint((e.target as HTMLSelectElement).value)}
               class="w-full p-1 rounded border border-gray-300 text-xs bg-white box-border transition-colors duration-200 focus:outline-none focus:border-green-500 focus:shadow-[0_0_0_2px_rgba(76,175,80,0.2)]"
             >
               <option value="">Select checkpoint...</option>
@@ -237,8 +238,7 @@
               <input
                 type="checkbox"
                 checked={$promptsData.useUpscale}
-                onchange={(e) =>
-                  updateUpscale((e.target as HTMLInputElement).checked)}
+                onchange={(e) => updateUpscale((e.target as HTMLInputElement).checked)}
                 class="m-0 cursor-pointer"
               />
               Use Upscale
@@ -251,8 +251,7 @@
                 type="checkbox"
                 class="accent-sky-600 m-0 cursor-pointer"
                 checked={$promptsData.useFaceDetailer}
-                onchange={(e) =>
-                  updateFaceDetailer((e.target as HTMLInputElement).checked)}
+                onchange={(e) => updateFaceDetailer((e.target as HTMLInputElement).checked)}
               />
               Use Face Detailer
             </label>

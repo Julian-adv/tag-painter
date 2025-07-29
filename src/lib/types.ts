@@ -42,6 +42,11 @@ export interface PromptCategory {
 
 export interface PromptsData {
   categories: PromptCategory[]
+  tags: {
+    all: string[]
+    zone1: string[]
+    zone2: string[]
+  }
   selectedCheckpoint: string | null
   useUpscale: boolean
   useFaceDetailer: boolean

@@ -213,7 +213,15 @@
         event.preventDefault()
         selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, -1)
         return
-      } else if (event.key === 'Tab' || event.key === 'Enter') {
+      } else if (event.key === 'Tab') {
+        event.preventDefault()
+        // Use first suggestion if none selected, otherwise use selected one
+        const indexToUse = selectedSuggestionIndex >= 0 ? selectedSuggestionIndex : 0
+        if (indexToUse < suggestions.length) {
+          insertSuggestion(suggestions[indexToUse])
+        }
+        return
+      } else if (event.key === 'Enter') {
         if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < suggestions.length) {
           event.preventDefault()
           insertSuggestion(suggestions[selectedSuggestionIndex])

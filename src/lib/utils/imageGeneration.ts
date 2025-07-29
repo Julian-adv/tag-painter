@@ -7,7 +7,14 @@ import { connectWebSocket, type WebSocketCallbacks } from './comfyui'
 import { defaultWorkflowPrompt, FINAL_SAVE_NODE_ID, generateLoraChain } from './workflow'
 import { processPrompts } from './promptProcessing'
 import { getEffectiveCategoryValueFromResolved } from '../stores/promptsStore'
-import type { PromptsData, Settings, ProgressData, OptionItem, PromptCategory, ComfyUIWorkflow } from '$lib/types'
+import type {
+  PromptsData,
+  Settings,
+  ProgressData,
+  OptionItem,
+  PromptCategory,
+  ComfyUIWorkflow
+} from '$lib/types'
 
 export interface GenerationOptions {
   promptsData: PromptsData
@@ -73,34 +80,35 @@ export async function generateImage(options: GenerationOptions): Promise<void> {
     // Generate unique client ID
     const clientId = crypto.randomUUID()
 
-    // Split promptValue by [SEP] for regional prompting
-    const promptParts = promptValue
-      .split('[SEP]')
-      .map((part) => part.trim())
-      .filter(Boolean)
+    // Create prompt parts from tags
+    const allTagsText = promptsData.tags.all.join(', ')
+    const zone1TagsText = promptsData.tags.zone1.join(', ')
+    const zone2TagsText = promptsData.tags.zone2.join(', ')
+
+    const promptParts = [allTagsText, zone1TagsText, zone2TagsText]
 
     // Assign prompts to different nodes based on number of parts
     if (promptParts.length === 1) {
       // Single prompt mode: disable regional separation
-      workflow['12'].inputs.text = promptParts[0] // Overall base prompt
-      workflow['13'].inputs.text = '' // Left side prompt (empty)
-      workflow['51'].inputs.text = '' // Right side prompt (empty)
+      workflow['12'].inputs.text = promptParts[0] // All tags
+      workflow['13'].inputs.text = promptParts[1] // Zone1 tags
+      workflow['51'].inputs.text = promptParts[2] // Zone2 tags
       // Connect both masks to the empty mask to not apply prompt
       workflow['10'].inputs.mask_1 = ['2', 0]
       workflow['10'].inputs.mask_2 = ['2', 0]
     } else if (promptParts.length === 2) {
       // Two prompt mode: left region and base
-      workflow['12'].inputs.text = promptParts[0] // Overall base prompt
-      workflow['13'].inputs.text = promptParts[1] // Left side prompt
-      workflow['51'].inputs.text = '' // Right side prompt (empty)
+      workflow['12'].inputs.text = promptParts[0] // All tags
+      workflow['13'].inputs.text = promptParts[1] // Zone1 tags
+      workflow['51'].inputs.text = promptParts[2] // Zone2 tags
       // mask_1 uses base mask(whole), mask_2 uses empty mask
       workflow['10'].inputs.mask_1 = ['3', 0]
       workflow['10'].inputs.mask_2 = ['2', 0]
     } else {
       // Three+ prompt mode: use full regional separation
-      workflow['12'].inputs.text = promptParts[0] // Overall base prompt
-      workflow['13'].inputs.text = promptParts[1] // Left side prompt
-      workflow['51'].inputs.text = promptParts[2] || '' // Right side prompt
+      workflow['12'].inputs.text = promptParts[0] // All tags
+      workflow['13'].inputs.text = promptParts[1] // Zone1 tags
+      workflow['51'].inputs.text = promptParts[2] // Zone2 tags
       // Use left and inverted masks for regional prompting
       workflow['10'].inputs.mask_1 = ['87', 0]
       workflow['10'].inputs.mask_2 = ['88', 0]
