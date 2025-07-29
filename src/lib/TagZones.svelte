@@ -2,9 +2,9 @@
 <script lang="ts">
   import TagInput from './TagInput.svelte'
   
-  let allTags = $state('')
-  let firstZoneTags = $state('')
-  let secondZoneTags = $state('')
+  let allTags = $state<string[]>([])
+  let firstZoneTags = $state<string[]>([])
+  let secondZoneTags = $state<string[]>([])
 </script>
 
 <div class="h-full flex flex-col">
@@ -18,21 +18,21 @@
       id="all-tags"
       label="All" 
       placeholder="Enter tags for all zones..."
-      bind:value={allTags}
+      bind:tags={allTags}
     />
     
     <TagInput 
       id="first-zone-tags"
       label="First Zone" 
       placeholder="Enter tags for first zone..."
-      bind:value={firstZoneTags}
+      bind:tags={firstZoneTags}
     />
     
     <TagInput 
       id="second-zone-tags"
       label="Second Zone" 
       placeholder="Enter tags for second zone..."
-      bind:value={secondZoneTags}
+      bind:tags={secondZoneTags}
     />
   </div>
 </div>

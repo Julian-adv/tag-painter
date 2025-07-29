@@ -1,30 +1,30 @@
 <!-- Component for individual tag input zone -->
 <script lang="ts">
   import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
+  import TagDisplay from './TagDisplay.svelte'
 
   interface Props {
     id: string
     label: string
     placeholder: string
-    value: string
+    tags: string[]
   }
 
-  let { id, label, placeholder, value = $bindable() }: Props = $props()
-  
+  let { id, label, placeholder, tags = $bindable() }: Props = $props()
+
   let quickTagInput = $state('')
-  
+
   function handleQuickTagChange(newValue: string) {
     quickTagInput = newValue
   }
-  
+
   function addQuickTagToMain() {
     if (quickTagInput.trim()) {
-      const separator = value ? ', ' : ''
-      value = value + separator + quickTagInput.trim()
+      tags = [...tags, quickTagInput.trim()]
       quickTagInput = ''
     }
   }
-  
+
   function handleQuickTagKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
@@ -34,17 +34,11 @@
 </script>
 
 <div>
-  <label for={id} class="block text-xs font-medium text-gray-700 mb-2 text-left">{label}</label>
-  <textarea 
-    {id}
-    bind:value
-    class="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-    rows="6"
-    {placeholder}
-  ></textarea>
-  
+  <label for={id} class="block text-xs font-medium text-gray-700 mb-1 text-left">{label}</label>
+  <TagDisplay {id} bind:tags {placeholder} />
+
   <!-- Quick tag input with autocomplete -->
-  <div class="mt-2">
+  <div class="mt-1">
     <AutoCompleteTextarea
       id={`${id}-quick`}
       bind:value={quickTagInput}
