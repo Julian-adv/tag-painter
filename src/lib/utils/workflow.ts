@@ -5,7 +5,11 @@ export const FINAL_SAVE_NODE_ID = 'final_save_output' // Consistent ID for our d
 import type { ComfyUIWorkflow } from '$lib/types'
 
 // Dynamic LoRA chain generation
-export function generateLoraChain(selectedLoras: string[], workflow: ComfyUIWorkflow, loraWeight: number = 0.8) {
+export function generateLoraChain(
+  selectedLoras: string[],
+  workflow: ComfyUIWorkflow,
+  loraWeight: number = 0.8
+) {
   // Remove existing LoRA nodes (70-85)
   for (let i = 70; i <= 85; i++) {
     delete workflow[i.toString()]
@@ -24,7 +28,7 @@ export function generateLoraChain(selectedLoras: string[], workflow: ComfyUIWork
 
   selectedLoras.forEach((lora, index) => {
     const nodeId = (70 + index).toString()
-    
+
     workflow[nodeId] = {
       inputs: {
         lora_name: lora,
@@ -51,8 +55,8 @@ export function generateLoraChain(selectedLoras: string[], workflow: ComfyUIWork
 function updateLoraReferences(workflow: ComfyUIWorkflow, targetNodeId: string) {
   // Update all nodes that were referencing '85' to use the target node
   const nodesToUpdate = ['10', '12', '13', '18', '51', '56', '69']
-  
-  nodesToUpdate.forEach(nodeId => {
+
+  nodesToUpdate.forEach((nodeId) => {
     if (workflow[nodeId] && workflow[nodeId].inputs) {
       if (workflow[nodeId].inputs.model && Array.isArray(workflow[nodeId].inputs.model)) {
         workflow[nodeId].inputs.model = [targetNodeId, 0]
@@ -211,9 +215,9 @@ export const defaultWorkflowPrompt = {
   },
   '56': {
     inputs: {
-      guide_size: 512,
+      guide_size: 1024,
       guide_size_for: true,
-      max_size: 1024,
+      max_size: 1536,
       seed: 136661438945910,
       steps: 15,
       cfg: 4.5,

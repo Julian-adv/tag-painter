@@ -84,6 +84,7 @@ export async function generateImage(options: GenerationOptions): Promise<void> {
     const allTagsText = promptsData.tags.all.join(', ')
     const zone1TagsText = promptsData.tags.zone1.join(', ')
     const zone2TagsText = promptsData.tags.zone2.join(', ')
+    const negativeTagsText = promptsData.tags.negative.join(', ')
 
     const promptParts = [allTagsText, zone1TagsText, zone2TagsText]
 
@@ -114,8 +115,11 @@ export async function generateImage(options: GenerationOptions): Promise<void> {
       workflow['10'].inputs.mask_2 = ['88', 0]
     }
 
-    // Set negative prompt
-    workflow['18'].inputs.text = negativePrompt
+    // Set negative prompt - combine existing negative prompt with negative tags
+    const combinedNegativePrompt = negativeTagsText 
+      ? `${negativePrompt}, ${negativeTagsText}` 
+      : negativePrompt
+    workflow['18'].inputs.text = combinedNegativePrompt
 
     // Get mask image path from server-side API
     const maskResponse = await fetch('/api/mask-path')

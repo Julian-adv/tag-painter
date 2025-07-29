@@ -46,6 +46,7 @@ export interface PromptsData {
     all: string[]
     zone1: string[]
     zone2: string[]
+    negative: string[]
   }
   selectedCheckpoint: string | null
   useUpscale: boolean

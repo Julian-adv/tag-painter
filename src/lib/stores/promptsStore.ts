@@ -6,7 +6,7 @@ import { savePrompts, loadPrompts } from '../utils/fileIO'
 // Minimal default data for initial store state
 const defaultPromptsData: PromptsData = {
   categories: [],
-  tags: { all: [], zone1: [], zone2: [] },
+  tags: { all: [], zone1: [], zone2: [], negative: [] },
   selectedCheckpoint: null,
   useUpscale: false,
   useFaceDetailer: false,
@@ -24,7 +24,17 @@ export const resolvedRandomValues = writable<Record<string, OptionItem>>({})
 export async function initializePromptsStore() {
   const savedPrompts = await loadPrompts()
   if (savedPrompts) {
-    promptsData.set(savedPrompts)
+    // Ensure backward compatibility - add missing negative tags field
+    const migratedData = {
+      ...savedPrompts,
+      tags: {
+        all: savedPrompts.tags?.all || [],
+        zone1: savedPrompts.tags?.zone1 || [],
+        zone2: savedPrompts.tags?.zone2 || [],
+        negative: savedPrompts.tags?.negative || []
+      }
+    }
+    promptsData.set(migratedData)
   } else {
     // If API fails, at least we have an empty structure
     console.warn('Failed to load prompts from API')
@@ -107,13 +117,14 @@ export function updateLoraWeight(weight: number) {
   promptsData.update(data => ({ ...data, loraWeight: weight }))
 }
 
-export function updateTags(allTags: string[], zone1Tags: string[], zone2Tags: string[]) {
+export function updateTags(allTags: string[], zone1Tags: string[], zone2Tags: string[], negativeTags: string[] = []) {
   promptsData.update(data => ({ 
     ...data, 
     tags: { 
       all: allTags, 
       zone1: zone1Tags, 
-      zone2: zone2Tags 
+      zone2: zone2Tags,
+      negative: negativeTags
     } 
   }))
 }

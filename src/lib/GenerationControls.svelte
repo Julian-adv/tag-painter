@@ -42,7 +42,7 @@
   }
 </script>
 
-<div class="flex flex-col gap-0 w-full mt-4">
+<div class="flex flex-col gap-0 w-full mt-2">
   <div class="flex gap-4 items-center justify-center">
     <button
       class="px-3 py-1.5 text-white border-none rounded-md text-sm font-semibold cursor-pointer transition-all duration-200 h-9 bg-sky-500 hover:enabled:bg-sky-500 hover:enabled:-translate-y-0.5 hover:enabled:shadow-lg active:enabled:translate-y-0 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
@@ -85,9 +85,12 @@
       {isLoading ? Math.round((progressData.value / progressData.max) * 100) : 0}%
     </span>
   </div>
-  
+
   <!-- Current node container - always present to maintain height -->
-  <div class="text-xs text-gray-500 text-left italic min-h-[1.2em] opacity-0" class:!opacity-100={isLoading && progressData.currentNode}>
+  <div
+    class="text-xs text-gray-500 text-left italic min-h-[1.2em] opacity-0"
+    class:!opacity-100={isLoading && progressData.currentNode}
+  >
     {progressData.currentNode || 'Ready'}
   </div>
 </div>
@@ -98,4 +101,3 @@
   onClose={closeSettingsDialog}
   onSave={handleSettingsChange}
 />
-

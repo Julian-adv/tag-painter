@@ -42,7 +42,7 @@ export async function POST({ request }) {
     // Clean the data to remove unnecessary fields like placeholder, rows, etc.
     const cleanedData: PromptsData = {
       categories: data.categories.map(cleanCategoryData),
-      tags: data.tags || { all: [], zone1: [], zone2: [] },
+      tags: data.tags || { all: [], zone1: [], zone2: [], negative: [] },
       selectedCheckpoint: data.selectedCheckpoint,
       useUpscale: data.useUpscale,
       useFaceDetailer: data.useFaceDetailer,
@@ -111,7 +111,7 @@ export async function GET() {
     if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
       const defaultPrompts: PromptsData = {
         categories: createDefaultCategories(),
-        tags: { all: [], zone1: [], zone2: [] },
+        tags: { all: [], zone1: [], zone2: [], negative: [] },
         selectedCheckpoint: null,
         useUpscale: true,
         useFaceDetailer: true,
