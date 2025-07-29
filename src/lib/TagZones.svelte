@@ -5,42 +5,47 @@
   let secondZoneTags = $state('')
 </script>
 
-<div class="border-b border-gray-200">
-  <h3 class="text-sm font-medium text-gray-800 p-2 text-left">Tags</h3>
-</div>
+<div class="h-full flex flex-col">
+  <div>
+    <h3 class="text-sm font-medium text-gray-800 p-2 text-left">Tags</h3>
+  </div>
 
-<!-- Tag zones input sections -->
-<div class="space-y-4 p-2">
+  <!-- Tag zones input sections -->
+  <div class="flex-1 space-y-4 p-2 overflow-y-auto">
   <!-- All tags section -->
   <div>
-    <label class="block text-sm font-medium text-gray-700 mb-2">All</label>
+    <label for="all-tags" class="block text-xs font-medium text-gray-700 mb-2 text-left">All</label>
     <textarea 
+      id="all-tags"
       bind:value={allTags}
       class="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-      rows="3"
+      rows="6"
       placeholder="Enter tags for all zones..."
     ></textarea>
   </div>
 
   <!-- First Zone section -->
   <div>
-    <label class="block text-sm font-medium text-gray-700 mb-2">First Zone</label>
+    <label for="first-zone-tags" class="block text-xs font-medium text-gray-700 mb-2 text-left">First Zone</label>
     <textarea 
+      id="first-zone-tags"
       bind:value={firstZoneTags}
       class="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-      rows="3"
+      rows="6"
       placeholder="Enter tags for first zone..."
     ></textarea>
   </div>
 
   <!-- Second Zone section -->
   <div>
-    <label class="block text-sm font-medium text-gray-700 mb-2">Second Zone</label>
+    <label for="second-zone-tags" class="block text-xs font-medium text-gray-700 mb-2 text-left">Second Zone</label>
     <textarea 
+      id="second-zone-tags"
       bind:value={secondZoneTags}
       class="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-      rows="3"
+      rows="6"
       placeholder="Enter tags for second zone..."
     ></textarea>
+  </div>
   </div>
 </div>

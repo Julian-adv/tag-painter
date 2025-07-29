@@ -2,8 +2,10 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte'
   import ImageViewer from './ImageViewer.svelte'
-  import PromptForm from './PromptForm.svelte'
   import GenerationControls from './GenerationControls.svelte'
+  import CompositionSelector from './CompositionSelector.svelte'
+  import TagZones from './TagZones.svelte'
+  import LoraSelector from './LoraSelector.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import {
     loadSettings,
@@ -17,7 +19,12 @@
     initializePromptsStore, 
     savePromptsData, 
     autoSaveCurrentValues,
-    resolveRandomValues
+    resolveRandomValues,
+    updateCheckpoint,
+    updateUpscale,
+    updateFaceDetailer,
+    updateSelectedLoras,
+    updateLoraWeight
   } from './stores/promptsStore'
 
   // Component state
@@ -29,7 +36,6 @@
   let imageViewer: { updateFileList: () => Promise<void> } | undefined
   let isGeneratingForever = $state(false)
   let shouldStopGeneration = $state(false)
-  let disabledCategoryIds = $state<Set<string>>(new Set())
 
   // Settings state
   let settings: Settings = $state({
@@ -70,8 +76,6 @@
 
   // Event handlers
   async function handleGenerate() {
-    // Clear previous disabled categories before new generation
-    disabledCategoryIds = new Set()
 
     // Add current values to options if they're not already there
     autoSaveCurrentValues()
@@ -115,10 +119,6 @@
         console.error('Generation error:', error)
         isLoading = false
       },
-      onCategoriesDisabled: (excludedCategories) => {
-        // Update disabled categories set for visual feedback
-        disabledCategoryIds = new Set(excludedCategories.map(cat => cat.id))
-      }
     })
   }
 
@@ -178,6 +178,15 @@
     }
   }
 
+  // PromptForm functions
+  function handleLoraChange(loras: string[]) {
+    updateSelectedLoras(loras)
+  }
+
+  function handleLoraWeightChange(weight: number) {
+    updateLoraWeight(weight)
+  }
+
   // Cleanup
   onDestroy(() => {
     if (imageUrl && imageUrl.startsWith('blob:')) {
@@ -186,10 +195,70 @@
   })
 </script>
 
-<main class="prompt-input">
-  <div class="content-grid">
-    <section class="form-section">
-      <PromptForm {availableCheckpoints} />
+<main class="h-screen w-screen m-0 p-4 bg-gradient-to-br from-gray-100 to-gray-200 box-border flex flex-col">
+  <div class="grid grid-cols-[1fr_minmax(0,832px)] gap-4 w-full h-full max-lg:grid-cols-1">
+    <section class="min-w-0 h-full overflow-hidden flex flex-col">
+      <div class="flex flex-col gap-4 w-full h-full">
+        <CompositionSelector />
+
+        <div class="flex-1 min-h-0">
+          <TagZones />
+        </div>
+
+        <div class="flex flex-col gap-1 overflow-y-auto pr-1">
+          <div class="flex flex-col gap-2">
+            <label for="checkpoint" class="font-bold text-sm text-black text-left">Checkpoint</label>
+            <select
+              id="checkpoint"
+              value={$promptsData.selectedCheckpoint || ""}
+              onchange={(e) =>
+                updateCheckpoint((e.target as HTMLSelectElement).value)}
+              class="w-full p-1 rounded border border-gray-300 text-xs bg-white box-border transition-colors duration-200 focus:outline-none focus:border-green-500 focus:shadow-[0_0_0_2px_rgba(76,175,80,0.2)]"
+            >
+              <option value="">Select checkpoint...</option>
+              {#each availableCheckpoints as checkpoint (checkpoint)}
+                <option value={checkpoint}>{checkpoint}</option>
+              {/each}
+            </select>
+          </div>
+
+          <!-- LoRA Selector -->
+          <div class="flex flex-col gap-2">
+            <LoraSelector
+              selectedLoras={$promptsData.selectedLoras}
+              onLoraChange={handleLoraChange}
+              loraWeight={$promptsData.loraWeight}
+              onWeightChange={handleLoraWeightChange}
+            />
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <label class="flex flex-row items-center gap-2 cursor-pointer font-normal text-xs">
+              <input
+                type="checkbox"
+                checked={$promptsData.useUpscale}
+                onchange={(e) =>
+                  updateUpscale((e.target as HTMLInputElement).checked)}
+                class="m-0 cursor-pointer"
+              />
+              Use Upscale
+            </label>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <label class="flex flex-row items-center gap-2 cursor-pointer font-normal text-xs">
+              <input
+                type="checkbox"
+                class="accent-sky-600 m-0 cursor-pointer"
+                checked={$promptsData.useFaceDetailer}
+                onchange={(e) =>
+                  updateFaceDetailer((e.target as HTMLInputElement).checked)}
+              />
+              Use Face Detailer
+            </label>
+          </div>
+        </div>
+      </div>
 
       <GenerationControls
         {isLoading}
@@ -203,7 +272,7 @@
       />
     </section>
 
-    <section class="image-section">
+    <section class="min-w-0">
       <ImageViewer
         bind:this={imageViewer}
         {imageUrl}
@@ -221,43 +290,5 @@
     padding: 0;
     width: 100%;
     overflow-x: hidden;
-  }
-
-  .prompt-input {
-    min-height: 100vh;
-    width: 100vw;
-    margin: 0;
-    padding: 1rem;
-    background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
-    box-sizing: border-box;
-  }
-
-  .content-grid {
-    display: grid;
-    grid-template-columns: 1fr minmax(0, 832px);
-    gap: 1rem;
-    width: 100%;
-    height: calc(100vh - 2rem);
-  }
-
-  @media (max-width: 1024px) {
-    .content-grid {
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-  }
-
-  .form-section {
-    min-width: 0;
-  }
-
-  .image-section {
-    min-width: 0;
-  }
-
-  @media (max-width: 768px) {
-    .prompt-input {
-      padding: 1rem;
-    }
   }
 </style>

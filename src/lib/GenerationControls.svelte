@@ -42,10 +42,10 @@
   }
 </script>
 
-<div class="generation-controls">
-  <div class="controls-row">
+<div class="flex flex-col gap-0 w-full mt-4">
+  <div class="flex gap-4 items-center justify-center">
     <button
-      class="generate-btn bg-sky-500"
+      class="px-3 py-1.5 text-white border-none rounded-md text-sm font-semibold cursor-pointer transition-all duration-200 h-9 bg-sky-500 hover:enabled:bg-sky-500 hover:enabled:-translate-y-0.5 hover:enabled:shadow-lg active:enabled:translate-y-0 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
       onclick={onGenerate}
       disabled={isLoading || isGeneratingForever}
     >
@@ -53,7 +53,7 @@
     </button>
 
     <button
-      class="generate-forever-btn border border-sky-200 bg-sky-50 text-sky-400 hover:not-disabled:bg-sky-200 disabled:text-sky-100"
+      class="flex items-center justify-center w-9 h-9 border border-sky-200 bg-sky-50 text-sky-400 rounded-md cursor-pointer transition-all duration-200 hover:enabled:bg-sky-200 hover:enabled:-translate-y-0.5 hover:enabled:shadow-lg active:enabled:translate-y-0 disabled:text-sky-100 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
       onclick={isGeneratingForever ? onStopGeneration : onGenerateForever}
       disabled={isLoading && !isGeneratingForever}
     >
@@ -65,7 +65,7 @@
     </button>
 
     <button
-      class="settings-btn"
+      class="flex items-center justify-center w-9 h-9 bg-gray-100 border border-gray-300 text-gray-600 rounded-md cursor-pointer transition-all duration-200 hover:enabled:bg-gray-200 hover:enabled:-translate-y-0.5 hover:enabled:shadow-lg active:enabled:translate-y-0 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
       onclick={openSettingsDialog}
       disabled={isLoading}
       aria-label="Settings"
@@ -73,24 +73,23 @@
     </button>
   </div>
 
-  {#if isLoading}
-    <div class="progress-container">
-      <div class="progress-bar">
-        <div
-          class="progress-fill"
-          style="width: {(progressData.value / progressData.max) * 100}%"
-        ></div>
-      </div>
-      <span class="progress-text">
-        {Math.round((progressData.value / progressData.max) * 100)}%
-      </span>
+  <!-- Progress container - always present to maintain height -->
+  <div class="flex items-center gap-4 mt-2 opacity-0" class:!opacity-100={isLoading}>
+    <div class="flex-1 h-2 bg-gray-100 rounded overflow-hidden">
+      <div
+        class="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-100 ease-out"
+        style="width: {isLoading ? (progressData.value / progressData.max) * 100 : 0}%"
+      ></div>
     </div>
-    {#if progressData.currentNode}
-      <div class="current-node">
-        {progressData.currentNode}
-      </div>
-    {/if}
-  {/if}
+    <span class="text-sm font-medium text-gray-600 min-w-[40px] text-right">
+      {isLoading ? Math.round((progressData.value / progressData.max) * 100) : 0}%
+    </span>
+  </div>
+  
+  <!-- Current node container - always present to maintain height -->
+  <div class="text-xs text-gray-500 text-left italic min-h-[1.2em] opacity-0" class:!opacity-100={isLoading && progressData.currentNode}>
+    {progressData.currentNode || 'Ready'}
+  </div>
 </div>
 
 <SettingsDialog
@@ -100,140 +99,3 @@
   onSave={handleSettingsChange}
 />
 
-<style>
-  .generation-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 0rem;
-    width: 100%;
-    margin-top: 1rem;
-  }
-
-  .controls-row {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .generate-btn {
-    padding: 0.375rem 0.75rem;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    height: 36px;
-  }
-
-  .generate-btn:hover:not(:disabled) {
-    background: var(--color-sky-500);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  }
-
-  .generate-btn:active:not(:disabled) {
-    transform: translateY(0);
-  }
-
-  .generate-btn:disabled {
-    background: #cccccc;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-  }
-
-  .generate-forever-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.375rem;
-    border-radius: 6px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    width: 36px;
-    height: 36px;
-  }
-
-  .generate-forever-btn:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  }
-
-  .generate-forever-btn:active:not(:disabled) {
-    transform: translateY(0);
-  }
-
-  .generate-forever-btn:disabled {
-    background: #cccccc;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-  }
-
-  .settings-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.375rem;
-    background: #f5f5f5;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    width: 36px;
-    height: 36px;
-  }
-
-  .settings-btn:hover:not(:disabled) {
-    background: #e9e9e9;
-    border-color: #bbb;
-  }
-
-  .settings-btn:disabled {
-    background: #f9f9f9;
-    color: #999;
-    cursor: not-allowed;
-  }
-
-  .progress-container {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-top: 0.5rem;
-  }
-
-  .progress-bar {
-    flex: 1;
-    height: 8px;
-    background: #f0f0f0;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #2196f3, #1976d2);
-    transition: width 0.1s ease;
-  }
-
-  .progress-text {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #666;
-    min-width: 40px;
-    text-align: right;
-  }
-
-  .current-node {
-    font-size: 0.75rem;
-    color: #999;
-    text-align: left;
-    font-style: italic;
-  }
-</style>
