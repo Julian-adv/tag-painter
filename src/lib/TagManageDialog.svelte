@@ -38,12 +38,13 @@
     // Save as custom tag if user entered a name
     if (newTagInput.trim()) {
       const customTagName = newTagInput.trim()
+      const currentDialogTags = [...dialogTags] // Create a snapshot
       
       // Save the custom tag
-      await saveCustomTag(customTagName, dialogTags)
+      await saveCustomTag(customTagName, currentDialogTags)
       
       // Pass the custom tag name and original tags to parent for processing
-      onSave(customTagName, dialogTags)
+      onSave(customTagName, currentDialogTags)
       
       isOpen = false
     }

@@ -1,6 +1,7 @@
 <!-- Component for individual tag input zone -->
 <script lang="ts">
   import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
+  import { isCustomTag } from './stores/tagsStore'
   import TagDisplay from './TagDisplay.svelte'
   import TagManageDialog from './TagManageDialog.svelte'
   import { Plus } from 'svelte-heros-v2'
@@ -41,12 +42,13 @@
     showDialog = true
   }
 
-  function handleDialogSave(customTagName: string, originalTags: string[]) {
+  async function handleDialogSave(customTagName: string, originalTags: string[]) {
     // New custom tag was created
     // Remove individual tags that are now part of the custom tag from current tags
-    const filteredTags = tags.filter(tag => !originalTags.includes(tag))
+    const filteredTags = tags.filter((tag) => !originalTags.includes(tag))
     // Add the new custom tag
     tags = [...filteredTags, customTagName]
+    
     onTagsChange?.()
   }
 
