@@ -7,7 +7,7 @@
     isOpen: boolean
     title: string
     tags: string[]
-    onSave: (tags: string[]) => void
+    onSave: (customTagName: string, originalTags: string[]) => void
     onCancel: () => void
   }
 
@@ -37,11 +37,16 @@
   function handleSave() {
     // Save as custom tag if user entered a name
     if (newTagInput.trim()) {
-      saveCustomTag(newTagInput.trim(), dialogTags)
+      const customTagName = newTagInput.trim()
+      
+      // Save the custom tag
+      saveCustomTag(customTagName, dialogTags)
+      
+      // Pass the custom tag name and original tags to parent for processing
+      onSave(customTagName, dialogTags)
+      
+      isOpen = false
     }
-    
-    onSave(dialogTags)
-    isOpen = false
   }
 
   function handleCancel() {

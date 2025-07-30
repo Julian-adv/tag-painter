@@ -41,8 +41,12 @@
     showDialog = true
   }
 
-  function handleDialogSave(newTags: string[]) {
-    tags = newTags
+  function handleDialogSave(customTagName: string, originalTags: string[]) {
+    // New custom tag was created
+    // Remove individual tags that are now part of the custom tag from current tags
+    const filteredTags = tags.filter(tag => !originalTags.includes(tag))
+    // Add the new custom tag
+    tags = [...filteredTags, customTagName]
     onTagsChange?.()
   }
 
