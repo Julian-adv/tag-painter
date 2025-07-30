@@ -1,6 +1,6 @@
 <!-- Component for selecting image composition layouts -->
 <script lang="ts">
-  let selectedComposition = $state<string | null>(null)
+  import { promptsData, updateComposition } from './stores/promptsStore'
 
   const compositions = [
     { id: 'left-horizontal', src: '/left-horizontal-mask.png', alt: 'Left Horizontal' },
@@ -10,7 +10,7 @@
   ]
 
   function selectComposition(compositionId: string) {
-    selectedComposition = selectedComposition === compositionId ? null : compositionId
+    updateComposition(compositionId)
   }
 </script>
 
@@ -20,7 +20,7 @@
     {#each compositions as composition (composition.id)}
       <button
         type="button"
-        class="border-2 border-transparent rounded-lg p-1 cursor-pointer transition-all duration-200 flex items-center justify-center hover:border-sky-300 hover:bg-sky-50 {selectedComposition ===
+        class="border-2 border-transparent rounded-lg p-1 cursor-pointer transition-all duration-200 flex items-center justify-center hover:border-sky-300 hover:bg-sky-50 {$promptsData.selectedComposition ===
         composition.id
           ? 'border-sky-500 bg-sky-200'
           : ''}"

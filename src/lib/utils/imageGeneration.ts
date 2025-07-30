@@ -87,8 +87,11 @@ export async function generateImage(options: GenerationOptions): Promise<void> {
     // Set negative prompt from negative tags
     workflow['18'].inputs.text = negativeTagsText
 
-    // Get mask image path from server-side API
-    const maskResponse = await fetch('/api/mask-path')
+    // Get mask image path from server-side API with selected composition
+    const maskResponse = await fetch(`/api/mask-path?composition=${encodeURIComponent(promptsData.selectedComposition)}`)
+    if (!maskResponse.ok) {
+      throw new Error(`Failed to get mask path: ${maskResponse.statusText}`)
+    }
     const { maskImagePath } = await maskResponse.json()
     workflow['86'].inputs.image = maskImagePath
 

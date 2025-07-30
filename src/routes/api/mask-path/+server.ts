@@ -1,12 +1,20 @@
 import { json } from '@sveltejs/kit'
 import path from 'path'
-import { cwd } from 'process'
+import type { RequestHandler } from './$types'
 
-export async function GET() {
+export const GET: RequestHandler = async ({ url }) => {
   try {
-    const maskImagePath = path.join(cwd(), 'static', 'left-horizontal-mask.png')
+    const composition = url.searchParams.get('composition')
+    if (!composition) {
+      return json({ error: 'Composition parameter is required' }, { status: 400 })
+    }
+
+    // Generate absolute path for the mask image based on composition
+    const maskImagePath = path.resolve(process.cwd(), 'static', `${composition}-mask.png`)
+    
     return json({ maskImagePath })
-  } catch {
+  } catch (error) {
+    console.error('Error resolving mask path:', error)
     return json({ error: 'Failed to resolve mask path' }, { status: 500 })
   }
 }

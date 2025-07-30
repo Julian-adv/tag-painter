@@ -49,6 +49,7 @@ export interface PromptsData {
     negative: string[]
   }
   selectedCheckpoint: string | null
+  selectedComposition: string
   useUpscale: boolean
   useFaceDetailer: boolean
   selectedLoras: string[]

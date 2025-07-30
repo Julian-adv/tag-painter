@@ -8,6 +8,7 @@ const defaultPromptsData: PromptsData = {
   categories: [],
   tags: { all: [], zone1: [], zone2: [], negative: [] },
   selectedCheckpoint: null,
+  selectedComposition: 'left-horizontal',
   useUpscale: false,
   useFaceDetailer: false,
   selectedLoras: [],
@@ -24,7 +25,7 @@ export const resolvedRandomValues = writable<Record<string, OptionItem>>({})
 export async function initializePromptsStore() {
   const savedPrompts = await loadPrompts()
   if (savedPrompts) {
-    // Ensure backward compatibility - add missing negative tags field
+    // Ensure backward compatibility - add missing fields
     const migratedData = {
       ...savedPrompts,
       tags: {
@@ -32,7 +33,8 @@ export async function initializePromptsStore() {
         zone1: savedPrompts.tags?.zone1 || [],
         zone2: savedPrompts.tags?.zone2 || [],
         negative: savedPrompts.tags?.negative || []
-      }
+      },
+      selectedComposition: savedPrompts.selectedComposition || 'left-horizontal'
     }
     promptsData.set(migratedData)
   } else {
@@ -99,6 +101,10 @@ export function updateCategory(categoryId: string, updates: Partial<PromptCatego
 
 export function updateCheckpoint(checkpoint: string) {
   promptsData.update(data => ({ ...data, selectedCheckpoint: checkpoint }))
+}
+
+export function updateComposition(composition: string) {
+  promptsData.update(data => ({ ...data, selectedComposition: composition }))
 }
 
 export function updateUpscale(enabled: boolean) {
