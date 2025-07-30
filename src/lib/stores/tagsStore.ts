@@ -4,6 +4,7 @@ import { get, writable } from 'svelte/store'
 
 let tags: string[] = []
 export const combinedTags = writable<string[]>([])
+let initPromise: Promise<void> | null = null
 
 export async function initTags(): Promise<void> {
   // Return cached tags if already loaded
@@ -12,15 +13,26 @@ export async function initTags(): Promise<void> {
     return
   }
 
-  // Fetch regular tags and cache them
-  try {
-    const response = await fetch('/api/tags')
-    tags = await response.json()
-    await updateCombinedTags()
-  } catch (error) {
-    console.error('Failed to load tags:', error)
-    await updateCombinedTags()
+  // If already initializing, return the existing promise
+  if (initPromise) {
+    return initPromise
   }
+
+  // Create and cache the initialization promise
+  initPromise = (async () => {
+    try {
+      const response = await fetch('/api/tags')
+      tags = await response.json()
+      await updateCombinedTags()
+    } catch (error) {
+      console.error('Failed to load tags:', error)
+      await updateCombinedTags()
+    } finally {
+      initPromise = null // Reset promise after completion
+    }
+  })()
+
+  return initPromise
 }
 
 export async function updateCombinedTags(): Promise<string[]> {
