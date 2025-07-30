@@ -33,7 +33,7 @@
   </div>
 
   <!-- Tag zones input sections -->
-  <div class="flex-1 space-y-4 p-2 overflow-y-auto border-y-1 border-gray-300">
+  <div class="flex-1 space-y-4 p-2 overflow-y-auto border-y-1 border-gray-300 tags-scroll">
     <TagInput
       id="all-tags"
       label="All"
@@ -67,3 +67,28 @@
     />
   </div>
 </div>
+
+<style>
+  .tags-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+  }
+
+  .tags-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .tags-scroll::-webkit-scrollbar-track {
+    background: #f7fafc;
+    border-radius: 3px;
+  }
+
+  .tags-scroll::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 3px;
+  }
+
+  .tags-scroll::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+  }
+</style>
