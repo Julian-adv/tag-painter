@@ -5,13 +5,7 @@
 import { saveImage } from './fileIO'
 import { connectWebSocket, type WebSocketCallbacks } from './comfyui'
 import { defaultWorkflowPrompt, FINAL_SAVE_NODE_ID, generateLoraChain } from './workflow'
-import type {
-  PromptsData,
-  Settings,
-  ProgressData,
-  OptionItem,
-  ComfyUIWorkflow
-} from '$lib/types'
+import type { PromptsData, Settings, ProgressData, OptionItem, ComfyUIWorkflow } from '$lib/types'
 
 export interface GenerationOptions {
   promptsData: PromptsData
@@ -22,6 +16,23 @@ export interface GenerationOptions {
   onProgressUpdate: (progress: ProgressData) => void
   onImageReceived: (imageBlob: Blob, filePath: string) => void
   onError: (error: string) => void
+}
+
+// Expand custom tags to their constituent tags
+function expandCustomTags(tags: string[], customTags: Record<string, string[]>): string[] {
+  const expandedTags: string[] = []
+
+  for (const tag of tags) {
+    if (tag in customTags) {
+      // This is a custom tag, expand it to its constituent tags
+      expandedTags.push(...customTags[tag])
+    } else {
+      // This is a regular tag, keep as is
+      expandedTags.push(tag)
+    }
+  }
+
+  return expandedTags
 }
 
 export async function generateImage(options: GenerationOptions): Promise<void> {
@@ -49,11 +60,16 @@ export async function generateImage(options: GenerationOptions): Promise<void> {
     // Generate unique client ID
     const clientId = crypto.randomUUID()
 
-    // Create prompt parts from tags
-    const allTagsText = promptsData.tags.all.join(', ')
-    const zone1TagsText = promptsData.tags.zone1.join(', ')
-    const zone2TagsText = promptsData.tags.zone2.join(', ')
-    const negativeTagsText = promptsData.tags.negative.join(', ')
+    // Expand custom tags and create prompt parts
+    const expandedAllTags = expandCustomTags(promptsData.tags.all, promptsData.customTags)
+    const expandedZone1Tags = expandCustomTags(promptsData.tags.zone1, promptsData.customTags)
+    const expandedZone2Tags = expandCustomTags(promptsData.tags.zone2, promptsData.customTags)
+    const expandedNegativeTags = expandCustomTags(promptsData.tags.negative, promptsData.customTags)
+
+    const allTagsText = expandedAllTags.join(', ')
+    const zone1TagsText = expandedZone1Tags.join(', ')
+    const zone2TagsText = expandedZone2Tags.join(', ')
+    const negativeTagsText = expandedNegativeTags.join(', ')
 
     const promptParts = [allTagsText, zone1TagsText, zone2TagsText]
 
@@ -88,7 +104,9 @@ export async function generateImage(options: GenerationOptions): Promise<void> {
     workflow['18'].inputs.text = negativeTagsText
 
     // Get mask image path from server-side API with selected composition
-    const maskResponse = await fetch(`/api/mask-path?composition=${encodeURIComponent(promptsData.selectedComposition)}`)
+    const maskResponse = await fetch(
+      `/api/mask-path?composition=${encodeURIComponent(promptsData.selectedComposition)}`
+    )
     if (!maskResponse.ok) {
       throw new Error(`Failed to get mask path: ${maskResponse.statusText}`)
     }

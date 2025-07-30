@@ -1,7 +1,7 @@
 <!-- Reusable textarea component with auto-completion support -->
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { getTags, isCustomTag } from './stores/tagsStore'
+  import { initTags, isCustomTag, combinedTags } from './stores/tagsStore'
 
   interface Props {
     id?: string
@@ -25,7 +25,6 @@
   }: Props = $props()
 
   let textareaElement: HTMLTextAreaElement
-  let tags: string[] = $state([])
   let suggestions: string[] = $state([])
   let showSuggestions = $state(false)
   let selectedSuggestionIndex = $state(-1)
@@ -33,7 +32,7 @@
   let mirrorDiv: HTMLDivElement | null = null
 
   onMount(async () => {
-    tags = await getTags()
+    await initTags()
   })
 
   function getCurrentWord(): { word: string; startIndex: number } {
@@ -84,7 +83,7 @@
       return
     }
 
-    suggestions = tags.filter((tag) => tag.toLowerCase().includes(word.toLowerCase())).slice(0, 100)
+    suggestions = $combinedTags.filter((tag) => tag.toLowerCase().includes(word.toLowerCase())).slice(0, 100)
 
     showSuggestions = suggestions.length > 0
     selectedSuggestionIndex = -1
