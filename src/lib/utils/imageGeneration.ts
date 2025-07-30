@@ -5,14 +5,11 @@
 import { saveImage } from './fileIO'
 import { connectWebSocket, type WebSocketCallbacks } from './comfyui'
 import { defaultWorkflowPrompt, FINAL_SAVE_NODE_ID, generateLoraChain } from './workflow'
-import { processPrompts } from './promptProcessing'
-import { getEffectiveCategoryValueFromResolved } from '../stores/promptsStore'
 import type {
   PromptsData,
   Settings,
   ProgressData,
   OptionItem,
-  PromptCategory,
   ComfyUIWorkflow
 } from '$lib/types'
 
@@ -25,7 +22,6 @@ export interface GenerationOptions {
   onProgressUpdate: (progress: ProgressData) => void
   onImageReceived: (imageBlob: Blob, filePath: string) => void
   onError: (error: string) => void
-  onCategoriesDisabled?: (excludedCategories: PromptCategory[]) => void
 }
 
 export async function generateImage(options: GenerationOptions): Promise<void> {
@@ -37,42 +33,15 @@ export async function generateImage(options: GenerationOptions): Promise<void> {
     onLoadingChange,
     onProgressUpdate,
     onImageReceived,
-    onError,
-    onCategoriesDisabled
+    onError
   } = options
 
   // Clone the default workflow
   const workflow = JSON.parse(JSON.stringify(defaultWorkflowPrompt))
 
   try {
-    // Separate negative category from positive categories
-    const negativeCategory = promptsData.categories.find((cat) => cat.id === 'negative')
-    const positiveCategories = promptsData.categories.filter((cat) => cat.id !== 'negative')
-
-    // Process prompts through multiple passes
-    const { promptValue, excludedCategories, faceDetailerWildcard } = processPrompts(
-      positiveCategories,
-      resolvedRandomValues
-    )
-
-    // Notify about excluded categories for UI feedback
-    if (excludedCategories.length > 0 && onCategoriesDisabled) {
-      onCategoriesDisabled(excludedCategories)
-    }
-
-    // Set face detailer wildcard
-    workflow['56'].inputs.wildcard = faceDetailerWildcard
-    console.log(`face detailer wildcard: ${faceDetailerWildcard}`)
-
-    // Build the negative prompt
-    const negativePrompt = negativeCategory
-      ? getEffectiveCategoryValueFromResolved(negativeCategory, resolvedRandomValues)
-      : ''
-
-    if (!promptValue.trim()) {
-      onError('Prompt is empty')
-      return
-    }
+    // Set face detailer wildcard to empty since categories are no longer used
+    workflow['56'].inputs.wildcard = ''
 
     onLoadingChange(true)
     onProgressUpdate({ value: 0, max: 100, currentNode: '' })
@@ -115,11 +84,8 @@ export async function generateImage(options: GenerationOptions): Promise<void> {
       workflow['10'].inputs.mask_2 = ['88', 0]
     }
 
-    // Set negative prompt - combine existing negative prompt with negative tags
-    const combinedNegativePrompt = negativeTagsText 
-      ? `${negativePrompt}, ${negativeTagsText}` 
-      : negativePrompt
-    workflow['18'].inputs.text = combinedNegativePrompt
+    // Set negative prompt from negative tags
+    workflow['18'].inputs.text = negativeTagsText
 
     // Get mask image path from server-side API
     const maskResponse = await fetch('/api/mask-path')
