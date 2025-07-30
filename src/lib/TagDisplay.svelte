@@ -1,6 +1,7 @@
 <!-- Component for displaying tags as boxes with delete functionality -->
 <script lang="ts">
   import { XMark } from 'svelte-heros-v2'
+  import { isCustomTag } from './stores/tagsStore'
 
   interface Props {
     id: string
@@ -41,7 +42,7 @@
     <div class="flex flex-wrap gap-1 text-left">
       {#each tags as tag (tag)}
         <div
-          class="inline-flex items-center gap-1 pl-2 pr-1 py-1 bg-sky-100 text-sky-800 rounded-md text-sm"
+          class="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-md text-sm {isCustomTag(tag) ? 'bg-pink-100 text-pink-800' : 'bg-sky-100 text-sky-800'}"
         >
           <span class="text-left">{tag}</span>
           {#if !readonly}

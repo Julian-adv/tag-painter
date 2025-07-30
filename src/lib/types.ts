@@ -53,7 +53,7 @@ export interface PromptsData {
     zone2: string[]
     negative: string[]
   }
-  customTags: CustomTag[]
+  customTags: Record<string, string[]>
   selectedCheckpoint: string | null
   selectedComposition: string
   useUpscale: boolean

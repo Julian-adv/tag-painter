@@ -1,7 +1,7 @@
 <!-- Reusable textarea component with auto-completion support -->
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { getTags } from './stores/tagsStore'
+  import { getTags, isCustomTag } from './stores/tagsStore'
 
   interface Props {
     id?: string
@@ -265,10 +265,14 @@
       {#each suggestions as suggestion, index (suggestion)}
         <button
           type="button"
-          class="py-1.5 px-3 cursor-pointer text-sm border-none bg-none w-full text-left text-blue-600 my-0.5 transition-colors duration-150 whitespace-nowrap overflow-hidden text-ellipsis box-border hover:bg-gray-100 {index ===
+          class="py-1.5 px-3 cursor-pointer text-sm border-none bg-none w-full text-left my-0.5 transition-colors duration-150 whitespace-nowrap overflow-hidden text-ellipsis box-border hover:bg-gray-100 {index ===
           selectedSuggestionIndex
-            ? 'bg-blue-50 text-blue-700'
-            : ''}"
+            ? isCustomTag(suggestion)
+              ? 'bg-pink-50 text-pink-700'
+              : 'bg-blue-50 text-blue-700'
+            : isCustomTag(suggestion)
+              ? 'text-pink-600'
+              : 'text-blue-600'}"
           onmousedown={(e) => {
             e.preventDefault()
             insertSuggestion(suggestion)
