@@ -168,7 +168,6 @@
     }, 0)
   }
 
-
   function autoResize() {
     if (textareaElement) {
       textareaElement.style.height = 'auto'
@@ -234,13 +233,13 @@
         return
       }
     }
-    
+
     // Call custom onkeydown handler if provided
     onkeydown?.(event)
   }
 </script>
 
-<div class="textarea-container">
+<div class="relative w-full">
   <textarea
     {id}
     bind:this={textareaElement}
@@ -248,23 +247,28 @@
     {placeholder}
     {readonly}
     rows={1}
-    class="textarea {className} {readonly ? 'readonly' : ''}"
+    class="block w-full p-1 rounded border border-gray-300 text-sm resize-y box-border bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200 {readonly
+      ? 'bg-gray-100 text-gray-600 cursor-not-allowed'
+      : ''} {className}"
     oninput={handleInput}
     onclick={handleClick}
     onkeydown={handleKeydown}
     onblur={handleBlur}
-    style="resize: none; overflow: hidden; min-height: 1.5em;"
+    style="resize: none; overflow: hidden;"
   ></textarea>
 
   {#if showSuggestions}
     <div
-      class="suggestions-dropdown"
+      class="fixed bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto overflow-x-hidden z-[9999] min-w-[120px] max-w-[250px]"
       style="top: {suggestionPosition.top}px; left: {suggestionPosition.left}px;"
     >
       {#each suggestions as suggestion, index (suggestion)}
         <button
           type="button"
-          class="suggestion-item {index === selectedSuggestionIndex ? 'selected' : ''}"
+          class="py-1.5 px-3 cursor-pointer text-sm border-none bg-none w-full text-left text-blue-600 my-0.5 transition-colors duration-150 whitespace-nowrap overflow-hidden text-ellipsis box-border hover:bg-gray-100 {index ===
+          selectedSuggestionIndex
+            ? 'bg-blue-50 text-blue-700'
+            : ''}"
           onmousedown={(e) => {
             e.preventDefault()
             insertSuggestion(suggestion)
@@ -276,74 +280,3 @@
     </div>
   {/if}
 </div>
-
-<style>
-  .textarea-container {
-    position: relative;
-    width: 100%;
-  }
-
-  .textarea {
-    display: block;
-    width: 100%;
-    padding: 4px;
-    border-radius: 4px;
-    border: 1px solid #ddd;
-    font-size: 13px;
-    resize: vertical;
-    box-sizing: border-box;
-    background-color: #fff;
-  }
-
-  .textarea:focus {
-    outline: none;
-    border-color: #2196f3;
-    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
-  }
-
-  .textarea.readonly {
-    background-color: #f5f5f5;
-    color: #666;
-    cursor: not-allowed;
-  }
-
-  .suggestions-dropdown {
-    position: fixed;
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    max-height: 200px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    z-index: 9999;
-    min-width: 120px;
-    max-width: 250px;
-  }
-
-  .suggestion-item {
-    padding: 6px 12px;
-    cursor: pointer;
-    font-size: 14px;
-    border: none;
-    background: none;
-    width: 100%;
-    text-align: left;
-    color: #2c6ded;
-    margin: 2px 0;
-    transition: background-color 0.15s ease;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    box-sizing: border-box;
-  }
-
-  .suggestion-item:hover {
-    background-color: #f5f5f5;
-  }
-
-  .suggestion-item.selected {
-    background-color: #e8f4fd;
-    color: #1976d2;
-  }
-</style>

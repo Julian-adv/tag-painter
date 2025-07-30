@@ -46,7 +46,7 @@
       bind:value={quickTagInput}
       placeholder="Type tags to add (press Enter to add)..."
       rows={1}
-      class="w-full p-2 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+      class="w-full p-1 border border-gray-200 rounded text-sm focus:ring-sky-500 focus:border-sky-500"
       onValueChange={handleQuickTagChange}
       onkeydown={handleQuickTagKeydown}
     />

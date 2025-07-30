@@ -1,34 +1,28 @@
 <!-- Component for displaying tags as boxes with delete functionality -->
 <script lang="ts">
-  import { XMark } from "svelte-heros-v2";
+  import { XMark } from 'svelte-heros-v2'
 
   interface Props {
-    id: string;
-    tags: string[];
-    placeholder?: string;
-    readonly?: boolean;
-    onTagsChange?: () => void;
+    id: string
+    tags: string[]
+    placeholder?: string
+    readonly?: boolean
+    onTagsChange?: () => void
   }
 
-  let {
-    id,
-    tags = $bindable(),
-    placeholder = "",
-    readonly = false,
-    onTagsChange,
-  }: Props = $props();
+  let { id, tags = $bindable(), placeholder = '', readonly = false, onTagsChange }: Props = $props()
 
   function removeTag(tagToRemove: string) {
-    if (readonly) return;
+    if (readonly) return
 
-    tags = tags.filter((tag) => tag !== tagToRemove);
-    onTagsChange?.();
+    tags = tags.filter((tag) => tag !== tagToRemove)
+    onTagsChange?.()
   }
 
   function handleKeydown(event: KeyboardEvent) {
     // Allow focus navigation with Tab
-    if (event.key === "Tab") {
-      return;
+    if (event.key === 'Tab') {
+      return
     }
   }
 </script>
