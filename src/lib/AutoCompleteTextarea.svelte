@@ -167,6 +167,21 @@
     }, 0)
   }
 
+  function scrollSelectedIntoView() {
+    if (selectedSuggestionIndex < 0) return
+    
+    // Use a small delay to ensure DOM is updated
+    setTimeout(() => {
+      const suggestionElement = document.querySelector(`[data-suggestion-index="${selectedSuggestionIndex}"]`)
+      if (suggestionElement) {
+        suggestionElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest'
+        })
+      }
+    }, 0)
+  }
+
   function autoResize() {
     if (textareaElement) {
       textareaElement.style.height = 'auto'
@@ -206,10 +221,12 @@
       if (event.key === 'ArrowDown') {
         event.preventDefault()
         selectedSuggestionIndex = Math.min(selectedSuggestionIndex + 1, suggestions.length - 1)
+        scrollSelectedIntoView()
         return
       } else if (event.key === 'ArrowUp') {
         event.preventDefault()
         selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, -1)
+        scrollSelectedIntoView()
         return
       } else if (event.key === 'Tab') {
         event.preventDefault()
@@ -264,6 +281,7 @@
       {#each suggestions as suggestion, index (suggestion)}
         <button
           type="button"
+          data-suggestion-index={index}
           class="py-1.5 px-3 cursor-pointer text-sm border-none bg-none w-full text-left my-0.5 transition-colors duration-150 whitespace-nowrap overflow-hidden text-ellipsis box-border hover:bg-gray-100 {index ===
           selectedSuggestionIndex
             ? isCustomTag(suggestion)

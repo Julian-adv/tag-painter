@@ -3,6 +3,7 @@
   import TagDisplay from './TagDisplay.svelte'
   import { promptsData, saveCustomTag, savePromptsData } from './stores/promptsStore'
   import { get } from 'svelte/store'
+  import { untrack } from 'svelte'
   import { Trash } from 'svelte-heros-v2'
 
   interface Props {
@@ -16,19 +17,25 @@
   let customTags = $state<Record<string, string[]>>({})
   let hasUnsavedChanges = $state(false)
 
-  // Update custom tags when dialog opens or store changes
+  // Update custom tags when dialog opens
   $effect(() => {
     if (isOpen) {
       const currentData = get(promptsData)
       customTags = { ...currentData.customTags }
-      // Select first tag if available
+      initializeSelectedTag()
+    }
+  })
+
+  function initializeSelectedTag() {
+    untrack(() => {
       const tagNames = Object.keys(customTags)
       if (tagNames.length > 0 && !selectedTagName) {
         selectedTagName = tagNames[0]
         selectedTagContent = [...customTags[selectedTagName]]
+        hasUnsavedChanges = false
       }
-    }
-  })
+    })
+  }
 
   async function selectTag(tagName: string) {
     // Save current changes before switching
@@ -103,6 +110,7 @@
     isOpen = false
     selectedTagName = ''
     selectedTagContent = []
+    hasUnsavedChanges = false
   }
 
   function handleBackdropClick(event: MouseEvent) {

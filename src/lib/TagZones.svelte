@@ -34,7 +34,7 @@
   }
 </script>
 
-<div class="h-full flex flex-col flex-shrink-1">
+<div class="w-full h-full flex flex-col flex-shrink-1">
   <div class="flex items-center justify-between pb-2">
     <h3 class="text-sm font-bold text-gray-800 text-left">Tags</h3>
     <button
