@@ -1,13 +1,16 @@
 <!-- Component for tag input zones -->
 <script lang="ts">
   import TagInput from './TagInput.svelte'
+  import CustomTagsManageDialog from './CustomTagsManageDialog.svelte'
   import { promptsData, updateTags, savePromptsData } from './stores/promptsStore'
   import { onMount } from 'svelte'
+  import { Tag } from 'svelte-heros-v2'
 
   let allTags = $state<string[]>([])
   let firstZoneTags = $state<string[]>([])
   let secondZoneTags = $state<string[]>([])
   let negativeTags = $state<string[]>([])
+  let showCustomTagsDialog = $state(false)
 
   // Load tags from store on mount
   onMount(() => {
@@ -25,11 +28,23 @@
     updateTags(allTags, firstZoneTags, secondZoneTags, negativeTags)
     await savePromptsData()
   }
+
+  function openCustomTagsDialog() {
+    showCustomTagsDialog = true
+  }
 </script>
 
 <div class="h-full flex flex-col flex-shrink-1">
-  <div>
-    <h3 class="text-sm font-bold text-gray-800 text-left pb-2">Tags</h3>
+  <div class="flex items-center justify-between pb-2">
+    <h3 class="text-sm font-bold text-gray-800 text-left">Tags</h3>
+    <button
+      type="button"
+      onclick={openCustomTagsDialog}
+      class="w-5 h-5 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-1 transition-colors flex items-center justify-center"
+      title="Manage custom tags"
+    >
+      <Tag class="w-3 h-3" />
+    </button>
   </div>
 
   <!-- Tag zones input sections -->
@@ -66,6 +81,9 @@
       onTagsChange={saveTags}
     />
   </div>
+
+  <!-- Custom tags management dialog -->
+  <CustomTagsManageDialog bind:isOpen={showCustomTagsDialog} />
 </div>
 
 <style>
