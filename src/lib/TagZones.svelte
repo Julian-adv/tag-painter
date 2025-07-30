@@ -21,9 +21,9 @@
   })
 
   // Save tags whenever they change
-  function saveTags() {
+  async function saveTags() {
     updateTags(allTags, firstZoneTags, secondZoneTags, negativeTags)
-    savePromptsData()
+    await savePromptsData()
   }
 </script>
 

@@ -34,13 +34,13 @@
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     // Save as custom tag if user entered a name
     if (newTagInput.trim()) {
       const customTagName = newTagInput.trim()
       
       // Save the custom tag
-      saveCustomTag(customTagName, dialogTags)
+      await saveCustomTag(customTagName, dialogTags)
       
       // Pass the custom tag name and original tags to parent for processing
       onSave(customTagName, dialogTags)

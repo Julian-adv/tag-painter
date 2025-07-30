@@ -141,20 +141,21 @@ export function updateTags(
 }
 
 export async function saveCustomTag(name: string, tags: string[]) {
+  let updatedData: PromptsData
+
   promptsData.update((data) => {
-    const updatedData = {
+    updatedData = {
       ...data,
       customTags: {
         ...data.customTags,
         [name]: [...tags]
       }
     }
-
-    // Save to API immediately
-    savePrompts(updatedData)
-
     return updatedData
   })
+
+  // Save to API immediately
+  await savePrompts(updatedData!)
 
   // Update combined tags to notify all subscribers
   await updateCombinedTags()
