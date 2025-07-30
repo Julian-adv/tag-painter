@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Toon Maker is a SvelteKit-based web application that interfaces with ComfyUI for AI image generation. The application allows users to create character art by providing prompts across different categories (quality, character, outfit, pose, background) and generates images using a local ComfyUI instance.
+Tag Painter is a SvelteKit-based web application that interfaces with ComfyUI for AI image generation. The application allows users to create character art by providing tags across different zones (All, First Zone, Second Zone, Negative Tags) and generates images using a local ComfyUI instance.
 
 ## Development Commands
 
@@ -35,13 +35,15 @@ npm run format
 
 The application follows a modular component architecture located in `src/lib/`:
 
-- **ImageGenerator.svelte**: Main orchestrating component that integrates all child components with 1:3 grid layout
-- **PromptForm.svelte**: Manages all prompt input forms and model settings (checkpoints, upscale, face detailer)
+- **ImageGenerator.svelte**: Main orchestrating component that integrates all child components with grid layout
+- **CompositionSelector.svelte**: Interface for selecting image composition layouts with visual previews
+- **TagZones.svelte**: Container component for managing different tag input zones with persistent storage
+- **TagInput.svelte**: Individual tag zone input component with quick tag entry and autocomplete
+- **TagDisplay.svelte**: Component for displaying tags as removable boxes with delete functionality
 - **ImageViewer.svelte**: Handles image display, navigation controls, and metadata loading with automatic prompt restoration
 - **GenerationControls.svelte**: Contains generation button, progress tracking, and settings dialog
-- **TextAreaInput.svelte**: Reusable input component with autocomplete suggestions, select dropdown, textarea, and integrated category controls (drag handle, delete button)
+- **LoraSelector.svelte**: Component for selecting and configuring LoRA models with weight adjustment
 - **SettingsDialog.svelte**: Modal for configuring generation parameters
-- **CategoryManagerDialog.svelte**: Dialog for adding and managing new prompt categories
 - **OptionsEditDialog.svelte**: Unified dialog for editing category options and settings with drag & drop support
 - **AutoCompleteTextarea.svelte**: Enhanced textarea component with auto-completion from tag database
 - **ComboBox.svelte**: Filtering and selection component for category management
@@ -53,23 +55,26 @@ Located in `src/lib/utils/` and `src/lib/stores/`:
 - **imageGeneration.ts**: Extracted image generation logic and ComfyUI workflow management
 - **comfyui.ts**: WebSocket communication and API interaction utilities
 - **fileIO.ts**: File system operations for saving/loading prompts and images
-- **types.ts**: Centralized TypeScript type definitions with category alias support
+- **promptProcessing.ts**: Tag processing and prompt generation utilities
 - **workflow.ts**: ComfyUI workflow configuration constants and node definitions
 - **date.ts**: Date and time formatting utilities for timestamps
+- **types.ts**: Centralized TypeScript type definitions with tag zone support
 - **constants.ts**: Application-wide constants and default values
 
 ### Store Modules
 
-- **stores/promptsStore.ts**: Central Svelte store for prompts data management and persistence
+- **stores/promptsStore.ts**: Central Svelte store for tag zones data management and persistence
 - **stores/tagsStore.ts**: Shared store for auto-completion tags and filtering
 
 ### API Routes
 
-- **`/api/prompts`**: Handles saving and loading prompt data to/from `data/prompts.json`
+- **`/api/prompts`**: Handles saving and loading tag zone data to/from `data/prompts.json`
 - **`/api/settings`**: Handles saving and loading user settings to/from `data/settings.json`
 - **`/api/image`**: Serves generated images from the output directory
 - **`/api/image-list`**: Returns list of generated images in the output directory
 - **`/api/tags`**: Provides autocomplete tags for prompt suggestions
+- **`/api/loras`**: Handles LoRA model information and selection
+- **`/api/mask-path`**: Provides composition mask file paths
 
 ### ComfyUI Integration
 
@@ -81,53 +86,54 @@ The application connects to a local ComfyUI instance at `http://127.0.0.1:8188` 
 
 ### Data Management
 
-- **Prompt Storage**: User inputs are saved to `data/prompts.json` with historical values for each category and category alias support
+- **Tag Zone Storage**: User inputs are saved to `data/prompts.json` with tags organized by zones (All, First Zone, Second Zone, Negative Tags)
 - **Image Storage**: Generated images are saved to `data/output/` with timestamp-based filenames
-- **Metadata Storage**: PNG images include embedded metadata with categorized prompts for automatic restoration using PNG chunk manipulation
-- **Quality Templates**: Pre-defined quality prompts stored in `data/qualityValues.json`
+- **Metadata Storage**: PNG images include embedded metadata with tag zone information for automatic restoration
 - **Tag Database**: Comprehensive tag suggestions from `data/danbooru_tags.txt` (20,000+ tags)
 - **State Management**: Uses Svelte 5's `$state`, stores, and callback patterns to avoid prop mutation warnings
 - **Settings Persistence**: User preferences saved to `data/settings.json` with validation
 
 ### UI/UX Features
 
-- **Responsive Layout**: 1:3 grid ratio with form section and image section
+- **Responsive Layout**: Grid layout with tag zones section and image section
+- **Composition Selection**: Visual composition selector with clickable layout previews
+- **Tag Zone Management**: Separate input zones for All tags, First Zone, Second Zone, and Negative Tags
+- **Tag Display**: Tags shown as removable boxes with individual delete functionality
+- **Quick Tag Entry**: Autocomplete-enabled quick input for adding tags to zones
 - **Image Navigation**: Previous/next buttons with current position indicator (n / total)
 - **Enhanced Autocomplete**: Tag suggestions with keyboard navigation, filtering, and fixed positioning to prevent clipping
 - **Progress Tracking**: Real-time progress bar with optimized animation timing
-- **Prompt History**: Automatic saving of new prompts to dropdown options on generation
-- **Metadata Restoration**: Clicking through saved images automatically loads their generation prompts (toggleable)
-- **Drag-and-Drop Reordering**: Categories can be reordered by dragging with visual feedback
-- **Scrollable Form Sections**: Form sections with custom thin scrollbars and auto-growing textareas
-- **Visual Category Feedback**: Background styling distinguishes random vs non-random categories and shows excluded categories
-- **Category Management**: Add, edit, delete, and create aliases for categories with unified dialog interface
-- **Options Editing**: Comprehensive options management with drag & drop, autocomplete integration, and editable titles
+- **Metadata Restoration**: Clicking through saved images automatically loads their generation tags (toggleable)
+- **Scrollable Sections**: Tag zones with custom thin scrollbars for overflow handling
+- **LoRA Integration**: Model selector with weight adjustment and visual feedback
+- **Persistent Storage**: Automatic saving of tag zones and settings with instant updates
 
 ### Key Features
 
-- **Multi-category prompt system** with dynamic category management and alias support
-- **2-Pass Prompt Generation** with category exclusion using `-[category]` pattern  
+- **Multi-zone tag system** with separate areas for different tag categories (All, First Zone, Second Zone, Negative Tags)
+- **Visual composition selection** with clickable layout previews for image generation
+- **Tag-based input** with individual tag boxes that can be removed independently
+- **Quick tag entry** with autocomplete suggestions for rapid tag addition
 - **Real-time progress tracking** during image generation with WebSocket communication
 - **Dynamic checkpoint selection** from ComfyUI with automatic detection
+- **LoRA model integration** with weight adjustment and visual selection interface
 - **Optional upscaling and face detailing** with configurable settings
-- **Automatic image saving** with embedded PNG metadata for prompt restoration
+- **Automatic image saving** with embedded PNG metadata for tag restoration
 - **Comprehensive tag autocomplete** with 20,000+ Danbooru tags and filtering
-- **Advanced category management**: add, edit, delete, create aliases, and reorder categories
-- **Enhanced options editing** with unified dialog, drag & drop, and autocomplete integration
-- **Visual feedback system** for category states (random, non-random, excluded)
-- **Prompt history management** with automatic updates and persistence
+- **Persistent tag storage** with automatic saving and loading of tag zones
 - **Image navigation** with position tracking and metadata loading control
 - **Settings persistence** with validation and user preference management
-- **Auto-growing textareas** that resize based on content with integrated controls
+- **Custom scrollbars** for improved UI aesthetics in tag zones
 
 ## Component Communication
 
 - Uses callback patterns instead of prop binding to avoid Svelte 5 warnings
-- Parent-child communication through well-defined interfaces
+- Parent-child communication through well-defined interfaces with `$bindable()` tags
 - Component instance binding for exposing utility functions (e.g., `refreshFileList`)
 - Event-driven updates for real-time progress and image delivery
-- **Svelte stores integration** for shared state management (prompts, tags)
+- **Svelte stores integration** for shared state management (tag zones, settings)
 - **Cross-component data flow** through centralized stores and reactive patterns
+- **Tag zone synchronization** between TagZones, TagInput, and TagDisplay components
 
 ## Important Notes
 
@@ -135,13 +141,19 @@ The application connects to a local ComfyUI instance at `http://127.0.0.1:8188` 
 - The workflow structure dynamically configures nodes based on user settings
 - WebSocket communication tracks the `final_save_output` node for image delivery
 - All generated images are automatically saved with timestamp-based filenames and embedded PNG metadata
-- **PNG metadata handling** uses chunk manipulation libraries for prompt restoration and categorization
-- **Category alias system** allows categories to reference other categories for flexible prompt organization
-- **2-pass generation** processes prompts twice: first for category resolution, then for final generation with exclusions
+- **PNG metadata handling** uses chunk manipulation libraries for tag restoration and zone information
+- **Tag zone system** organizes tags into All, First Zone, Second Zone, and Negative Tags categories
+- **Composition selection** allows users to choose image layouts with visual previews
 - Component architecture follows separation of concerns with focused, reusable components
-- Uses modern Svelte 5 patterns with `$state`, `$props`, `$effect`, and centralized stores
-- **TailwindCSS 4.x** is used for styling with custom component classes
+- Uses modern Svelte 5 patterns with `$state`, `$props`, `$bindable`, and centralized stores
+- **TailwindCSS** is used for styling with custom component classes and thin scrollbars
 - **To avoid lint errors, don't use explicit `any` type** - use proper TypeScript types, `unknown`, or type assertions instead
 - **Avoid optional parameters in `$props` types when possible** - prefer required props with default values or explicit handling over optional (`?`) parameters
 - **Avoid optional function parameters when possible** - when adding parameters to existing functions, prefer making them required and updating all call sites rather than using optional (`?`) parameters
 - **Always run type checking after completing tasks** - execute `npm run check` after finishing any task to ensure there are no TypeScript errors
+
+## Puppeteer Configuration
+
+When using Puppeteer MCP for screenshots, use these settings for optimal app capture:
+- **Default screenshot size**: 1270x1300 pixels
+- This size captures the full app interface including all tag zones, settings, and generated images
