@@ -43,6 +43,7 @@ export async function POST({ request }) {
     const cleanedData: PromptsData = {
       categories: data.categories.map(cleanCategoryData),
       tags: data.tags || { all: [], zone1: [], zone2: [], negative: [] },
+      customTags: data.customTags || [],
       selectedCheckpoint: data.selectedCheckpoint,
       selectedComposition: data.selectedComposition || 'left-horizontal',
       useUpscale: data.useUpscale,
@@ -113,6 +114,7 @@ export async function GET() {
       const defaultPrompts: PromptsData = {
         categories: createDefaultCategories(),
         tags: { all: [], zone1: [], zone2: [], negative: [] },
+        customTags: [],
         selectedCheckpoint: null,
         selectedComposition: 'left-horizontal',
         useUpscale: true,

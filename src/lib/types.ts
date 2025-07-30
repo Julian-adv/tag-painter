@@ -40,6 +40,11 @@ export interface PromptCategory {
   aliasOf?: string // ID of the category this one is an alias of
 }
 
+export interface CustomTag {
+  name: string
+  tags: string[]
+}
+
 export interface PromptsData {
   categories: PromptCategory[]
   tags: {
@@ -48,6 +53,7 @@ export interface PromptsData {
     zone2: string[]
     negative: string[]
   }
+  customTags: CustomTag[]
   selectedCheckpoint: string | null
   selectedComposition: string
   useUpscale: boolean

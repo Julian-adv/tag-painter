@@ -1,12 +1,13 @@
 // Central store for prompts data using Svelte stores
 import { writable } from 'svelte/store'
-import type { PromptsData, PromptCategory, OptionItem } from '$lib/types'
+import type { PromptsData, PromptCategory, OptionItem, CustomTag } from '$lib/types'
 import { savePrompts, loadPrompts } from '../utils/fileIO'
 
 // Minimal default data for initial store state
 const defaultPromptsData: PromptsData = {
   categories: [],
   tags: { all: [], zone1: [], zone2: [], negative: [] },
+  customTags: [],
   selectedCheckpoint: null,
   selectedComposition: 'left-horizontal',
   useUpscale: false,
@@ -34,6 +35,7 @@ export async function initializePromptsStore() {
         zone2: savedPrompts.tags?.zone2 || [],
         negative: savedPrompts.tags?.negative || []
       },
+      customTags: savedPrompts.customTags || [],
       selectedComposition: savedPrompts.selectedComposition || 'left-horizontal'
     }
     promptsData.set(migratedData)
@@ -133,6 +135,25 @@ export function updateTags(allTags: string[], zone1Tags: string[], zone2Tags: st
       negative: negativeTags
     } 
   }))
+}
+
+export function saveCustomTag(name: string, tags: string[]) {
+  const customTag: CustomTag = {
+    name,
+    tags: [...tags]
+  }
+
+  promptsData.update(data => {
+    const updatedData = {
+      ...data,
+      customTags: [...data.customTags, customTag]
+    }
+    
+    // Save to API immediately
+    savePrompts(updatedData)
+    
+    return updatedData
+  })
 }
 
 export function reorderCategories(fromIndex: number, toIndex: number) {
