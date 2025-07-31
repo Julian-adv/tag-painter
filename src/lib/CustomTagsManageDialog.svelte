@@ -4,7 +4,7 @@
   import { promptsData, saveCustomTag, savePromptsData } from './stores/promptsStore'
   import { get } from 'svelte/store'
   import { untrack } from 'svelte'
-  import { Trash } from 'svelte-heros-v2'
+  import { Trash, DocumentDuplicate } from 'svelte-heros-v2'
 
   interface Props {
     isOpen: boolean
@@ -95,6 +95,59 @@
         selectedTagContent = []
         editingTagName = ''
       }
+    }
+  }
+
+  async function duplicateSelectedTag() {
+    if (!selectedTagName) return
+
+    // Generate new name based on current tag name
+    const newName = generateDuplicateName(selectedTagName)
+
+    // Check if new name already exists (shouldn't happen with our algorithm, but just in case)
+    if (newName in customTags) {
+      statusMessage = 'Unable to create duplicate - name already exists!'
+      return
+    }
+
+    // Create duplicate with same content
+    const duplicateContent = [...selectedTagContent]
+
+    // Update local state
+    customTags[newName] = duplicateContent
+    customTags = { ...customTags }
+
+    // Update the store
+    promptsData.update((data) => {
+      return {
+        ...data,
+        customTags: {
+          ...data.customTags,
+          [newName]: duplicateContent
+        }
+      }
+    })
+
+    // Select the newly created duplicate
+    selectedTagName = newName
+    selectedTagContent = [...duplicateContent]
+    editingTagName = newName
+    hasUnsavedChanges = true
+    statusMessage = ''
+  }
+
+  function generateDuplicateName(originalName: string): string {
+    // Check if name ends with a number
+    const match = originalName.match(/^(.*?)(\d+)$/)
+
+    if (match) {
+      // Name ends with a number, increment it
+      const baseName = match[1]
+      const currentNumber = parseInt(match[2])
+      return `${baseName}${currentNumber + 1}`
+    } else {
+      // Name doesn't end with a number, append "2"
+      return `${originalName} 2`
     }
   }
 
@@ -230,8 +283,8 @@
                   type="button"
                   class="w-full text-left px-3 py-1 rounded-md text-sm transition-colors {selectedTagName ===
                   tagName
-                    ? 'bg-sky-100 text-sky-800 border-2 border-sky-300'
-                    : 'hover:bg-gray-100 text-gray-700'}"
+                    ? 'bg-pink-100 text-pink-800'
+                    : 'hover:bg-gray-100 text-pink-800'}"
                   onclick={() => selectTag(tagName)}
                 >
                   {tagName}
@@ -256,13 +309,24 @@
                 onblur={saveTagName}
                 placeholder="Custom tag name"
               />
-              <button
-                type="button"
-                onclick={deleteSelectedTag}
-                class="inline-flex items-center gap-1 p-1.5 bg-red-200 text-red-500 rounded-md hover:bg-red-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors text-sm"
-              >
-                <Trash class="w-4 h-4" />
-              </button>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  onclick={duplicateSelectedTag}
+                  class="inline-flex items-center gap-1 p-1.5 bg-blue-200 text-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm"
+                  title="Duplicate this custom tag"
+                >
+                  <DocumentDuplicate class="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onclick={deleteSelectedTag}
+                  class="inline-flex items-center gap-1 p-1.5 bg-red-200 text-red-500 rounded-md hover:bg-red-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors text-sm"
+                  title="Delete this custom tag"
+                >
+                  <Trash class="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <div class="flex-1">
