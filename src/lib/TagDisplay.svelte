@@ -2,6 +2,8 @@
 <script lang="ts">
   import { XMark } from 'svelte-heros-v2'
   import { isCustomTag } from './stores/tagsStore'
+  import { promptsData } from './stores/promptsStore'
+  import { get } from 'svelte/store'
 
   interface Props {
     id: string
@@ -9,9 +11,17 @@
     placeholder?: string
     readonly?: boolean
     onTagsChange?: () => void
+    onCustomTagDoubleClick?: (tagName: string) => void
   }
 
-  let { id, tags = $bindable(), placeholder = '', readonly = false, onTagsChange }: Props = $props()
+  let {
+    id,
+    tags = $bindable(),
+    placeholder = '',
+    readonly = false,
+    onTagsChange,
+    onCustomTagDoubleClick
+  }: Props = $props()
 
   function removeTag(tagToRemove: string) {
     if (readonly) return
@@ -24,6 +34,38 @@
     // Allow focus navigation with Tab
     if (event.key === 'Tab') {
       return
+    }
+  }
+
+  function handleTagDoubleClick(tag: string) {
+    if (isCustomTag(tag) && onCustomTagDoubleClick) {
+      onCustomTagDoubleClick(tag)
+    }
+  }
+
+  function handleTagKeydown(event: KeyboardEvent, tag: string) {
+    if (isCustomTag(tag) && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault()
+      handleTagDoubleClick(tag)
+    }
+  }
+
+  function getCustomTagContent(tagName: string): string {
+    if (!isCustomTag(tagName)) return ''
+
+    const currentData = get(promptsData)
+    const tagContent = currentData.customTags[tagName]
+
+    if (!tagContent || tagContent.length === 0) {
+      return 'Empty custom tag'
+    }
+
+    // Show first few tags with ellipsis if there are many
+    const maxTags = 50
+    if (tagContent.length <= maxTags) {
+      return tagContent.join(', ')
+    } else {
+      return `${tagContent.slice(0, maxTags).join(', ')}... (${tagContent.length} tags total)`
     }
   }
 </script>
@@ -46,7 +88,22 @@
             ? 'bg-pink-100 text-pink-800'
             : 'bg-sky-100 text-sky-800'}"
         >
-          <span class="text-left">{tag}</span>
+          {#if isCustomTag(tag)}
+            <button
+              type="button"
+              class="text-left cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit focus:outline-none"
+              ondblclick={() => handleTagDoubleClick(tag)}
+              onkeydown={(e) => handleTagKeydown(e, tag)}
+              title={getCustomTagContent(tag)}
+              aria-label={`Edit custom tag ${tag}`}
+            >
+              {tag}
+            </button>
+          {:else}
+            <span class="text-left">
+              {tag}
+            </span>
+          {/if}
           {#if !readonly}
             <button
               type="button"

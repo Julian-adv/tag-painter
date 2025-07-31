@@ -12,9 +12,10 @@
     tags: string[]
     showPlusButton?: boolean
     onTagsChange?: () => void
+    onCustomTagDoubleClick?: (tagName: string) => void
   }
 
-  let { id, label, placeholder, tags = $bindable(), showPlusButton = true, onTagsChange }: Props = $props()
+  let { id, label, placeholder, tags = $bindable(), showPlusButton = true, onTagsChange, onCustomTagDoubleClick }: Props = $props()
 
   let quickTagInput = $state('')
   let showDialog = $state(false)
@@ -71,7 +72,7 @@
       </button>
     {/if}
   </div>
-  <TagDisplay {id} bind:tags {placeholder} {onTagsChange} />
+  <TagDisplay {id} bind:tags {placeholder} {onTagsChange} {onCustomTagDoubleClick} />
 
   <!-- Quick tag input with autocomplete -->
   <div class="mt-1">

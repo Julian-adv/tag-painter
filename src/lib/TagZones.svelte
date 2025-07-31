@@ -11,6 +11,7 @@
   let secondZoneTags = $state<string[]>([])
   let negativeTags = $state<string[]>([])
   let showCustomTagsDialog = $state(false)
+  let selectedCustomTagName = $state<string>('')
 
   // Load tags from store on mount
   onMount(() => {
@@ -30,6 +31,12 @@
   }
 
   function openCustomTagsDialog() {
+    selectedCustomTagName = ''
+    showCustomTagsDialog = true
+  }
+
+  function handleCustomTagDoubleClick(tagName: string) {
+    selectedCustomTagName = tagName
     showCustomTagsDialog = true
   }
 </script>
@@ -55,6 +62,7 @@
       placeholder="Enter tags for all zones..."
       bind:tags={allTags}
       onTagsChange={saveTags}
+      onCustomTagDoubleClick={handleCustomTagDoubleClick}
     />
 
     <TagInput
@@ -63,6 +71,7 @@
       placeholder="Enter tags for first zone..."
       bind:tags={firstZoneTags}
       onTagsChange={saveTags}
+      onCustomTagDoubleClick={handleCustomTagDoubleClick}
     />
 
     <TagInput
@@ -71,6 +80,7 @@
       placeholder="Enter tags for second zone..."
       bind:tags={secondZoneTags}
       onTagsChange={saveTags}
+      onCustomTagDoubleClick={handleCustomTagDoubleClick}
     />
 
     <TagInput
@@ -79,11 +89,12 @@
       placeholder="Enter negative tags..."
       bind:tags={negativeTags}
       onTagsChange={saveTags}
+      onCustomTagDoubleClick={handleCustomTagDoubleClick}
     />
   </div>
 
   <!-- Custom tags management dialog -->
-  <CustomTagsManageDialog bind:isOpen={showCustomTagsDialog} />
+  <CustomTagsManageDialog bind:isOpen={showCustomTagsDialog} initialSelectedTag={selectedCustomTagName} />
 </div>
 
 <style>

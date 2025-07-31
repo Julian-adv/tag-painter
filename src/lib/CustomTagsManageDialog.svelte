@@ -8,9 +8,10 @@
 
   interface Props {
     isOpen: boolean
+    initialSelectedTag?: string
   }
 
-  let { isOpen = $bindable() }: Props = $props()
+  let { isOpen = $bindable(), initialSelectedTag = '' }: Props = $props()
 
   let selectedTagName = $state<string>('')
   let selectedTagContent = $state<string[]>([])
@@ -31,10 +32,20 @@
   function initializeSelectedTag() {
     untrack(() => {
       const tagNames = Object.keys(customTags)
-      if (tagNames.length > 0 && !selectedTagName) {
-        selectedTagName = tagNames[0]
-        selectedTagContent = [...customTags[selectedTagName]]
-        editingTagName = selectedTagName
+      let tagToSelect = ''
+      
+      // If initialSelectedTag is provided and exists, use it
+      if (initialSelectedTag && initialSelectedTag in customTags) {
+        tagToSelect = initialSelectedTag
+      } else if (tagNames.length > 0) {
+        // Otherwise, select the first available tag
+        tagToSelect = tagNames[0]
+      }
+      
+      if (tagToSelect && (!selectedTagName || selectedTagName !== tagToSelect)) {
+        selectedTagName = tagToSelect
+        selectedTagContent = [...customTags[tagToSelect]]
+        editingTagName = tagToSelect
         hasUnsavedChanges = false
       }
     })
