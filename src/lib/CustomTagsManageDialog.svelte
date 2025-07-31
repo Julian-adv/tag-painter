@@ -33,7 +33,7 @@
     untrack(() => {
       const tagNames = Object.keys(customTags)
       let tagToSelect = ''
-      
+
       // If initialSelectedTag is provided and exists, use it
       if (initialSelectedTag && initialSelectedTag in customTags) {
         tagToSelect = initialSelectedTag
@@ -41,7 +41,7 @@
         // Otherwise, select the first available tag
         tagToSelect = tagNames[0]
       }
-      
+
       if (tagToSelect && (!selectedTagName || selectedTagName !== tagToSelect)) {
         selectedTagName = tagToSelect
         selectedTagContent = [...customTags[tagToSelect]]
@@ -228,9 +228,9 @@
               {#each Object.keys(customTags) as tagName (tagName)}
                 <button
                   type="button"
-                  class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors {selectedTagName ===
+                  class="w-full text-left px-3 py-1 rounded-md text-sm transition-colors {selectedTagName ===
                   tagName
-                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                    ? 'bg-sky-100 text-sky-800 border-2 border-sky-300'
                     : 'hover:bg-gray-100 text-gray-700'}"
                   onclick={() => selectTag(tagName)}
                 >

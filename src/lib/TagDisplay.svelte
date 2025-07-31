@@ -84,9 +84,11 @@
     <div class="flex flex-wrap gap-1 text-left">
       {#each tags as tag (tag)}
         <div
-          class="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-md text-sm {isCustomTag(tag)
-            ? 'bg-pink-100 text-pink-800'
-            : 'bg-sky-100 text-sky-800'}"
+          class="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-md text-sm bg-sky-100 text-sky-800 {isCustomTag(
+            tag
+          )
+            ? 'border-sky-300 border-2'
+            : ''}"
         >
           {#if isCustomTag(tag)}
             <button
@@ -107,7 +109,7 @@
           {#if !readonly}
             <button
               type="button"
-              class="text-sky-600 hover:text-sky-800 hover:bg-sky-200 rounded-full w-4 h-4 inline-flex items-center justify-center"
+              class="rounded-full w-4 h-4 inline-flex items-center justify-center text-sky-600 hover:text-sky-800 hover:bg-sky-200"
               onclick={() => removeTag(tag)}
               aria-label="Remove {tag}"
             >
