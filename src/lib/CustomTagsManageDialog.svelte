@@ -1,6 +1,6 @@
 <!-- Dialog component for managing all custom tags -->
 <script lang="ts">
-  import TagDisplay from './TagDisplay.svelte'
+  import TagInput from './TagInput.svelte'
   import { promptsData, saveCustomTag, savePromptsData } from './stores/promptsStore'
   import { get } from 'svelte/store'
   import { untrack } from 'svelte'
@@ -16,6 +16,8 @@
   let selectedTagContent = $state<string[]>([])
   let customTags = $state<Record<string, string[]>>({})
   let hasUnsavedChanges = $state(false)
+  let editingTagName = $state<string>('')
+  let statusMessage = $state<string>('')
 
   // Update custom tags when dialog opens
   $effect(() => {
@@ -32,6 +34,7 @@
       if (tagNames.length > 0 && !selectedTagName) {
         selectedTagName = tagNames[0]
         selectedTagContent = [...customTags[selectedTagName]]
+        editingTagName = selectedTagName
         hasUnsavedChanges = false
       }
     })
@@ -45,6 +48,7 @@
 
     selectedTagName = tagName
     selectedTagContent = [...customTags[tagName]]
+    editingTagName = tagName
     hasUnsavedChanges = false
   }
 
@@ -74,9 +78,11 @@
       if (remainingTags.length > 0) {
         selectedTagName = remainingTags[0]
         selectedTagContent = [...customTags[selectedTagName]]
+        editingTagName = selectedTagName
       } else {
         selectedTagName = ''
         selectedTagContent = []
+        editingTagName = ''
       }
     }
   }
@@ -104,13 +110,63 @@
   function handleTagsChange() {
     // Mark as having unsaved changes
     hasUnsavedChanges = true
+    statusMessage = ''
+  }
+
+  async function saveTagName() {
+    if (!editingTagName.trim() || editingTagName === selectedTagName) {
+      editingTagName = selectedTagName
+      return
+    }
+
+    const newName = editingTagName.trim()
+
+    // Check if new name already exists
+    if (newName in customTags) {
+      statusMessage = 'A custom tag with this name already exists!'
+      return
+    }
+
+    // Update local state - rename the tag
+    const tagContent = customTags[selectedTagName]
+    delete customTags[selectedTagName]
+    customTags[newName] = tagContent
+    customTags = { ...customTags }
+
+    // Update the store
+    promptsData.update((data) => {
+      const newCustomTags = { ...data.customTags }
+      delete newCustomTags[selectedTagName]
+      newCustomTags[newName] = tagContent
+      return {
+        ...data,
+        customTags: newCustomTags
+      }
+    })
+
+    // Update selected tag name
+    selectedTagName = newName
+    hasUnsavedChanges = true
+    statusMessage = ''
+  }
+
+  function handleNameKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      saveTagName()
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      editingTagName = selectedTagName
+    }
   }
 
   function handleClose() {
     isOpen = false
     selectedTagName = ''
     selectedTagContent = []
+    editingTagName = ''
     hasUnsavedChanges = false
+    statusMessage = ''
   }
 
   function handleBackdropClick(event: MouseEvent) {
@@ -181,9 +237,14 @@
         <div class="flex-1 p-4 flex flex-col">
           {#if selectedTagName}
             <div class="flex items-center justify-between mb-4">
-              <h3 class="text-sm font-medium text-gray-700">
-                <span class="font-semibold text-gray-900">{selectedTagName}</span>
-              </h3>
+              <input
+                type="text"
+                bind:value={editingTagName}
+                class="text-sm font-semibold text-gray-900 bg-transparent border-b border-blue-500 focus:outline-none focus:border-blue-600 px-1 py-0.5 flex-1 mr-2"
+                onkeydown={handleNameKeydown}
+                onblur={saveTagName}
+                placeholder="Custom tag name"
+              />
               <button
                 type="button"
                 onclick={deleteSelectedTag}
@@ -194,10 +255,12 @@
             </div>
 
             <div class="flex-1">
-              <TagDisplay
+              <TagInput
                 id="custom-tag-content"
+                label=""
+                placeholder="Add tags to this custom tag..."
                 bind:tags={selectedTagContent}
-                placeholder="No tags in this custom tag"
+                showPlusButton={false}
                 onTagsChange={handleTagsChange}
               />
             </div>
@@ -212,7 +275,9 @@
       <!-- Footer -->
       <div class="flex justify-between items-center p-6 border-t border-gray-300">
         <div class="text-sm">
-          {#if hasUnsavedChanges}
+          {#if statusMessage}
+            <span class="text-red-600">{statusMessage}</span>
+          {:else if hasUnsavedChanges}
             <span class="text-orange-600">Unsaved changes</span>
           {/if}
         </div>
