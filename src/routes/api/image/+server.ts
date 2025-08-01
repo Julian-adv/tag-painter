@@ -18,6 +18,7 @@ interface WorkflowNode {
     scheduler?: string
     cfg?: number
     seed?: number
+    noise_seed?: number
     width?: number
     height?: number
     ckpt_name?: string
@@ -113,32 +114,38 @@ export async function POST({ request }) {
     let promptText = ''
     let outputDirectory = DEFAULT_OUTPUT_DIRECTORY
     let workflowData: WorkflowData | null = null
-    let categorizedPrompts: Record<string, string> = {}
+    const prompts: {
+      all: string
+      zone1: string
+      zone2: string
+      negative: string
+    } = { all: '', zone1: '', zone2: '', negative: '' }
+    let seed = 0
 
     if (contentType?.includes('multipart/form-data')) {
       // Handle form data with prompt metadata and output directory
       const formData = await request.formData()
       const imageFile = formData.get('image') as File
-      // Extract all category data dynamically
-      const categoryData: Record<string, string> = {}
-      for (const [key, value] of formData.entries()) {
-        if (key !== 'image' && key !== 'outputDirectory' && key !== 'workflow') {
-          categoryData[key] = value as string
-        }
-      }
+
+      // Extract prompt data
+      prompts.all = (formData.get('allPrompt') as string) || ''
+      prompts.zone1 = (formData.get('zone1Prompt') as string) || ''
+      prompts.zone2 = (formData.get('zone2Prompt') as string) || ''
+      prompts.negative = (formData.get('negativePrompt') as string) || ''
+      seed = parseInt((formData.get('seed') as string) || '0', 10)
+
       const outputDir = formData.get('outputDirectory') as string
       const workflow = formData.get('workflow') as string
 
       if (imageFile) {
         imageBuffer = Buffer.from(await imageFile.arrayBuffer())
-        // Reconstruct full prompt for metadata (exclude negative category)
-        const promptParts = Object.entries(categoryData)
-          .filter(([key, value]) => key !== 'negative' && Boolean(value))
-          .map(([, value]) => value)
-        promptText = promptParts.join(', ')
 
-        // Store categorized prompts for structured metadata
-        categorizedPrompts = categoryData
+        // Construct main prompt text from non-empty prompt parts
+        const promptParts = [prompts.all, prompts.zone1, prompts.zone2].filter(
+          (p) => p.trim().length > 0
+        )
+        promptText = promptParts.join(' [SEP] ')
+
         outputDirectory = outputDir || DEFAULT_OUTPUT_DIRECTORY
 
         // Parse workflow data
@@ -167,14 +174,14 @@ export async function POST({ request }) {
     // Add metadata to PNG if prompt is provided
     if (promptText) {
       // Extract parameters from workflow and settings
-      const steps = workflowData?.['8']?.inputs?.steps || 28
-      const sampler = workflowData?.['8']?.inputs?.sampler_name || 'euler_ancestral'
-      const scheduler = workflowData?.['8']?.inputs?.scheduler || 'simple'
-      const cfg = workflowData?.['8']?.inputs?.cfg || 5
-      const seed = workflowData?.['8']?.inputs?.seed || Math.floor(Math.random() * 10000000000)
-      const width = workflowData?.['9']?.inputs?.width || 832
-      const height = workflowData?.['9']?.inputs?.height || 1216
-      const model = workflowData?.['10']?.inputs?.ckpt_name || 'unknown'
+      const steps = workflowData?.['45']?.inputs?.steps || 28
+      const sampler = workflowData?.['15']?.inputs?.sampler_name || 'euler_ancestral'
+      const scheduler = 'simple' // Basic scheduler doesn't have configurable scheduler type
+      const cfg = workflowData?.['14']?.inputs?.cfg || 5
+      const workflowSeed = workflowData?.['14']?.inputs?.noise_seed || seed
+      const width = workflowData?.['16']?.inputs?.width || 832
+      const height = workflowData?.['16']?.inputs?.height || 1216
+      const model = workflowData?.['11']?.inputs?.ckpt_name || 'unknown'
 
       // Convert scheduler to proper format
       const schedulerMap: Record<string, string> = {
@@ -200,18 +207,15 @@ export async function POST({ request }) {
       const modelName = model.replace(/\.(safetensors|ckpt)$/, '')
 
       // Format prompt in WebUI style with parameters
-      const categoryLines = Object.entries(categorizedPrompts)
-        .map(([key, value]) => {
-          if (key === 'negative') {
-            return `Negative prompt: ${value}`
-          }
-          return `${key.charAt(0).toUpperCase() + key.slice(1)}: ${value}`
-        })
-        .join('\n')
+      const zoneLines = []
+      if (prompts.all) zoneLines.push(`All: ${prompts.all}`)
+      if (prompts.zone1) zoneLines.push(`First Zone: ${prompts.zone1}`)
+      if (prompts.zone2) zoneLines.push(`Second Zone: ${prompts.zone2}`)
 
       const parametersText = `${promptText}
-${categoryLines}
-Steps: ${steps}, Sampler: ${samplerName}, Schedule type: ${scheduleType}, CFG scale: ${cfg}, Seed: ${seed}, Size: ${width}x${height}, Model: ${modelName}`
+${zoneLines.join('\n')}
+Negative prompt: ${prompts.negative}
+Steps: ${steps}, Sampler: ${samplerName}, Schedule type: ${scheduleType}, CFG scale: ${cfg}, Seed: ${workflowSeed}, Size: ${width}x${height}, Model: ${modelName}`
 
       // First process the image with Sharp
       const processedBuffer = await sharp(imageBuffer)

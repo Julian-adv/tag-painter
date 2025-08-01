@@ -81,8 +81,8 @@
     // Add current values to options if they're not already there
     autoSaveCurrentValues()
 
-    // Resolve random values for display and pass to generateImage
-    const resolvedValues = resolveRandomValues()
+    // Resolve random values for display
+    resolveRandomValues()
 
     // Save prompts before generating
     await savePromptsData()
@@ -93,7 +93,6 @@
     lastSeed = await generateImage({
       promptsData: currentPromptsData!,
       settings,
-      resolvedRandomValues: resolvedValues,
       selectedLoras: currentPromptsData!.selectedLoras,
       seed: seedToUse,
       onLoadingChange: (loading) => {

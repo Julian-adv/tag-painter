@@ -5,12 +5,11 @@
 import { saveImage } from './fileIO'
 import { connectWebSocket, type WebSocketCallbacks } from './comfyui'
 import { defaultWorkflowPrompt, FINAL_SAVE_NODE_ID, generateLoraChain } from './workflow'
-import type { PromptsData, Settings, ProgressData, OptionItem, ComfyUIWorkflow } from '$lib/types'
+import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow } from '$lib/types'
 
 export interface GenerationOptions {
   promptsData: PromptsData
   settings: Settings
-  resolvedRandomValues: Record<string, OptionItem>
   selectedLoras: string[]
   seed?: number | null
   onLoadingChange: (loading: boolean) => void
@@ -40,7 +39,6 @@ export async function generateImage(options: GenerationOptions): Promise<number>
   const {
     promptsData,
     settings,
-    resolvedRandomValues,
     selectedLoras,
     seed,
     onLoadingChange,
@@ -133,12 +131,24 @@ export async function generateImage(options: GenerationOptions): Promise<number>
 
     console.log('workflow', workflow)
     // Submit to ComfyUI
-    await submitToComfyUI(workflow, clientId, promptsData, settings, resolvedRandomValues, {
-      onLoadingChange,
-      onProgressUpdate,
-      onImageReceived,
-      onError
-    })
+    await submitToComfyUI(
+      workflow,
+      clientId,
+      {
+        all: allTagsText,
+        zone1: zone1TagsText,
+        zone2: zone2TagsText,
+        negative: negativeTagsText
+      },
+      settings,
+      appliedSeed,
+      {
+        onLoadingChange,
+        onProgressUpdate,
+        onImageReceived,
+        onError
+      }
+    )
 
     return appliedSeed
   } catch (error) {
@@ -238,9 +248,14 @@ function addSaveImageWebsocketNode(workflow: ComfyUIWorkflow, promptsData: Promp
 async function submitToComfyUI(
   workflow: ComfyUIWorkflow,
   clientId: string,
-  promptsData: PromptsData,
+  prompts: {
+    all: string
+    zone1: string
+    zone2: string
+    negative: string
+  },
   settings: Settings,
-  resolvedRandomValues: Record<string, OptionItem>,
+  seed: number,
   callbacks: {
     onLoadingChange: (loading: boolean) => void
     onProgressUpdate: (progress: ProgressData) => void
@@ -275,13 +290,7 @@ async function submitToComfyUI(
     onLoadingChange: callbacks.onLoadingChange,
     onProgressUpdate: callbacks.onProgressUpdate,
     onImageReceived: async (imageBlob: Blob) => {
-      const filePath = await saveImage(
-        imageBlob,
-        promptsData,
-        settings.outputDirectory,
-        workflow,
-        resolvedRandomValues
-      )
+      const filePath = await saveImage(imageBlob, prompts, settings.outputDirectory, workflow, seed)
       if (filePath) {
         callbacks.onImageReceived(imageBlob, filePath)
       } else {
