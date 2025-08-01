@@ -43,6 +43,7 @@ export interface PromptCategory {
 export interface CustomTag {
   name: string
   tags: string[]
+  type: 'custom' | 'random'
 }
 
 export interface PromptsData {
@@ -53,7 +54,7 @@ export interface PromptsData {
     zone2: string[]
     negative: string[]
   }
-  customTags: Record<string, string[]>
+  customTags: Record<string, CustomTag>
   selectedCheckpoint: string | null
   selectedComposition: string
   useUpscale: boolean

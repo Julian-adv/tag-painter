@@ -1,6 +1,6 @@
 // Central store for prompts data using Svelte stores
 import { writable } from 'svelte/store'
-import type { PromptsData, PromptCategory, OptionItem } from '$lib/types'
+import type { PromptsData, PromptCategory, OptionItem, CustomTag } from '$lib/types'
 import { savePrompts, loadPrompts } from '../utils/fileIO'
 import { updateCombinedTags } from './tagsStore'
 
@@ -23,6 +23,30 @@ export const promptsData = writable<PromptsData>(defaultPromptsData)
 // Store for tracking resolved random values during generation
 export const resolvedRandomValues = writable<Record<string, OptionItem>>({})
 
+// Migrate old customTags format to new format
+function migrateCustomTags(oldCustomTags: any): Record<string, CustomTag> {
+  const newCustomTags: Record<string, CustomTag> = {}
+  
+  // Check if it's already in new format
+  if (oldCustomTags && typeof oldCustomTags === 'object') {
+    for (const [name, data] of Object.entries(oldCustomTags)) {
+      if (Array.isArray(data)) {
+        // Old format: Record<string, string[]>
+        newCustomTags[name] = {
+          name,
+          tags: data,
+          type: 'custom'
+        }
+      } else if (data && typeof data === 'object' && 'tags' in data) {
+        // New format: already migrated
+        newCustomTags[name] = data as CustomTag
+      }
+    }
+  }
+  
+  return newCustomTags
+}
+
 // Load prompts from API on initialization
 export async function initializePromptsStore() {
   const savedPrompts = await loadPrompts()
@@ -36,7 +60,7 @@ export async function initializePromptsStore() {
         zone2: savedPrompts.tags?.zone2 || [],
         negative: savedPrompts.tags?.negative || []
       },
-      customTags: savedPrompts.customTags || {},
+      customTags: migrateCustomTags(savedPrompts.customTags || {}),
       selectedComposition: savedPrompts.selectedComposition || 'left-horizontal'
     }
     promptsData.set(migratedData)
@@ -140,7 +164,7 @@ export function updateTags(
   }))
 }
 
-export async function saveCustomTag(name: string, tags: string[]) {
+export async function saveCustomTag(name: string, tags: string[], type: 'custom' | 'random' = 'custom') {
   let updatedData: PromptsData
 
   promptsData.update((data) => {
@@ -148,7 +172,11 @@ export async function saveCustomTag(name: string, tags: string[]) {
       ...data,
       customTags: {
         ...data.customTags,
-        [name]: [...tags]
+        [name]: {
+          name,
+          tags: [...tags],
+          type
+        }
       }
     }
     return updatedData

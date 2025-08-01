@@ -5,6 +5,7 @@
   import { get } from 'svelte/store'
   import { untrack } from 'svelte'
   import { Trash, DocumentDuplicate } from 'svelte-heros-v2'
+  import type { CustomTag } from '$lib/types'
 
   interface Props {
     isOpen: boolean
@@ -15,7 +16,8 @@
 
   let selectedTagName = $state<string>('')
   let selectedTagContent = $state<string[]>([])
-  let customTags = $state<Record<string, string[]>>({})
+  let selectedTagType = $state<'custom' | 'random'>('custom')
+  let customTags = $state<Record<string, CustomTag>>({})
   let hasUnsavedChanges = $state(false)
   let editingTagName = $state<string>('')
   let statusMessage = $state<string>('')
@@ -44,7 +46,9 @@
 
       if (tagToSelect && (!selectedTagName || selectedTagName !== tagToSelect)) {
         selectedTagName = tagToSelect
-        selectedTagContent = [...customTags[tagToSelect]]
+        const tag = customTags[tagToSelect]
+        selectedTagContent = [...tag.tags]
+        selectedTagType = tag.type
         editingTagName = tagToSelect
         hasUnsavedChanges = false
       }
@@ -58,7 +62,9 @@
     }
 
     selectedTagName = tagName
-    selectedTagContent = [...customTags[tagName]]
+    const tag = customTags[tagName]
+    selectedTagContent = [...tag.tags]
+    selectedTagType = tag.type
     editingTagName = tagName
     hasUnsavedChanges = false
   }
@@ -88,11 +94,14 @@
       const remainingTags = Object.keys(customTags)
       if (remainingTags.length > 0) {
         selectedTagName = remainingTags[0]
-        selectedTagContent = [...customTags[selectedTagName]]
+        const tag = customTags[selectedTagName]
+        selectedTagContent = [...tag.tags]
+        selectedTagType = tag.type
         editingTagName = selectedTagName
       } else {
         selectedTagName = ''
         selectedTagContent = []
+        selectedTagType = 'custom'
         editingTagName = ''
       }
     }
@@ -110,11 +119,15 @@
       return
     }
 
-    // Create duplicate with same content
-    const duplicateContent = [...selectedTagContent]
+    // Create duplicate with same content and type
+    const duplicateTag: CustomTag = {
+      name: newName,
+      tags: [...selectedTagContent],
+      type: selectedTagType
+    }
 
     // Update local state
-    customTags[newName] = duplicateContent
+    customTags[newName] = duplicateTag
     customTags = { ...customTags }
 
     // Update the store
@@ -123,14 +136,15 @@
         ...data,
         customTags: {
           ...data.customTags,
-          [newName]: duplicateContent
+          [newName]: duplicateTag
         }
       }
     })
 
     // Select the newly created duplicate
     selectedTagName = newName
-    selectedTagContent = [...duplicateContent]
+    selectedTagContent = [...duplicateTag.tags]
+    selectedTagType = duplicateTag.type
     editingTagName = newName
     hasUnsavedChanges = true
     statusMessage = ''
@@ -155,10 +169,15 @@
     if (!selectedTagName) return
 
     // Update custom tags in store
-    await saveCustomTag(selectedTagName, selectedTagContent)
+    await saveCustomTag(selectedTagName, selectedTagContent, selectedTagType)
 
     // Update local state
-    customTags[selectedTagName] = [...selectedTagContent]
+    const updatedTag: CustomTag = {
+      name: selectedTagName,
+      tags: [...selectedTagContent],
+      type: selectedTagType
+    }
+    customTags[selectedTagName] = updatedTag
     customTags = { ...customTags }
     hasUnsavedChanges = false
   }
@@ -172,6 +191,12 @@
   }
 
   function handleTagsChange() {
+    // Mark as having unsaved changes
+    hasUnsavedChanges = true
+    statusMessage = ''
+  }
+
+  function handleTagTypeChange() {
     // Mark as having unsaved changes
     hasUnsavedChanges = true
     statusMessage = ''
@@ -192,16 +217,20 @@
     }
 
     // Update local state - rename the tag
-    const tagContent = customTags[selectedTagName]
+    const existingTag = customTags[selectedTagName]
+    const renamedTag: CustomTag = {
+      ...existingTag,
+      name: newName
+    }
     delete customTags[selectedTagName]
-    customTags[newName] = tagContent
+    customTags[newName] = renamedTag
     customTags = { ...customTags }
 
     // Update the store
     promptsData.update((data) => {
       const newCustomTags = { ...data.customTags }
       delete newCustomTags[selectedTagName]
-      newCustomTags[newName] = tagContent
+      newCustomTags[newName] = renamedTag
       return {
         ...data,
         customTags: newCustomTags
@@ -228,6 +257,7 @@
     isOpen = false
     selectedTagName = ''
     selectedTagContent = []
+    selectedTagType = 'custom'
     editingTagName = ''
     hasUnsavedChanges = false
     statusMessage = ''
@@ -279,12 +309,17 @@
           <div class="flex-1 p-4 overflow-y-auto">
             <div class="space-y-1">
               {#each Object.keys(customTags) as tagName (tagName)}
+                {@const tag = customTags[tagName]}
                 <button
                   type="button"
                   class="w-full text-left px-3 py-1 rounded-md text-sm transition-colors {selectedTagName ===
                   tagName
-                    ? 'bg-pink-100 text-pink-800'
-                    : 'hover:bg-gray-100 text-pink-800'}"
+                    ? tag.type === 'random' 
+                      ? 'bg-purple-100 text-purple-800' 
+                      : 'bg-pink-100 text-pink-800'
+                    : tag.type === 'random'
+                      ? 'hover:bg-purple-50 text-purple-700'  
+                      : 'hover:bg-gray-100 text-pink-800'}"
                   onclick={() => selectTag(tagName)}
                 >
                   {tagName}
@@ -309,23 +344,37 @@
                 onblur={saveTagName}
                 placeholder="Custom tag name"
               />
-              <div class="flex gap-2">
-                <button
-                  type="button"
-                  onclick={duplicateSelectedTag}
-                  class="inline-flex items-center gap-1 p-1.5 bg-blue-200 text-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm"
-                  title="Duplicate this custom tag"
-                >
-                  <DocumentDuplicate class="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onclick={deleteSelectedTag}
-                  class="inline-flex items-center gap-1 p-1.5 bg-red-200 text-red-500 rounded-md hover:bg-red-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors text-sm"
-                  title="Delete this custom tag"
-                >
-                  <Trash class="w-4 h-4" />
-                </button>
+              <div class="flex items-center gap-3">
+                <label class="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selectedTagType === 'random'}
+                    onchange={(e) => {
+                      selectedTagType = (e.target as HTMLInputElement).checked ? 'random' : 'custom'
+                      handleTagTypeChange()
+                    }}
+                    class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
+                  />
+                  <span class="text-gray-700">Random tag</span>
+                </label>
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    onclick={duplicateSelectedTag}
+                    class="inline-flex items-center gap-1 p-1.5 bg-blue-200 text-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm"
+                    title="Duplicate this custom tag"
+                  >
+                    <DocumentDuplicate class="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onclick={deleteSelectedTag}
+                    class="inline-flex items-center gap-1 p-1.5 bg-red-200 text-red-500 rounded-md hover:bg-red-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors text-sm"
+                    title="Delete this custom tag"
+                  >
+                    <Trash class="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
 

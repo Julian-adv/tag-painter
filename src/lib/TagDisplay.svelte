@@ -53,22 +53,29 @@
     }
   }
 
+  function getTagType(tagName: string): 'regular' | 'custom' | 'random' {
+    const currentData = get(promptsData)
+    const customTag = currentData.customTags[tagName]
+    return customTag?.type ?? 'regular'
+  }
+
   function getCustomTagContent(tagName: string): string {
     if (!isCustomTag(tagName)) return ''
 
     const currentData = get(promptsData)
-    const tagContent = currentData.customTags[tagName]
+    const customTag = currentData.customTags[tagName]
 
-    if (!tagContent || tagContent.length === 0) {
+    if (!customTag || customTag.tags.length === 0) {
       return 'Empty custom tag'
     }
 
     // Show first few tags with ellipsis if there are many
     const maxTags = 50
-    if (tagContent.length <= maxTags) {
-      return tagContent.join(', ')
+    const tagTypeLabel = customTag.type === 'random' ? ' (random)' : ''
+    if (customTag.tags.length <= maxTags) {
+      return `${customTag.tags.join(', ')}${tagTypeLabel}`
     } else {
-      return `${tagContent.slice(0, maxTags).join(', ')}... (${tagContent.length} tags total)`
+      return `${customTag.tags.slice(0, maxTags).join(', ')}... (${customTag.tags.length} tags total)${tagTypeLabel}`
     }
   }
 
@@ -160,6 +167,7 @@
   {#if tags.length > 0}
     <div class="flex flex-wrap gap-1 text-left relative">
       {#each tags as tag, index (tag)}
+        {@const tagType = getTagType(tag)}
         <div class="relative">
           <!-- Drop indicator before this tag -->
           {#if dropPosition === index && draggedIndex !== null}
@@ -178,15 +186,15 @@
             role="button"
             tabindex={readonly ? -1 : 0}
             aria-label="Drag to reorder tag: {tag}"
-            class="inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-md text-sm transition-all duration-200 {isCustomTag(
-              tag
-            )
-              ? 'bg-pink-100 text-pink-800'
-              : 'bg-sky-100 text-sky-800'} {!readonly
+            class="inline-flex items-center gap-1 rounded-md text-sm transition-all duration-200 {tagType === 'random'
+              ? 'bg-purple-100 text-purple-800 border-2 border-dashed border-purple-400 pl-1.5 pr-0.5 py-0.5'
+              : tagType === 'custom'
+                ? 'bg-pink-100 text-pink-800 pl-2 pr-1 py-1'
+                : 'bg-sky-100 text-sky-800 pl-2 pr-1 py-1'} {!readonly
               ? 'cursor-move hover:shadow-md'
               : ''} {draggedIndex === index ? 'opacity-50 scale-95' : ''}"
           >
-            {#if isCustomTag(tag)}
+            {#if tagType === 'custom' || tagType === 'random'}
               <button
                 type="button"
                 class="text-left cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit focus:outline-none"
@@ -205,11 +213,11 @@
             {#if !readonly}
               <button
                 type="button"
-                class="rounded-full w-4 h-4 inline-flex items-center justify-center {isCustomTag(
-                  tag
-                )
-                  ? 'text-pink-600 hover:text-pink-800 hover:bg-pink-200'
-                  : 'text-sky-600 hover:text-sky-800 hover:bg-sky-200'}"
+                class="rounded-full w-4 h-4 inline-flex items-center justify-center {tagType === 'random'
+                  ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-200'
+                  : tagType === 'custom'
+                    ? 'text-pink-600 hover:text-pink-800 hover:bg-pink-200'
+                    : 'text-sky-600 hover:text-sky-800 hover:bg-sky-200'}"
                 onclick={() => removeTag(tag)}
                 aria-label="Remove {tag}"
               >

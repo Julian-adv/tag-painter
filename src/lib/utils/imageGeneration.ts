@@ -5,7 +5,7 @@
 import { saveImage } from './fileIO'
 import { connectWebSocket, type WebSocketCallbacks } from './comfyui'
 import { defaultWorkflowPrompt, FINAL_SAVE_NODE_ID, generateLoraChain } from './workflow'
-import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow } from '$lib/types'
+import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow, CustomTag } from '$lib/types'
 
 export interface GenerationOptions {
   promptsData: PromptsData
@@ -19,13 +19,22 @@ export interface GenerationOptions {
 }
 
 // Expand custom tags to their constituent tags
-function expandCustomTags(tags: string[], customTags: Record<string, string[]>): string[] {
+function expandCustomTags(tags: string[], customTags: Record<string, CustomTag>): string[] {
   const expandedTags: string[] = []
 
   for (const tag of tags) {
     if (tag in customTags) {
-      // This is a custom tag, expand it to its constituent tags
-      expandedTags.push(...customTags[tag])
+      const customTag = customTags[tag]
+      if (customTag.type === 'random') {
+        // For random tags, select one random tag from the list
+        if (customTag.tags.length > 0) {
+          const randomIndex = Math.floor(Math.random() * customTag.tags.length)
+          expandedTags.push(customTag.tags[randomIndex])
+        }
+      } else {
+        // For custom tags, expand to all constituent tags
+        expandedTags.push(...customTag.tags)
+      }
     } else {
       // This is a regular tag, keep as is
       expandedTags.push(tag)
