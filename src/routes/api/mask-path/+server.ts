@@ -11,7 +11,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
     // Generate absolute path for the mask image based on composition
     const maskImagePath = path.resolve(process.cwd(), 'static', `${composition}-mask.png`)
-    
+
     return json({ maskImagePath })
   } catch (error) {
     console.error('Error resolving mask path:', error)

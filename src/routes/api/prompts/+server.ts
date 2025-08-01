@@ -1,9 +1,9 @@
 // API for prompts storage and retrieval
 
-import { json } from '@sveltejs/kit';
-import fs from 'fs/promises';
-import path from 'path';
-import type { PromptsData, PromptCategory } from '$lib/types';
+import { json } from '@sveltejs/kit'
+import fs from 'fs/promises'
+import path from 'path'
+import type { PromptsData, PromptCategory } from '$lib/types'
 
 const dataDir = path.resolve(process.cwd(), 'data')
 const filePath = path.join(dataDir, 'prompts.json')
@@ -25,12 +25,12 @@ function cleanCategoryData(category: PromptCategory): PromptCategory {
     values: category.aliasOf ? [] : category.values, // Empty array if it's an alias
     currentValue: category.currentValue
   }
-  
+
   // Include aliasOf if it exists
   if (category.aliasOf) {
     cleaned.aliasOf = category.aliasOf
   }
-  
+
   return cleaned
 }
 
@@ -51,7 +51,7 @@ export async function POST({ request }) {
       selectedLoras: data.selectedLoras,
       loraWeight: data.loraWeight
     }
-    
+
     await fs.writeFile(filePath, JSON.stringify(cleanedData, null, 2))
     return json({ success: true })
   } catch (error) {
@@ -100,7 +100,6 @@ function createDefaultCategories(): PromptCategory[] {
     }
   ]
 }
-
 
 export async function GET() {
   await ensureDir()

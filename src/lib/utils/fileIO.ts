@@ -48,13 +48,13 @@ export async function saveImage(
     // Send as form data with prompt metadata and output directory
     const formData = new FormData()
     formData.append('image', imageBlob, 'generated-image.png')
-    
+
     // Add category data dynamically (use resolved random values)
-    promptsData.categories.forEach(category => {
+    promptsData.categories.forEach((category) => {
       const effectiveValue = getEffectiveCategoryValueFromResolved(category, resolvedRandomValues)
       formData.append(category.id, effectiveValue)
     })
-    
+
     formData.append('outputDirectory', outputDirectory)
 
     // Add workflow data for metadata generation

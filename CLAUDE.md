@@ -79,6 +79,7 @@ Located in `src/lib/utils/` and `src/lib/stores/`:
 ### ComfyUI Integration
 
 The application connects to a local ComfyUI instance at `http://127.0.0.1:8188` and uses:
+
 - REST API for submitting workflows and fetching available checkpoints
 - WebSocket connection for real-time progress updates and image delivery
 - Dynamic workflow configuration based on user settings (upscale, face detailer, checkpoint selection)
@@ -155,5 +156,6 @@ The application connects to a local ComfyUI instance at `http://127.0.0.1:8188` 
 ## Puppeteer Configuration
 
 When using Puppeteer MCP for screenshots, use these settings for optimal app capture:
+
 - **Default screenshot size**: 1270x1300 pixels
 - This size captures the full app interface including all tag zones, settings, and generated images

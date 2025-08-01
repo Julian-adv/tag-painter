@@ -35,7 +35,6 @@ Or to automatically open in browser:
 npm run dev -- --open
 ```
 
-
 ## Key Features
 
 - **Multi-category prompts** - Quality, character, outfit, pose, background categories
@@ -43,5 +42,3 @@ npm run dev -- --open
 - **20,000+ Danbooru tags** - Auto-complete suggestions for prompts
 - **Image navigation** - Browse generated images with metadata restoration
 - **Category management** - Add, edit, delete categories with drag & drop
-
-

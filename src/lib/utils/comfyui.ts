@@ -50,7 +50,7 @@ export function connectWebSocket(
 ): void {
   const ws = new WebSocket(`ws://127.0.0.1:8188/ws?clientId=${generatedClientId}`)
   ws.binaryType = 'arraybuffer'
-  
+
   let lastExecutingNode: string | null = null
 
   // Function to get node title from workflow
@@ -101,10 +101,7 @@ export function connectWebSocket(
     } else if (event.data instanceof ArrayBuffer) {
       // Check if the last executing node was our SaveImageWebsocket node
       // AND that the current prompt ID matches.
-      if (
-        lastExecutingNode === finalSaveNodeId &&
-        promptId /* && execution prompt_id matches */
-      ) {
+      if (lastExecutingNode === finalSaveNodeId && promptId /* && execution prompt_id matches */) {
         const imageBlob = new Blob([event.data.slice(8)], { type: 'image/png' })
         callbacks.onImageReceived(imageBlob)
         callbacks.onLoadingChange(false)

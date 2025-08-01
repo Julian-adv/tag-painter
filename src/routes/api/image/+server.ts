@@ -136,7 +136,7 @@ export async function POST({ request }) {
           .filter(([key, value]) => key !== 'negative' && Boolean(value))
           .map(([, value]) => value)
         promptText = promptParts.join(', ')
-        
+
         // Store categorized prompts for structured metadata
         categorizedPrompts = categoryData
         outputDirectory = outputDir || DEFAULT_OUTPUT_DIRECTORY
@@ -178,21 +178,21 @@ export async function POST({ request }) {
 
       // Convert scheduler to proper format
       const schedulerMap: Record<string, string> = {
-        'simple': 'Simple',
-        'karras': 'Karras',
-        'exponential': 'Exponential',
-        'sgm_uniform': 'SGM Uniform'
+        simple: 'Simple',
+        karras: 'Karras',
+        exponential: 'Exponential',
+        sgm_uniform: 'SGM Uniform'
       }
       const scheduleType = schedulerMap[scheduler] || 'Simple'
 
       // Convert sampler name to proper format
       const samplerMap: Record<string, string> = {
-        'euler_ancestral': 'Euler a',
-        'dpmpp_2m_sde': 'DPM++ 2M SDE',
-        'dpmpp_2m': 'DPM++ 2M',
-        'euler': 'Euler',
-        'heun': 'Heun',
-        'lms': 'LMS'
+        euler_ancestral: 'Euler a',
+        dpmpp_2m_sde: 'DPM++ 2M SDE',
+        dpmpp_2m: 'DPM++ 2M',
+        euler: 'Euler',
+        heun: 'Heun',
+        lms: 'LMS'
       }
       const samplerName = samplerMap[sampler] || sampler
 
@@ -208,7 +208,7 @@ export async function POST({ request }) {
           return `${key.charAt(0).toUpperCase() + key.slice(1)}: ${value}`
         })
         .join('\n')
-      
+
       const parametersText = `${promptText}
 ${categoryLines}
 Steps: ${steps}, Sampler: ${samplerName}, Schedule type: ${scheduleType}, CFG scale: ${cfg}, Seed: ${seed}, Size: ${width}x${height}, Model: ${modelName}`

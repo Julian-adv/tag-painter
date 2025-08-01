@@ -93,7 +93,7 @@ export function processPrompts(
       if (categoriesToRemove.includes(categoryName)) {
         isExcluded = true
       }
-      
+
       // Check for wildcard patterns like *2, *1, etc.
       for (const pattern of categoriesToRemove) {
         if (pattern.startsWith('*')) {
@@ -152,32 +152,30 @@ export function generateFaceDetailerWildcard(
   resolvedRandomValues: Record<string, OptionItem>
 ): string {
   // Filter face categories
-  const faceCategories = categories.filter((cat) =>
-    cat.name.toLowerCase().includes('face')
-  )
-  
+  const faceCategories = categories.filter((cat) => cat.name.toLowerCase().includes('face'))
+
   if (faceCategories.length === 0) {
     return ''
   }
 
   // Group categories by suffix number (no number, 1, 2, 3, etc.)
   const categoryGroups = new Map<string, PromptCategory[]>()
-  
-  faceCategories.forEach(cat => {
+
+  faceCategories.forEach((cat) => {
     const numberMatch = cat.name.match(/(\d+)$/) // Match number at end
     const groupKey = numberMatch ? numberMatch[1] : '0' // '0' for no number
-    
+
     if (!categoryGroups.has(groupKey)) {
       categoryGroups.set(groupKey, [])
     }
     categoryGroups.get(groupKey)!.push(cat)
   })
-  
+
   // Sort groups by key: 0, 1, 2, 3, etc.
   const sortedKeys = Array.from(categoryGroups.keys()).sort((a, b) => {
     return parseInt(a) - parseInt(b)
   })
-  
+
   // Combine groups with [SEP]
   const wildcardParts = []
   for (const key of sortedKeys) {
@@ -185,16 +183,16 @@ export function generateFaceDetailerWildcard(
     const values = categories
       .map((cat) => getEffectiveCategoryValueFromResolved(cat, resolvedRandomValues))
       .filter(Boolean)
-    
+
     if (values.length > 0) {
       wildcardParts.push(values.join(', '))
     }
   }
-  
+
   if (wildcardParts.length > 0) {
     // Join parts with [SEP] and return wildcard
     return '[ASC]\n' + wildcardParts.join(' [SEP]\n')
   }
-  
+
   return ''
 }
