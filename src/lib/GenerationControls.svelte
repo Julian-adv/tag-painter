@@ -1,7 +1,7 @@
 <!-- Component for generation controls, progress bar, and loading state -->
 <script lang="ts">
   import SettingsDialog from './SettingsDialog.svelte'
-  import { Cog8Tooth, Play, Stop } from 'svelte-heros-v2'
+  import { Cog8Tooth, Play, Stop, ArrowPath } from 'svelte-heros-v2'
   import type { Settings, ProgressData } from '$lib/types'
 
   interface Props {
@@ -9,10 +9,12 @@
     progressData: ProgressData
     settings: Settings
     onGenerate: () => void
+    onRegenerate: () => void
     onGenerateForever: () => void
     onStopGeneration: () => void
     isGeneratingForever: boolean
     onSettingsChange: (settings: Settings) => void
+    lastSeed: number | null
   }
 
   let {
@@ -20,10 +22,12 @@
     progressData,
     settings,
     onGenerate,
+    onRegenerate,
     onGenerateForever,
     onStopGeneration,
     isGeneratingForever,
-    onSettingsChange
+    onSettingsChange,
+    lastSeed
   }: Props = $props()
 
   let showSettingsDialog = $state(false)
@@ -50,6 +54,16 @@
       disabled={isLoading || isGeneratingForever}
     >
       {isLoading ? 'Generating...' : 'Generate'}
+    </button>
+
+    <button
+      class="flex items-center justify-center gap-1 px-2 py-1.5 text-white border-none rounded-md text-sm font-semibold cursor-pointer transition-all duration-200 h-9 bg-green-500 hover:enabled:bg-green-600 hover:enabled:-translate-y-0.5 hover:enabled:shadow-lg active:enabled:translate-y-0 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+      onclick={onRegenerate}
+      disabled={isLoading || isGeneratingForever || lastSeed === null}
+      title={lastSeed !== null ? `Regenerate with seed: ${lastSeed}` : 'No previous seed available'}
+    >
+      <ArrowPath class="w-4 h-4" />
+      Regen
     </button>
 
     <button

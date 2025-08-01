@@ -12,6 +12,7 @@ export interface GenerationOptions {
   settings: Settings
   resolvedRandomValues: Record<string, OptionItem>
   selectedLoras: string[]
+  seed?: number | null
   onLoadingChange: (loading: boolean) => void
   onProgressUpdate: (progress: ProgressData) => void
   onImageReceived: (imageBlob: Blob, filePath: string) => void
@@ -35,12 +36,13 @@ function expandCustomTags(tags: string[], customTags: Record<string, string[]>):
   return expandedTags
 }
 
-export async function generateImage(options: GenerationOptions): Promise<void> {
+export async function generateImage(options: GenerationOptions): Promise<number> {
   const {
     promptsData,
     settings,
     resolvedRandomValues,
     selectedLoras,
+    seed,
     onLoadingChange,
     onProgressUpdate,
     onImageReceived,
@@ -51,9 +53,6 @@ export async function generateImage(options: GenerationOptions): Promise<void> {
   const workflow = JSON.parse(JSON.stringify(defaultWorkflowPrompt))
 
   try {
-    // Set face detailer wildcard to empty since categories are no longer used
-    workflow['56'].inputs.wildcard = ''
-
     onLoadingChange(true)
     onProgressUpdate({ value: 0, max: 100, currentNode: '' })
 
@@ -70,6 +69,13 @@ export async function generateImage(options: GenerationOptions): Promise<void> {
     const zone1TagsText = expandedZone1Tags.join(', ')
     const zone2TagsText = expandedZone2Tags.join(', ')
     const negativeTagsText = expandedNegativeTags.join(', ')
+
+    // Set face detailer wildcard with combined first zone and second zone prompts
+    const combinedZonePrompt =
+      zone1TagsText && zone2TagsText
+        ? `${zone1TagsText} [SEP] ${zone2TagsText}`
+        : zone1TagsText || zone2TagsText
+    workflow['56'].inputs.wildcard = combinedZonePrompt
 
     const promptParts = [allTagsText, zone1TagsText, zone2TagsText]
 
@@ -119,12 +125,13 @@ export async function generateImage(options: GenerationOptions): Promise<void> {
     // Configure workflow based on settings
     configureWorkflow(workflow, promptsData, settings)
 
-    // Apply random seeds
-    applySeedsToWorkflow(workflow)
+    // Apply seeds (either use provided seed or generate new one)
+    const appliedSeed = applySeedsToWorkflow(workflow, seed)
 
     // Add SaveImageWebsocket node for output
     addSaveImageWebsocketNode(workflow, promptsData)
 
+    console.log('workflow', workflow)
     // Submit to ComfyUI
     await submitToComfyUI(workflow, clientId, promptsData, settings, resolvedRandomValues, {
       onLoadingChange,
@@ -132,10 +139,13 @@ export async function generateImage(options: GenerationOptions): Promise<void> {
       onImageReceived,
       onError
     })
+
+    return appliedSeed
   } catch (error) {
     console.error('Failed to generate image:', error)
     onError(error instanceof Error ? error.message : 'Failed to generate image')
     onLoadingChange(false)
+    throw error
   }
 }
 
@@ -170,9 +180,9 @@ function configureWorkflow(
   }
 }
 
-function applySeedsToWorkflow(workflow: ComfyUIWorkflow) {
-  // Apply random seed to relevant nodes
-  const seed = Math.floor(Math.random() * 10000000000000000)
+function applySeedsToWorkflow(workflow: ComfyUIWorkflow, providedSeed?: number | null): number {
+  // Use provided seed or generate a new random seed
+  const seed = providedSeed ?? Math.floor(Math.random() * 10000000000000000)
 
   // Set seed for SamplerCustom node
   workflow['14'].inputs.noise_seed = seed
@@ -190,6 +200,8 @@ function applySeedsToWorkflow(workflow: ComfyUIWorkflow) {
   if (workflow['69']) {
     workflow['69'].inputs.seed = seed + 2
   }
+
+  return seed
 }
 
 function addSaveImageWebsocketNode(workflow: ComfyUIWorkflow, promptsData: PromptsData) {

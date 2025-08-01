@@ -37,6 +37,7 @@
   let imageViewer: { updateFileList: () => Promise<void> } | undefined
   let isGeneratingForever = $state(false)
   let shouldStopGeneration = $state(false)
+  let lastSeed: number | null = $state(null)
 
   // Settings state
   let settings: Settings = $state({
@@ -76,7 +77,7 @@
   })
 
   // Event handlers
-  async function handleGenerate() {
+  async function handleGenerate(seedToUse: number | null = null) {
     // Add current values to options if they're not already there
     autoSaveCurrentValues()
 
@@ -89,11 +90,12 @@
     let currentPromptsData: PromptsData
     promptsData.subscribe((data) => (currentPromptsData = data))()
 
-    await generateImage({
+    lastSeed = await generateImage({
       promptsData: currentPromptsData!,
       settings,
       resolvedRandomValues: resolvedValues,
       selectedLoras: currentPromptsData!.selectedLoras,
+      seed: seedToUse,
       onLoadingChange: (loading) => {
         isLoading = loading
       },
@@ -128,7 +130,7 @@
 
     while (isGeneratingForever && !shouldStopGeneration) {
       try {
-        await handleGenerate()
+        await handleGenerate(null)
 
         // Wait for current generation to complete
         while (isLoading && !shouldStopGeneration) {
@@ -261,7 +263,9 @@
         {progressData}
         {settings}
         {isGeneratingForever}
-        onGenerate={handleGenerate}
+        {lastSeed}
+        onGenerate={() => handleGenerate(null)}
+        onRegenerate={() => handleGenerate(lastSeed)}
         onGenerateForever={handleGenerateForever}
         onStopGeneration={handleStopGeneration}
         onSettingsChange={handleSettingsChange}
