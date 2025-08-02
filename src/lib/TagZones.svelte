@@ -96,7 +96,6 @@
     <TagInput
       id="all-tags"
       label="All"
-      placeholder="Enter tags for all zones..."
       bind:tags={allTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={handleCustomTagDoubleClick}
@@ -106,7 +105,6 @@
     <TagInput
       id="first-zone-tags"
       label="First Zone"
-      placeholder="Enter tags for first zone..."
       bind:tags={firstZoneTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={handleCustomTagDoubleClick}
@@ -116,7 +114,6 @@
     <TagInput
       id="second-zone-tags"
       label="Second Zone"
-      placeholder="Enter tags for second zone..."
       bind:tags={secondZoneTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={handleCustomTagDoubleClick}
@@ -126,7 +123,6 @@
     <TagInput
       id="negative-tags"
       label="Negative Tags"
-      placeholder="Enter negative tags..."
       bind:tags={negativeTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={handleCustomTagDoubleClick}

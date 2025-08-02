@@ -122,7 +122,6 @@
         <TagDisplay
           id="dialog-tags"
           bind:tags={dialogTags}
-          placeholder="No tags yet"
         />
       </div>
 

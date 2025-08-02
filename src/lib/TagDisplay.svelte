@@ -6,7 +6,6 @@
   interface Props {
     id: string
     tags: CustomTag[]
-    placeholder?: string
     readonly?: boolean
     onTagsChange?: () => void
     onCustomTagDoubleClick?: (tagName: string) => void
@@ -16,7 +15,6 @@
   let {
     id,
     tags = $bindable(),
-    placeholder = '',
     readonly = false,
     onTagsChange,
     onCustomTagDoubleClick,
@@ -118,12 +116,12 @@
 
 <div
   {id}
-  class="w-full min-h-[6rem] p-1 border border-gray-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-sky-500 focus-within:border-sky-500 {readonly
+  class="w-full min-h-[6rem] p-1 border border-gray-300 rounded-lg bg-white {readonly
     ? 'bg-gray-50'
     : ''}"
-  tabindex="0"
+  tabindex="-1"
   role="textbox"
-  aria-label={placeholder}
+  aria-label="Tag display area"
   onkeydown={handleKeydown}
 >
   {#if tags.length > 0}
@@ -145,10 +143,6 @@
           onDrop={handleDrop}
         />
       {/each}
-    </div>
-  {:else}
-    <div class="text-gray-400 text-sm italic">
-      {placeholder}
     </div>
   {/if}
 </div>

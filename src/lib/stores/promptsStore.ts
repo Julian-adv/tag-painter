@@ -164,11 +164,7 @@ export function updateTags(
   }))
 }
 
-export async function saveCustomTag(
-  name: string,
-  tags: string[],
-  type: TagType = 'sequential'
-) {
+export async function saveCustomTag(name: string, tags: string[], type: TagType = 'sequential') {
   let updatedData: PromptsData
 
   promptsData.update((data) => {

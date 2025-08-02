@@ -11,7 +11,6 @@
   interface Props {
     id: string
     label: string
-    placeholder: string
     tags: CustomTag[]
     showPlusButton?: boolean
     onTagsChange?: () => void
@@ -19,7 +18,7 @@
     currentRandomTagResolutions?: Record<string, string>
   }
 
-  let { id, label, placeholder, tags = $bindable(), showPlusButton = true, onTagsChange, onCustomTagDoubleClick, currentRandomTagResolutions = {} }: Props = $props()
+  let { id, label, tags = $bindable(), showPlusButton = true, onTagsChange, onCustomTagDoubleClick, currentRandomTagResolutions = {} }: Props = $props()
 
   let quickTagInput = $state('')
   let showDialog = $state(false)
@@ -87,7 +86,7 @@
       </button>
     {/if}
   </div>
-  <TagDisplay {id} bind:tags {placeholder} {onTagsChange} {onCustomTagDoubleClick} {currentRandomTagResolutions} />
+  <TagDisplay {id} bind:tags {onTagsChange} {onCustomTagDoubleClick} {currentRandomTagResolutions} />
 
   <!-- Quick tag input with autocomplete -->
   <div class="mt-1">

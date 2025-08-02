@@ -90,7 +90,7 @@
     ondragleave={onDragLeave}
     ondrop={onDrop}
     role="button"
-    tabindex={readonly ? -1 : 0}
+    tabindex="-1"
     aria-label="Drag to reorder tag: {tag.name}"
     class="inline-flex items-center gap-1 {getTagClasses({
       tag,
@@ -103,6 +103,7 @@
       <button
         type="button"
         class="text-left cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit focus:outline-none"
+        tabindex="-1"
         ondblclick={handleTagDoubleClick}
         onkeydown={handleTagKeydown}
         title={getCustomTagContent()}
@@ -119,6 +120,7 @@
       <button
         type="button"
         class={getTagRemoveButtonClasses(tag)}
+        tabindex="-1"
         onclick={() => onRemove(tag.name)}
         aria-label="Remove {tag.name}"
       >

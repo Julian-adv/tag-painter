@@ -4,7 +4,7 @@
   import { promptsData, saveCustomTag, savePromptsData } from './stores/promptsStore'
   import { get } from 'svelte/store'
   import { untrack } from 'svelte'
-  import { Trash, DocumentDuplicate } from 'svelte-heros-v2'
+  import { Trash, DocumentDuplicate, Plus } from 'svelte-heros-v2'
   import type { CustomTag, TagType } from '$lib/types'
   import { getTagClasses } from './utils/tagStyling'
 
@@ -22,21 +22,27 @@
   let hasUnsavedChanges = $state(false)
   let editingTagName = $state<string>('')
   let statusMessage = $state<string>('')
-  
+
   // Drag & drop state
   let draggedTagName = $state<string | null>(null)
   let dropPosition = $state<number | null>(null)
+
+  // Reference to the left column scroll container
+  let leftColumnElement = $state<HTMLElement>()
+
+  // Reference to the tag name input field
+  let tagNameInputElement = $state<HTMLInputElement>()
 
   // Convert string array to CustomTag array
   function convertToCustomTags(tagNames: string[]): CustomTag[] {
     const currentData = get(promptsData)
     return tagNames.map((tagName: string): CustomTag => {
       const customTag = currentData.customTags[tagName]
-      
+
       if (customTag) {
         return customTag
       }
-      
+
       // Create regular tag object for non-custom tags
       return {
         name: tagName,
@@ -131,6 +137,50 @@
     }
   }
 
+  async function addNewTag() {
+    // Generate unique name for new tag
+    let newName = 'New Tag'
+    let counter = 1
+    while (newName in customTags) {
+      counter++
+      newName = `New Tag ${counter}`
+    }
+
+    // Create new empty sequential tag
+    const newTag: CustomTag = {
+      name: newName,
+      tags: [],
+      type: 'sequential'
+    }
+
+    // Update local state
+    customTags[newName] = newTag
+    customTags = { ...customTags }
+
+    // Update the store
+    promptsData.update((data) => {
+      return {
+        ...data,
+        customTags: {
+          ...data.customTags,
+          [newName]: newTag
+        }
+      }
+    })
+
+    // Select the newly created tag
+    selectedTagName = newName
+    selectedTagContent = []
+    selectedTagType = 'sequential'
+    editingTagName = newName
+    hasUnsavedChanges = true
+    statusMessage = ''
+
+    // Scroll to the newly created tag and focus the name input
+    scrollToTag(newName)
+    focusTagNameInput()
+  }
+
   async function duplicateSelectedTag() {
     if (!selectedTagName) return
 
@@ -146,7 +196,7 @@
     // Create duplicate with same content and type
     const duplicateTag: CustomTag = {
       name: newName,
-      tags: selectedTagContent.map(tag => tag.name),
+      tags: selectedTagContent.map((tag) => tag.name),
       type: selectedTagType
     }
 
@@ -172,6 +222,37 @@
     editingTagName = newName
     hasUnsavedChanges = true
     statusMessage = ''
+
+    // Scroll to the newly created duplicate and focus the name input
+    scrollToTag(newName)
+    focusTagNameInput()
+  }
+
+  function scrollToTag(tagName: string) {
+    // Wait for the DOM to update, then scroll to the tag
+    setTimeout(() => {
+      if (leftColumnElement) {
+        const tagButton = leftColumnElement.querySelector(
+          `button[data-tag-name="${tagName}"]`
+        ) as HTMLElement
+        if (tagButton) {
+          tagButton.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          })
+        }
+      }
+    }, 50)
+  }
+
+  function focusTagNameInput() {
+    // Wait for the DOM to update and scroll to complete, then focus the input
+    setTimeout(() => {
+      if (tagNameInputElement) {
+        tagNameInputElement.focus()
+        tagNameInputElement.select() // Select all text for easy replacement
+      }
+    }, 150)
   }
 
   function generateDuplicateName(originalName: string): string {
@@ -193,12 +274,16 @@
     if (!selectedTagName) return
 
     // Update custom tags in store
-    await saveCustomTag(selectedTagName, selectedTagContent.map(tag => tag.name), selectedTagType)
+    await saveCustomTag(
+      selectedTagName,
+      selectedTagContent.map((tag) => tag.name),
+      selectedTagType
+    )
 
     // Update local state
     const updatedTag: CustomTag = {
       name: selectedTagName,
-      tags: selectedTagContent.map(tag => tag.name),
+      tags: selectedTagContent.map((tag) => tag.name),
       type: selectedTagType
     }
     customTags[selectedTagName] = updatedTag
@@ -210,16 +295,16 @@
     if (selectedTagName && hasUnsavedChanges) {
       await saveTagContent()
     }
-    
+
     // Update the store with the current customTags order
     promptsData.update((data) => ({
       ...data,
       customTags: { ...customTags }
     }))
-    
+
     // Save the entire prompts data
     await savePromptsData()
-    
+
     hasUnsavedChanges = false
   }
 
@@ -330,12 +415,12 @@
 
   async function handleDrop(event: DragEvent) {
     event.preventDefault()
-    
+
     if (!draggedTagName || dropPosition === null) return
 
     const tagNames = Object.keys(customTags)
     const draggedIndex = tagNames.indexOf(draggedTagName)
-    
+
     if (draggedIndex === -1) return
 
     // Calculate the actual insertion index accounting for the removed element
@@ -356,10 +441,10 @@
     }
 
     customTags = newCustomTags
-    
+
     // Mark as having unsaved changes
     hasUnsavedChanges = true
-    
+
     draggedTagName = null
     dropPosition = null
   }
@@ -401,7 +486,7 @@
       <div class="flex-1 flex min-h-0">
         <!-- Left column: Custom tags list -->
         <div class="w-1/3 border-r border-gray-300 flex flex-col">
-          <div class="flex-1 p-4 overflow-y-auto">
+          <div class="flex-1 p-4 overflow-y-auto" bind:this={leftColumnElement}>
             <div class="space-y-1">
               {#each Object.keys(customTags) as tagName, index (tagName)}
                 {@const tag = customTags[tagName]}
@@ -422,6 +507,7 @@
                       dragged: draggedTagName === tagName,
                       additionalClasses: 'pl-2 pr-3 py-1.5 cursor-move'
                     })}"
+                    data-tag-name={tagName}
                     onclick={() => selectTag(tagName)}
                     ondragstart={(e) => handleDragStart(e, tagName)}
                     ondragend={handleDragEnd}
@@ -449,56 +535,88 @@
         </div>
 
         <!-- Right column: Selected tag content -->
-        <div class="flex-1 p-4 flex flex-col">
+        <div class="flex-1 p-4 flex flex-col gap-2">
           {#if selectedTagName}
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center justify-between">
               <input
                 type="text"
                 bind:value={editingTagName}
-                class="text-sm font-semibold text-gray-900 bg-transparent border-b border-blue-500 focus:outline-none focus:border-blue-600 px-1 py-0.5 flex-1 mr-2"
+                bind:this={tagNameInputElement}
+                class="text-sm font-semibold text-gray-900 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 px-3 py-2 flex-1 mr-2"
+                tabindex="0"
                 onkeydown={handleNameKeydown}
                 onblur={saveTagName}
                 placeholder="Custom tag name"
               />
-              <div class="flex items-center gap-3">
-                <label class="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selectedTagType === 'random'}
-                    onchange={(e) => {
-                      selectedTagType = (e.target as HTMLInputElement).checked ? 'random' : 'sequential'
-                      handleTagTypeChange()
-                    }}
-                    class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
-                  />
-                  <span class="text-gray-700">Random tag</span>
-                </label>
-                <div class="flex gap-2">
-                  <button
-                    type="button"
-                    onclick={duplicateSelectedTag}
-                    class="inline-flex items-center gap-1 p-1.5 bg-blue-200 text-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm"
-                    title="Duplicate this custom tag"
-                  >
-                    <DocumentDuplicate class="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onclick={deleteSelectedTag}
-                    class="inline-flex items-center gap-1 p-1.5 bg-red-200 text-red-500 rounded-md hover:bg-red-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors text-sm"
-                    title="Delete this custom tag"
-                  >
-                    <Trash class="w-4 h-4" />
-                  </button>
-                </div>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  onclick={addNewTag}
+                  class="inline-flex items-center gap-1 p-1.5 bg-green-200 text-green-600 rounded-md hover:bg-green-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors text-sm"
+                  tabindex="-1"
+                  title="Add new custom tag"
+                >
+                  <Plus class="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onclick={duplicateSelectedTag}
+                  class="inline-flex items-center gap-1 p-1.5 bg-blue-200 text-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm"
+                  tabindex="-1"
+                  title="Duplicate this custom tag"
+                >
+                  <DocumentDuplicate class="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onclick={deleteSelectedTag}
+                  class="inline-flex items-center gap-1 p-1.5 bg-red-200 text-red-500 rounded-md hover:bg-red-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors text-sm"
+                  tabindex="-1"
+                  title="Delete this custom tag"
+                >
+                  <Trash class="w-4 h-4" />
+                </button>
               </div>
+            </div>
+
+            <!-- Tag type radio buttons -->
+            <div class="flex items-center gap-4 text-sm">
+              <label class="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="tagType"
+                  value="sequential"
+                  checked={selectedTagType === 'sequential'}
+                  tabindex="-1"
+                  onchange={() => {
+                    selectedTagType = 'sequential'
+                    handleTagTypeChange()
+                  }}
+                  class="w-4 h-4 text-pink-600 bg-gray-100 border-gray-300 focus:ring-pink-500 focus:ring-2"
+                />
+                <span class="text-gray-700">Sequential</span>
+              </label>
+              <label class="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="tagType"
+                  value="random"
+                  checked={selectedTagType === 'random'}
+                  tabindex="-1"
+                  onchange={() => {
+                    selectedTagType = 'random'
+                    handleTagTypeChange()
+                  }}
+                  class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500 focus:ring-2"
+                />
+                <span class="text-gray-700">Random</span>
+              </label>
             </div>
 
             <div class="flex-1">
               <TagInput
                 id="custom-tag-content"
                 label=""
-                placeholder="Add tags to this custom tag..."
                 bind:tags={selectedTagContent}
                 showPlusButton={false}
                 onTagsChange={handleTagsChange}
