@@ -2,11 +2,12 @@
 <script lang="ts">
   import TagDisplay from './TagDisplay.svelte'
   import { saveCustomTag } from './stores/promptsStore'
+  import type { CustomTag } from './types'
 
   interface Props {
     isOpen: boolean
     title: string
-    tags: string[]
+    tags: CustomTag[]
     onSave: (customTagName: string, originalTags: string[]) => void
     onCancel: () => void
   }
@@ -14,7 +15,7 @@
   let { isOpen = $bindable(), title, tags, onSave, onCancel }: Props = $props()
 
   let newTagInput = $state('')
-  let dialogTags = $state([...tags])
+  let dialogTags = $state<CustomTag[]>([...tags])
 
   // Update internal tags when props change
   $effect(() => {
@@ -38,13 +39,13 @@
     // Save as custom tag if user entered a name
     if (newTagInput.trim()) {
       const customTagName = newTagInput.trim()
-      const currentDialogTags = [...dialogTags] // Create a snapshot
+      const currentDialogTagNames = dialogTags.map(tag => tag.name) // Convert to string array
       
       // Save the custom tag
-      await saveCustomTag(customTagName, currentDialogTags)
+      await saveCustomTag(customTagName, currentDialogTagNames)
       
       // Pass the custom tag name and original tags to parent for processing
-      onSave(customTagName, currentDialogTags)
+      onSave(customTagName, currentDialogTagNames)
       
       isOpen = false
     }
@@ -62,9 +63,6 @@
     }
   }
 
-  function handleTagsChange() {
-    // No additional action needed, tags are already updated via binding
-  }
 </script>
 
 {#if isOpen}
@@ -125,7 +123,6 @@
           id="dialog-tags"
           bind:tags={dialogTags}
           placeholder="No tags yet"
-          onTagsChange={handleTagsChange}
         />
       </div>
 

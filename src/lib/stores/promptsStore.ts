@@ -24,7 +24,7 @@ export const promptsData = writable<PromptsData>(defaultPromptsData)
 export const resolvedRandomValues = writable<Record<string, OptionItem>>({})
 
 // Migrate old customTags format to new format
-function migrateCustomTags(oldCustomTags: any): Record<string, CustomTag> {
+function migrateCustomTags(oldCustomTags: unknown): Record<string, CustomTag> {
   const newCustomTags: Record<string, CustomTag> = {}
 
   // Check if it's already in new format
@@ -167,7 +167,7 @@ export function updateTags(
 export async function saveCustomTag(
   name: string,
   tags: string[],
-  type: 'custom' | 'random' = 'custom'
+  type: 'custom' | 'random' | 'regular' = 'custom'
 ) {
   let updatedData: PromptsData
 

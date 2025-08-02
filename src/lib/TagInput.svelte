@@ -4,12 +4,15 @@
   import TagDisplay from './TagDisplay.svelte'
   import TagManageDialog from './TagManageDialog.svelte'
   import { Plus } from 'svelte-heros-v2'
+  import { promptsData } from './stores/promptsStore'
+  import { get } from 'svelte/store'
+  import type { CustomTag } from './types'
 
   interface Props {
     id: string
     label: string
     placeholder: string
-    tags: string[]
+    tags: CustomTag[]
     showPlusButton?: boolean
     onTagsChange?: () => void
     onCustomTagDoubleClick?: (tagName: string) => void
@@ -27,7 +30,12 @@
 
   function addQuickTagToMain() {
     if (quickTagInput.trim()) {
-      tags = [...tags, quickTagInput.trim()]
+      const newTag: CustomTag = {
+        name: quickTagInput.trim(),
+        tags: [quickTagInput.trim()],
+        type: 'regular'
+      }
+      tags = [...tags, newTag]
       quickTagInput = ''
       onTagsChange?.()
     }
@@ -47,11 +55,17 @@
   async function handleDialogSave(customTagName: string, originalTags: string[]) {
     // New custom tag was created
     // Remove individual tags that are now part of the custom tag from current tags
-    const filteredTags = tags.filter((tag) => !originalTags.includes(tag))
-    // Add the new custom tag
-    tags = [...filteredTags, customTagName]
-
-    onTagsChange?.()
+    const filteredTags = tags.filter((tag) => !originalTags.includes(tag.name))
+    
+    // Get the newly created custom tag from the store
+    const currentData = get(promptsData)
+    const newCustomTag = currentData.customTags[customTagName]
+    
+    if (newCustomTag) {
+      // Add the new custom tag
+      tags = [...filteredTags, newCustomTag]
+      onTagsChange?.()
+    }
   }
 
   function handleDialogCancel() {

@@ -5,6 +5,8 @@
   import { promptsData, updateTags, savePromptsData } from './stores/promptsStore'
   import { onMount } from 'svelte'
   import { Tag } from 'svelte-heros-v2'
+  import { get } from 'svelte/store'
+  import type { CustomTag } from './types'
 
   interface Props {
     currentRandomTagResolutions?: {
@@ -17,27 +19,51 @@
 
   let { currentRandomTagResolutions = { all: {}, zone1: {}, zone2: {}, negative: {} } }: Props = $props()
 
-  let allTags = $state<string[]>([])
-  let firstZoneTags = $state<string[]>([])
-  let secondZoneTags = $state<string[]>([])
-  let negativeTags = $state<string[]>([])
+  let allTags = $state<CustomTag[]>([])
+  let firstZoneTags = $state<CustomTag[]>([])
+  let secondZoneTags = $state<CustomTag[]>([])
+  let negativeTags = $state<CustomTag[]>([])
   let showCustomTagsDialog = $state(false)
   let selectedCustomTagName = $state<string>('')
+
+  // Convert string array to CustomTag array
+  function convertToCustomTags(tagNames: string[]): CustomTag[] {
+    const currentData = get(promptsData)
+    return tagNames.map((tagName: string): CustomTag => {
+      const customTag = currentData.customTags[tagName]
+      
+      if (customTag) {
+        return customTag
+      }
+      
+      // Create regular tag object for non-custom tags
+      return {
+        name: tagName,
+        tags: [tagName],
+        type: 'regular'
+      }
+    })
+  }
 
   // Load tags from store on mount
   onMount(() => {
     const unsubscribe = promptsData.subscribe((data) => {
-      allTags = [...data.tags.all]
-      firstZoneTags = [...data.tags.zone1]
-      secondZoneTags = [...data.tags.zone2]
-      negativeTags = [...data.tags.negative]
+      allTags = convertToCustomTags(data.tags.all)
+      firstZoneTags = convertToCustomTags(data.tags.zone1)
+      secondZoneTags = convertToCustomTags(data.tags.zone2)
+      negativeTags = convertToCustomTags(data.tags.negative)
     })
     return unsubscribe
   })
 
   // Save tags whenever they change
   async function saveTags() {
-    updateTags(allTags, firstZoneTags, secondZoneTags, negativeTags)
+    updateTags(
+      allTags.map(tag => tag.name),
+      firstZoneTags.map(tag => tag.name),
+      secondZoneTags.map(tag => tag.name),
+      negativeTags.map(tag => tag.name)
+    )
     await savePromptsData()
   }
 

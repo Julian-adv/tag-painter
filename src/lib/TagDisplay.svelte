@@ -1,10 +1,11 @@
 <!-- Component for displaying tags as boxes with delete functionality -->
 <script lang="ts">
   import TagItem from './TagItem.svelte'
+  import type { CustomTag } from './types'
 
   interface Props {
     id: string
-    tags: string[]
+    tags: CustomTag[]
     placeholder?: string
     readonly?: boolean
     onTagsChange?: () => void
@@ -25,10 +26,10 @@
   let draggedIndex: number | null = $state(null)
   let dropPosition: number | null = $state(null)
 
-  function removeTag(tagToRemove: string) {
+  function removeTag(tagNameToRemove: string) {
     if (readonly) return
 
-    tags = tags.filter((tag) => tag !== tagToRemove)
+    tags = tags.filter((tag) => tag.name !== tagNameToRemove)
     onTagsChange?.()
   }
 
@@ -127,7 +128,7 @@
 >
   {#if tags.length > 0}
     <div class="flex flex-wrap gap-1 text-left relative">
-      {#each tags as tag, index (tag)}
+      {#each tags as tag, index (tag.name)}
         <TagItem
           {tag}
           {index}

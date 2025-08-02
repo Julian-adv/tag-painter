@@ -43,7 +43,7 @@ export interface PromptCategory {
 export interface CustomTag {
   name: string
   tags: string[]
-  type: 'custom' | 'random'
+  type: 'custom' | 'random' | 'regular'
 }
 
 export interface PromptsData {

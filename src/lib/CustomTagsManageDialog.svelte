@@ -6,6 +6,7 @@
   import { untrack } from 'svelte'
   import { Trash, DocumentDuplicate } from 'svelte-heros-v2'
   import type { CustomTag } from '$lib/types'
+  import { getTagClasses } from './utils/tagStyling'
 
   interface Props {
     isOpen: boolean
@@ -15,12 +16,35 @@
   let { isOpen = $bindable(), initialSelectedTag = '' }: Props = $props()
 
   let selectedTagName = $state<string>('')
-  let selectedTagContent = $state<string[]>([])
-  let selectedTagType = $state<'custom' | 'random'>('custom')
+  let selectedTagContent = $state<CustomTag[]>([])
+  let selectedTagType = $state<'custom' | 'random' | 'regular'>('custom')
   let customTags = $state<Record<string, CustomTag>>({})
   let hasUnsavedChanges = $state(false)
   let editingTagName = $state<string>('')
   let statusMessage = $state<string>('')
+  
+  // Drag & drop state
+  let draggedTagName = $state<string | null>(null)
+  let dropPosition = $state<number | null>(null)
+
+  // Convert string array to CustomTag array
+  function convertToCustomTags(tagNames: string[]): CustomTag[] {
+    const currentData = get(promptsData)
+    return tagNames.map((tagName: string): CustomTag => {
+      const customTag = currentData.customTags[tagName]
+      
+      if (customTag) {
+        return customTag
+      }
+      
+      // Create regular tag object for non-custom tags
+      return {
+        name: tagName,
+        tags: [tagName],
+        type: 'regular'
+      }
+    })
+  }
 
   // Update custom tags when dialog opens
   $effect(() => {
@@ -47,7 +71,7 @@
       if (tagToSelect && (!selectedTagName || selectedTagName !== tagToSelect)) {
         selectedTagName = tagToSelect
         const tag = customTags[tagToSelect]
-        selectedTagContent = [...tag.tags]
+        selectedTagContent = convertToCustomTags([...tag.tags])
         selectedTagType = tag.type
         editingTagName = tagToSelect
         hasUnsavedChanges = false
@@ -63,7 +87,7 @@
 
     selectedTagName = tagName
     const tag = customTags[tagName]
-    selectedTagContent = [...tag.tags]
+    selectedTagContent = convertToCustomTags([...tag.tags])
     selectedTagType = tag.type
     editingTagName = tagName
     hasUnsavedChanges = false
@@ -95,7 +119,7 @@
       if (remainingTags.length > 0) {
         selectedTagName = remainingTags[0]
         const tag = customTags[selectedTagName]
-        selectedTagContent = [...tag.tags]
+        selectedTagContent = convertToCustomTags([...tag.tags])
         selectedTagType = tag.type
         editingTagName = selectedTagName
       } else {
@@ -122,7 +146,7 @@
     // Create duplicate with same content and type
     const duplicateTag: CustomTag = {
       name: newName,
-      tags: [...selectedTagContent],
+      tags: selectedTagContent.map(tag => tag.name),
       type: selectedTagType
     }
 
@@ -143,7 +167,7 @@
 
     // Select the newly created duplicate
     selectedTagName = newName
-    selectedTagContent = [...duplicateTag.tags]
+    selectedTagContent = convertToCustomTags([...duplicateTag.tags])
     selectedTagType = duplicateTag.type
     editingTagName = newName
     hasUnsavedChanges = true
@@ -169,12 +193,12 @@
     if (!selectedTagName) return
 
     // Update custom tags in store
-    await saveCustomTag(selectedTagName, selectedTagContent, selectedTagType)
+    await saveCustomTag(selectedTagName, selectedTagContent.map(tag => tag.name), selectedTagType)
 
     // Update local state
     const updatedTag: CustomTag = {
       name: selectedTagName,
-      tags: [...selectedTagContent],
+      tags: selectedTagContent.map(tag => tag.name),
       type: selectedTagType
     }
     customTags[selectedTagName] = updatedTag
@@ -268,6 +292,63 @@
       handleClose()
     }
   }
+
+  // Drag & drop handlers
+  function handleDragStart(event: DragEvent, tagName: string) {
+    draggedTagName = tagName
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move'
+      event.dataTransfer.setData('text/plain', tagName)
+    }
+  }
+
+  function handleDragEnd() {
+    draggedTagName = null
+    dropPosition = null
+  }
+
+  function handleDragOver(event: DragEvent, index: number) {
+    event.preventDefault()
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move'
+    }
+    dropPosition = index
+  }
+
+  function handleDragLeave() {
+    dropPosition = null
+  }
+
+  async function handleDrop(event: DragEvent) {
+    event.preventDefault()
+    
+    if (!draggedTagName || dropPosition === null) return
+
+    const tagNames = Object.keys(customTags)
+    const draggedIndex = tagNames.indexOf(draggedTagName)
+    
+    if (draggedIndex === -1) return
+
+    // Create new order
+    const newTagNames = [...tagNames]
+    const [draggedTag] = newTagNames.splice(draggedIndex, 1)
+    newTagNames.splice(dropPosition, 0, draggedTag)
+
+    // Rebuild customTags object in new order
+    const newCustomTags: Record<string, CustomTag> = {}
+    for (const tagName of newTagNames) {
+      newCustomTags[tagName] = customTags[tagName]
+    }
+
+    customTags = newCustomTags
+    
+    // Update the store and save
+    promptsData.update(data => ({ ...data, customTags: newCustomTags }))
+    await savePromptsData()
+    
+    draggedTagName = null
+    dropPosition = null
+  }
 </script>
 
 {#if isOpen}
@@ -308,22 +389,43 @@
         <div class="w-1/3 border-r border-gray-300 flex flex-col">
           <div class="flex-1 p-4 overflow-y-auto">
             <div class="space-y-1">
-              {#each Object.keys(customTags) as tagName (tagName)}
+              {#each Object.keys(customTags) as tagName, index (tagName)}
                 {@const tag = customTags[tagName]}
-                <button
-                  type="button"
-                  class="w-full text-left px-3 py-1 rounded-md text-sm transition-colors {selectedTagName ===
-                  tagName
-                    ? tag.type === 'random' 
-                      ? 'bg-purple-100 text-purple-800' 
-                      : 'bg-pink-100 text-pink-800'
-                    : tag.type === 'random'
-                      ? 'hover:bg-purple-50 text-purple-700'  
-                      : 'hover:bg-gray-100 text-pink-800'}"
-                  onclick={() => selectTag(tagName)}
-                >
-                  {tagName}
-                </button>
+                <div class="relative">
+                  <!-- Drop indicator before this tag -->
+                  {#if dropPosition === index && draggedTagName !== null}
+                    <div
+                      class="absolute w-0.5 h-8 bg-blue-500 z-10 -left-1 top-1/2 -translate-y-1/2 animate-pulse"
+                    ></div>
+                  {/if}
+
+                  <button
+                    type="button"
+                    draggable="true"
+                    class="w-full text-left {getTagClasses({
+                      tag: tag,
+                      selected: selectedTagName === tagName,
+                      dragged: draggedTagName === tagName,
+                      additionalClasses: 'pl-2 pr-3 py-1.5 cursor-move'
+                    })}"
+                    onclick={() => selectTag(tagName)}
+                    ondragstart={(e) => handleDragStart(e, tagName)}
+                    ondragend={handleDragEnd}
+                    ondragover={(e) => handleDragOver(e, index)}
+                    ondragleave={handleDragLeave}
+                    ondrop={handleDrop}
+                    aria-label="Drag to reorder tag: {tagName}"
+                  >
+                    {tagName}
+                  </button>
+
+                  <!-- Drop indicator after this tag (for last position) -->
+                  {#if dropPosition === index + 1 && draggedTagName !== null}
+                    <div
+                      class="absolute w-0.5 h-8 bg-blue-500 z-10 -right-1 top-1/2 -translate-y-1/2 animate-pulse"
+                    ></div>
+                  {/if}
+                </div>
               {/each}
               {#if Object.keys(customTags).length === 0}
                 <p class="text-gray-400 text-sm italic">No custom tags available</p>

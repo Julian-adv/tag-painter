@@ -1,18 +1,17 @@
 <!-- Individual tag item component with drag & drop and editing functionality -->
 <script lang="ts">
   import { XMark } from 'svelte-heros-v2'
-  import { isCustomTag } from './stores/tagsStore'
-  import { promptsData } from './stores/promptsStore'
-  import { get } from 'svelte/store'
+  import { getTagClasses, getTagRemoveButtonClasses } from './utils/tagStyling'
+  import type { CustomTag } from './types'
 
   interface Props {
-    tag: string
+    tag: CustomTag
     index: number
     readonly?: boolean
     draggedIndex: number | null
     dropPosition: number | null
     currentRandomTagResolutions?: Record<string, string>
-    onRemove: (tag: string) => void
+    onRemove: (tagName: string) => void
     onCustomTagDoubleClick?: (tagName: string) => void
     onDragStart: (event: DragEvent, index: number) => void
     onDragEnd: (event: DragEvent) => void
@@ -37,54 +36,42 @@
     onDrop
   }: Props = $props()
 
-  function handleTagDoubleClick(tag: string) {
-    if (isCustomTag(tag) && onCustomTagDoubleClick) {
-      onCustomTagDoubleClick(tag)
+  function handleTagDoubleClick() {
+    if (tag.type !== 'regular' && onCustomTagDoubleClick) {
+      onCustomTagDoubleClick(tag.name)
     }
   }
 
-  function handleTagKeydown(event: KeyboardEvent, tag: string) {
-    if (isCustomTag(tag) && (event.key === 'Enter' || event.key === ' ')) {
+  function handleTagKeydown(event: KeyboardEvent) {
+    if (tag.type !== 'regular' && (event.key === 'Enter' || event.key === ' ')) {
       event.preventDefault()
-      handleTagDoubleClick(tag)
+      handleTagDoubleClick()
     }
   }
 
-  function getTagType(tagName: string): 'regular' | 'custom' | 'random' {
-    const currentData = get(promptsData)
-    const customTag = currentData.customTags[tagName]
-    return customTag?.type ?? 'regular'
-  }
-
-  function getDisplayText(tagName: string): string {
-    const tagType = getTagType(tagName)
-    if (tagType === 'random' && currentRandomTagResolutions[tagName]) {
-      return `${tagName} (${currentRandomTagResolutions[tagName]})`
+  function getDisplayText(): string {
+    if (tag.type === 'random' && currentRandomTagResolutions[tag.name]) {
+      return `${tag.name} (${currentRandomTagResolutions[tag.name]})`
     }
-    return tagName
+    return tag.name
   }
 
-  function getCustomTagContent(tagName: string): string {
-    if (!isCustomTag(tagName)) return ''
+  function getCustomTagContent(): string {
+    if (tag.type === 'regular') return ''
 
-    const currentData = get(promptsData)
-    const customTag = currentData.customTags[tagName]
-
-    if (!customTag || customTag.tags.length === 0) {
+    if (tag.tags.length === 0) {
       return 'Empty custom tag'
     }
 
     // Show first few tags with ellipsis if there are many
     const maxTags = 50
-    const tagTypeLabel = customTag.type === 'random' ? ' (random)' : ''
-    if (customTag.tags.length <= maxTags) {
-      return `${customTag.tags.join(', ')}${tagTypeLabel}`
+    const tagTypeLabel = tag.type === 'random' ? ' (random)' : ''
+    if (tag.tags.length <= maxTags) {
+      return `${tag.tags.join(', ')}${tagTypeLabel}`
     } else {
-      return `${customTag.tags.slice(0, maxTags).join(', ')}... (${customTag.tags.length} tags total)${tagTypeLabel}`
+      return `${tag.tags.slice(0, maxTags).join(', ')}... (${tag.tags.length} tags total)${tagTypeLabel}`
     }
   }
-
-  const tagType = $derived(getTagType(tag))
 </script>
 
 <div class="relative">
@@ -104,41 +91,36 @@
     ondrop={onDrop}
     role="button"
     tabindex={readonly ? -1 : 0}
-    aria-label="Drag to reorder tag: {tag}"
-    class="inline-flex items-center gap-1 rounded-md text-sm transition-all duration-200 {tagType === 'random'
-      ? 'bg-purple-100 text-purple-800 border-2 border-dashed border-purple-400 pl-1.5 pr-0.5 py-0.5'
-      : tagType === 'custom'
-        ? 'bg-pink-100 text-pink-800 pl-2 pr-1 py-1'
-        : 'bg-sky-100 text-sky-800 pl-2 pr-1 py-1'} {!readonly
-      ? 'cursor-move hover:shadow-md'
-      : ''} {draggedIndex === index ? 'opacity-50 scale-95' : ''}"
+    aria-label="Drag to reorder tag: {tag.name}"
+    class="inline-flex items-center gap-1 {getTagClasses({
+      tag,
+      dragged: draggedIndex === index,
+      readonly,
+      additionalClasses: tag.type === 'random' ? 'pl-1.5 pr-0.5 py-0.5' : 'pl-2 pr-1 py-1'
+    })}"
   >
-    {#if tagType === 'custom' || tagType === 'random'}
+    {#if tag.type === 'custom' || tag.type === 'random'}
       <button
         type="button"
         class="text-left cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit focus:outline-none"
-        ondblclick={() => handleTagDoubleClick(tag)}
-        onkeydown={(e) => handleTagKeydown(e, tag)}
-        title={getCustomTagContent(tag)}
-        aria-label={`Edit custom tag ${tag}`}
+        ondblclick={handleTagDoubleClick}
+        onkeydown={handleTagKeydown}
+        title={getCustomTagContent()}
+        aria-label={`Edit custom tag ${tag.name}`}
       >
-        {getDisplayText(tag)}
+        {getDisplayText()}
       </button>
     {:else}
       <span class="text-left">
-        {getDisplayText(tag)}
+        {getDisplayText()}
       </span>
     {/if}
     {#if !readonly}
       <button
         type="button"
-        class="rounded-full w-4 h-4 inline-flex items-center justify-center {tagType === 'random'
-          ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-200'
-          : tagType === 'custom'
-            ? 'text-pink-600 hover:text-pink-800 hover:bg-pink-200'
-            : 'text-sky-600 hover:text-sky-800 hover:bg-sky-200'}"
-        onclick={() => onRemove(tag)}
-        aria-label="Remove {tag}"
+        class={getTagRemoveButtonClasses(tag)}
+        onclick={() => onRemove(tag.name)}
+        aria-label="Remove {tag.name}"
       >
         <XMark class="w-3 h-3" />
       </button>
