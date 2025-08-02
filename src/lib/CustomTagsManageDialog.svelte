@@ -592,7 +592,7 @@
                     selectedTagType = 'sequential'
                     handleTagTypeChange()
                   }}
-                  class="w-4 h-4 text-pink-600 bg-gray-100 border-gray-300 focus:ring-pink-500 focus:ring-2"
+                  class="w-4 h-4 text-pink-600 bg-gray-100 border-gray-300 focus:outline-none"
                 />
                 <span class="text-gray-700">Sequential</span>
               </label>
@@ -607,7 +607,7 @@
                     selectedTagType = 'random'
                     handleTagTypeChange()
                   }}
-                  class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500 focus:ring-2"
+                  class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:outline-none"
                 />
                 <span class="text-gray-700">Random</span>
               </label>
@@ -618,7 +618,6 @@
                 id="custom-tag-content"
                 label=""
                 bind:tags={selectedTagContent}
-                showPlusButton={false}
                 onTagsChange={handleTagsChange}
               />
             </div>
