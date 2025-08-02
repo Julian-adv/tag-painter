@@ -38,7 +38,8 @@ This application requires a local ComfyUI instance:
   - **SAMLoader (Impact)** - For segmentation
   - Standard ComfyUI nodes (CheckpointLoaderSimple, CLIPTextEncode, etc.)
 
-**Easy Setup**: 
+**Easy Setup**:
+
 1. Load `docs/example-workflow.json` into your ComfyUI interface
 2. Use **ComfyUI Manager** to install any missing nodes automatically
 3. If the workflow runs successfully, ComfyUI is properly configured
@@ -57,17 +58,17 @@ Or to automatically open in browser:
 npm run dev -- --open
 ```
 
-
-
 ## Example Model Files
 
 The screenshot above was generated using these models. Download and place them in your ComfyUI directories:
 
 ### Base Model
+
 - **Zeniji_Mix K-illust** - [Download from Civitai](https://civitai.com/models/1651774?modelVersionId=1869616)
   - Place in `ComfyUI/models/checkpoints/`
 
-### LoRA Models  
+### LoRA Models
+
 - **MoriiMee Gothic Niji Lora** - [Download from Civitai](https://civitai.com/models/915918?modelVersionId=1244133)
   - Place in `ComfyUI/models/loras/`
 - **Niji anime style illustrious lora** - [Download from Civitai](https://civitai.com/models/1261988?modelVersionId=1939768)
@@ -76,12 +77,14 @@ The screenshot above was generated using these models. Download and place them i
 ## Troubleshooting
 
 ### Common Issues
+
 1. **ComfyUI not running** - Ensure ComfyUI is started at `http://127.0.0.1:8188`
 2. **Missing nodes** - Install required custom nodes listed above
 3. **No checkpoints** - Place model files in ComfyUI's `models/checkpoints/` directory
 4. **Generation fails** - Check ComfyUI console for workflow errors
 
 ### File Locations
+
 - Generated images: `data/output/YYYY-MM-DD/`
 - Settings: `data/settings.json`
 - Tag database: `data/danbooru_tags.txt`

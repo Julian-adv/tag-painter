@@ -6,6 +6,17 @@
   import { onMount } from 'svelte'
   import { Tag } from 'svelte-heros-v2'
 
+  interface Props {
+    currentRandomTagResolutions?: {
+      all: Record<string, string>
+      zone1: Record<string, string>
+      zone2: Record<string, string>
+      negative: Record<string, string>
+    }
+  }
+
+  let { currentRandomTagResolutions = { all: {}, zone1: {}, zone2: {}, negative: {} } }: Props = $props()
+
   let allTags = $state<string[]>([])
   let firstZoneTags = $state<string[]>([])
   let secondZoneTags = $state<string[]>([])
@@ -63,6 +74,7 @@
       bind:tags={allTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={handleCustomTagDoubleClick}
+      currentRandomTagResolutions={currentRandomTagResolutions.all}
     />
 
     <TagInput
@@ -72,6 +84,7 @@
       bind:tags={firstZoneTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={handleCustomTagDoubleClick}
+      currentRandomTagResolutions={currentRandomTagResolutions.zone1}
     />
 
     <TagInput
@@ -81,6 +94,7 @@
       bind:tags={secondZoneTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={handleCustomTagDoubleClick}
+      currentRandomTagResolutions={currentRandomTagResolutions.zone2}
     />
 
     <TagInput
@@ -90,6 +104,7 @@
       bind:tags={negativeTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={handleCustomTagDoubleClick}
+      currentRandomTagResolutions={currentRandomTagResolutions.negative}
     />
   </div>
 

@@ -19,8 +19,15 @@ export interface GenerationOptions {
 }
 
 // Expand custom tags to their constituent tags
-function expandCustomTags(tags: string[], customTags: Record<string, CustomTag>): string[] {
+function expandCustomTags(
+  tags: string[],
+  customTags: Record<string, CustomTag>
+): {
+  expandedTags: string[]
+  randomTagResolutions: Record<string, string>
+} {
   const expandedTags: string[] = []
+  const randomTagResolutions: Record<string, string> = {}
 
   for (const tag of tags) {
     if (tag in customTags) {
@@ -29,7 +36,9 @@ function expandCustomTags(tags: string[], customTags: Record<string, CustomTag>)
         // For random tags, select one random tag from the list
         if (customTag.tags.length > 0) {
           const randomIndex = Math.floor(Math.random() * customTag.tags.length)
-          expandedTags.push(customTag.tags[randomIndex])
+          const selectedTag = customTag.tags[randomIndex]
+          expandedTags.push(selectedTag)
+          randomTagResolutions[tag] = selectedTag
         }
       } else {
         // For custom tags, expand to all constituent tags
@@ -41,10 +50,18 @@ function expandCustomTags(tags: string[], customTags: Record<string, CustomTag>)
     }
   }
 
-  return expandedTags
+  return { expandedTags, randomTagResolutions }
 }
 
-export async function generateImage(options: GenerationOptions): Promise<number> {
+export async function generateImage(options: GenerationOptions): Promise<{
+  seed: number
+  randomTagResolutions: {
+    all: Record<string, string>
+    zone1: Record<string, string>
+    zone2: Record<string, string>
+    negative: Record<string, string>
+  }
+}> {
   const {
     promptsData,
     settings,
@@ -67,15 +84,23 @@ export async function generateImage(options: GenerationOptions): Promise<number>
     const clientId = crypto.randomUUID()
 
     // Expand custom tags and create prompt parts
-    const expandedAllTags = expandCustomTags(promptsData.tags.all, promptsData.customTags)
-    const expandedZone1Tags = expandCustomTags(promptsData.tags.zone1, promptsData.customTags)
-    const expandedZone2Tags = expandCustomTags(promptsData.tags.zone2, promptsData.customTags)
-    const expandedNegativeTags = expandCustomTags(promptsData.tags.negative, promptsData.customTags)
+    const allResult = expandCustomTags(promptsData.tags.all, promptsData.customTags)
+    const zone1Result = expandCustomTags(promptsData.tags.zone1, promptsData.customTags)
+    const zone2Result = expandCustomTags(promptsData.tags.zone2, promptsData.customTags)
+    const negativeResult = expandCustomTags(promptsData.tags.negative, promptsData.customTags)
 
-    const allTagsText = expandedAllTags.join(', ')
-    const zone1TagsText = expandedZone1Tags.join(', ')
-    const zone2TagsText = expandedZone2Tags.join(', ')
-    const negativeTagsText = expandedNegativeTags.join(', ')
+    // Organize random tag resolutions by zone
+    const allRandomResolutions = {
+      all: allResult.randomTagResolutions,
+      zone1: zone1Result.randomTagResolutions,
+      zone2: zone2Result.randomTagResolutions,
+      negative: negativeResult.randomTagResolutions
+    }
+
+    const allTagsText = allResult.expandedTags.join(', ')
+    const zone1TagsText = zone1Result.expandedTags.join(', ')
+    const zone2TagsText = zone2Result.expandedTags.join(', ')
+    const negativeTagsText = negativeResult.expandedTags.join(', ')
 
     // Set face detailer wildcard with combined first zone and second zone prompts
     const combinedZonePrompt =
@@ -159,7 +184,7 @@ export async function generateImage(options: GenerationOptions): Promise<number>
       }
     )
 
-    return appliedSeed
+    return { seed: appliedSeed, randomTagResolutions: allRandomResolutions }
   } catch (error) {
     console.error('Failed to generate image:', error)
     onError(error instanceof Error ? error.message : 'Failed to generate image')

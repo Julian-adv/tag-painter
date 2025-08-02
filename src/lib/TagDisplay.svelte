@@ -12,6 +12,7 @@
     readonly?: boolean
     onTagsChange?: () => void
     onCustomTagDoubleClick?: (tagName: string) => void
+    currentRandomTagResolutions?: Record<string, string>
   }
 
   let {
@@ -20,7 +21,8 @@
     placeholder = '',
     readonly = false,
     onTagsChange,
-    onCustomTagDoubleClick
+    onCustomTagDoubleClick,
+    currentRandomTagResolutions = {}
   }: Props = $props()
 
   let draggedIndex: number | null = $state(null)
@@ -57,6 +59,14 @@
     const currentData = get(promptsData)
     const customTag = currentData.customTags[tagName]
     return customTag?.type ?? 'regular'
+  }
+
+  function getDisplayText(tagName: string): string {
+    const tagType = getTagType(tagName)
+    if (tagType === 'random' && currentRandomTagResolutions[tagName]) {
+      return `${tagName} (${currentRandomTagResolutions[tagName]})`
+    }
+    return tagName
   }
 
   function getCustomTagContent(tagName: string): string {
@@ -203,11 +213,11 @@
                 title={getCustomTagContent(tag)}
                 aria-label={`Edit custom tag ${tag}`}
               >
-                {tag}
+                {getDisplayText(tag)}
               </button>
             {:else}
               <span class="text-left">
-                {tag}
+                {getDisplayText(tag)}
               </span>
             {/if}
             {#if !readonly}

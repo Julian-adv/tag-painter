@@ -26,7 +26,7 @@ export const resolvedRandomValues = writable<Record<string, OptionItem>>({})
 // Migrate old customTags format to new format
 function migrateCustomTags(oldCustomTags: any): Record<string, CustomTag> {
   const newCustomTags: Record<string, CustomTag> = {}
-  
+
   // Check if it's already in new format
   if (oldCustomTags && typeof oldCustomTags === 'object') {
     for (const [name, data] of Object.entries(oldCustomTags)) {
@@ -43,7 +43,7 @@ function migrateCustomTags(oldCustomTags: any): Record<string, CustomTag> {
       }
     }
   }
-  
+
   return newCustomTags
 }
 
@@ -164,7 +164,11 @@ export function updateTags(
   }))
 }
 
-export async function saveCustomTag(name: string, tags: string[], type: 'custom' | 'random' = 'custom') {
+export async function saveCustomTag(
+  name: string,
+  tags: string[],
+  type: 'custom' | 'random' = 'custom'
+) {
   let updatedData: PromptsData
 
   promptsData.update((data) => {

@@ -38,6 +38,17 @@
   let isGeneratingForever = $state(false)
   let shouldStopGeneration = $state(false)
   let lastSeed: number | null = $state(null)
+  let currentRandomTagResolutions: {
+    all: Record<string, string>
+    zone1: Record<string, string>
+    zone2: Record<string, string>
+    negative: Record<string, string>
+  } = $state({
+    all: {},
+    zone1: {},
+    zone2: {},
+    negative: {}
+  })
 
   // Settings state
   let settings: Settings = $state({
@@ -90,7 +101,7 @@
     let currentPromptsData: PromptsData
     promptsData.subscribe((data) => (currentPromptsData = data))()
 
-    lastSeed = await generateImage({
+    const result = await generateImage({
       promptsData: currentPromptsData!,
       settings,
       selectedLoras: currentPromptsData!.selectedLoras,
@@ -121,6 +132,10 @@
         isLoading = false
       }
     })
+    
+    // Store the results
+    lastSeed = result.seed
+    currentRandomTagResolutions = result.randomTagResolutions
   }
 
   async function handleGenerateForever() {
@@ -203,7 +218,7 @@
       <CompositionSelector />
 
       <div class="flex flex-1 min-h-0 flex-shrink-1">
-        <TagZones />
+        <TagZones {currentRandomTagResolutions} />
       </div>
 
       <div class="flex flex-col gap-1 flex-shrink-0">
