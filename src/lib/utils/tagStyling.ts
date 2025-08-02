@@ -4,9 +4,7 @@
 
 import { get } from 'svelte/store'
 import { promptsData } from '../stores/promptsStore'
-import type { CustomTag } from '../types'
-
-export type TagType = 'regular' | 'custom' | 'random'
+import type { CustomTag, TagType } from '../types'
 
 export interface TagStyleOptions {
   /** Tag name or CustomTag object to determine styling */
@@ -67,7 +65,7 @@ export function getTagClasses(options: TagStyleOptions): string {
       }
       break
 
-    case 'custom':
+    case 'sequential':
       if (selected) {
         classes += ' bg-pink-200 text-pink-900 border border-pink-500'
       } else {
@@ -118,7 +116,7 @@ export function getTagRemoveButtonClasses(tag: string | CustomTag): string {
   switch (type) {
     case 'random':
       return `${baseClasses} text-purple-600 hover:text-purple-800 hover:bg-purple-200`
-    case 'custom':
+    case 'sequential':
       return `${baseClasses} text-pink-600 hover:text-pink-800 hover:bg-pink-200`
     case 'regular':
     default:

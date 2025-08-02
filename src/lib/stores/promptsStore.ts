@@ -1,6 +1,6 @@
 // Central store for prompts data using Svelte stores
 import { writable } from 'svelte/store'
-import type { PromptsData, PromptCategory, OptionItem, CustomTag } from '$lib/types'
+import type { PromptsData, PromptCategory, OptionItem, CustomTag, TagType } from '$lib/types'
 import { savePrompts, loadPrompts } from '../utils/fileIO'
 import { updateCombinedTags } from './tagsStore'
 
@@ -35,7 +35,7 @@ function migrateCustomTags(oldCustomTags: unknown): Record<string, CustomTag> {
         newCustomTags[name] = {
           name,
           tags: data,
-          type: 'custom'
+          type: 'sequential'
         }
       } else if (data && typeof data === 'object' && 'tags' in data) {
         // New format: already migrated
@@ -167,7 +167,7 @@ export function updateTags(
 export async function saveCustomTag(
   name: string,
   tags: string[],
-  type: 'custom' | 'random' | 'regular' = 'custom'
+  type: TagType = 'sequential'
 ) {
   let updatedData: PromptsData
 

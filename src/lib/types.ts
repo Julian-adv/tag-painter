@@ -40,10 +40,12 @@ export interface PromptCategory {
   aliasOf?: string // ID of the category this one is an alias of
 }
 
+export type TagType = 'regular' | 'sequential' | 'random'
+
 export interface CustomTag {
   name: string
   tags: string[]
-  type: 'custom' | 'random' | 'regular'
+  type: TagType
 }
 
 export interface PromptsData {

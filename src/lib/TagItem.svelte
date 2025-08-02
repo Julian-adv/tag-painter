@@ -99,7 +99,7 @@
       additionalClasses: tag.type === 'random' ? 'pl-1.5 pr-0.5 py-0.5' : 'pl-2 pr-1 py-1'
     })}"
   >
-    {#if tag.type === 'custom' || tag.type === 'random'}
+    {#if tag.type === 'sequential' || tag.type === 'random'}
       <button
         type="button"
         class="text-left cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit focus:outline-none"

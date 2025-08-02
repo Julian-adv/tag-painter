@@ -5,7 +5,7 @@
   import { get } from 'svelte/store'
   import { untrack } from 'svelte'
   import { Trash, DocumentDuplicate } from 'svelte-heros-v2'
-  import type { CustomTag } from '$lib/types'
+  import type { CustomTag, TagType } from '$lib/types'
   import { getTagClasses } from './utils/tagStyling'
 
   interface Props {
@@ -17,7 +17,7 @@
 
   let selectedTagName = $state<string>('')
   let selectedTagContent = $state<CustomTag[]>([])
-  let selectedTagType = $state<'custom' | 'random' | 'regular'>('custom')
+  let selectedTagType = $state<TagType>('sequential')
   let customTags = $state<Record<string, CustomTag>>({})
   let hasUnsavedChanges = $state(false)
   let editingTagName = $state<string>('')
@@ -125,7 +125,7 @@
       } else {
         selectedTagName = ''
         selectedTagContent = []
-        selectedTagType = 'custom'
+        selectedTagType = 'sequential'
         editingTagName = ''
       }
     }
@@ -210,8 +210,17 @@
     if (selectedTagName && hasUnsavedChanges) {
       await saveTagContent()
     }
+    
+    // Update the store with the current customTags order
+    promptsData.update((data) => ({
+      ...data,
+      customTags: { ...customTags }
+    }))
+    
     // Save the entire prompts data
     await savePromptsData()
+    
+    hasUnsavedChanges = false
   }
 
   function handleTagsChange() {
@@ -281,7 +290,7 @@
     isOpen = false
     selectedTagName = ''
     selectedTagContent = []
-    selectedTagType = 'custom'
+    selectedTagType = 'sequential'
     editingTagName = ''
     hasUnsavedChanges = false
     statusMessage = ''
@@ -329,10 +338,16 @@
     
     if (draggedIndex === -1) return
 
+    // Calculate the actual insertion index accounting for the removed element
+    let insertIndex = dropPosition
+    if (draggedIndex < dropPosition) {
+      insertIndex = dropPosition - 1
+    }
+
     // Create new order
     const newTagNames = [...tagNames]
     const [draggedTag] = newTagNames.splice(draggedIndex, 1)
-    newTagNames.splice(dropPosition, 0, draggedTag)
+    newTagNames.splice(insertIndex, 0, draggedTag)
 
     // Rebuild customTags object in new order
     const newCustomTags: Record<string, CustomTag> = {}
@@ -342,9 +357,8 @@
 
     customTags = newCustomTags
     
-    // Update the store and save
-    promptsData.update(data => ({ ...data, customTags: newCustomTags }))
-    await savePromptsData()
+    // Mark as having unsaved changes
+    hasUnsavedChanges = true
     
     draggedTagName = null
     dropPosition = null
@@ -395,7 +409,7 @@
                   <!-- Drop indicator before this tag -->
                   {#if dropPosition === index && draggedTagName !== null}
                     <div
-                      class="absolute w-0.5 h-8 bg-blue-500 z-10 -left-1 top-1/2 -translate-y-1/2 animate-pulse"
+                      class="absolute w-full h-0.5 bg-blue-500 z-10 -top-0.5 left-0 animate-pulse"
                     ></div>
                   {/if}
 
@@ -422,7 +436,7 @@
                   <!-- Drop indicator after this tag (for last position) -->
                   {#if dropPosition === index + 1 && draggedTagName !== null}
                     <div
-                      class="absolute w-0.5 h-8 bg-blue-500 z-10 -right-1 top-1/2 -translate-y-1/2 animate-pulse"
+                      class="absolute w-full h-0.5 bg-blue-500 z-10 -bottom-0.5 left-0 animate-pulse"
                     ></div>
                   {/if}
                 </div>
@@ -452,7 +466,7 @@
                     type="checkbox"
                     checked={selectedTagType === 'random'}
                     onchange={(e) => {
-                      selectedTagType = (e.target as HTMLInputElement).checked ? 'random' : 'custom'
+                      selectedTagType = (e.target as HTMLInputElement).checked ? 'random' : 'sequential'
                       handleTagTypeChange()
                     }}
                     class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
