@@ -614,7 +614,7 @@
               </label>
             </div>
 
-            <div class="flex-1">
+            <div class="flex-1 overflow-y-auto max-h-80">
               <TagInput
                 id="custom-tag-content"
                 label=""

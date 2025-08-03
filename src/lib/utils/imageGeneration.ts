@@ -46,18 +46,19 @@ function expandCustomTags(
         if (customTag.tags.length > 0) {
           const randomIndex = Math.floor(Math.random() * customTag.tags.length)
           const selectedTag = customTag.tags[randomIndex]
-          randomTagResolutions[tag] = selectedTag
-          
+
           // Recursively expand the selected tag
           const recursiveResult = expandCustomTags([selectedTag], customTags, visitedTags)
           expandedTags.push(...recursiveResult.expandedTags)
-          Object.assign(randomTagResolutions, recursiveResult.randomTagResolutions)
+
+          // Set the final resolution to the fully expanded result
+          randomTagResolutions[tag] = recursiveResult.expandedTags.join(', ')
         }
       } else {
         // For sequential tags, expand all constituent tags recursively
         const recursiveResult = expandCustomTags(customTag.tags, customTags, visitedTags)
         expandedTags.push(...recursiveResult.expandedTags)
-        Object.assign(randomTagResolutions, recursiveResult.randomTagResolutions)
+        randomTagResolutions[tag] = recursiveResult.expandedTags.join(', ')
       }
 
       visitedTags.delete(tag)

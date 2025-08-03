@@ -43,15 +43,18 @@
   }
 
   function handleTagKeydown(event: KeyboardEvent) {
-    if ((event.key === 'Enter' || event.key === ' ')) {
+    if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       handleTagDoubleClick()
     }
   }
 
   function getDisplayText(): string {
-    if (tag.type === 'random' && currentRandomTagResolutions[tag.name]) {
-      return `${tag.name} (${currentRandomTagResolutions[tag.name]})`
+    if (
+      (tag.type === 'random' || tag.type === 'sequential') &&
+      currentRandomTagResolutions[tag.name]
+    ) {
+      return `${tag.name}: ${currentRandomTagResolutions[tag.name]}`
     }
     return tag.name
   }
@@ -95,8 +98,7 @@
     class="inline-flex items-center gap-1 {getTagClasses({
       tag,
       dragged: draggedIndex === index,
-      readonly,
-      additionalClasses: tag.type === 'random' ? 'pl-1.5 pr-0.5 py-0.5' : 'pl-2 pr-1 py-1'
+      additionalClasses: 'pl-1.5 pr-0.5 py-0.5'
     })}"
   >
     <button
@@ -105,8 +107,12 @@
       tabindex="-1"
       ondblclick={handleTagDoubleClick}
       onkeydown={handleTagKeydown}
-      title={tag.type === 'regular' ? `Double-click to create custom tag from: ${tag.name}` : getCustomTagContent()}
-      aria-label={tag.type === 'regular' ? `Create custom tag from ${tag.name}` : `Edit custom tag ${tag.name}`}
+      title={tag.type === 'regular'
+        ? `Double-click to create custom tag from: ${tag.name}`
+        : getCustomTagContent()}
+      aria-label={tag.type === 'regular'
+        ? `Create custom tag from ${tag.name}`
+        : `Edit custom tag ${tag.name}`}
     >
       {getDisplayText()}
     </button>
