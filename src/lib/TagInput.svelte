@@ -2,6 +2,8 @@
 <script lang="ts">
   import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
   import TagDisplay from './TagDisplay.svelte'
+  import { get } from 'svelte/store'
+  import { promptsData } from './stores/promptsStore'
   import type { CustomTag } from './types'
 
   interface Props {
@@ -23,10 +25,14 @@
 
   function addQuickTagToMain() {
     if (quickTagInput.trim()) {
+      const tagName = quickTagInput.trim()
+      const currentData = get(promptsData)
+      const existingCustomTag = currentData.customTags[tagName]
+      
       const newTag: CustomTag = {
-        name: quickTagInput.trim(),
-        tags: [quickTagInput.trim()],
-        type: 'regular'
+        name: tagName,
+        tags: [tagName],
+        type: existingCustomTag ? existingCustomTag.type : 'regular'
       }
       tags = [...tags, newTag]
       quickTagInput = ''

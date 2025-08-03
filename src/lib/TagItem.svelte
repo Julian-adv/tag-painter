@@ -37,13 +37,13 @@
   }: Props = $props()
 
   function handleTagDoubleClick() {
-    if (tag.type !== 'regular' && onCustomTagDoubleClick) {
+    if (onCustomTagDoubleClick) {
       onCustomTagDoubleClick(tag.name)
     }
   }
 
   function handleTagKeydown(event: KeyboardEvent) {
-    if (tag.type !== 'regular' && (event.key === 'Enter' || event.key === ' ')) {
+    if ((event.key === 'Enter' || event.key === ' ')) {
       event.preventDefault()
       handleTagDoubleClick()
     }
@@ -99,23 +99,17 @@
       additionalClasses: tag.type === 'random' ? 'pl-1.5 pr-0.5 py-0.5' : 'pl-2 pr-1 py-1'
     })}"
   >
-    {#if tag.type === 'sequential' || tag.type === 'random'}
-      <button
-        type="button"
-        class="text-left cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit focus:outline-none"
-        tabindex="-1"
-        ondblclick={handleTagDoubleClick}
-        onkeydown={handleTagKeydown}
-        title={getCustomTagContent()}
-        aria-label={`Edit custom tag ${tag.name}`}
-      >
-        {getDisplayText()}
-      </button>
-    {:else}
-      <span class="text-left">
-        {getDisplayText()}
-      </span>
-    {/if}
+    <button
+      type="button"
+      class="text-left cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit focus:outline-none"
+      tabindex="-1"
+      ondblclick={handleTagDoubleClick}
+      onkeydown={handleTagKeydown}
+      title={tag.type === 'regular' ? `Double-click to create custom tag from: ${tag.name}` : getCustomTagContent()}
+      aria-label={tag.type === 'regular' ? `Create custom tag from ${tag.name}` : `Edit custom tag ${tag.name}`}
+    >
+      {getDisplayText()}
+    </button>
     {#if !readonly}
       <button
         type="button"

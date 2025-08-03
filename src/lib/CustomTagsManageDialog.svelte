@@ -2,6 +2,7 @@
 <script lang="ts">
   import TagInput from './TagInput.svelte'
   import { promptsData, saveCustomTag, savePromptsData } from './stores/promptsStore'
+  import { combinedTags } from './stores/tagsStore'
   import { get } from 'svelte/store'
   import { untrack } from 'svelte'
   import { Trash, DocumentDuplicate, Plus } from 'svelte-heros-v2'
@@ -137,7 +138,51 @@
     }
   }
 
-  async function addNewTag() {
+  async function createAndSelectTag(name: string, tags: string[], type: TagType) {
+    // Check if name already exists
+    if (name in customTags) {
+      statusMessage = 'Unable to create tag - name already exists!'
+      return false
+    }
+
+    // Create new tag
+    const newTag: CustomTag = {
+      name: name,
+      tags: tags,
+      type: type
+    }
+
+    // Update local state
+    customTags[name] = newTag
+    customTags = { ...customTags }
+
+    // Update the store
+    promptsData.update((data) => {
+      return {
+        ...data,
+        customTags: {
+          ...data.customTags,
+          [name]: newTag
+        }
+      }
+    })
+
+    // Select the newly created tag
+    selectedTagName = name
+    selectedTagContent = convertToCustomTags(tags)
+    selectedTagType = type
+    editingTagName = name
+    hasUnsavedChanges = true
+    statusMessage = ''
+
+    // Scroll to the newly created tag and focus the name input
+    scrollToTag(name)
+    focusTagNameInput()
+    
+    return true
+  }
+
+  async function addNewTag(initialTags: string[] = []) {
     // Generate unique name for new tag
     let newName = 'New Tag'
     let counter = 1
@@ -146,39 +191,7 @@
       newName = `New Tag ${counter}`
     }
 
-    // Create new empty sequential tag
-    const newTag: CustomTag = {
-      name: newName,
-      tags: [],
-      type: 'sequential'
-    }
-
-    // Update local state
-    customTags[newName] = newTag
-    customTags = { ...customTags }
-
-    // Update the store
-    promptsData.update((data) => {
-      return {
-        ...data,
-        customTags: {
-          ...data.customTags,
-          [newName]: newTag
-        }
-      }
-    })
-
-    // Select the newly created tag
-    selectedTagName = newName
-    selectedTagContent = []
-    selectedTagType = 'sequential'
-    editingTagName = newName
-    hasUnsavedChanges = true
-    statusMessage = ''
-
-    // Scroll to the newly created tag and focus the name input
-    scrollToTag(newName)
-    focusTagNameInput()
+    await createAndSelectTag(newName, initialTags, 'sequential')
   }
 
   async function duplicateSelectedTag() {
@@ -186,46 +199,11 @@
 
     // Generate new name based on current tag name
     const newName = generateDuplicateName(selectedTagName)
-
-    // Check if new name already exists (shouldn't happen with our algorithm, but just in case)
-    if (newName in customTags) {
-      statusMessage = 'Unable to create duplicate - name already exists!'
-      return
-    }
-
-    // Create duplicate with same content and type
-    const duplicateTag: CustomTag = {
-      name: newName,
-      tags: selectedTagContent.map((tag) => tag.name),
-      type: selectedTagType
-    }
-
-    // Update local state
-    customTags[newName] = duplicateTag
-    customTags = { ...customTags }
-
-    // Update the store
-    promptsData.update((data) => {
-      return {
-        ...data,
-        customTags: {
-          ...data.customTags,
-          [newName]: duplicateTag
-        }
-      }
-    })
-
-    // Select the newly created duplicate
-    selectedTagName = newName
-    selectedTagContent = convertToCustomTags([...duplicateTag.tags])
-    selectedTagType = duplicateTag.type
-    editingTagName = newName
-    hasUnsavedChanges = true
-    statusMessage = ''
-
-    // Scroll to the newly created duplicate and focus the name input
-    scrollToTag(newName)
-    focusTagNameInput()
+    
+    // Get current tag content
+    const currentTags = selectedTagContent.map((tag) => tag.name)
+    
+    await createAndSelectTag(newName, currentTags, selectedTagType)
   }
 
   function scrollToTag(tagName: string) {
@@ -320,6 +298,29 @@
     statusMessage = ''
   }
 
+  async function handleCustomTagDoubleClick(tagName: string) {
+    // Find the clicked tag in selectedTagContent
+    const clickedTag = selectedTagContent.find((tag) => tag.name === tagName)
+    if (!clickedTag) return
+
+    // Split the tag content by comma and create individual tags
+    let tagsToAdd: string[] = []
+
+    if (clickedTag.type === 'regular') {
+      // For regular tags, split the name by comma
+      tagsToAdd = clickedTag.name
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter((tag) => tag)
+    } else {
+      // For sequential/random tags, use their tags array
+      tagsToAdd = clickedTag.tags
+    }
+
+    // Create new sequential tag with the split tags
+    await addNewTag(tagsToAdd)
+  }
+
   async function saveTagName() {
     if (!editingTagName.trim() || editingTagName === selectedTagName) {
       editingTagName = selectedTagName
@@ -328,9 +329,9 @@
 
     const newName = editingTagName.trim()
 
-    // Check if new name already exists
-    if (newName in customTags) {
-      statusMessage = 'A custom tag with this name already exists!'
+    // Check if new name already exists in combined tags (custom tags + danbooru tags)
+    if ($combinedTags.includes(newName)) {
+      statusMessage = 'A tag with this name already exists!'
       return
     }
 
@@ -551,7 +552,7 @@
               <div class="flex gap-2">
                 <button
                   type="button"
-                  onclick={addNewTag}
+                  onclick={() => addNewTag()}
                   class="inline-flex items-center gap-1 p-1.5 bg-green-200 text-green-600 rounded-md hover:bg-green-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors text-sm"
                   tabindex="-1"
                   title="Add new custom tag"
@@ -619,6 +620,7 @@
                 label=""
                 bind:tags={selectedTagContent}
                 onTagsChange={handleTagsChange}
+                onCustomTagDoubleClick={handleCustomTagDoubleClick}
               />
             </div>
           {:else}
