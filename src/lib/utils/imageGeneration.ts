@@ -123,7 +123,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     // Set face detailer wildcard with combined first zone and second zone prompts
     const combinedZonePrompt =
       zone1TagsText && zone2TagsText
-        ? `${zone1TagsText} [SEP] ${zone2TagsText}`
+        ? `[ASC] ${zone1TagsText} [SEP] ${zone2TagsText}`
         : zone1TagsText || zone2TagsText
     workflow['56'].inputs.wildcard = combinedZonePrompt
 

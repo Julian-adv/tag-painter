@@ -59,22 +59,6 @@
     return tag.name
   }
 
-  function getCustomTagContent(): string {
-    if (tag.type === 'regular') return ''
-
-    if (tag.tags.length === 0) {
-      return 'Empty custom tag'
-    }
-
-    // Show first few tags with ellipsis if there are many
-    const maxTags = 50
-    const tagTypeLabel = tag.type === 'random' ? ' (random)' : ''
-    if (tag.tags.length <= maxTags) {
-      return `${tag.tags.join(', ')}${tagTypeLabel}`
-    } else {
-      return `${tag.tags.slice(0, maxTags).join(', ')}... (${tag.tags.length} tags total)${tagTypeLabel}`
-    }
-  }
 </script>
 
 <div class="relative">
@@ -109,7 +93,7 @@
       onkeydown={handleTagKeydown}
       title={tag.type === 'regular'
         ? `Double-click to create custom tag from: ${tag.name}`
-        : getCustomTagContent()}
+        : `Double-click to edit ${tag.name}`}
       aria-label={tag.type === 'regular'
         ? `Create custom tag from ${tag.name}`
         : `Edit custom tag ${tag.name}`}

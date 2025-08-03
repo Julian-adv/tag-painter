@@ -82,6 +82,9 @@
         selectedTagType = tag.type
         editingTagName = tagToSelect
         hasUnsavedChanges = false
+        
+        // Scroll to the selected tag
+        scrollToTag(tagToSelect)
       }
     })
   }
@@ -98,6 +101,9 @@
     selectedTagType = tag.type
     editingTagName = tagName
     hasUnsavedChanges = false
+    
+    // Scroll to the selected tag
+    scrollToTag(tagName)
   }
 
   async function deleteSelectedTag() {
@@ -178,7 +184,7 @@
     // Scroll to the newly created tag and focus the name input
     scrollToTag(name)
     focusTagNameInput()
-    
+
     return true
   }
 
@@ -199,10 +205,10 @@
 
     // Generate new name based on current tag name
     const newName = generateDuplicateName(selectedTagName)
-    
+
     // Get current tag content
     const currentTags = selectedTagContent.map((tag) => tag.name)
-    
+
     await createAndSelectTag(newName, currentTags, selectedTagType)
   }
 
@@ -303,6 +309,13 @@
     const clickedTag = selectedTagContent.find((tag) => tag.name === tagName)
     if (!clickedTag) return
 
+    // Check if the clicked tag already exists as a custom tag
+    if (tagName in customTags) {
+      // Navigate to edit the existing custom tag
+      await selectTag(tagName)
+      return
+    }
+
     // Split the tag content by comma and create individual tags
     let tagsToAdd: string[] = []
 
@@ -350,9 +363,22 @@
       const newCustomTags = { ...data.customTags }
       delete newCustomTags[selectedTagName]
       newCustomTags[newName] = renamedTag
+
+      // Replace old tag name with new name in all tag zones
+      const updateTagsInZone = (tags: string[]): string[] => {
+        return tags.map((tag) => (tag === selectedTagName ? newName : tag))
+      }
+
       return {
         ...data,
-        customTags: newCustomTags
+        customTags: newCustomTags,
+        tags: {
+          ...data.tags,
+          all: updateTagsInZone(data.tags.all),
+          zone1: updateTagsInZone(data.tags.zone1),
+          zone2: updateTagsInZone(data.tags.zone2),
+          negative: updateTagsInZone(data.tags.negative)
+        }
       }
     })
 
@@ -360,6 +386,9 @@
     selectedTagName = newName
     hasUnsavedChanges = true
     statusMessage = ''
+    
+    // Scroll to the renamed tag
+    scrollToTag(newName)
   }
 
   function handleNameKeydown(event: KeyboardEvent) {
