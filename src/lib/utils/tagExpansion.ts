@@ -3,7 +3,6 @@
  */
 
 import type { CustomTag } from '../types'
-import { get } from 'svelte/store'
 import { testModeStore } from '../stores/testModeStore'
 
 /**
@@ -27,10 +26,10 @@ function expandRandomTag(
 ): { expandedTags: string[], resolution: string } {
   // Check for test mode override
   let selectedTag: string
-  const testMode = get(testModeStore)
-  if (testMode.enabled && testMode.overrides[tag]) {
+  const overrideTag = testModeStore[tag]?.overrideTag
+  if (overrideTag) {
     // Use the test override tag
-    selectedTag = testMode.overrides[tag]
+    selectedTag = overrideTag
   } else {
     // Use crypto.getRandomValues for better randomness
     const randomIndex = getSecureRandomIndex(customTag.tags.length)

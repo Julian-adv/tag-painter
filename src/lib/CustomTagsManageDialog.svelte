@@ -3,10 +3,10 @@
   import TagInput from './TagInput.svelte'
   import { promptsData, saveCustomTag, savePromptsData } from './stores/promptsStore'
   import { combinedTags } from './stores/tagsStore'
-  import { setTestModeOverride, removeTestModeOverride, clearTestMode, testModeStore } from './stores/testModeStore'
+  import { testModeStore, setTestModeOverride, setTagTestMode, removeTestModeOverride } from './stores/testModeStore'
   import { get } from 'svelte/store'
   import { untrack } from 'svelte'
-  import { Trash, DocumentDuplicate, Plus } from 'svelte-heros-v2'
+  import { Trash, DocumentDuplicate, Plus, Beaker } from 'svelte-heros-v2'
   import type { CustomTag, TagType } from '$lib/types'
   import { getTagClasses } from './utils/tagStyling'
 
@@ -29,14 +29,13 @@
   let draggedTagName = $state<string | null>(null)
   let dropPosition = $state<number | null>(null)
 
-  // Test mode state
-  let testMode = $state(false)
-  
-  // Get the override tag for the currently selected tag
-  const testOverrideTag = $derived.by(() => {
-    if (!testMode || !selectedTagName) return ''
-    const testState = $testModeStore
-    return testState.overrides[selectedTagName] || ''
+  // Get test mode state for the currently selected tag
+  const selectedTagTestMode = $derived.by(() => {
+    if (!selectedTagName) return { enabled: false, overrideTag: '' }
+    return {
+      enabled: testModeStore[selectedTagName]?.enabled ?? false,
+      overrideTag: testModeStore[selectedTagName]?.overrideTag || ''
+    }
   })
 
   // Reference to the left column scroll container
@@ -396,7 +395,10 @@
 
   function handleTagClick(tagName: string) {
     // If test mode is enabled and the current tag is random/consistent-random
-    if (testMode && (selectedTagType === 'random' || selectedTagType === 'consistent-random')) {
+    if (
+      selectedTagTestMode.enabled &&
+      (selectedTagType === 'random' || selectedTagType === 'consistent-random')
+    ) {
       statusMessage = `Test mode: "${selectedTagName}" will always expand to "${tagName}"`
 
       // Set test mode override for this specific tag
@@ -609,6 +611,7 @@
             <div class="space-y-1">
               {#each Object.keys(customTags) as tagName, index (tagName)}
                 {@const tag = customTags[tagName]}
+                {@const isTestModeEnabled = testModeStore[tagName]?.enabled ?? false}
                 <div class="relative">
                   <!-- Drop indicator before this tag -->
                   {#if dropPosition === index && draggedTagName !== null}
@@ -635,7 +638,12 @@
                     ondrop={handleDrop}
                     aria-label="Drag to reorder tag: {tagName}"
                   >
-                    {tagName}
+                    <div class="flex items-center justify-between w-full">
+                      <span>{tagName}</span>
+                      {#if isTestModeEnabled && (tag.type === 'random' || tag.type === 'consistent-random')}
+                        <Beaker class="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      {/if}
+                    </div>
                   </button>
 
                   <!-- Drop indicator after this tag (for last position) -->
@@ -755,7 +763,7 @@
                 onTagsChange={handleTagsChange}
                 onCustomTagDoubleClick={handleCustomTagDoubleClick}
                 onTagClick={handleTagClick}
-                testOverrideTag={testMode ? testOverrideTag : ''}
+                testOverrideTag={selectedTagTestMode.enabled ? selectedTagTestMode.overrideTag : ''}
               />
             </div>
 
@@ -765,12 +773,13 @@
                 <label class="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    bind:checked={testMode}
+                    checked={selectedTagTestMode.enabled}
                     onchange={() => {
-                      if (!testMode) {
+                      const newState = !selectedTagTestMode.enabled
+                      setTagTestMode(selectedTagName, newState)
+                      if (!newState) {
                         statusMessage = ''
-                        // Clear test mode in store
-                        clearTestMode()
+                        removeTestModeOverride(selectedTagName)
                       }
                     }}
                     class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:outline-none"
