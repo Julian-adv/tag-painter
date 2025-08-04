@@ -49,11 +49,11 @@ export async function generateImage(options: GenerationOptions): Promise<{
     // Generate unique client ID
     const clientId = crypto.randomUUID()
 
-    // Expand custom tags and create prompt parts
+    // Expand custom tags and create prompt parts, passing previous resolutions for consistency
     const allResult = expandCustomTags(promptsData.tags.all, promptsData.customTags)
-    const zone1Result = expandCustomTags(promptsData.tags.zone1, promptsData.customTags)
-    const zone2Result = expandCustomTags(promptsData.tags.zone2, promptsData.customTags)
-    const negativeResult = expandCustomTags(promptsData.tags.negative, promptsData.customTags)
+    const zone1Result = expandCustomTags(promptsData.tags.zone1, promptsData.customTags, new Set(), allResult.randomTagResolutions)
+    const zone2Result = expandCustomTags(promptsData.tags.zone2, promptsData.customTags, new Set(), { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions })
+    const negativeResult = expandCustomTags(promptsData.tags.negative, promptsData.customTags, new Set(), { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions, ...zone2Result.randomTagResolutions })
 
     // Organize random tag resolutions by zone
     const allRandomResolutions = {

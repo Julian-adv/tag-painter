@@ -51,7 +51,7 @@
 
   function getDisplayText(): string {
     if (
-      (tag.type === 'random' || tag.type === 'sequential') &&
+      (tag.type === 'random' || tag.type === 'sequential' || tag.type === 'consistent-random') &&
       currentRandomTagResolutions[tag.name]
     ) {
       return `${tag.name}: ${currentRandomTagResolutions[tag.name]}`

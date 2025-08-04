@@ -56,6 +56,15 @@ export function getTagClasses(options: TagStyleOptions): string {
       }
       break
 
+    case 'consistent-random':
+      if (selected) {
+        classes += ' bg-orange-200 text-orange-900 border-2 border-solid border-orange-500'
+      } else {
+        classes +=
+          ' bg-orange-100 text-orange-800 border-1 border-dashed border-orange-400 hover:bg-orange-200'
+      }
+      break
+
     // case 'sequential':
     //   if (selected) {
     //     classes += ' bg-pink-200 text-pink-900 border border-pink-500'
@@ -103,6 +112,8 @@ export function getTagRemoveButtonClasses(tag: string | CustomTag): string {
     case 'random':
     case 'sequential':
       return `${baseClasses} text-purple-600 hover:text-purple-800 hover:bg-purple-200`
+    case 'consistent-random':
+      return `${baseClasses} text-orange-600 hover:text-orange-800 hover:bg-orange-200`
     // case 'sequential':
     //   return `${baseClasses} text-pink-600 hover:text-pink-800 hover:bg-pink-200`
     case 'regular':

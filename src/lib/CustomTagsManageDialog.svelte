@@ -641,6 +641,21 @@
                 />
                 <span class="text-gray-700">Random</span>
               </label>
+              <label class="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="tagType"
+                  value="consistent-random"
+                  checked={selectedTagType === 'consistent-random'}
+                  tabindex="-1"
+                  onchange={() => {
+                    selectedTagType = 'consistent-random'
+                    handleTagTypeChange()
+                  }}
+                  class="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 focus:outline-none"
+                />
+                <span class="text-gray-700">Consistent Random</span>
+              </label>
             </div>
 
             <div class="flex-1 overflow-y-auto max-h-80">
