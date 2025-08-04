@@ -12,10 +12,12 @@
     tags: CustomTag[]
     onTagsChange?: () => void
     onCustomTagDoubleClick?: (tagName: string) => void
+    onTagClick?: (tagName: string) => void
     currentRandomTagResolutions?: Record<string, string>
+    testOverrideTag?: string
   }
 
-  let { id, label, tags = $bindable(), onTagsChange, onCustomTagDoubleClick, currentRandomTagResolutions = {} }: Props = $props()
+  let { id, label, tags = $bindable(), onTagsChange, onCustomTagDoubleClick, onTagClick, currentRandomTagResolutions = {}, testOverrideTag = '' }: Props = $props()
 
   let quickTagInput = $state('')
 
@@ -53,7 +55,7 @@
   <div class="flex items-center justify-between mb-1">
     <label for={id} class="text-xs font-medium text-gray-700 text-left">{label}</label>
   </div>
-  <TagDisplay {id} bind:tags {onTagsChange} {onCustomTagDoubleClick} {currentRandomTagResolutions} />
+  <TagDisplay {id} bind:tags {onTagsChange} {onCustomTagDoubleClick} {onTagClick} {currentRandomTagResolutions} {testOverrideTag} />
 
   <!-- Quick tag input with autocomplete -->
   <div class="mt-1">

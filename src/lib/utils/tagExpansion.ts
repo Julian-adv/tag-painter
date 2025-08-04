@@ -3,6 +3,8 @@
  */
 
 import type { CustomTag } from '../types'
+import { get } from 'svelte/store'
+import { testModeStore } from '../stores/testModeStore'
 
 /**
  * Generate a cryptographically secure random number for better randomness
@@ -23,9 +25,17 @@ function expandRandomTag(
   visitedTags: Set<string>,
   existingRandomResolutions: Record<string, string>
 ): { expandedTags: string[], resolution: string } {
-  // Use crypto.getRandomValues for better randomness
-  const randomIndex = getSecureRandomIndex(customTag.tags.length)
-  const selectedTag = customTag.tags[randomIndex]
+  // Check for test mode override
+  let selectedTag: string
+  const testMode = get(testModeStore)
+  if (testMode.enabled && testMode.overrides[tag]) {
+    // Use the test override tag
+    selectedTag = testMode.overrides[tag]
+  } else {
+    // Use crypto.getRandomValues for better randomness
+    const randomIndex = getSecureRandomIndex(customTag.tags.length)
+    selectedTag = customTag.tags[randomIndex]
+  }
 
   // Recursively expand the selected tag
   const recursiveResult = expandCustomTags([selectedTag], customTags, visitedTags, existingRandomResolutions)

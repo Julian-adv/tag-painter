@@ -9,7 +9,9 @@
     readonly?: boolean
     onTagsChange?: () => void
     onCustomTagDoubleClick?: (tagName: string) => void
+    onTagClick?: (tagName: string) => void
     currentRandomTagResolutions?: Record<string, string>
+    testOverrideTag?: string
   }
 
   let {
@@ -18,7 +20,9 @@
     readonly = false,
     onTagsChange,
     onCustomTagDoubleClick,
-    currentRandomTagResolutions = {}
+    onTagClick,
+    currentRandomTagResolutions = {},
+    testOverrideTag = ''
   }: Props = $props()
 
   let draggedIndex: number | null = $state(null)
@@ -134,8 +138,10 @@
           {draggedIndex}
           {dropPosition}
           {currentRandomTagResolutions}
+          {testOverrideTag}
           onRemove={removeTag}
           onCustomTagDoubleClick={onCustomTagDoubleClick}
+          onTagClick={onTagClick}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onDragOver={handleDragOver}

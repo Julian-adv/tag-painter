@@ -13,6 +13,8 @@ export interface TagStyleOptions {
   selected?: boolean
   /** Whether the tag is being dragged */
   dragged?: boolean
+  /** Whether the tag is selected for test mode */
+  testSelected?: boolean
   /** Additional state-specific classes */
   additionalClasses?: string
 }
@@ -39,7 +41,13 @@ export const baseTagClasses = 'rounded-md text-sm transition-all duration-200'
  * Get tag styling classes based on tag name and state
  */
 export function getTagClasses(options: TagStyleOptions): string {
-  const { tag, selected = false, dragged = false, additionalClasses = '' } = options
+  const {
+    tag,
+    selected = false,
+    dragged = false,
+    testSelected = false,
+    additionalClasses = ''
+  } = options
   const type = getTagType(tag)
 
   let classes = baseTagClasses
@@ -89,6 +97,11 @@ export function getTagClasses(options: TagStyleOptions): string {
   // State-specific styling
   if (dragged) {
     classes += ' opacity-50 scale-95'
+  }
+
+  // Test selection styling - thick blue border
+  if (testSelected) {
+    classes += ' ring-3 ring-blue-500 ring-opacity-75'
   }
 
   classes += ' cursor-move hover:shadow-md'

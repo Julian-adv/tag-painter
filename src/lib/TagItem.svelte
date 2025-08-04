@@ -11,8 +11,10 @@
     draggedIndex: number | null
     dropPosition: number | null
     currentRandomTagResolutions?: Record<string, string>
+    testOverrideTag?: string
     onRemove: (tagName: string) => void
     onCustomTagDoubleClick?: (tagName: string) => void
+    onTagClick?: (tagName: string) => void
     onDragStart: (event: DragEvent, index: number) => void
     onDragEnd: (event: DragEvent) => void
     onDragOver: (event: DragEvent, index: number) => void
@@ -27,8 +29,10 @@
     draggedIndex,
     dropPosition,
     currentRandomTagResolutions = {},
+    testOverrideTag = '',
     onRemove,
     onCustomTagDoubleClick,
+    onTagClick,
     onDragStart,
     onDragEnd,
     onDragOver,
@@ -39,6 +43,12 @@
   function handleTagDoubleClick() {
     if (onCustomTagDoubleClick) {
       onCustomTagDoubleClick(tag.name)
+    }
+  }
+
+  function handleTagClick() {
+    if (onTagClick) {
+      onTagClick(tag.name)
     }
   }
 
@@ -82,6 +92,7 @@
     class="inline-flex items-center gap-1 {getTagClasses({
       tag,
       dragged: draggedIndex === index,
+      testSelected: testOverrideTag === tag.name,
       additionalClasses: 'pl-1.5 pr-0.5 py-0.5'
     })}"
   >
@@ -89,6 +100,7 @@
       type="button"
       class="text-left cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit focus:outline-none"
       tabindex="-1"
+      onclick={handleTagClick}
       ondblclick={handleTagDoubleClick}
       onkeydown={handleTagKeydown}
       title={tag.type === 'regular'

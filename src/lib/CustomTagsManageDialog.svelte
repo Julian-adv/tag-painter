@@ -3,6 +3,7 @@
   import TagInput from './TagInput.svelte'
   import { promptsData, saveCustomTag, savePromptsData } from './stores/promptsStore'
   import { combinedTags } from './stores/tagsStore'
+  import { setTestModeOverride, removeTestModeOverride, clearTestMode, testModeStore } from './stores/testModeStore'
   import { get } from 'svelte/store'
   import { untrack } from 'svelte'
   import { Trash, DocumentDuplicate, Plus } from 'svelte-heros-v2'
@@ -27,6 +28,16 @@
   // Drag & drop state
   let draggedTagName = $state<string | null>(null)
   let dropPosition = $state<number | null>(null)
+
+  // Test mode state
+  let testMode = $state(false)
+  
+  // Get the override tag for the currently selected tag
+  const testOverrideTag = $derived.by(() => {
+    if (!testMode || !selectedTagName) return ''
+    const testState = $testModeStore
+    return testState.overrides[selectedTagName] || ''
+  })
 
   // Reference to the left column scroll container
   let leftColumnElement = $state<HTMLElement>()
@@ -82,7 +93,7 @@
         selectedTagType = tag.type
         editingTagName = tagToSelect
         hasUnsavedChanges = false
-        
+
         // Scroll to the selected tag
         scrollToTag(tagToSelect)
       }
@@ -101,7 +112,7 @@
     selectedTagType = tag.type
     editingTagName = tagName
     hasUnsavedChanges = false
-    
+
     // Scroll to the selected tag
     scrollToTag(tagName)
   }
@@ -144,50 +155,6 @@
     }
   }
 
-  async function createAndSelectTag(name: string, tags: string[], type: TagType) {
-    // Check if name already exists
-    if (name in customTags) {
-      statusMessage = 'Unable to create tag - name already exists!'
-      return false
-    }
-
-    // Create new tag
-    const newTag: CustomTag = {
-      name: name,
-      tags: tags,
-      type: type
-    }
-
-    // Update local state
-    customTags[name] = newTag
-    customTags = { ...customTags }
-
-    // Update the store
-    promptsData.update((data) => {
-      return {
-        ...data,
-        customTags: {
-          ...data.customTags,
-          [name]: newTag
-        }
-      }
-    })
-
-    // Select the newly created tag
-    selectedTagName = name
-    selectedTagContent = convertToCustomTags(tags)
-    selectedTagType = type
-    editingTagName = name
-    hasUnsavedChanges = true
-    statusMessage = ''
-
-    // Scroll to the newly created tag and focus the name input
-    scrollToTag(name)
-    focusTagNameInput()
-
-    return true
-  }
-
   async function addNewTag(initialTags: string[] = []) {
     // Generate unique name for new tag
     let newName = 'New Tag'
@@ -197,7 +164,47 @@
       newName = `New Tag ${counter}`
     }
 
-    await createAndSelectTag(newName, initialTags, 'sequential')
+    // Check if name already exists (should not happen due to above logic, but safety check)
+    if (newName in customTags) {
+      statusMessage = 'Unable to create tag - name already exists!'
+      return false
+    }
+
+    // Create new tag
+    const newTag: CustomTag = {
+      name: newName,
+      tags: initialTags,
+      type: 'sequential'
+    }
+
+    // Update local state
+    customTags[newName] = newTag
+    customTags = { ...customTags }
+
+    // Update the store
+    promptsData.update((data) => {
+      return {
+        ...data,
+        customTags: {
+          ...data.customTags,
+          [newName]: newTag
+        }
+      }
+    })
+
+    // Select the newly created tag
+    selectedTagName = newName
+    selectedTagContent = convertToCustomTags(initialTags)
+    selectedTagType = 'sequential'
+    editingTagName = newName
+    hasUnsavedChanges = true
+    statusMessage = ''
+
+    // Scroll to the newly created tag and focus the name input
+    scrollToTag(newName)
+    focusTagNameInput()
+
+    return true
   }
 
   async function duplicateSelectedTag() {
@@ -209,7 +216,60 @@
     // Get current tag content
     const currentTags = selectedTagContent.map((tag) => tag.name)
 
-    await createAndSelectTag(newName, currentTags, selectedTagType)
+    // Check if name already exists
+    if (newName in customTags) {
+      statusMessage = 'Unable to create tag - name already exists!'
+      return false
+    }
+
+    // Create new tag
+    const newTag: CustomTag = {
+      name: newName,
+      tags: currentTags,
+      type: selectedTagType
+    }
+
+    // Find the position of the original tag
+    const tagNames = Object.keys(customTags)
+    const originalIndex = tagNames.indexOf(selectedTagName)
+
+    // Insert the new tag right after the original
+    const newTagNames = [...tagNames]
+    newTagNames.splice(originalIndex + 1, 0, newName)
+
+    // Rebuild customTags object in new order
+    const newCustomTags: Record<string, CustomTag> = {}
+    for (const tagName of newTagNames) {
+      if (tagName === newName) {
+        newCustomTags[tagName] = newTag
+      } else {
+        newCustomTags[tagName] = customTags[tagName]
+      }
+    }
+
+    customTags = newCustomTags
+
+    // Update the store
+    promptsData.update((data) => {
+      return {
+        ...data,
+        customTags: newCustomTags
+      }
+    })
+
+    // Select the newly created tag
+    selectedTagName = newName
+    selectedTagContent = convertToCustomTags(currentTags)
+    selectedTagType = selectedTagType
+    editingTagName = newName
+    hasUnsavedChanges = true
+    statusMessage = ''
+
+    // Scroll to the newly created tag and focus the name input
+    scrollToTag(newName)
+    focusTagNameInput()
+
+    return true
   }
 
   function scrollToTag(tagName: string) {
@@ -334,6 +394,16 @@
     await addNewTag(tagsToAdd)
   }
 
+  function handleTagClick(tagName: string) {
+    // If test mode is enabled and the current tag is random/consistent-random
+    if (testMode && (selectedTagType === 'random' || selectedTagType === 'consistent-random')) {
+      statusMessage = `Test mode: "${selectedTagName}" will always expand to "${tagName}"`
+
+      // Set test mode override for this specific tag
+      setTestModeOverride(selectedTagName, tagName)
+    }
+  }
+
   async function saveTagName() {
     if (!editingTagName.trim() || editingTagName === selectedTagName) {
       editingTagName = selectedTagName
@@ -348,21 +418,40 @@
       return
     }
 
-    // Update local state - rename the tag
+    // Update local state - rename the tag while maintaining position
     const existingTag = customTags[selectedTagName]
     const renamedTag: CustomTag = {
       ...existingTag,
       name: newName
     }
-    delete customTags[selectedTagName]
-    customTags[newName] = renamedTag
-    customTags = { ...customTags }
+
+    // Maintain the order by rebuilding the object
+    const tagNames = Object.keys(customTags)
+    const newCustomTags: Record<string, CustomTag> = {}
+
+    for (const tagName of tagNames) {
+      if (tagName === selectedTagName) {
+        newCustomTags[newName] = renamedTag
+      } else {
+        newCustomTags[tagName] = customTags[tagName]
+      }
+    }
+
+    customTags = newCustomTags
 
     // Update the store
     promptsData.update((data) => {
-      const newCustomTags = { ...data.customTags }
-      delete newCustomTags[selectedTagName]
-      newCustomTags[newName] = renamedTag
+      // Maintain the order in store as well
+      const storeTagNames = Object.keys(data.customTags)
+      const newStoreCustomTags: Record<string, CustomTag> = {}
+
+      for (const tagName of storeTagNames) {
+        if (tagName === selectedTagName) {
+          newStoreCustomTags[newName] = renamedTag
+        } else {
+          newStoreCustomTags[tagName] = data.customTags[tagName]
+        }
+      }
 
       // Replace old tag name with new name in all tag zones
       const updateTagsInZone = (tags: string[]): string[] => {
@@ -371,7 +460,7 @@
 
       return {
         ...data,
-        customTags: newCustomTags,
+        customTags: newStoreCustomTags,
         tags: {
           ...data.tags,
           all: updateTagsInZone(data.tags.all),
@@ -386,7 +475,7 @@
     selectedTagName = newName
     hasUnsavedChanges = true
     statusMessage = ''
-    
+
     // Scroll to the renamed tag
     scrollToTag(newName)
   }
@@ -665,8 +754,31 @@
                 bind:tags={selectedTagContent}
                 onTagsChange={handleTagsChange}
                 onCustomTagDoubleClick={handleCustomTagDoubleClick}
+                onTagClick={handleTagClick}
+                testOverrideTag={testMode ? testOverrideTag : ''}
               />
             </div>
+
+            <!-- Test Mode -->
+            {#if selectedTagType === 'random' || selectedTagType === 'consistent-random'}
+              <div class="border-t pt-3 mt-3 border-gray-300">
+                <label class="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    bind:checked={testMode}
+                    onchange={() => {
+                      if (!testMode) {
+                        statusMessage = ''
+                        // Clear test mode in store
+                        clearTestMode()
+                      }
+                    }}
+                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:outline-none"
+                  />
+                  <span class="text-gray-700 text-sm">Test Mode</span>
+                </label>
+              </div>
+            {/if}
           {:else}
             <div class="flex-1 flex items-center justify-center">
               <p class="text-gray-400 text-sm italic">Select a custom tag to edit</p>
