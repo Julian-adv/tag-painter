@@ -3,7 +3,7 @@
   import TagInput from './TagInput.svelte'
   import { promptsData, saveCustomTag, savePromptsData } from './stores/promptsStore'
   import { combinedTags } from './stores/tagsStore'
-  import { testModeStore, setTestModeOverride, setTagTestMode, removeTestModeOverride } from './stores/testModeStore'
+  import { testModeStore, setTestModeOverride, setTagTestMode, removeTestModeOverride } from './stores/testModeStore.svelte'
   import { get } from 'svelte/store'
   import { untrack } from 'svelte'
   import { Trash, DocumentDuplicate, Plus, Beaker } from 'svelte-heros-v2'

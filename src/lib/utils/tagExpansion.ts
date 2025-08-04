@@ -3,7 +3,7 @@
  */
 
 import type { CustomTag } from '../types'
-import { testModeStore } from '../stores/testModeStore'
+import { testModeStore } from '../stores/testModeStore.svelte'
 
 /**
  * Generate a cryptographically secure random number for better randomness
