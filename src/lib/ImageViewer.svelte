@@ -3,6 +3,7 @@
   import { getImageList, getImageMetadata } from './utils/fileIO'
   import type { OptionItem } from '$lib/types'
   import { promptsData } from './stores/promptsStore'
+  import { maskOverlay } from './stores/maskOverlayStore'
 
   interface Props {
     imageUrl: string | null
@@ -133,27 +134,32 @@
   }
 </script>
 
-<div class="image-viewer">
+<div class="w-full mx-auto flex flex-col items-center gap-4">
   {#if imageUrl}
-    <img src={imageUrl} alt="" class="main-image" />
+    <div class="relative inline-block">
+      <img src={imageUrl} alt="" class="max-w-full max-h-[calc(100vh-2rem)] object-contain rounded-lg shadow-md block" />
+      {#if $maskOverlay.isVisible && $maskOverlay.maskSrc}
+        <img src={$maskOverlay.maskSrc} alt="Mask overlay" class="absolute top-0 left-0 w-full h-full object-contain opacity-30 pointer-events-none rounded-lg mix-blend-multiply" />
+      {/if}
+    </div>
   {:else}
-    <div class="placeholder">
+    <div class="flex items-center justify-center w-[832px] h-[1216px] bg-gray-100 rounded-lg text-gray-500 text-lg">
       <p>No image to display</p>
     </div>
   {/if}
 
-  <div class="nav-controls">
-    <button class="nav-button prev" onclick={goToPreviousImage} aria-label="Previous image">
+  <div class="flex justify-center items-center gap-4">
+    <button class="flex items-center justify-center w-9 h-9 border border-gray-300 rounded-full bg-gray-100 text-gray-600 cursor-pointer transition-all duration-200 hover:bg-gray-200 hover:border-gray-400 hover:scale-105 active:scale-95" onclick={goToPreviousImage} aria-label="Previous image">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <path d="M15 18l-6-6 6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
     </button>
 
-    <span class="image-counter">
+    <span class="text-sm text-gray-600 font-medium min-w-[60px] text-center">
       {currentIndex >= 0 ? currentIndex + 1 : 0} / {allFiles.length}
     </span>
 
-    <button class="nav-button next" onclick={goToNextImage} aria-label="Next image">
+    <button class="flex items-center justify-center w-9 h-9 border border-gray-300 rounded-full bg-gray-100 text-gray-600 cursor-pointer transition-all duration-200 hover:bg-gray-200 hover:border-gray-400 hover:scale-105 active:scale-95" onclick={goToNextImage} aria-label="Next image">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
@@ -161,73 +167,3 @@
   </div>
 </div>
 
-<style>
-  .image-viewer {
-    width: 100%;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .nav-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .image-counter {
-    font-size: 0.8125rem;
-    color: #666;
-    font-weight: 500;
-    min-width: 60px;
-    text-align: center;
-  }
-
-  .main-image {
-    max-width: 100%;
-    max-height: calc(100vh - 2rem);
-    object-fit: contain;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
-
-  .nav-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border: none;
-    border-radius: 50%;
-    background: #f5f5f5;
-    color: #666;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 1px solid #ddd;
-  }
-
-  .nav-button:hover {
-    background: #e8e8e8;
-    border-color: #bbb;
-    transform: scale(1.05);
-  }
-
-  .nav-button:active {
-    transform: scale(0.95);
-  }
-
-  .placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 832px;
-    height: 1216px;
-    background: #f5f5f5;
-    border-radius: 8px;
-    color: #666;
-    font-size: 1.1rem;
-  }
-</style>

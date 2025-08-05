@@ -1,6 +1,7 @@
 <!-- Component for selecting image composition layouts -->
 <script lang="ts">
   import { promptsData, updateComposition } from './stores/promptsStore'
+  import { maskOverlay } from './stores/maskOverlayStore'
 
   const compositions = [
     { id: 'all', src: '/all-mask.png', alt: 'All' },
@@ -12,6 +13,14 @@
 
   function selectComposition(compositionId: string) {
     updateComposition(compositionId)
+  }
+
+  function handleMouseEnter(maskSrc: string) {
+    maskOverlay.showMask(maskSrc)
+  }
+
+  function handleMouseLeave() {
+    maskOverlay.hideMask()
   }
 </script>
 
@@ -26,6 +35,8 @@
           ? 'border-sky-500 bg-sky-200'
           : ''}"
         onclick={() => selectComposition(composition.id)}
+        onmouseenter={() => handleMouseEnter(composition.src)}
+        onmouseleave={handleMouseLeave}
         title={composition.alt}
       >
         <img src={composition.src} alt={composition.alt} class="w-12 h-auto block" />
