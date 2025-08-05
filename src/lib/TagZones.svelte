@@ -141,6 +141,7 @@
       onTagsChange={saveTags}
       onCustomTagDoubleClick={handleCustomTagDoubleClick}
       currentRandomTagResolutions={currentRandomTagResolutions.zone2}
+      disabled={$promptsData.selectedComposition === 'all'}
     />
 
     <TagInput

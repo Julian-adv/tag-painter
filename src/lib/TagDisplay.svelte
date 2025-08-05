@@ -11,6 +11,7 @@
     onTagClick?: (tagName: string) => void
     currentRandomTagResolutions?: Record<string, string>
     testOverrideTag?: string
+    disabled?: boolean
   }
 
   let {
@@ -20,7 +21,8 @@
     onCustomTagDoubleClick,
     onTagClick,
     currentRandomTagResolutions = {},
-    testOverrideTag = ''
+    testOverrideTag = '',
+    disabled = false
   }: Props = $props()
 
   let draggedIndex: number | null = $state(null)
@@ -130,6 +132,7 @@
           {dropPosition}
           {currentRandomTagResolutions}
           {testOverrideTag}
+          {disabled}
           onRemove={removeTag}
           onCustomTagDoubleClick={onCustomTagDoubleClick}
           onTagClick={onTagClick}

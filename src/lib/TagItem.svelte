@@ -11,6 +11,7 @@
     dropPosition: number | null
     currentRandomTagResolutions?: Record<string, string>
     testOverrideTag?: string
+    disabled?: boolean
     onRemove: (tagName: string) => void
     onCustomTagDoubleClick?: (tagName: string) => void
     onTagClick?: (tagName: string) => void
@@ -29,6 +30,7 @@
     dropPosition,
     currentRandomTagResolutions = {},
     testOverrideTag = '',
+    disabled = false,
     onRemove,
     onCustomTagDoubleClick,
     onTagClick,
@@ -60,6 +62,9 @@
   }
 
   function handleWheel(event: WheelEvent) {
+    // Don't handle weight adjustment if disabled
+    if (disabled) return
+    
     // Only handle weight adjustment when Ctrl key is pressed
     if (!event.ctrlKey) {
       return // Let the normal scroll behavior happen

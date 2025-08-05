@@ -3,6 +3,7 @@
   import { promptsData, updateComposition } from './stores/promptsStore'
 
   const compositions = [
+    { id: 'all', src: '/all-mask.png', alt: 'All' },
     { id: 'left-horizontal', src: '/left-horizontal-mask.png', alt: 'Left Horizontal' },
     { id: 'left-top', src: '/left-top-mask.png', alt: 'Left Top' },
     { id: 'top-right', src: '/top-right-mask.png', alt: 'Top Right' },
@@ -16,7 +17,7 @@
 
 <div class="border-gray-200">
   <h3 class="text-sm font-bold text-gray-800 text-left">Composition</h3>
-  <div class="flex gap-2 flex-wrap bg-gray-200 p-1 m-2 rounded-lg">
+  <div class="flex gap-1 flex-wrap bg-gray-200 p-1 m-2 rounded-lg">
     {#each compositions as composition (composition.id)}
       <button
         type="button"

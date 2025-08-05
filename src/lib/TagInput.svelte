@@ -15,9 +15,10 @@
     onTagClick?: (tagName: string) => void
     currentRandomTagResolutions?: Record<string, string>
     testOverrideTag?: string
+    disabled?: boolean
   }
 
-  let { id, label, tags = $bindable(), onTagsChange, onCustomTagDoubleClick, onTagClick, currentRandomTagResolutions = {}, testOverrideTag = '' }: Props = $props()
+  let { id, label, tags = $bindable(), onTagsChange, onCustomTagDoubleClick, onTagClick, currentRandomTagResolutions = {}, testOverrideTag = '', disabled = false }: Props = $props()
 
   let quickTagInput = $state('')
 
@@ -51,11 +52,11 @@
 
 </script>
 
-<div>
+<div class={disabled ? 'opacity-50 pointer-events-none' : ''}>
   <div class="flex items-center justify-between mb-1">
-    <label for={id} class="text-xs font-medium text-gray-700 text-left">{label}</label>
+    <label for={id} class="text-xs font-medium {disabled ? 'text-gray-400' : 'text-gray-700'} text-left">{label}</label>
   </div>
-  <TagDisplay {id} bind:tags {onTagsChange} {onCustomTagDoubleClick} {onTagClick} {currentRandomTagResolutions} {testOverrideTag} />
+  <TagDisplay {id} bind:tags {onTagsChange} {onCustomTagDoubleClick} {onTagClick} {currentRandomTagResolutions} {testOverrideTag} {disabled} />
 
   <!-- Quick tag input with autocomplete -->
   <div class="mt-1">
@@ -65,6 +66,7 @@
       placeholder="Type tags to add (press Enter to add)..."
       rows={1}
       class="w-full p-1 border border-gray-200 rounded text-sm focus:ring-sky-500 focus:border-sky-500"
+      readonly={disabled}
       onValueChange={handleQuickTagChange}
       onkeydown={handleQuickTagKeydown}
     />
