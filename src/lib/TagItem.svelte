@@ -60,6 +60,11 @@
   }
 
   function handleWheel(event: WheelEvent) {
+    // Only handle weight adjustment when Ctrl key is pressed
+    if (!event.ctrlKey) {
+      return // Let the normal scroll behavior happen
+    }
+
     event.preventDefault()
 
     const delta = event.deltaY > 0 ? -0.1 : 0.1 // Scroll down = decrease, scroll up = increase
@@ -118,7 +123,7 @@
     onwheel={handleWheel}
     role="button"
     tabindex="-1"
-    aria-label="Drag to reorder tag: {tag.name}. Scroll to adjust weight."
+    aria-label="Drag to reorder tag: {tag.name}. Ctrl+Scroll to adjust weight."
     class="inline-flex items-center gap-1 {getTagClasses({
       tag,
       dragged: draggedIndex === index,
