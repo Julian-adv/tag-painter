@@ -13,6 +13,12 @@ export interface GenerationOptions {
   settings: Settings
   selectedLoras: string[]
   seed?: number | null
+  previousRandomTagResolutions?: {
+    all: Record<string, string>
+    zone1: Record<string, string>
+    zone2: Record<string, string>
+    negative: Record<string, string>
+  }
   onLoadingChange: (loading: boolean) => void
   onProgressUpdate: (progress: ProgressData) => void
   onImageReceived: (imageBlob: Blob, filePath: string) => void
@@ -33,6 +39,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     settings,
     selectedLoras,
     seed,
+    previousRandomTagResolutions,
     onLoadingChange,
     onProgressUpdate,
     onImageReceived,
@@ -49,11 +56,18 @@ export async function generateImage(options: GenerationOptions): Promise<{
     // Generate unique client ID
     const clientId = crypto.randomUUID()
 
-    // Expand custom tags and create prompt parts, passing previous resolutions for consistency
-    const allResult = expandCustomTags(promptsData.tags.all, promptsData.customTags)
-    const zone1Result = expandCustomTags(promptsData.tags.zone1, promptsData.customTags, new Set(), allResult.randomTagResolutions)
-    const zone2Result = expandCustomTags(promptsData.tags.zone2, promptsData.customTags, new Set(), { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions })
-    const negativeResult = expandCustomTags(promptsData.tags.negative, promptsData.customTags, new Set(), { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions, ...zone2Result.randomTagResolutions })
+    // Expand custom tags and create prompt parts, using previous resolutions if regenerating
+    const previousAll = previousRandomTagResolutions?.all || {}
+    const allResult = expandCustomTags(promptsData.tags.all, promptsData.customTags, new Set(), {}, previousAll)
+    
+    const previousZone1 = previousRandomTagResolutions?.zone1 || {}
+    const zone1Result = expandCustomTags(promptsData.tags.zone1, promptsData.customTags, new Set(), { ...allResult.randomTagResolutions }, previousZone1)
+    
+    const previousZone2 = previousRandomTagResolutions?.zone2 || {}
+    const zone2Result = expandCustomTags(promptsData.tags.zone2, promptsData.customTags, new Set(), { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions }, previousZone2)
+    
+    const previousNegative = previousRandomTagResolutions?.negative || {}
+    const negativeResult = expandCustomTags(promptsData.tags.negative, promptsData.customTags, new Set(), { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions, ...zone2Result.randomTagResolutions }, previousNegative)
 
     // Organize random tag resolutions by zone
     const allRandomResolutions = {

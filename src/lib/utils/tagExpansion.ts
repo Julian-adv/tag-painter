@@ -22,14 +22,23 @@ function expandRandomTag(
   customTag: CustomTag,
   customTags: Record<string, CustomTag>,
   visitedTags: Set<string>,
-  existingRandomResolutions: Record<string, string>
-): { expandedTags: string[], resolution: string } {
-  // Check for test mode override
+  existingRandomResolutions: Record<string, string>,
+  previousZoneRandomResults: Record<string, string>
+): { expandedTags: string[]; resolution: string } {
+  // Check for test mode override first (user can always override even during regen)
   let selectedTag: string
   const overrideTag = testModeStore[tag]?.overrideTag
   if (overrideTag) {
     // Use the test override tag
     selectedTag = overrideTag
+  } else if (previousZoneRandomResults[tag]) {
+    // Use previous zone random result for regen if no override
+    const previousResult = previousZoneRandomResults[tag]
+    const previousTags = previousResult.split(', ')
+    return {
+      expandedTags: previousTags,
+      resolution: previousResult
+    }
   } else {
     // Use crypto.getRandomValues for better randomness
     const randomIndex = getSecureRandomIndex(customTag.tags.length)
@@ -37,8 +46,14 @@ function expandRandomTag(
   }
 
   // Recursively expand the selected tag
-  const recursiveResult = expandCustomTags([selectedTag], customTags, visitedTags, existingRandomResolutions)
-  
+  const recursiveResult = expandCustomTags(
+    [selectedTag],
+    customTags,
+    visitedTags,
+    existingRandomResolutions,
+    previousZoneRandomResults
+  )
+
   return {
     expandedTags: recursiveResult.expandedTags,
     resolution: recursiveResult.expandedTags.join(', ')
@@ -48,7 +63,7 @@ function expandRandomTag(
 /**
  * Parse weight from tag string
  */
-function parseTagWithWeight(tagString: string): { name: string, weight?: number } {
+function parseTagWithWeight(tagString: string): { name: string; weight?: number } {
   const weightMatch = tagString.match(/^(.+):(\d+(?:\.\d+)?)$/)
   if (weightMatch) {
     const [, name, weightStr] = weightMatch
@@ -75,7 +90,8 @@ export function expandCustomTags(
   tags: string[],
   customTags: Record<string, CustomTag>,
   visitedTags: Set<string> = new Set(),
-  existingRandomResolutions: Record<string, string> = {}
+  existingRandomResolutions: Record<string, string> = {},
+  previousZoneRandomResults: Record<string, string> = {}
 ): {
   expandedTags: string[]
   randomTagResolutions: Record<string, string>
@@ -85,7 +101,7 @@ export function expandCustomTags(
 
   for (const tagString of tags) {
     const { name: tag, weight: tagWeight } = parseTagWithWeight(tagString)
-    
+
     // Prevent infinite recursion by tracking visited tags
     if (visitedTags.has(tag)) {
       console.warn(`Circular reference detected for tag: ${tag}`)
@@ -99,7 +115,14 @@ export function expandCustomTags(
       if (customTag.type === 'random') {
         // For random tags, select one random tag from the list
         if (customTag.tags.length > 0) {
-          const result = expandRandomTag(tag, customTag, customTags, visitedTags, existingRandomResolutions)
+          const result = expandRandomTag(
+            tag,
+            customTag,
+            customTags,
+            visitedTags,
+            existingRandomResolutions,
+            previousZoneRandomResults
+          )
           // Apply weight to the entire expanded result if it has a weight
           if (tagWeight) {
             const combinedExpansion = result.expandedTags.join(', ')
@@ -129,7 +152,14 @@ export function expandCustomTags(
             }
           } else {
             // No existing resolution, select randomly
-            const result = expandRandomTag(tag, customTag, customTags, visitedTags, existingRandomResolutions)
+            const result = expandRandomTag(
+              tag,
+              customTag,
+              customTags,
+              visitedTags,
+              existingRandomResolutions,
+              previousZoneRandomResults
+            )
             // Apply weight to the entire expanded result if it has a weight
             if (tagWeight) {
               const combinedExpansion = result.expandedTags.join(', ')
@@ -144,7 +174,16 @@ export function expandCustomTags(
         }
       } else {
         // For sequential tags, expand all constituent tags recursively
-        const recursiveResult = expandCustomTags(customTag.tags, customTags, visitedTags, existingRandomResolutions)
+        const recursiveResult = expandCustomTags(
+          customTag.tags,
+          customTags,
+          visitedTags,
+          existingRandomResolutions,
+          previousZoneRandomResults
+        )
+        // Merge random tag resolutions from recursive call
+        Object.assign(randomTagResolutions, recursiveResult.randomTagResolutions)
+        
         // Apply weight to the entire sequential tag result if it has a weight
         if (tagWeight) {
           const combinedExpansion = recursiveResult.expandedTags.join(', ')

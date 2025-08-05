@@ -20,8 +20,6 @@ const defaultPromptsData: PromptsData = {
 // Create reactive store
 export const promptsData = writable<PromptsData>(defaultPromptsData)
 
-// Store for tracking resolved random values during generation
-export const resolvedRandomValues = writable<Record<string, OptionItem>>({})
 
 // Migrate old customTags format to new format
 function migrateCustomTags(oldCustomTags: unknown): Record<string, CustomTag> {
@@ -198,23 +196,6 @@ export function reorderCategories(fromIndex: number, toIndex: number) {
   })
 }
 
-// Get random option for a category
-export function getRandomOption(categoryId: string): OptionItem | null {
-  let randomOption: OptionItem | null = null
-  promptsData.subscribe((data) => {
-    const category = data.categories.find((cat) => cat.id === categoryId)
-    if (category) {
-      const effectiveOptions = getEffectiveOptions(category, data.categories)
-      // Filter out the random option itself to avoid infinite loop
-      const realOptions = effectiveOptions.filter((option) => option.title !== '[Random]')
-      if (realOptions.length > 0) {
-        const randomIndex = Math.floor(Math.random() * realOptions.length)
-        randomOption = realOptions[randomIndex]
-      }
-    }
-  })()
-  return randomOption
-}
 
 // Get the source category (following alias chain)
 export function getSourceCategory(
@@ -242,16 +223,6 @@ export function getEffectiveOptions(
   return category.values
 }
 
-// Get effective value using already resolved random values
-export function getEffectiveCategoryValueFromResolved(
-  category: PromptCategory,
-  resolvedValues: Record<string, OptionItem>
-): string {
-  if (category.currentValue.title === '[Random]') {
-    return resolvedValues[category.id]?.value || ''
-  }
-  return category.currentValue.value
-}
 
 // Auto-save current values to options arrays when they don't exist
 export function autoSaveCurrentValues() {
@@ -283,21 +254,3 @@ export function autoSaveCurrentValues() {
   })
 }
 
-// Resolve random values and store them for display
-export function resolveRandomValues() {
-  const resolved: Record<string, OptionItem> = {}
-
-  promptsData.subscribe((data) => {
-    data.categories.forEach((category) => {
-      if (category.currentValue.title === '[Random]') {
-        const randomOption = getRandomOption(category.id)
-        if (randomOption) {
-          resolved[category.id] = randomOption
-        }
-      }
-    })
-  })()
-
-  resolvedRandomValues.set(resolved)
-  return resolved
-}

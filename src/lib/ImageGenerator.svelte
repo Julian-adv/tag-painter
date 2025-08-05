@@ -16,7 +16,6 @@
     initializePromptsStore,
     savePromptsData,
     autoSaveCurrentValues,
-    resolveRandomValues,
     updateCheckpoint,
     updateUpscale,
     updateFaceDetailer,
@@ -92,11 +91,10 @@
     // Add current values to options if they're not already there
     autoSaveCurrentValues()
 
-    // Resolve random values for display
-    resolveRandomValues()
-
     // Save prompts before generating
     await savePromptsData()
+
+    const isRegeneration = seedToUse !== null
 
     let currentPromptsData: PromptsData
     promptsData.subscribe((data) => (currentPromptsData = data))()
@@ -106,6 +104,7 @@
       settings,
       selectedLoras: currentPromptsData!.selectedLoras,
       seed: seedToUse,
+      previousRandomTagResolutions: isRegeneration ? currentRandomTagResolutions : undefined,
       onLoadingChange: (loading) => {
         isLoading = loading
       },
