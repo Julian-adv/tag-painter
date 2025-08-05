@@ -7,7 +7,6 @@
   interface Props {
     tag: CustomTag
     index: number
-    readonly?: boolean
     draggedIndex: number | null
     dropPosition: number | null
     currentRandomTagResolutions?: Record<string, string>
@@ -26,7 +25,6 @@
   let {
     tag = $bindable(),
     index,
-    readonly = false,
     draggedIndex,
     dropPosition,
     currentRandomTagResolutions = {},
@@ -63,43 +61,43 @@
 
   function handleWheel(event: WheelEvent) {
     event.preventDefault()
-    
+
     const delta = event.deltaY > 0 ? -0.1 : 0.1 // Scroll down = decrease, scroll up = increase
     const currentWeight = tag.weight ?? 1.0
     const newWeight = Math.max(0.1, Math.min(2.0, currentWeight + delta)) // Clamp between 0.1 and 2.0
-    
+
     // Round to 1 decimal place
     const roundedWeight = Math.round(newWeight * 10) / 10
-    
+
     // Update the tag weight directly
     tag.weight = roundedWeight === 1.0 ? undefined : roundedWeight
-    
+
     // Notify parent of weight change
     onWeightChange?.()
   }
 
-  function getDisplayText(): string {
+  let displayParts = $derived.by(() => {
     const weight = tag.weight ?? 1.0
-    
+
     if (
       (tag.type === 'random' || tag.type === 'sequential' || tag.type === 'consistent-random') &&
       currentRandomTagResolutions[tag.name]
     ) {
-      // For expanded tags, show weight at the end if different from 1.0
-      if (weight !== 1.0) {
-        return `${tag.name}: ${currentRandomTagResolutions[tag.name]}:${weight}`
+      // For expanded tags, use the resolution directly (no parsing needed)
+      return {
+        name: tag.name,
+        content: currentRandomTagResolutions[tag.name],
+        weight: weight !== 1.0 ? weight.toString() : ''
       }
-      return `${tag.name}: ${currentRandomTagResolutions[tag.name]}`
     }
-    
-    // For non-expanded tags, show weight if different from 1.0
-    if (weight !== 1.0) {
-      return `${tag.name}:${weight}`
-    }
-    
-    return tag.name
-  }
 
+    // For non-expanded tags
+    return {
+      name: tag.name,
+      content: '',
+      weight: weight !== 1.0 ? weight.toString() : ''
+    }
+  })
 </script>
 
 <div class="relative">
@@ -111,7 +109,7 @@
   {/if}
 
   <div
-    draggable={!readonly}
+    draggable={true}
     ondragstart={(e) => onDragStart(e, index)}
     ondragend={onDragEnd}
     ondragover={(e) => onDragOver(e, index)}
@@ -130,7 +128,7 @@
   >
     <button
       type="button"
-      class="text-left cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit focus:outline-none"
+      class="text-left cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit focus:outline-none flex items-center"
       tabindex="-1"
       onclick={handleTagClick}
       ondblclick={handleTagDoubleClick}
@@ -142,19 +140,25 @@
         ? `Create custom tag from ${tag.name}`
         : `Edit custom tag ${tag.name}`}
     >
-      {getDisplayText()}
+      <span class="font-medium">{displayParts.name}</span>
+      {#if displayParts.content}
+        <span class="border-l border-dashed border-gray-400 mx-1 self-stretch"></span>
+        <span class="text-gray-600">{displayParts.content}</span>
+      {/if}
+      {#if displayParts.weight}
+        <span class="border-l border-dashed border-gray-400 mx-1 self-stretch"></span>
+        <span class="font-semibold text-blue-600">{displayParts.weight}</span>
+      {/if}
     </button>
-    {#if !readonly}
-      <button
-        type="button"
-        class={getTagRemoveButtonClasses(tag)}
-        tabindex="-1"
-        onclick={() => onRemove(tag.name)}
-        aria-label="Remove {tag.name}"
-      >
-        <XMark class="w-3 h-3" />
-      </button>
-    {/if}
+    <button
+      type="button"
+      class={getTagRemoveButtonClasses(tag)}
+      tabindex="-1"
+      onclick={() => onRemove(tag.name)}
+      aria-label="Remove {tag.name}"
+    >
+      <XMark class="w-3 h-3" />
+    </button>
   </div>
 
   <!-- Drop indicator after this tag (for last position) -->

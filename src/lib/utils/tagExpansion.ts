@@ -105,7 +105,7 @@ export function expandCustomTags(
             const combinedExpansion = result.expandedTags.join(', ')
             const weightedExpansion = applyWeight(combinedExpansion, tagWeight)
             expandedTags.push(weightedExpansion)
-            randomTagResolutions[tag] = weightedExpansion
+            randomTagResolutions[tag] = combinedExpansion
           } else {
             expandedTags.push(...result.expandedTags)
             randomTagResolutions[tag] = result.resolution
@@ -121,7 +121,7 @@ export function expandCustomTags(
             if (tagWeight) {
               const weightedExpansion = applyWeight(existingResult, tagWeight)
               expandedTags.push(weightedExpansion)
-              randomTagResolutions[tag] = weightedExpansion
+              randomTagResolutions[tag] = existingResult
             } else {
               const existingTags = existingResult.split(', ')
               expandedTags.push(...existingTags)
@@ -135,7 +135,7 @@ export function expandCustomTags(
               const combinedExpansion = result.expandedTags.join(', ')
               const weightedExpansion = applyWeight(combinedExpansion, tagWeight)
               expandedTags.push(weightedExpansion)
-              randomTagResolutions[tag] = weightedExpansion
+              randomTagResolutions[tag] = combinedExpansion
             } else {
               expandedTags.push(...result.expandedTags)
               randomTagResolutions[tag] = result.resolution
@@ -150,7 +150,7 @@ export function expandCustomTags(
           const combinedExpansion = recursiveResult.expandedTags.join(', ')
           const weightedExpansion = applyWeight(combinedExpansion, tagWeight)
           expandedTags.push(weightedExpansion)
-          randomTagResolutions[tag] = weightedExpansion
+          randomTagResolutions[tag] = combinedExpansion
         } else {
           expandedTags.push(...recursiveResult.expandedTags)
           randomTagResolutions[tag] = recursiveResult.expandedTags.join(', ')

@@ -6,7 +6,6 @@
   interface Props {
     id: string
     tags: CustomTag[]
-    readonly?: boolean
     onTagsChange?: () => void
     onCustomTagDoubleClick?: (tagName: string) => void
     onTagClick?: (tagName: string) => void
@@ -17,7 +16,6 @@
   let {
     id,
     tags = $bindable(),
-    readonly = false,
     onTagsChange,
     onCustomTagDoubleClick,
     onTagClick,
@@ -29,8 +27,6 @@
   let dropPosition: number | null = $state(null)
 
   function removeTag(tagNameToRemove: string) {
-    if (readonly) return
-
     tags = tags.filter((tag) => tag.name !== tagNameToRemove)
     onTagsChange?.()
   }
@@ -44,8 +40,6 @@
 
 
   function handleDragStart(event: DragEvent, index: number) {
-    if (readonly) return
-
     draggedIndex = index
     event.dataTransfer!.effectAllowed = 'move'
     event.dataTransfer!.setData('text/plain', index.toString())
@@ -67,7 +61,7 @@
   }
 
   function handleDragOver(event: DragEvent, index: number) {
-    if (readonly || draggedIndex === null) return
+    if (draggedIndex === null) return
 
     event.preventDefault()
     event.dataTransfer!.dropEffect = 'move'
@@ -90,7 +84,7 @@
   }
 
   function handleDrop(event: DragEvent) {
-    if (readonly || draggedIndex === null || dropPosition === null) return
+    if (draggedIndex === null || dropPosition === null) return
 
     event.preventDefault()
 
@@ -120,9 +114,7 @@
 
 <div
   {id}
-  class="w-full min-h-[6rem] p-1 border border-gray-300 rounded-lg bg-white {readonly
-    ? 'bg-gray-50'
-    : ''}"
+  class="w-full min-h-[6rem] p-1 border border-gray-300 rounded-lg bg-white"
   tabindex="-1"
   role="textbox"
   aria-label="Tag display area"
@@ -134,7 +126,6 @@
         <TagItem
           bind:tag={tags[index]}
           {index}
-          {readonly}
           {draggedIndex}
           {dropPosition}
           {currentRandomTagResolutions}

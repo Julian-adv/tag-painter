@@ -81,7 +81,6 @@
 
   // Save tags whenever they change
   async function saveTags() {
-    console.log('firstZoneTags', firstZoneTags)
     updateTags(
       allTags.map(tagToString),
       firstZoneTags.map(tagToString),
