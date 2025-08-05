@@ -30,6 +30,7 @@
   let selectedSuggestionIndex = $state(-1)
   let suggestionPosition = $state({ top: 0, left: 0 })
   let mirrorDiv: HTMLDivElement | null = null
+  let lastSelectedSuggestions: Map<string, string> = new Map()
 
   onMount(async () => {
     await initTags()
@@ -88,7 +89,17 @@
     showSuggestions = suggestions.length > 0
     selectedSuggestionIndex = -1
 
+    // Auto-select previously chosen suggestion if it exists
     if (showSuggestions) {
+      const lastSelected = lastSelectedSuggestions.get(word.toLowerCase())
+      if (lastSelected) {
+        const index = suggestions.findIndex(suggestion => suggestion === lastSelected)
+        if (index !== -1) {
+          selectedSuggestionIndex = index
+          // Scroll to show the selected suggestion
+          scrollSelectedIntoView()
+        }
+      }
       updateSuggestionPosition()
     }
   }
@@ -154,6 +165,11 @@
     const { word, startIndex } = getCurrentWord()
     const beforeWord = value.substring(0, startIndex)
     const afterWord = value.substring(startIndex + word.length)
+
+    // Remember this selection for the current word
+    if (word.length >= 2) {
+      lastSelectedSuggestions.set(word.toLowerCase(), suggestion)
+    }
 
     value = beforeWord + suggestion + afterWord
     showSuggestions = false
