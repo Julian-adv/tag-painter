@@ -132,7 +132,7 @@
     <div class="flex flex-wrap gap-1 text-left relative">
       {#each tags as tag, index (tag.name)}
         <TagItem
-          {tag}
+          bind:tag={tags[index]}
           {index}
           {readonly}
           {draggedIndex}
@@ -142,6 +142,7 @@
           onRemove={removeTag}
           onCustomTagDoubleClick={onCustomTagDoubleClick}
           onTagClick={onTagClick}
+          onWeightChange={onTagsChange}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onDragOver={handleDragOver}

@@ -46,6 +46,29 @@ function expandRandomTag(
 }
 
 /**
+ * Parse weight from tag string
+ */
+function parseTagWithWeight(tagString: string): { name: string, weight?: number } {
+  const weightMatch = tagString.match(/^(.+):(\d+(?:\.\d+)?)$/)
+  if (weightMatch) {
+    const [, name, weightStr] = weightMatch
+    const weight = parseFloat(weightStr)
+    return { name, weight: weight !== 1.0 ? weight : undefined }
+  }
+  return { name: tagString }
+}
+
+/**
+ * Apply weight formatting to a tag name
+ */
+function applyWeight(tagName: string, weight?: number): string {
+  if (!weight || weight === 1.0) {
+    return tagName
+  }
+  return `(${tagName}:${weight})`
+}
+
+/**
  * Expand custom tags to their constituent tags recursively
  */
 export function expandCustomTags(
@@ -60,7 +83,9 @@ export function expandCustomTags(
   const expandedTags: string[] = []
   const randomTagResolutions: Record<string, string> = {}
 
-  for (const tag of tags) {
+  for (const tagString of tags) {
+    const { name: tag, weight: tagWeight } = parseTagWithWeight(tagString)
+    
     // Prevent infinite recursion by tracking visited tags
     if (visitedTags.has(tag)) {
       console.warn(`Circular reference detected for tag: ${tag}`)
@@ -75,8 +100,16 @@ export function expandCustomTags(
         // For random tags, select one random tag from the list
         if (customTag.tags.length > 0) {
           const result = expandRandomTag(tag, customTag, customTags, visitedTags, existingRandomResolutions)
-          expandedTags.push(...result.expandedTags)
-          randomTagResolutions[tag] = result.resolution
+          // Apply weight to the entire expanded result if it has a weight
+          if (tagWeight) {
+            const combinedExpansion = result.expandedTags.join(', ')
+            const weightedExpansion = applyWeight(combinedExpansion, tagWeight)
+            expandedTags.push(weightedExpansion)
+            randomTagResolutions[tag] = weightedExpansion
+          } else {
+            expandedTags.push(...result.expandedTags)
+            randomTagResolutions[tag] = result.resolution
+          }
         }
       } else if (customTag.type === 'consistent-random') {
         // For consistent-random tags, use existing resolution if available, otherwise select randomly
@@ -84,27 +117,54 @@ export function expandCustomTags(
           if (existingRandomResolutions[tag]) {
             // Use the existing resolution directly
             const existingResult = existingRandomResolutions[tag]
-            const existingTags = existingResult.split(', ')
-            expandedTags.push(...existingTags)
-            randomTagResolutions[tag] = existingResult
+            // Apply weight to existing resolution if tagWeight exists
+            if (tagWeight) {
+              const weightedExpansion = applyWeight(existingResult, tagWeight)
+              expandedTags.push(weightedExpansion)
+              randomTagResolutions[tag] = weightedExpansion
+            } else {
+              const existingTags = existingResult.split(', ')
+              expandedTags.push(...existingTags)
+              randomTagResolutions[tag] = existingResult
+            }
           } else {
             // No existing resolution, select randomly
             const result = expandRandomTag(tag, customTag, customTags, visitedTags, existingRandomResolutions)
-            expandedTags.push(...result.expandedTags)
-            randomTagResolutions[tag] = result.resolution
+            // Apply weight to the entire expanded result if it has a weight
+            if (tagWeight) {
+              const combinedExpansion = result.expandedTags.join(', ')
+              const weightedExpansion = applyWeight(combinedExpansion, tagWeight)
+              expandedTags.push(weightedExpansion)
+              randomTagResolutions[tag] = weightedExpansion
+            } else {
+              expandedTags.push(...result.expandedTags)
+              randomTagResolutions[tag] = result.resolution
+            }
           }
         }
       } else {
         // For sequential tags, expand all constituent tags recursively
         const recursiveResult = expandCustomTags(customTag.tags, customTags, visitedTags, existingRandomResolutions)
-        expandedTags.push(...recursiveResult.expandedTags)
-        randomTagResolutions[tag] = recursiveResult.expandedTags.join(', ')
+        // Apply weight to the entire sequential tag result if it has a weight
+        if (tagWeight) {
+          const combinedExpansion = recursiveResult.expandedTags.join(', ')
+          const weightedExpansion = applyWeight(combinedExpansion, tagWeight)
+          expandedTags.push(weightedExpansion)
+          randomTagResolutions[tag] = weightedExpansion
+        } else {
+          expandedTags.push(...recursiveResult.expandedTags)
+          randomTagResolutions[tag] = recursiveResult.expandedTags.join(', ')
+        }
       }
 
       visitedTags.delete(tag)
     } else {
-      // This is a regular tag, keep as is
-      expandedTags.push(tag)
+      // This is a regular tag, apply weight if it exists
+      if (tagWeight) {
+        expandedTags.push(applyWeight(tag, tagWeight))
+      } else {
+        expandedTags.push(tag)
+      }
     }
   }
 

@@ -17,7 +17,8 @@
     }
   }
 
-  let { currentRandomTagResolutions = { all: {}, zone1: {}, zone2: {}, negative: {} } }: Props = $props()
+  let { currentRandomTagResolutions = { all: {}, zone1: {}, zone2: {}, negative: {} } }: Props =
+    $props()
 
   let allTags = $state<CustomTag[]>([])
   let firstZoneTags = $state<CustomTag[]>([])
@@ -26,21 +27,35 @@
   let showCustomTagsDialog = $state(false)
   let selectedCustomTagName = $state<string>('')
 
+  // Parse weight from tag string
+  function parseTagWithWeight(tagString: string): { name: string; weight?: number } {
+    const weightMatch = tagString.match(/^(.+):(\d+(?:\.\d+)?)$/)
+    if (weightMatch) {
+      const [, name, weightStr] = weightMatch
+      const weight = parseFloat(weightStr)
+      return { name, weight: weight !== 1.0 ? weight : undefined }
+    }
+    return { name: tagString }
+  }
+
   // Convert string array to CustomTag array
   function convertToCustomTags(tagNames: string[]): CustomTag[] {
     const currentData = get(promptsData)
-    return tagNames.map((tagName: string): CustomTag => {
-      const customTag = currentData.customTags[tagName]
-      
+    return tagNames.map((tagString: string): CustomTag => {
+      const { name, weight } = parseTagWithWeight(tagString)
+      const customTag = currentData.customTags[name]
+
       if (customTag) {
-        return customTag
+        // Create a copy so each usage can have its own weight
+        return { ...customTag, weight }
       }
-      
+
       // Create regular tag object for non-custom tags
       return {
-        name: tagName,
-        tags: [tagName],
-        type: 'regular'
+        name,
+        tags: [name],
+        type: 'regular',
+        weight
       }
     })
   }
@@ -56,13 +71,22 @@
     return unsubscribe
   })
 
+  // Convert CustomTag to string with weight
+  function tagToString(tag: CustomTag): string {
+    if (tag.weight && tag.weight !== 1.0) {
+      return `${tag.name}:${tag.weight}`
+    }
+    return tag.name
+  }
+
   // Save tags whenever they change
   async function saveTags() {
+    console.log('firstZoneTags', firstZoneTags)
     updateTags(
-      allTags.map(tag => tag.name),
-      firstZoneTags.map(tag => tag.name),
-      secondZoneTags.map(tag => tag.name),
-      negativeTags.map(tag => tag.name)
+      allTags.map(tagToString),
+      firstZoneTags.map(tagToString),
+      secondZoneTags.map(tagToString),
+      negativeTags.map(tagToString)
     )
     await savePromptsData()
   }
@@ -131,7 +155,10 @@
   </div>
 
   <!-- Custom tags management dialog -->
-  <CustomTagsManageDialog bind:isOpen={showCustomTagsDialog} initialSelectedTag={selectedCustomTagName} />
+  <CustomTagsManageDialog
+    bind:isOpen={showCustomTagsDialog}
+    initialSelectedTag={selectedCustomTagName}
+  />
 </div>
 
 <style>

@@ -46,6 +46,7 @@ export interface CustomTag {
   name: string
   tags: string[]
   type: TagType
+  weight?: number // Weight for emphasis/de-emphasis (1.0 = normal, >1.0 = emphasis, <1.0 = de-emphasis)
 }
 
 export interface PromptsData {

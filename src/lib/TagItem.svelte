@@ -15,6 +15,7 @@
     onRemove: (tagName: string) => void
     onCustomTagDoubleClick?: (tagName: string) => void
     onTagClick?: (tagName: string) => void
+    onWeightChange?: () => void
     onDragStart: (event: DragEvent, index: number) => void
     onDragEnd: (event: DragEvent) => void
     onDragOver: (event: DragEvent, index: number) => void
@@ -23,7 +24,7 @@
   }
 
   let {
-    tag,
+    tag = $bindable(),
     index,
     readonly = false,
     draggedIndex,
@@ -33,6 +34,7 @@
     onRemove,
     onCustomTagDoubleClick,
     onTagClick,
+    onWeightChange,
     onDragStart,
     onDragEnd,
     onDragOver,
@@ -59,13 +61,42 @@
     }
   }
 
+  function handleWheel(event: WheelEvent) {
+    event.preventDefault()
+    
+    const delta = event.deltaY > 0 ? -0.1 : 0.1 // Scroll down = decrease, scroll up = increase
+    const currentWeight = tag.weight ?? 1.0
+    const newWeight = Math.max(0.1, Math.min(2.0, currentWeight + delta)) // Clamp between 0.1 and 2.0
+    
+    // Round to 1 decimal place
+    const roundedWeight = Math.round(newWeight * 10) / 10
+    
+    // Update the tag weight directly
+    tag.weight = roundedWeight === 1.0 ? undefined : roundedWeight
+    
+    // Notify parent of weight change
+    onWeightChange?.()
+  }
+
   function getDisplayText(): string {
+    const weight = tag.weight ?? 1.0
+    
     if (
       (tag.type === 'random' || tag.type === 'sequential' || tag.type === 'consistent-random') &&
       currentRandomTagResolutions[tag.name]
     ) {
+      // For expanded tags, show weight at the end if different from 1.0
+      if (weight !== 1.0) {
+        return `${tag.name}: ${currentRandomTagResolutions[tag.name]}:${weight}`
+      }
       return `${tag.name}: ${currentRandomTagResolutions[tag.name]}`
     }
+    
+    // For non-expanded tags, show weight if different from 1.0
+    if (weight !== 1.0) {
+      return `${tag.name}:${weight}`
+    }
+    
     return tag.name
   }
 
@@ -86,9 +117,10 @@
     ondragover={(e) => onDragOver(e, index)}
     ondragleave={onDragLeave}
     ondrop={onDrop}
+    onwheel={handleWheel}
     role="button"
     tabindex="-1"
-    aria-label="Drag to reorder tag: {tag.name}"
+    aria-label="Drag to reorder tag: {tag.name}. Scroll to adjust weight."
     class="inline-flex items-center gap-1 {getTagClasses({
       tag,
       dragged: draggedIndex === index,
