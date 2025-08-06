@@ -34,6 +34,7 @@
   })
   let availableCheckpoints: string[] = $state([])
   let imageViewer: { updateFileList: () => Promise<void> } | undefined
+  let compositionSelector: { refreshTempMask: () => void } | undefined
   let isGeneratingForever = $state(false)
   let shouldStopGeneration = $state(false)
   let lastSeed: number | null = $state(null)
@@ -135,6 +136,11 @@
         if (imageViewer?.updateFileList) {
           await imageViewer.updateFileList()
         }
+        
+        // Refresh temp mask in composition selector if mask was used
+        if (maskData && compositionSelector?.refreshTempMask) {
+          compositionSelector.refreshTempMask()
+        }
       },
       onError: (error) => {
         console.error('Generation error:', error)
@@ -224,7 +230,7 @@
 >
   <div class="grid grid-cols-[1fr_minmax(0,832px)] gap-4 w-full h-full max-lg:grid-cols-1">
     <section class="min-w-0 h-full overflow-auto flex flex-col gap-2">
-      <CompositionSelector />
+      <CompositionSelector bind:this={compositionSelector} />
 
       <div class="flex flex-1 min-h-0 flex-shrink-1">
         <TagZones {currentRandomTagResolutions} />

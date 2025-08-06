@@ -11,14 +11,13 @@ export const POST: RequestHandler = async ({ request }) => {
       return json({ error: 'Invalid mask data' }, { status: 400 })
     }
 
-    // Create masks directory if it doesn't exist
-    const masksDir = join(process.cwd(), 'data', 'masks')
-    await mkdir(masksDir, { recursive: true })
+    // Save to static directory for web access
+    const staticDir = join(process.cwd(), 'static')
+    await mkdir(staticDir, { recursive: true })
 
-    // Generate unique filename
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const filename = `mask_${timestamp}.png`
-    const filepath = join(masksDir, filename)
+    // Use single temporary mask file
+    const filename = 'temp_mask.png'
+    const filepath = join(staticDir, filename)
 
     // Convert base64 to buffer and save
     const base64Data = maskData.replace(/^data:image\/png;base64,/, '')

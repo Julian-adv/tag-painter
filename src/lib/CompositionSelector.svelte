@@ -3,13 +3,19 @@
   import { promptsData, updateComposition } from './stores/promptsStore'
   import { maskOverlay } from './stores/maskOverlayStore'
 
-  const compositions = [
+  let tempMaskTimestamp = $state(Date.now())
+
+  const getCompositions = () => [
     { id: 'all', src: '/all-mask.png', alt: 'All' },
     { id: 'left-horizontal', src: '/left-horizontal-mask.png', alt: 'Left Horizontal' },
-    { id: 'left-top', src: '/left-top-mask.png', alt: 'Left Top' },
-    { id: 'top-right', src: '/top-right-mask.png', alt: 'Top Right' },
-    { id: 'top-vertical', src: '/top-vertical-mask.png', alt: 'Top Vertical' }
+    { id: 'top-vertical', src: '/top-vertical-mask.png', alt: 'Top Vertical' },
+    { id: 'temp-mask', src: `/temp_mask.png?t=${tempMaskTimestamp}`, alt: 'Custom Mask' }
   ]
+
+  // Function to refresh temp mask when it's updated
+  export function refreshTempMask() {
+    tempMaskTimestamp = Date.now()
+  }
 
   function selectComposition(compositionId: string) {
     updateComposition(compositionId)
@@ -27,7 +33,7 @@
 <div class="border-gray-200">
   <h3 class="text-sm font-bold text-gray-800 text-left">Composition</h3>
   <div class="flex gap-1 flex-wrap bg-gray-200 p-1 m-2 rounded-lg">
-    {#each compositions as composition (composition.id)}
+    {#each getCompositions() as composition (composition.id)}
       <button
         type="button"
         class="border-2 border-transparent rounded-lg p-1 cursor-pointer transition-all duration-200 flex items-center justify-center hover:border-sky-300 hover:bg-sky-50 {$promptsData.selectedComposition ===
