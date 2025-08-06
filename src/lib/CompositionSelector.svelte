@@ -17,6 +17,12 @@
     tempMaskTimestamp = Date.now()
   }
 
+  // Function to programmatically select composition
+  export function selectTempMask() {
+    refreshTempMask() // Refresh the mask image first
+    updateComposition('temp-mask')
+  }
+
   function selectComposition(compositionId: string) {
     updateComposition(compositionId)
   }

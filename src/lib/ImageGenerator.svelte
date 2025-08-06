@@ -33,8 +33,8 @@
     currentNode: ''
   })
   let availableCheckpoints: string[] = $state([])
-  let imageViewer: { updateFileList: () => Promise<void> } | undefined
-  let compositionSelector: { refreshTempMask: () => void } | undefined
+  let imageViewer: { updateFileList: () => Promise<void>; disableDrawingMode: () => void; getMaskData: () => string | null; hasMask: () => boolean } | undefined
+  let compositionSelector: { selectTempMask: () => void } | undefined
   let isGeneratingForever = $state(false)
   let shouldStopGeneration = $state(false)
   let lastSeed: number | null = $state(null)
@@ -102,10 +102,19 @@
 
     // Get mask data from ImageViewer if available
     let maskData: string | null = null
-    if (imageViewer && 'getMaskData' in imageViewer && 'hasMask' in imageViewer) {
-      const viewer = imageViewer as { getMaskData: () => string | null; hasMask: () => boolean }
-      if (viewer.hasMask()) {
-        maskData = viewer.getMaskData()
+    if (imageViewer) {
+      if (imageViewer.hasMask()) {
+        maskData = imageViewer.getMaskData()
+        
+        // Disable drawing mode when generation starts
+        imageViewer.disableDrawingMode()
+        
+        // Auto-select temp-mask composition after a short delay to ensure mask is saved
+        if (compositionSelector?.selectTempMask) {
+          setTimeout(() => {
+            compositionSelector?.selectTempMask()
+          }, 100)
+        }
       }
     }
 
@@ -135,11 +144,6 @@
         // Update file list after new image is generated
         if (imageViewer?.updateFileList) {
           await imageViewer.updateFileList()
-        }
-        
-        // Refresh temp mask in composition selector if mask was used
-        if (maskData && compositionSelector?.refreshTempMask) {
-          compositionSelector.refreshTempMask()
         }
       },
       onError: (error) => {
