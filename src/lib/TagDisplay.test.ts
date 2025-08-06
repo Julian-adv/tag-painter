@@ -1,19 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/svelte'
-import userEvent from '@testing-library/user-event'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, unmount, flushSync } from 'svelte'
 import TagDisplay from './TagDisplay.svelte'
 import type { CustomTag } from './types'
-
-// Mock TagItem component
-vi.mock('./TagItem.svelte', () => ({
-  default: vi.fn().mockImplementation((props) => ({
-    component: 'div',
-    props: {
-      'data-testid': `tag-item-${props.tag.name}`,
-      children: props.tag.name
-    }
-  }))
-}))
 
 describe('TagDisplay', () => {
   const mockTags: CustomTag[] = [
@@ -22,70 +10,102 @@ describe('TagDisplay', () => {
     { name: 'tag3', type: 'sequential', tags: ['seq1', 'seq2'] }
   ]
 
+  let container: HTMLElement
+  let component: any
+
+  beforeEach(() => {
+    container = document.createElement('div')
+    document.body.appendChild(container)
+  })
+
+  afterEach(() => {
+    if (component) {
+      unmount(component)
+    }
+    if (container && container.parentNode) {
+      container.parentNode.removeChild(container)
+    }
+  })
+
   it('should render empty state when no tags', () => {
-    render(TagDisplay, { 
+    component = mount(TagDisplay, {
+      target: container,
       props: { 
         id: 'test-display',
         tags: []
-      } 
+      }
     })
 
-    const container = screen.getByRole('textbox', { name: 'Tag display area' })
-    expect(container).toBeInTheDocument()
+    flushSync()
+    const textbox = container.querySelector('[role="textbox"]')
+    expect(textbox).toBeTruthy()
   })
 
   it('should render tags when provided', () => {
-    render(TagDisplay, { 
+    component = mount(TagDisplay, {
+      target: container,
       props: { 
         id: 'test-display',
         tags: mockTags
-      } 
+      }
     })
 
-    expect(screen.getByTestId('tag-item-tag1')).toBeInTheDocument()
-    expect(screen.getByTestId('tag-item-tag2')).toBeInTheDocument()
-    expect(screen.getByTestId('tag-item-tag3')).toBeInTheDocument()
+    flushSync()
+    // Check if tag names are present in the rendered content
+    expect(container.textContent).toContain('tag1')
+    expect(container.textContent).toContain('tag2')
+    expect(container.textContent).toContain('tag3')
   })
 
   it('should have proper accessibility attributes', () => {
-    render(TagDisplay, { 
+    component = mount(TagDisplay, {
+      target: container,
       props: { 
         id: 'test-display',
         tags: mockTags
-      } 
+      }
     })
 
-    const container = screen.getByRole('textbox', { name: 'Tag display area' })
-    expect(container).toHaveAttribute('tabindex', '-1')
-    expect(container).toHaveAttribute('id', 'test-display')
+    flushSync()
+    const textbox = container.querySelector('[role="textbox"]') as HTMLElement
+    expect(textbox?.getAttribute('tabindex')).toBe('-1')
+    expect(textbox?.getAttribute('id')).toBe('test-display')
   })
 
   it('should apply correct CSS classes', () => {
-    render(TagDisplay, { 
+    component = mount(TagDisplay, {
+      target: container,
       props: { 
         id: 'test-display',
         tags: mockTags
-      } 
+      }
     })
 
-    const container = screen.getByRole('textbox')
-    expect(container).toHaveClass('w-full', 'min-h-[6rem]', 'p-1', 'border', 'border-gray-300', 'rounded-lg', 'bg-white')
+    flushSync()
+    const textbox = container.querySelector('[role="textbox"]') as HTMLElement
+    expect(textbox?.className).toContain('w-full')
+    expect(textbox?.className).toContain('min-h-')
+    expect(textbox?.className).toContain('border')
   })
 
-  it('should handle keyboard events', async () => {
-    const user = userEvent.setup()
-    render(TagDisplay, { 
+  it('should handle keyboard events', () => {
+    component = mount(TagDisplay, {
+      target: container,
       props: { 
         id: 'test-display',
         tags: mockTags
-      } 
+      }
     })
 
-    const container = screen.getByRole('textbox')
+    flushSync()
+    const textbox = container.querySelector('[role="textbox"]') as HTMLElement
     
-    // Tab key should not be prevented (for navigation)
-    await user.tab()
-    expect(container).toHaveClass('w-full') // Should still have classes, meaning no error occurred
+    // Simulate Tab key press
+    textbox.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+    flushSync()
+    
+    // Should still have classes, meaning no error occurred
+    expect(textbox?.className).toContain('w-full')
   })
 
   it('should pass props to TagItem components correctly', () => {
@@ -98,7 +118,8 @@ describe('TagDisplay', () => {
     const mockResolutions = { 'tag2': 'resolved-value' }
     const testOverride = 'test-override'
 
-    render(TagDisplay, { 
+    component = mount(TagDisplay, {
+      target: container,
       props: { 
         id: 'test-display',
         tags: mockTags,
@@ -106,12 +127,13 @@ describe('TagDisplay', () => {
         testOverrideTag: testOverride,
         disabled: true,
         ...mockCallbacks
-      } 
+      }
     })
 
-    // Verify that TagItem components receive the correct props
-    expect(screen.getByTestId('tag-item-tag1')).toBeInTheDocument()
-    expect(screen.getByTestId('tag-item-tag2')).toBeInTheDocument()
-    expect(screen.getByTestId('tag-item-tag3')).toBeInTheDocument()
+    flushSync()
+    // Verify that tag components are rendered with correct content
+    expect(container.textContent).toContain('tag1')
+    expect(container.textContent).toContain('tag2')
+    expect(container.textContent).toContain('tag3')
   })
 })

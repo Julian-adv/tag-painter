@@ -11,5 +11,10 @@ export default defineConfig({
     alias: {
       $lib: new URL('./src/lib', import.meta.url).pathname
     }
-  }
+  },
+  resolve: process.env.VITEST
+    ? {
+        conditions: ['browser']
+      }
+    : undefined
 })
