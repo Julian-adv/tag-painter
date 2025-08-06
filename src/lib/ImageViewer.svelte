@@ -16,6 +16,11 @@
 
   let allFiles: string[] = $state([])
   let currentIndex = $state(-1)
+  let isDrawingMode = $state(false)
+  let canvasElement: HTMLCanvasElement | undefined = $state()
+  let imageElement: HTMLImageElement | undefined = $state()
+  let isDrawing = $state(false)
+  let fillMode = $state(false)
 
   // Watch for outputDirectory changes and update file list
   $effect(() => {
@@ -84,6 +89,172 @@
     await updateFileList()
   }
 
+  function toggleDrawingMode() {
+    isDrawingMode = !isDrawingMode
+    if (isDrawingMode) {
+      // Use setTimeout to ensure canvas is rendered before setup
+      setTimeout(() => {
+        if (canvasElement && imageElement) {
+          setupCanvas()
+        }
+      }, 0)
+    }
+  }
+
+  function setupCanvas() {
+    if (!canvasElement || !imageElement) return
+    
+    // Wait for image to be fully loaded and get correct dimensions
+    requestAnimationFrame(() => {
+      if (!canvasElement || !imageElement) return
+      
+      const rect = imageElement.getBoundingClientRect()
+      const naturalWidth = imageElement.naturalWidth
+      const naturalHeight = imageElement.naturalHeight
+      
+      // Set canvas internal dimensions to match natural image size
+      canvasElement.width = naturalWidth
+      canvasElement.height = naturalHeight
+      
+      // Set canvas display size to match rendered image size
+      canvasElement.style.width = `${rect.width}px`
+      canvasElement.style.height = `${rect.height}px`
+      
+      const ctx = canvasElement.getContext('2d')
+      if (ctx) {
+        ctx.fillStyle = 'white'
+        ctx.strokeStyle = 'white'
+        ctx.lineWidth = Math.max(20, naturalWidth / 40) // Scale brush size with image
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+      }
+    })
+  }
+
+  function startDrawing(event: MouseEvent) {
+    if (!isDrawingMode || !canvasElement || !imageElement) return
+    
+    const rect = canvasElement.getBoundingClientRect()
+    const scaleX = canvasElement.width / rect.width
+    const scaleY = canvasElement.height / rect.height
+    
+    const x = Math.floor((event.clientX - rect.left) * scaleX)
+    const y = Math.floor((event.clientY - rect.top) * scaleY)
+    
+    if (fillMode) {
+      // Fill mode: flood fill at click position
+      floodFill(x, y)
+    } else {
+      // Draw mode: start drawing line
+      isDrawing = true
+      const ctx = canvasElement.getContext('2d')
+      if (ctx) {
+        ctx.beginPath()
+        ctx.moveTo(x, y)
+      }
+    }
+  }
+
+  function draw(event: MouseEvent) {
+    if (!isDrawing || !isDrawingMode || !canvasElement || !imageElement) return
+    
+    const rect = canvasElement.getBoundingClientRect()
+    const scaleX = canvasElement.width / rect.width
+    const scaleY = canvasElement.height / rect.height
+    
+    const x = (event.clientX - rect.left) * scaleX
+    const y = (event.clientY - rect.top) * scaleY
+    
+    const ctx = canvasElement.getContext('2d')
+    if (ctx) {
+      ctx.lineTo(x, y)
+      ctx.stroke()
+    }
+  }
+
+  function stopDrawing() {
+    isDrawing = false
+  }
+
+  function clearMask() {
+    if (!canvasElement) return
+    const ctx = canvasElement.getContext('2d')
+    if (ctx) {
+      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height)
+    }
+  }
+
+  function floodFill(x: number, y: number) {
+    if (!canvasElement) return
+    
+    const ctx = canvasElement.getContext('2d')
+    if (!ctx) return
+    
+    const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height)
+    const data = imageData.data
+    const width = canvasElement.width
+    const height = canvasElement.height
+    
+    // Get target color at click position
+    const targetIndex = (y * width + x) * 4
+    const targetR = data[targetIndex]
+    const targetG = data[targetIndex + 1] 
+    const targetB = data[targetIndex + 2]
+    const targetA = data[targetIndex + 3]
+    
+    // Fill color (opaque white)
+    const fillR = 255
+    const fillG = 255
+    const fillB = 255
+    const fillA = 255 // Fully opaque
+    
+    // If target is already fill color, return
+    if (targetR === fillR && targetG === fillG && targetB === fillB && targetA === fillA) {
+      return
+    }
+    
+    const stack = [[x, y]]
+    
+    function matchesTarget(index: number): boolean {
+      return data[index] === targetR && 
+             data[index + 1] === targetG && 
+             data[index + 2] === targetB && 
+             data[index + 3] === targetA
+    }
+    
+    function setPixel(index: number) {
+      data[index] = fillR
+      data[index + 1] = fillG
+      data[index + 2] = fillB
+      data[index + 3] = fillA
+    }
+    
+    while (stack.length > 0) {
+      const [currentX, currentY] = stack.pop()!
+      
+      if (currentX < 0 || currentX >= width || currentY < 0 || currentY >= height) {
+        continue
+      }
+      
+      const currentIndex = (currentY * width + currentX) * 4
+      
+      if (!matchesTarget(currentIndex)) {
+        continue
+      }
+      
+      setPixel(currentIndex)
+      
+      // Add neighboring pixels to stack
+      stack.push([currentX + 1, currentY])
+      stack.push([currentX - 1, currentY])
+      stack.push([currentX, currentY + 1])
+      stack.push([currentX, currentY - 1])
+    }
+    
+    ctx.putImageData(imageData, 0, 0)
+  }
+
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function loadImageMetadata(filePath: string) {
     try {
@@ -137,9 +308,25 @@
 <div class="w-full mx-auto flex flex-col items-center gap-4">
   {#if imageUrl}
     <div class="relative inline-block">
-      <img src={imageUrl} alt="" class="max-w-full max-h-[calc(100vh-2rem)] object-contain rounded-lg shadow-md block" />
+      <img 
+        bind:this={imageElement}
+        src={imageUrl} 
+        alt="" 
+        class="max-w-full max-h-[calc(100vh-2rem)] object-contain rounded-lg shadow-md block" 
+        onload={setupCanvas}
+      />
       {#if $maskOverlay.isVisible && $maskOverlay.maskSrc}
         <img src={$maskOverlay.maskSrc} alt="Mask overlay" class="absolute top-0 left-0 w-full h-full object-contain opacity-30 pointer-events-none rounded-lg mix-blend-multiply" />
+      {/if}
+      {#if isDrawingMode}
+        <canvas
+          bind:this={canvasElement}
+          class="absolute top-0 left-0 {fillMode ? 'cursor-pointer' : 'cursor-crosshair'} rounded-lg opacity-70"
+          onmousedown={startDrawing}
+          onmousemove={draw}
+          onmouseup={stopDrawing}
+          onmouseleave={stopDrawing}
+        ></canvas>
       {/if}
     </div>
   {:else}
@@ -148,22 +335,62 @@
     </div>
   {/if}
 
-  <div class="flex justify-center items-center gap-4">
-    <button class="flex items-center justify-center w-9 h-9 border border-gray-300 rounded-full bg-gray-100 text-gray-600 cursor-pointer transition-all duration-200 hover:bg-gray-200 hover:border-gray-400 hover:scale-105 active:scale-95" onclick={goToPreviousImage} aria-label="Previous image">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M15 18l-6-6 6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-    </button>
+  <div class="flex justify-between items-center w-full">
+    <div class="flex items-center gap-2">
+      {#if imageUrl}
+        <button 
+          class="flex items-center justify-center w-9 h-9 border border-gray-300 rounded-full {isDrawingMode ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-white text-gray-700'} cursor-pointer transition-all duration-200 hover:bg-gray-50 hover:border-gray-400 hover:scale-105 active:scale-95" 
+          onclick={toggleDrawingMode}
+          aria-label="Draw mask"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M13.707 2.293a1 1 0 0 0-1.414 0l-5.84 5.84c-.015-.001-.029-.009-.044-.009a1 1 0 0 0-.707.293L4.288 9.831a3 3 0 0 0-.878 2.122c0 .802.313 1.556.879 2.121l.707.707l-2.122 2.122A2.92 2.92 0 0 0 2 19.012a2.97 2.97 0 0 0 1.063 2.308c.519.439 1.188.68 1.885.68c.834 0 1.654-.341 2.25-.937l2.04-2.039l.707.706c1.134 1.133 3.109 1.134 4.242.001l1.415-1.414a1 1 0 0 0 .293-.707c0-.026-.013-.05-.015-.076l5.827-5.827a1 1 0 0 0 0-1.414zm-.935 16.024a1.023 1.023 0 0 1-1.414-.001l-1.414-1.413a1 1 0 0 0-1.414 0l-2.746 2.745a1.2 1.2 0 0 1-.836.352a.9.9 0 0 1-.594-.208A.98.98 0 0 1 4 19.01a.96.96 0 0 1 .287-.692l2.829-2.829a1 1 0 0 0 0-1.414L5.701 12.66a1 1 0 0 1-.292-.706c0-.268.104-.519.293-.708l.707-.707l7.071 7.072zm1.889-2.392L8.075 9.339L13 4.414L19.586 11z"/>
+          </svg>
+        </button>
+        {#if isDrawingMode}
+          <button 
+            class="flex items-center justify-center w-8 h-8 border border-green-300 rounded-full {fillMode ? 'bg-green-200 text-green-800 border-green-500' : 'bg-green-50 text-green-600'} cursor-pointer transition-all duration-200 hover:bg-green-100 hover:border-green-400 hover:scale-105 active:scale-95" 
+            onclick={() => fillMode = !fillMode}
+            aria-label="Toggle fill mode"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 12H5m14 0-4 4m4-4-4-4"/>
+            </svg>
+          </button>
+          <button 
+            class="flex items-center justify-center w-8 h-8 border border-red-300 rounded-full bg-red-50 text-red-600 cursor-pointer transition-all duration-200 hover:bg-red-100 hover:border-red-400 hover:scale-105 active:scale-95" 
+            onclick={clearMask}
+            aria-label="Clear mask"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M3 6h18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        {/if}
+      {/if}
+    </div>
 
-    <span class="text-sm text-gray-600 font-medium min-w-[60px] text-center">
-      {currentIndex >= 0 ? currentIndex + 1 : 0} / {allFiles.length}
-    </span>
+    <div class="flex justify-center items-center gap-4">
+      <button class="flex items-center justify-center w-9 h-9 border border-gray-300 rounded-full bg-gray-100 text-gray-600 cursor-pointer transition-all duration-200 hover:bg-gray-200 hover:border-gray-400 hover:scale-105 active:scale-95" onclick={goToPreviousImage} aria-label="Previous image">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M15 18l-6-6 6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
 
-    <button class="flex items-center justify-center w-9 h-9 border border-gray-300 rounded-full bg-gray-100 text-gray-600 cursor-pointer transition-all duration-200 hover:bg-gray-200 hover:border-gray-400 hover:scale-105 active:scale-95" onclick={goToNextImage} aria-label="Next image">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-    </button>
+      <span class="text-sm text-gray-600 font-medium min-w-[60px] text-center">
+        {currentIndex >= 0 ? currentIndex + 1 : 0} / {allFiles.length}
+      </span>
+
+      <button class="flex items-center justify-center w-9 h-9 border border-gray-300 rounded-full bg-gray-100 text-gray-600 cursor-pointer transition-all duration-200 hover:bg-gray-200 hover:border-gray-400 hover:scale-105 active:scale-95" onclick={goToNextImage} aria-label="Next image">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="w-9"></div>
   </div>
 </div>
 
