@@ -99,11 +99,21 @@
     let currentPromptsData: PromptsData
     promptsData.subscribe((data) => (currentPromptsData = data))()
 
+    // Get mask data from ImageViewer if available
+    let maskData: string | null = null
+    if (imageViewer && 'getMaskData' in imageViewer && 'hasMask' in imageViewer) {
+      const viewer = imageViewer as { getMaskData: () => string | null; hasMask: () => boolean }
+      if (viewer.hasMask()) {
+        maskData = viewer.getMaskData()
+      }
+    }
+
     const result = await generateImage({
       promptsData: currentPromptsData!,
       settings,
       selectedLoras: currentPromptsData!.selectedLoras,
       seed: seedToUse,
+      maskData,
       previousRandomTagResolutions: isRegeneration ? currentRandomTagResolutions : undefined,
       onLoadingChange: (loading) => {
         isLoading = loading

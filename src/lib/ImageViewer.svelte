@@ -184,6 +184,30 @@
     }
   }
 
+  export function getMaskData(): string | null {
+    if (!canvasElement || !isDrawingMode) return null
+    
+    // Convert canvas to base64 image data
+    return canvasElement.toDataURL('image/png')
+  }
+
+  export function hasMask(): boolean {
+    if (!canvasElement || !isDrawingMode) return false
+    
+    const ctx = canvasElement.getContext('2d')
+    if (!ctx) return false
+    
+    // Check if canvas has any non-transparent pixels
+    const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height)
+    const data = imageData.data
+    
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] > 0) return true // Found non-transparent pixel
+    }
+    
+    return false
+  }
+
   function floodFill(x: number, y: number) {
     if (!canvasElement) return
     
@@ -353,8 +377,8 @@
             onclick={() => fillMode = !fillMode}
             aria-label="Toggle fill mode"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 12H5m14 0-4 4m4-4-4-4"/>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M20 14c-.092.064-2 2.083-2 3.5c0 1.494.949 2.448 2 2.5c.906.044 2-.891 2-2.5c0-1.5-1.908-3.436-2-3.5M9.586 20c.378.378.88.586 1.414.586s1.036-.208 1.414-.586l7-7l-.707-.707L11 4.586L8.707 2.293L7.293 3.707L9.586 6L4 11.586c-.378.378-.586.88-.586 1.414s.208 1.036.586 1.414zM11 7.414L16.586 13H5.414z"/>
             </svg>
           </button>
           <button 

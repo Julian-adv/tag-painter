@@ -13,6 +13,7 @@ export interface GenerationOptions {
   settings: Settings
   selectedLoras: string[]
   seed?: number | null
+  maskData?: string | null
   previousRandomTagResolutions?: {
     all: Record<string, string>
     zone1: Record<string, string>
@@ -39,6 +40,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     settings,
     selectedLoras,
     seed,
+    maskData,
     previousRandomTagResolutions,
     onLoadingChange,
     onProgressUpdate,
@@ -55,6 +57,26 @@ export async function generateImage(options: GenerationOptions): Promise<{
 
     // Generate unique client ID
     const clientId = crypto.randomUUID()
+
+    // Save mask data if provided
+    let maskFilePath: string | null = null
+    if (maskData) {
+      try {
+        const maskResponse = await fetch('/api/mask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ maskData })
+        })
+        
+        if (maskResponse.ok) {
+          const result = await maskResponse.json()
+          maskFilePath = result.filepath
+          console.log('Mask saved to:', maskFilePath)
+        }
+      } catch (error) {
+        console.error('Failed to save mask:', error)
+      }
+    }
 
     // Expand custom tags and create prompt parts, using previous resolutions if regenerating
     const previousAll = previousRandomTagResolutions?.all || {}
@@ -122,6 +144,15 @@ export async function generateImage(options: GenerationOptions): Promise<{
 
     // Add SaveImageWebsocket node for output
     addSaveImageWebsocketNode(workflow, promptsData)
+
+    // Update mask file in workflow if provided
+    if (maskFilePath) {
+      console.log('Using mask file:', maskFilePath)
+      // Update node 86 to use the generated mask
+      if (workflow['86']) {
+        workflow['86'].inputs.image = maskFilePath
+      }
+    }
 
     console.log('workflow', workflow)
     // Submit to ComfyUI
