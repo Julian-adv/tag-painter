@@ -10,7 +10,9 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     // Generate absolute path for the mask image based on composition
-    const maskImagePath = path.resolve(process.cwd(), 'static', `${composition}-mask.png`)
+    // Special handling for temp-mask
+    const fileName = composition === 'temp-mask' ? 'temp_mask.png' : `${composition}-mask.png`
+    const maskImagePath = path.resolve(process.cwd(), 'static', fileName)
 
     return json({ maskImagePath })
   } catch (error) {
