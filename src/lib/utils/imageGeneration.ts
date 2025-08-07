@@ -289,6 +289,11 @@ function applySeedsToWorkflow(workflow: ComfyUIWorkflow, providedSeed?: number |
   if (isInpainting) {
     // Inpainting workflow - set seed for KSampler node
     workflow['10'].inputs.seed = seed
+    
+    // Set seed for FaceDetailer if it exists
+    if (workflow['56']) {
+      workflow['56'].inputs.seed = seed + 1
+    }
   } else {
     // Regular workflow - set seed for SamplerCustom node
     if (workflow['14']) {
@@ -310,9 +315,18 @@ function applySeedsToWorkflow(workflow: ComfyUIWorkflow, providedSeed?: number |
 
 function addSaveImageWebsocketNode(workflow: ComfyUIWorkflow, promptsData: PromptsData, isInpainting: boolean = false) {
   if (isInpainting) {
-    // Inpainting workflow - output from VAE Decode
+    // Inpainting workflow - check if FaceDetailer should be used
+    let imageSourceNodeId: string
+    if (promptsData.useFaceDetailer) {
+      // Use ImageCompositeMasked output (FaceDetailer result composited with original)
+      imageSourceNodeId = '93'
+    } else {
+      // Use VAE Decode output directly
+      imageSourceNodeId = '19'
+    }
+    
     workflow[FINAL_SAVE_NODE_ID] = {
-      inputs: { images: ['19', 0] },
+      inputs: { images: [imageSourceNodeId, 0] },
       class_type: 'SaveImageWebsocket',
       _meta: { title: 'Final Save Image Websocket' }
     }
