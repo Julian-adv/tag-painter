@@ -68,6 +68,114 @@ function updateLoraReferences(workflow: ComfyUIWorkflow, targetNodeId: string) {
   })
 }
 
+export const inpaintingWorkflowPrompt = {
+  '4': {
+    inputs: {
+      pixels: ['89', 0],
+      vae: ['11', 2]
+    },
+    class_type: 'VAEEncode',
+    _meta: {
+      title: 'VAE Encode (for inpainting)'
+    }
+  },
+  '5': {
+    inputs: {
+      samples: ['4', 0],
+      mask: ['91', 0]
+    },
+    class_type: 'SetLatentNoiseMask',
+    _meta: {
+      title: 'Set Latent Noise Mask'
+    }
+  },
+  '10': {
+    inputs: {
+      seed: 0,
+      steps: 20,
+      cfg: 8.0,
+      sampler_name: 'euler',
+      scheduler: 'normal',
+      denoise: 1.0,
+      model: ['11', 0],
+      positive: ['12', 0],
+      negative: ['18', 0],
+      latent_image: ['5', 0]
+    },
+    class_type: 'KSampler',
+    _meta: {
+      title: 'KSampler (inpainting)'
+    }
+  },
+  '11': {
+    inputs: {
+      ckpt_name: 'model.safetensors'
+    },
+    class_type: 'CheckpointLoaderSimple',
+    _meta: {
+      title: 'Load Checkpoint'
+    }
+  },
+  '12': {
+    inputs: {
+      text: 'inpainting prompt',
+      clip: ['11', 1]
+    },
+    class_type: 'CLIPTextEncode',
+    _meta: {
+      title: 'CLIP Text Encode (Prompt)'
+    }
+  },
+  '18': {
+    inputs: {
+      text: 'negative prompt',
+      clip: ['11', 1]
+    },
+    class_type: 'CLIPTextEncode',
+    _meta: {
+      title: 'CLIP Text Encode (Negative)'
+    }
+  },
+  '19': {
+    inputs: {
+      samples: ['10', 0],
+      vae: ['11', 2]
+    },
+    class_type: 'VAEDecode',
+    _meta: {
+      title: 'VAE Decode'
+    }
+  },
+  '89': {
+    inputs: {
+      image: 'user_image.png'
+    },
+    class_type: 'LoadImage',
+    _meta: {
+      title: 'Load Input Image'
+    }
+  },
+  '90': {
+    inputs: {
+      image: 'temp_mask.png'
+    },
+    class_type: 'LoadImage',
+    _meta: {
+      title: 'Load Mask Image'
+    }
+  },
+  '91': {
+    inputs: {
+      channel: 'red',
+      image: ['90', 0]
+    },
+    class_type: 'ImageToMask',
+    _meta: {
+      title: 'Convert Image to Mask'
+    }
+  }
+}
+
 export const defaultWorkflowPrompt = {
   '2': {
     inputs: {

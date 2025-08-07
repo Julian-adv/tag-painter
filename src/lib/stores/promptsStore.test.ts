@@ -22,7 +22,7 @@ import {
   getEffectiveOptions,
   autoSaveCurrentValues
 } from './promptsStore'
-import type { PromptsData, PromptCategory, CustomTag } from '$lib/types'
+import type { PromptsData, PromptCategory } from '$lib/types'
 
 // Mock fileIO module
 vi.mock('../utils/fileIO', () => ({
@@ -44,7 +44,7 @@ describe('promptsStore', () => {
     // Reset store to default state
     promptsData.set({
       categories: [],
-      tags: { all: [], zone1: [], zone2: [], negative: [] },
+      tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] },
       customTags: {},
       selectedCheckpoint: null,
       selectedComposition: 'left-horizontal',
@@ -69,12 +69,17 @@ describe('promptsStore', () => {
           all: ['tag1', 'tag2'],
           zone1: ['zone1tag'],
           zone2: ['zone2tag'],
-          negative: ['negative1']
+          negative: ['negative1'],
+          inpainting: ['inpaint1']
         },
         selectedCheckpoint: 'test-model.ckpt',
         selectedComposition: 'center',
         customTags: {
-          'custom1': ['option1', 'option2'] // Old format
+          custom1: {
+            name: 'custom1',
+            tags: ['option1', 'option2'],
+            type: 'sequential'
+          }
         }
       }
 
@@ -87,8 +92,7 @@ describe('promptsStore', () => {
       expect(storeData.tags).toEqual(mockLoadedData.tags)
       expect(storeData.selectedCheckpoint).toBe('test-model.ckpt')
       expect(storeData.selectedComposition).toBe('center')
-      
-      // Check custom tags migration
+
       expect(storeData.customTags.custom1).toEqual({
         name: 'custom1',
         tags: ['option1', 'option2'],
@@ -113,7 +117,8 @@ describe('promptsStore', () => {
         all: [],
         zone1: [],
         zone2: [],
-        negative: []
+        negative: [],
+        inpainting: []
       })
       expect(storeData.customTags).toEqual({})
       expect(storeData.selectedComposition).toBe('left-horizontal')
@@ -131,46 +136,20 @@ describe('promptsStore', () => {
         all: [],
         zone1: [],
         zone2: [],
-        negative: []
+        negative: [],
+        inpainting: []
       })
     })
 
-    it('should migrate custom tags from old format', async () => {
-      const dataWithOldCustomTags: Partial<PromptsData> = {
-        categories: [],
-        customTags: {
-          'oldTag1': ['value1', 'value2'], // Old format: string[]
-          'newTag1': { // New format: CustomTag
-            name: 'newTag1',
-            tags: ['new1', 'new2'],
-            type: 'random'
-          }
-        }
-      }
-
-      vi.mocked(loadPrompts).mockResolvedValueOnce(dataWithOldCustomTags as PromptsData)
-
-      await initializePromptsStore()
-
-      const storeData = get(promptsData)
-      expect(storeData.customTags.oldTag1).toEqual({
-        name: 'oldTag1',
-        tags: ['value1', 'value2'],
-        type: 'sequential'
-      })
-      expect(storeData.customTags.newTag1).toEqual({
-        name: 'newTag1',
-        tags: ['new1', 'new2'],
-        type: 'random'
-      })
-    })
   })
 
   describe('savePromptsData', () => {
     it('should save current store data', async () => {
       const testData: PromptsData = {
-        categories: [{ id: 'test', name: 'Test', values: [], currentValue: { title: '', value: '' } }],
-        tags: { all: ['tag1'], zone1: [], zone2: [], negative: [] },
+        categories: [
+          { id: 'test', name: 'Test', values: [], currentValue: { title: '', value: '' } }
+        ],
+        tags: { all: ['tag1'], zone1: [], zone2: [], negative: [], inpainting: [] },
         customTags: {},
         selectedCheckpoint: 'test.ckpt',
         selectedComposition: 'left-horizontal',
@@ -196,7 +175,7 @@ describe('promptsStore', () => {
         values: [],
         currentValue: { title: '', value: '' }
       }
-      promptsData.update(data => ({ ...data, categories: [category] }))
+      promptsData.update((data) => ({ ...data, categories: [category] }))
 
       const newValue = { title: 'New Value', value: 'new-value' }
       updateCategoryValue('test', newValue)
@@ -212,7 +191,7 @@ describe('promptsStore', () => {
         values: [],
         currentValue: { title: '', value: '' }
       }
-      promptsData.update(data => ({ ...data, categories: [category] }))
+      promptsData.update((data) => ({ ...data, categories: [category] }))
 
       const newValues = [
         { title: 'Value 1', value: 'value1' },
@@ -245,7 +224,7 @@ describe('promptsStore', () => {
         values: [],
         currentValue: { title: '', value: '' }
       }
-      promptsData.update(data => ({ ...data, categories: [category] }))
+      promptsData.update((data) => ({ ...data, categories: [category] }))
 
       removeCategory('test')
 
@@ -260,7 +239,7 @@ describe('promptsStore', () => {
         values: [],
         currentValue: { title: '', value: '' }
       }
-      promptsData.update(data => ({ ...data, categories: [category] }))
+      promptsData.update((data) => ({ ...data, categories: [category] }))
 
       updateCategory('test', { name: 'Updated Test' })
 
@@ -272,28 +251,28 @@ describe('promptsStore', () => {
   describe('settings updates', () => {
     it('should update checkpoint', () => {
       updateCheckpoint('new-model.ckpt')
-      
+
       const storeData = get(promptsData)
       expect(storeData.selectedCheckpoint).toBe('new-model.ckpt')
     })
 
     it('should update composition', () => {
       updateComposition('right-vertical')
-      
+
       const storeData = get(promptsData)
       expect(storeData.selectedComposition).toBe('right-vertical')
     })
 
     it('should update upscale setting', () => {
       updateUpscale(true)
-      
+
       const storeData = get(promptsData)
       expect(storeData.useUpscale).toBe(true)
     })
 
     it('should update face detailer setting', () => {
       updateFaceDetailer(true)
-      
+
       const storeData = get(promptsData)
       expect(storeData.useFaceDetailer).toBe(true)
     })
@@ -301,14 +280,14 @@ describe('promptsStore', () => {
     it('should update selected loras', () => {
       const loras = ['lora1', 'lora2']
       updateSelectedLoras(loras)
-      
+
       const storeData = get(promptsData)
       expect(storeData.selectedLoras).toEqual(loras)
     })
 
     it('should update lora weight', () => {
       updateLoraWeight(0.7)
-      
+
       const storeData = get(promptsData)
       expect(storeData.loraWeight).toBe(0.7)
     })
@@ -316,20 +295,21 @@ describe('promptsStore', () => {
 
   describe('tags management', () => {
     it('should update tags', () => {
-      updateTags(['all1', 'all2'], ['zone1-1'], ['zone2-1'], ['neg1'])
-      
+      updateTags(['all1', 'all2'], ['zone1-1'], ['zone2-1'], ['neg1'], ['inpaint1'])
+
       const storeData = get(promptsData)
       expect(storeData.tags).toEqual({
         all: ['all1', 'all2'],
         zone1: ['zone1-1'],
         zone2: ['zone2-1'],
-        negative: ['neg1']
+        negative: ['neg1'],
+        inpainting: ['inpaint1']
       })
     })
 
     it('should save custom tag', async () => {
       await saveCustomTag('testTag', ['option1', 'option2'], 'random')
-      
+
       const storeData = get(promptsData)
       expect(storeData.customTags.testTag).toEqual({
         name: 'testTag',
@@ -349,14 +329,14 @@ describe('promptsStore', () => {
         { id: 'second', name: 'Second', values: [], currentValue: { title: '', value: '' } },
         { id: 'third', name: 'Third', values: [], currentValue: { title: '', value: '' } }
       ]
-      promptsData.update(data => ({ ...data, categories }))
+      promptsData.update((data) => ({ ...data, categories }))
 
       // Move first item (index 0) to position 2
       reorderCategories(0, 2)
 
       const storeData = get(promptsData)
       expect(storeData.categories[0].id).toBe('second')
-      expect(storeData.categories[1].id).toBe('third') 
+      expect(storeData.categories[1].id).toBe('third')
       expect(storeData.categories[2].id).toBe('first')
     })
   })
@@ -366,7 +346,10 @@ describe('promptsStore', () => {
       {
         id: 'source',
         name: 'Source',
-        values: [{ title: 'Option 1', value: 'opt1' }, { title: 'Option 2', value: 'opt2' }],
+        values: [
+          { title: 'Option 1', value: 'opt1' },
+          { title: 'Option 2', value: 'opt2' }
+        ],
         currentValue: { title: '', value: '' }
       },
       {
@@ -406,9 +389,9 @@ describe('promptsStore', () => {
     })
 
     it('should get effective options from source category', () => {
-      const aliasCategory = categories.find(c => c.id === 'alias')!
+      const aliasCategory = categories.find((c) => c.id === 'alias')!
       const options = getEffectiveOptions(aliasCategory, categories)
-      
+
       expect(options).toEqual([
         { title: 'Option 1', value: 'opt1' },
         { title: 'Option 2', value: 'opt2' }
@@ -416,9 +399,9 @@ describe('promptsStore', () => {
     })
 
     it('should get effective options from regular category', () => {
-      const sourceCategory = categories.find(c => c.id === 'source')!
+      const sourceCategory = categories.find((c) => c.id === 'source')!
       const options = getEffectiveOptions(sourceCategory, categories)
-      
+
       expect(options).toEqual([
         { title: 'Option 1', value: 'opt1' },
         { title: 'Option 2', value: 'opt2' }
@@ -436,7 +419,7 @@ describe('promptsStore', () => {
           currentValue: { title: 'New Value', value: 'new-value' }
         }
       ]
-      promptsData.update(data => ({ ...data, categories }))
+      promptsData.update((data) => ({ ...data, categories }))
 
       autoSaveCurrentValues()
 
@@ -456,7 +439,7 @@ describe('promptsStore', () => {
           currentValue: { title: 'Existing', value: 'updated-value' }
         }
       ]
-      promptsData.update(data => ({ ...data, categories }))
+      promptsData.update((data) => ({ ...data, categories }))
 
       autoSaveCurrentValues()
 
@@ -473,7 +456,7 @@ describe('promptsStore', () => {
           currentValue: { title: '[Random]', value: 'random-value' }
         }
       ]
-      promptsData.update(data => ({ ...data, categories }))
+      promptsData.update((data) => ({ ...data, categories }))
 
       autoSaveCurrentValues()
 
@@ -490,7 +473,7 @@ describe('promptsStore', () => {
           currentValue: { title: '', value: '' }
         }
       ]
-      promptsData.update(data => ({ ...data, categories }))
+      promptsData.update((data) => ({ ...data, categories }))
 
       autoSaveCurrentValues()
 

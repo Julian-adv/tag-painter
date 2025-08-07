@@ -167,3 +167,27 @@ export async function saveSettings(settings: unknown): Promise<boolean> {
     return false
   }
 }
+
+// Save mask data to temporary file
+export async function saveMaskData(maskData: string): Promise<string | null> {
+  try {
+    const maskResponse = await fetch('/api/mask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ maskData })
+    })
+
+    if (maskResponse.ok) {
+      const result = await maskResponse.json()
+      console.log('Mask saved to:', result.filepath)
+      return result.filepath
+    } else {
+      const errorData = await maskResponse.json()
+      console.error('Failed to save mask:', errorData.error)
+      return null
+    }
+  } catch (error) {
+    console.error('Error saving mask:', error)
+    return null
+  }
+}

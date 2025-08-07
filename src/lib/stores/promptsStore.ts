@@ -1,13 +1,13 @@
 // Central store for prompts data using Svelte stores
 import { writable } from 'svelte/store'
-import type { PromptsData, PromptCategory, OptionItem, CustomTag, TagType } from '$lib/types'
+import type { PromptsData, PromptCategory, OptionItem, TagType } from '$lib/types'
 import { savePrompts, loadPrompts } from '../utils/fileIO'
 import { updateCombinedTags } from './tagsStore'
 
 // Minimal default data for initial store state
 const defaultPromptsData: PromptsData = {
   categories: [],
-  tags: { all: [], zone1: [], zone2: [], negative: [] },
+  tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] },
   customTags: {},
   selectedCheckpoint: null,
   selectedComposition: 'left-horizontal',
@@ -20,31 +20,6 @@ const defaultPromptsData: PromptsData = {
 // Create reactive store
 export const promptsData = writable<PromptsData>(defaultPromptsData)
 
-
-// Migrate old customTags format to new format
-function migrateCustomTags(oldCustomTags: unknown): Record<string, CustomTag> {
-  const newCustomTags: Record<string, CustomTag> = {}
-
-  // Check if it's already in new format
-  if (oldCustomTags && typeof oldCustomTags === 'object') {
-    for (const [name, data] of Object.entries(oldCustomTags)) {
-      if (Array.isArray(data)) {
-        // Old format: Record<string, string[]>
-        newCustomTags[name] = {
-          name,
-          tags: data,
-          type: 'sequential'
-        }
-      } else if (data && typeof data === 'object' && 'tags' in data) {
-        // New format: already migrated
-        newCustomTags[name] = data as CustomTag
-      }
-    }
-  }
-
-  return newCustomTags
-}
-
 // Load prompts from API on initialization
 export async function initializePromptsStore() {
   const savedPrompts = await loadPrompts()
@@ -56,9 +31,10 @@ export async function initializePromptsStore() {
         all: savedPrompts.tags?.all || [],
         zone1: savedPrompts.tags?.zone1 || [],
         zone2: savedPrompts.tags?.zone2 || [],
-        negative: savedPrompts.tags?.negative || []
+        negative: savedPrompts.tags?.negative || [],
+        inpainting: savedPrompts.tags?.inpainting || []
       },
-      customTags: migrateCustomTags(savedPrompts.customTags || {}),
+      customTags: savedPrompts.customTags || {},
       selectedComposition: savedPrompts.selectedComposition || 'left-horizontal'
     }
     promptsData.set(migratedData)
@@ -149,7 +125,8 @@ export function updateTags(
   allTags: string[],
   zone1Tags: string[],
   zone2Tags: string[],
-  negativeTags: string[] = []
+  negativeTags: string[],
+  inpaintingTags: string[]
 ) {
   promptsData.update((data) => ({
     ...data,
@@ -157,7 +134,8 @@ export function updateTags(
       all: allTags,
       zone1: zone1Tags,
       zone2: zone2Tags,
-      negative: negativeTags
+      negative: negativeTags,
+      inpainting: inpaintingTags
     }
   }))
 }
@@ -196,7 +174,6 @@ export function reorderCategories(fromIndex: number, toIndex: number) {
   })
 }
 
-
 // Get the source category (following alias chain)
 export function getSourceCategory(
   categoryId: string,
@@ -222,7 +199,6 @@ export function getEffectiveOptions(
   }
   return category.values
 }
-
 
 // Auto-save current values to options arrays when they don't exist
 export function autoSaveCurrentValues() {
@@ -253,4 +229,3 @@ export function autoSaveCurrentValues() {
     return updated
   })
 }
-

@@ -112,7 +112,7 @@ export async function GET() {
     if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
       const defaultPrompts: PromptsData = {
         categories: createDefaultCategories(),
-        tags: { all: [], zone1: [], zone2: [], negative: [] },
+        tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] },
         customTags: {},
         selectedCheckpoint: null,
         selectedComposition: 'left-horizontal',

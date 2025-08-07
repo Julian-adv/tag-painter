@@ -214,9 +214,57 @@ npm run test:run
 npm run test:ui
 ```
 
-## Puppeteer Configuration
+## TODO / Future Features
 
-When using Puppeteer MCP for screenshots, use these settings for optimal app capture:
+### High Priority
+- **Mask-based Inpainting**: Implement full inpainting workflow using user-drawn masks
+  - Integrate mask data with ComfyUI inpainting nodes
+  - Add inpainting-specific workflow configuration
+  - Support different inpainting models and settings
+  - Implement mask refinement and preprocessing options
 
-- **Default screenshot size**: 1270x1300 pixels
-- This size captures the full app interface including all tag zones, settings, and generated images
+### Medium Priority
+- **ComfyUI Portable Auto-Installation**: Automatic setup of ComfyUI environment
+  - Download and install ComfyUI Portable automatically
+  - Configure required nodes and extensions
+  - Handle different operating systems (Windows/Linux/Mac)
+  - Provide installation progress feedback and error handling
+
+### Enhancement Features
+- **Smart Random Tag Constraints**: Advanced random tag relationship management
+  - Implement tag exclusion rules (when tag A is selected, prevent tag B/C/D)
+  - Add tag dependency relationships (tag A requires tag B)
+  - Create tag group conflicts (only one from group X can be selected)
+  - Provide UI for managing tag relationships and constraints
+
+### Low Priority
+- **Additional Drawing Tools**: Expand mask creation capabilities
+  - Add eraser tool for mask editing
+  - Implement selection tools (rectangle, lasso)
+  - Add mask blur/feather options
+  - Support multiple mask layers
+
+- **Batch Processing**: Generate multiple images with variations
+  - Queue multiple generations with different settings
+  - Batch apply random tag variations
+  - Export batch results with metadata
+  - Progress tracking for batch operations
+
+- **Advanced Workflow Support**: Extended ComfyUI integration
+  - Support custom workflow loading
+  - Dynamic node configuration UI
+  - Workflow templates and presets
+  - Real-time workflow validation
+
+### Performance & Quality of Life
+- **Improved Error Handling**: Better user feedback and recovery
+  - Detailed error messages with solutions
+  - Automatic retry mechanisms
+  - Connection status indicators
+  - Offline mode support
+
+- **Enhanced UI/UX**: Better user experience
+  - Keyboard shortcuts for common actions
+  - Drag & drop file support
+  - Theme customization options
+  - Mobile responsive design improvements

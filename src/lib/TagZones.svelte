@@ -14,16 +14,19 @@
       zone1: Record<string, string>
       zone2: Record<string, string>
       negative: Record<string, string>
+      inpainting: Record<string, string>
     }
   }
 
-  let { currentRandomTagResolutions = { all: {}, zone1: {}, zone2: {}, negative: {} } }: Props =
-    $props()
+  let {
+    currentRandomTagResolutions = { all: {}, zone1: {}, zone2: {}, negative: {}, inpainting: {} }
+  }: Props = $props()
 
   let allTags = $state<CustomTag[]>([])
   let firstZoneTags = $state<CustomTag[]>([])
   let secondZoneTags = $state<CustomTag[]>([])
   let negativeTags = $state<CustomTag[]>([])
+  let inpaintingTags = $state<CustomTag[]>([])
   let showCustomTagsDialog = $state(false)
   let selectedCustomTagName = $state<string>('')
 
@@ -67,6 +70,7 @@
       firstZoneTags = convertToCustomTags(data.tags.zone1)
       secondZoneTags = convertToCustomTags(data.tags.zone2)
       negativeTags = convertToCustomTags(data.tags.negative)
+      inpaintingTags = convertToCustomTags(data.tags.inpainting)
     })
     return unsubscribe
   })
@@ -85,7 +89,8 @@
       allTags.map(tagToString),
       firstZoneTags.map(tagToString),
       secondZoneTags.map(tagToString),
-      negativeTags.map(tagToString)
+      negativeTags.map(tagToString),
+      inpaintingTags.map(tagToString)
     )
     await savePromptsData()
   }
@@ -151,6 +156,15 @@
       onTagsChange={saveTags}
       onCustomTagDoubleClick={handleCustomTagDoubleClick}
       currentRandomTagResolutions={currentRandomTagResolutions.negative}
+    />
+
+    <TagInput
+      id="inpainting-tags"
+      label="Inpainting Prompt"
+      bind:tags={inpaintingTags}
+      onTagsChange={saveTags}
+      onCustomTagDoubleClick={handleCustomTagDoubleClick}
+      currentRandomTagResolutions={currentRandomTagResolutions.inpainting}
     />
   </div>
 

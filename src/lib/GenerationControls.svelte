@@ -1,7 +1,7 @@
 <!-- Component for generation controls, progress bar, and loading state -->
 <script lang="ts">
   import SettingsDialog from './SettingsDialog.svelte'
-  import { Cog8Tooth, Play, Stop, ArrowPath } from 'svelte-heros-v2'
+  import { Cog8Tooth, Play, Stop, ArrowPath, PaintBrush } from 'svelte-heros-v2'
   import type { Settings, ProgressData } from '$lib/types'
 
   interface Props {
@@ -9,6 +9,7 @@
     progressData: ProgressData
     settings: Settings
     onGenerate: () => void
+    onInpaint: () => void
     onRegenerate: () => void
     onGenerateForever: () => void
     onStopGeneration: () => void
@@ -22,6 +23,7 @@
     progressData,
     settings,
     onGenerate,
+    onInpaint,
     onRegenerate,
     onGenerateForever,
     onStopGeneration,
@@ -46,7 +48,8 @@
   }
 </script>
 
-<div class="flex flex-col gap-0 w-full mt-2">
+<div class="flex flex-col gap-2 w-full mt-2">
+  <!-- First row: Generate, Regen, Forever, Settings -->
   <div class="flex gap-4 items-center justify-center">
     <button
       class="px-3 py-1.5 text-white border-none rounded-md text-sm font-semibold cursor-pointer transition-all duration-200 h-9 bg-sky-500 hover:enabled:bg-sky-500 hover:enabled:-translate-y-0.5 hover:enabled:shadow-lg active:enabled:translate-y-0 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
@@ -84,6 +87,18 @@
       disabled={isLoading}
       aria-label="Settings"
       ><Cog8Tooth />
+    </button>
+  </div>
+
+  <!-- Second row: Inpaint -->
+  <div class="flex gap-4 items-center justify-center">
+    <button
+      class="flex items-center justify-center gap-1 px-3 py-1.5 text-white border-none rounded-md text-sm font-semibold cursor-pointer transition-all duration-200 h-9 bg-purple-500 hover:enabled:bg-purple-600 hover:enabled:-translate-y-0.5 hover:enabled:shadow-lg active:enabled:translate-y-0 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+      onclick={onInpaint}
+      disabled={isLoading || isGeneratingForever}
+    >
+      <PaintBrush class="w-4 h-4" />
+      Inpaint
     </button>
   </div>
 

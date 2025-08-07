@@ -7,7 +7,7 @@
   import TagZones from './TagZones.svelte'
   import LoraSelector from './LoraSelector.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
-  import { loadSettings, saveSettings as saveSettingsToFile } from './utils/fileIO'
+  import { loadSettings, saveSettings as saveSettingsToFile, saveMaskData } from './utils/fileIO'
   import { fetchCheckpoints } from './utils/comfyui'
   import { generateImage } from './utils/imageGeneration'
   import { DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
@@ -33,7 +33,14 @@
     currentNode: ''
   })
   let availableCheckpoints: string[] = $state([])
-  let imageViewer: { updateFileList: () => Promise<void>; disableDrawingMode: () => void; getMaskData: () => string | null; hasMask: () => boolean } | undefined
+  let imageViewer:
+    | {
+        updateFileList: () => Promise<void>
+        disableDrawingMode: () => void
+        getMaskData: () => string | null
+        hasMask: () => boolean
+      }
+    | undefined
   let compositionSelector: { selectTempMask: () => void } | undefined
   let isGeneratingForever = $state(false)
   let shouldStopGeneration = $state(false)
@@ -43,11 +50,13 @@
     zone1: Record<string, string>
     zone2: Record<string, string>
     negative: Record<string, string>
+    inpainting: Record<string, string>
   } = $state({
     all: {},
     zone1: {},
     zone2: {},
-    negative: {}
+    negative: {},
+    inpainting: {}
   })
 
   // Settings state
@@ -100,21 +109,17 @@
     let currentPromptsData: PromptsData
     promptsData.subscribe((data) => (currentPromptsData = data))()
 
-    // Get mask data from ImageViewer if available
-    let maskData: string | null = null
+    // Get mask data from ImageViewer if available and save it
+    let maskFilePath: string | null = null
     if (imageViewer) {
       if (imageViewer.hasMask()) {
-        maskData = imageViewer.getMaskData()
-        
+        const maskData = imageViewer.getMaskData()
+        if (maskData) {
+          maskFilePath = await saveMaskData(maskData)
+        }
+
         // Disable drawing mode when generation starts
         imageViewer.disableDrawingMode()
-        
-        // Auto-select temp-mask composition after a short delay to ensure mask is saved
-        if (compositionSelector?.selectTempMask) {
-          setTimeout(() => {
-            compositionSelector?.selectTempMask()
-          }, 100)
-        }
       }
     }
 
@@ -123,7 +128,9 @@
       settings,
       selectedLoras: currentPromptsData!.selectedLoras,
       seed: seedToUse,
-      maskData,
+      maskFilePath,
+      currentImagePath: currentImageFileName,
+      isInpainting: false,
       previousRandomTagResolutions: isRegeneration ? currentRandomTagResolutions : undefined,
       onLoadingChange: (loading) => {
         isLoading = loading
@@ -151,7 +158,104 @@
         isLoading = false
       }
     })
-    
+
+    // Store the results
+    lastSeed = result.seed
+    currentRandomTagResolutions = result.randomTagResolutions
+  }
+
+  async function handleInpaint() {
+    // Check if inpainting tags exist
+    let currentPromptsData: PromptsData
+    promptsData.subscribe((data) => (currentPromptsData = data))()
+
+    if (!currentPromptsData!.tags.inpainting || currentPromptsData!.tags.inpainting.length === 0) {
+      alert('Please add inpainting prompts before using inpainting.')
+      return
+    }
+
+    await handleInpaintGeneration()
+  }
+
+  async function handleInpaintGeneration() {
+    // Add current values to options if they're not already there
+    autoSaveCurrentValues()
+
+    // Save prompts before generating
+    await savePromptsData()
+
+    let currentPromptsData: PromptsData
+    promptsData.subscribe((data) => (currentPromptsData = data))()
+
+    // Get mask data from ImageViewer if available and save it
+    let maskFilePath: string | null = null
+    if (imageViewer) {
+      if (imageViewer.hasMask()) {
+        const maskData = imageViewer.getMaskData()
+        if (maskData) {
+          maskFilePath = await saveMaskData(maskData)
+
+          // Auto-select temp-mask composition after mask is saved
+          if (compositionSelector?.selectTempMask) {
+            setTimeout(() => {
+              compositionSelector?.selectTempMask()
+            }, 100)
+          }
+        }
+
+        // Disable drawing mode when generation starts
+        imageViewer.disableDrawingMode()
+      }
+    }
+
+    // If no custom mask but inpainting is requested, use composition mask
+    if (!maskFilePath) {
+      const maskResponse = await fetch(
+        `/api/mask-path?composition=${encodeURIComponent(currentPromptsData!.selectedComposition)}`
+      )
+      if (maskResponse.ok) {
+        const { maskImagePath } = await maskResponse.json()
+        maskFilePath = maskImagePath
+        console.log('Using composition mask path:', maskImagePath)
+      }
+    }
+
+    const result = await generateImage({
+      promptsData: currentPromptsData!,
+      settings,
+      selectedLoras: currentPromptsData!.selectedLoras,
+      seed: null,
+      maskFilePath,
+      currentImagePath: currentImageFileName,
+      isInpainting: true,
+      previousRandomTagResolutions: undefined,
+      onLoadingChange: (loading) => {
+        isLoading = loading
+      },
+      onProgressUpdate: (progress) => {
+        progressData = progress
+      },
+      onImageReceived: async (imageBlob, filePath) => {
+        // Create blob URL for immediate display
+        if (imageUrl && imageUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(imageUrl)
+        }
+        imageUrl = URL.createObjectURL(imageBlob)
+
+        // Set the current image file name
+        currentImageFileName = filePath
+
+        // Update file list after new image is generated
+        if (imageViewer?.updateFileList) {
+          await imageViewer.updateFileList()
+        }
+      },
+      onError: (error) => {
+        console.error('Generation error:', error)
+        isLoading = false
+      }
+    })
+
     // Store the results
     lastSeed = result.seed
     currentRandomTagResolutions = result.randomTagResolutions
@@ -298,6 +402,7 @@
         {isGeneratingForever}
         {lastSeed}
         onGenerate={() => handleGenerate(null)}
+        onInpaint={handleInpaint}
         onRegenerate={() => handleGenerate(lastSeed)}
         onGenerateForever={handleGenerateForever}
         onStopGeneration={handleStopGeneration}

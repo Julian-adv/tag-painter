@@ -56,7 +56,15 @@ class MockWebSocket {
 
 // Mock WebSocket constructor
 const mockWebSocketConstructor = vi.fn().mockImplementation((url: string) => new MockWebSocket(url))
-global.WebSocket = mockWebSocketConstructor
+// Add required static properties to make it compatible with WebSocket constructor type
+Object.assign(mockWebSocketConstructor, {
+  CONNECTING: 0,
+  OPEN: 1,
+  CLOSING: 2,
+  CLOSED: 3,
+  prototype: MockWebSocket.prototype
+})
+global.WebSocket = mockWebSocketConstructor as any
 
 describe('comfyui utilities', () => {
   beforeEach(() => {

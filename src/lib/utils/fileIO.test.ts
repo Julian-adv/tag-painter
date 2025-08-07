@@ -61,7 +61,7 @@ describe('fileIO utilities', () => {
     it('should load prompts successfully', async () => {
       const mockData: Partial<PromptsData> = {
         categories: [
-          { name: 'test', values: [], currentValue: { title: '', value: '' } }
+          { id: 'test', name: 'test', values: [], currentValue: { title: '', value: '' } }
         ]
       }
 

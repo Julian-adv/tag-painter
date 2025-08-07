@@ -1,9 +1,10 @@
 <!-- Component for selecting image composition layouts -->
 <script lang="ts">
+  import { onMount } from 'svelte'
   import { promptsData, updateComposition } from './stores/promptsStore'
   import { maskOverlay } from './stores/maskOverlayStore'
 
-  let tempMaskTimestamp = $state(Date.now())
+  let tempMaskTimestamp = $state(0)
 
   const getCompositions = () => [
     { id: 'all', src: '/all-mask.png', alt: 'All' },
@@ -11,6 +12,10 @@
     { id: 'top-vertical', src: '/top-vertical-mask.png', alt: 'Top Vertical' },
     { id: 'temp-mask', src: `/temp_mask.png?t=${tempMaskTimestamp}`, alt: 'Custom Mask' }
   ]
+
+  onMount(() => {
+    tempMaskTimestamp = Date.now()
+  })
 
   // Function to refresh temp mask when it's updated
   export function refreshTempMask() {

@@ -56,6 +56,7 @@ export interface PromptsData {
     zone1: string[]
     zone2: string[]
     negative: string[]
+    inpainting: string[]
   }
   customTags: Record<string, CustomTag>
   selectedCheckpoint: string | null

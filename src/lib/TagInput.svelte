@@ -18,7 +18,17 @@
     disabled?: boolean
   }
 
-  let { id, label, tags = $bindable(), onTagsChange, onCustomTagDoubleClick, onTagClick, currentRandomTagResolutions = {}, testOverrideTag = '', disabled = false }: Props = $props()
+  let {
+    id,
+    label,
+    tags = $bindable(),
+    onTagsChange,
+    onCustomTagDoubleClick,
+    onTagClick,
+    currentRandomTagResolutions = {},
+    testOverrideTag = '',
+    disabled = false
+  }: Props = $props()
 
   let quickTagInput = $state('')
 
@@ -31,7 +41,7 @@
       const tagName = quickTagInput.trim()
       const currentData = get(promptsData)
       const existingCustomTag = currentData.customTags[tagName]
-      
+
       const newTag: CustomTag = {
         name: tagName,
         tags: [tagName],
@@ -49,14 +59,26 @@
       addQuickTagToMain()
     }
   }
-
 </script>
 
 <div class={disabled ? 'opacity-50 pointer-events-none' : ''}>
   <div class="flex items-center justify-between mb-1">
-    <label for={id} class="text-xs font-medium {disabled ? 'text-gray-400' : 'text-gray-700'} text-left">{label}</label>
+    <label
+      for={id}
+      class="text-xs font-medium {disabled ? 'text-gray-400' : 'text-gray-700'} text-left"
+      >{label}</label
+    >
   </div>
-  <TagDisplay {id} bind:tags {onTagsChange} {onCustomTagDoubleClick} {onTagClick} {currentRandomTagResolutions} {testOverrideTag} {disabled} />
+  <TagDisplay
+    {id}
+    bind:tags
+    {onTagsChange}
+    {onCustomTagDoubleClick}
+    {onTagClick}
+    {currentRandomTagResolutions}
+    {testOverrideTag}
+    {disabled}
+  />
 
   <!-- Quick tag input with autocomplete -->
   <div class="mt-1">
@@ -71,5 +93,4 @@
       onkeydown={handleQuickTagKeydown}
     />
   </div>
-
 </div>

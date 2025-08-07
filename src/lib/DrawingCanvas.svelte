@@ -40,7 +40,7 @@
       canvasElement.style.width = `${rect.width}px`
       canvasElement.style.height = `${rect.height}px`
 
-      const ctx = canvasElement.getContext('2d')
+      const ctx = canvasElement.getContext('2d', { willReadFrequently: true })
       if (ctx) {
         // Fill canvas with black background initially
         ctx.fillStyle = 'black'
@@ -77,7 +77,7 @@
     } else {
       // Brush mode: start drawing line
       isDrawing = true
-      const ctx = canvasElement.getContext('2d')
+      const ctx = canvasElement.getContext('2d', { willReadFrequently: true })
       if (ctx) {
         ctx.beginPath()
         ctx.moveTo(x, y)
@@ -95,7 +95,7 @@
     const x = (event.clientX - rect.left) * scaleX
     const y = (event.clientY - rect.top) * scaleY
 
-    const ctx = canvasElement.getContext('2d')
+    const ctx = canvasElement.getContext('2d', { willReadFrequently: true })
     if (ctx) {
       ctx.lineTo(x, y)
       ctx.stroke()
@@ -108,7 +108,7 @@
 
   export function clearMask() {
     if (!canvasElement) return
-    const ctx = canvasElement.getContext('2d')
+    const ctx = canvasElement.getContext('2d', { willReadFrequently: true })
     if (ctx) {
       // Fill with black instead of clearing to transparent
       ctx.fillStyle = 'black'
@@ -130,7 +130,7 @@
   export function hasMask(): boolean {
     if (!canvasElement || !isDrawingMode) return false
 
-    const ctx = canvasElement.getContext('2d')
+    const ctx = canvasElement.getContext('2d', { willReadFrequently: true })
     if (!ctx) return false
 
     // Check if canvas has any non-transparent pixels
@@ -179,7 +179,7 @@
   function floodFill(x: number, y: number) {
     if (!canvasElement) return
 
-    const ctx = canvasElement.getContext('2d')
+    const ctx = canvasElement.getContext('2d', { willReadFrequently: true })
     if (!ctx) return
 
     const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height)

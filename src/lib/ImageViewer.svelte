@@ -21,7 +21,9 @@
   let isDrawingMode = $state(false)
   let imageElement: HTMLImageElement | undefined = $state()
   let drawingTool = $state<'brush' | 'fill'>('brush')
-  let drawingCanvas: { clearMask: () => void; getMaskData: () => string | null; hasMask: () => boolean } | undefined = $state()
+  let drawingCanvas:
+    | { clearMask: () => void; getMaskData: () => string | null; hasMask: () => boolean }
+    | undefined = $state()
 
   // Watch for outputDirectory changes and update file list
   $effect(() => {
@@ -90,9 +92,6 @@
     await updateFileList()
   }
 
-
-
-
   function clearMask() {
     drawingCanvas?.clearMask()
   }
@@ -108,7 +107,6 @@
   export function disableDrawingMode() {
     isDrawingMode = false
   }
-
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function loadImageMetadata(filePath: string) {
@@ -177,12 +175,7 @@
           class="absolute top-0 left-0 w-full h-full object-contain opacity-40 pointer-events-none rounded-lg mix-blend-multiply"
         />
       {/if}
-      <DrawingCanvas
-        bind:this={drawingCanvas}
-        {isDrawingMode}
-        {drawingTool}
-        {imageElement}
-      />
+      <DrawingCanvas bind:this={drawingCanvas} {isDrawingMode} {drawingTool} {imageElement} />
     </div>
   {:else}
     <div
@@ -195,11 +188,7 @@
   <div class="flex justify-between items-center w-full">
     <div class="flex items-center gap-2">
       {#if imageUrl}
-        <DrawingControls
-          bind:isDrawingMode
-          bind:drawingTool
-          onClearMask={clearMask}
-        />
+        <DrawingControls bind:isDrawingMode bind:drawingTool onClearMask={clearMask} />
       {/if}
     </div>
 
