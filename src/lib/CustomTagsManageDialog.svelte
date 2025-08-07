@@ -3,10 +3,15 @@
   import TagInput from './TagInput.svelte'
   import { promptsData, saveCustomTag, savePromptsData } from './stores/promptsStore'
   import { combinedTags } from './stores/tagsStore'
-  import { testModeStore, setTestModeOverride, setTagTestMode, removeTestModeOverride } from './stores/testModeStore.svelte'
+  import {
+    testModeStore,
+    setTestModeOverride,
+    setTagTestMode,
+    removeTestModeOverride
+  } from './stores/testModeStore.svelte'
   import { get } from 'svelte/store'
   import { untrack } from 'svelte'
-  import { Trash, DocumentDuplicate, Plus, Beaker } from 'svelte-heros-v2'
+  import { Trash, DocumentDuplicate, Plus, LockClosed } from 'svelte-heros-v2'
   import type { CustomTag, TagType } from '$lib/types'
   import { getTagClasses } from './utils/tagStyling'
 
@@ -641,7 +646,7 @@
                     <div class="flex items-center justify-between w-full">
                       <span>{tagName}</span>
                       {#if isTestModeEnabled && (tag.type === 'random' || tag.type === 'consistent-random')}
-                        <Beaker class="w-4 h-4 text-blue-600 flex-shrink-0" />
+                        <LockClosed class="w-4 h-4 text-blue-600 flex-shrink-0" />
                       {/if}
                     </div>
                   </button>
@@ -780,11 +785,13 @@
                       if (!newState) {
                         statusMessage = ''
                         removeTestModeOverride(selectedTagName)
+                      } else {
+                        statusMessage = 'Choose a tag to force this value'
                       }
                     }}
                     class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:outline-none"
                   />
-                  <span class="text-gray-700 text-sm">Test Mode</span>
+                  <span class="text-gray-700 text-sm">Force Override</span>
                 </label>
               </div>
             {/if}

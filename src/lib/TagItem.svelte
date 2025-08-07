@@ -1,6 +1,6 @@
 <!-- Individual tag item component with drag & drop and editing functionality -->
 <script lang="ts">
-  import { XMark } from 'svelte-heros-v2'
+  import { XMark, LockClosed } from 'svelte-heros-v2'
   import { getTagClasses, getTagRemoveButtonClasses } from './utils/tagStyling'
   import type { CustomTag } from './types'
 
@@ -10,7 +10,8 @@
     draggedIndex: number | null
     dropPosition: number | null
     currentRandomTagResolutions?: Record<string, string>
-    testOverrideTag?: string
+    isTestSelected?: boolean
+    isForceOverridden?: boolean
     disabled?: boolean
     onRemove: (tagName: string) => void
     onCustomTagDoubleClick?: (tagName: string) => void
@@ -29,7 +30,8 @@
     draggedIndex,
     dropPosition,
     currentRandomTagResolutions = {},
-    testOverrideTag = '',
+    isTestSelected = false,
+    isForceOverridden = false,
     disabled = false,
     onRemove,
     onCustomTagDoubleClick,
@@ -132,7 +134,7 @@
     class="inline-flex items-center gap-1 {getTagClasses({
       tag,
       dragged: draggedIndex === index,
-      testSelected: testOverrideTag === tag.name,
+      testSelected: isTestSelected,
       additionalClasses: 'pl-1.5 pr-0.5 py-0.5'
     })}"
   >
@@ -151,6 +153,9 @@
         : `Edit custom tag ${tag.name}`}
     >
       <span class="font-medium">{displayParts.name}</span>
+      {#if isForceOverridden}
+        <LockClosed class="w-3 h-3 text-orange-500 ml-1" />
+      {/if}
       {#if displayParts.content}
         <span class="border-l border-dashed border-gray-400 mx-1 self-stretch"></span>
         <span class="text-gray-600">{displayParts.content}</span>

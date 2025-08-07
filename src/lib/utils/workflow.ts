@@ -182,7 +182,7 @@ export const inpaintingWorkflowPrompt = {
     inputs: {
       mask: ['91', 0],
       device: 'cpu',
-      amount: 32
+      amount: 16
     },
     class_type: 'MaskBlur+',
     _meta: {

@@ -33,7 +33,7 @@
   }: Props = $props()
 
   let showSettingsDialog = $state(false)
-  let inpaintDenoiseStrength = $state(0.5)
+  let inpaintDenoiseStrength = $state(0.55)
 
   function openSettingsDialog() {
     showSettingsDialog = true

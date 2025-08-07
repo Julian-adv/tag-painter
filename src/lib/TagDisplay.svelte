@@ -1,6 +1,7 @@
 <!-- Component for displaying tags as boxes with delete functionality -->
 <script lang="ts">
   import TagItem from './TagItem.svelte'
+  import { testModeStore } from './stores/testModeStore.svelte'
   import type { CustomTag } from './types'
 
   interface Props {
@@ -131,7 +132,8 @@
           {draggedIndex}
           {dropPosition}
           {currentRandomTagResolutions}
-          {testOverrideTag}
+          isTestSelected={testOverrideTag === tag.name}
+          isForceOverridden={!!testModeStore[tag.name]?.overrideTag}
           {disabled}
           onRemove={removeTag}
           onCustomTagDoubleClick={onCustomTagDoubleClick}
