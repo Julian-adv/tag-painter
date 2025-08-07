@@ -109,7 +109,7 @@
         type="number"
         min="0.1"
         max="1.0"
-        step="0.1"
+        step="0.05"
         bind:value={inpaintDenoiseStrength}
         class="w-16 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
         disabled={isLoading || isGeneratingForever}

@@ -79,36 +79,46 @@ export const inpaintingWorkflowPrompt = {
       title: 'VAE Encode (for inpainting)'
     }
   },
-  '5': {
-    inputs: {
-      positive: ['12', 0],
-      negative: ['18', 0],
-      vae: ['11', 2],
-      pixels: ['89', 0],
-      mask: ['92', 0],
-      noise_mask: true
-    },
-    class_type: 'InpaintModelConditioning',
-    _meta: {
-      title: 'Inpaint Model Conditioning'
-    }
-  },
   '10': {
     inputs: {
       seed: 0,
       steps: 25,
-      cfg: 7.0,
-      sampler_name: 'dpmpp_2m_sde',
-      scheduler: 'karras',
-      denoise: 0.5,
+      cfg: 5.0,
+      sampler_name: 'euler_ancestral',
+      scheduler: 'simple',
+      denoise: 0.55,
       model: ['11', 0],
-      positive: ['5', 0],
-      negative: ['5', 1],
-      latent_image: ['5', 2]
+      positive: ['95', 0],
+      negative: ['95', 1],
+      latent_image: ['4', 0]
     },
     class_type: 'KSampler',
     _meta: {
       title: 'KSampler (inpainting)'
+    }
+  },
+  '101': {
+    inputs: {
+      destination: ['4', 0],
+      source: ['10', 0],
+      mask: ['92', 0],
+      x: 0,
+      y: 0,
+      resize_source: true
+    },
+    class_type: 'LatentCompositeMasked',
+    _meta: {
+      title: 'Latent Composite Masked'
+    }
+  },
+  '102': {
+    inputs: {
+      samples: ['101', 0],
+      vae: ['11', 2]
+    },
+    class_type: 'VAEDecode',
+    _meta: {
+      title: 'VAE Decode for FaceDetailer'
     }
   },
   '11': {
@@ -138,16 +148,6 @@ export const inpaintingWorkflowPrompt = {
     class_type: 'CLIPTextEncode',
     _meta: {
       title: 'CLIP Text Encode (Negative)'
-    }
-  },
-  '19': {
-    inputs: {
-      samples: ['10', 0],
-      vae: ['11', 2]
-    },
-    class_type: 'VAEDecode',
-    _meta: {
-      title: 'VAE Decode'
     }
   },
   '89': {
@@ -182,7 +182,7 @@ export const inpaintingWorkflowPrompt = {
     inputs: {
       mask: ['91', 0],
       device: 'cpu',
-      amount: 16
+      amount: 32
     },
     class_type: 'MaskBlur+',
     _meta: {
@@ -219,7 +219,7 @@ export const inpaintingWorkflowPrompt = {
       noise_mask_feather: 20,
       tiled_encode: false,
       tiled_decode: false,
-      image: ['19', 0],
+      image: ['102', 0],
       model: ['11', 0],
       clip: ['11', 1],
       vae: ['11', 2],
@@ -262,7 +262,7 @@ export const inpaintingWorkflowPrompt = {
       title: 'UltralyticsDetectorProvider'
     }
   },
-  '93': {
+  '106': {
     inputs: {
       destination: ['89', 0],
       source: ['56', 0],
@@ -274,6 +274,44 @@ export const inpaintingWorkflowPrompt = {
     class_type: 'ImageCompositeMasked',
     _meta: {
       title: 'Composite FaceDetailer Result with Original'
+    }
+  },
+  '94': {
+    inputs: {
+      image: ['89', 0],
+      detect_hand: 'enable',
+      detect_body: 'enable',
+      detect_face: 'enable',
+      resolution: 512
+    },
+    class_type: 'OpenposePreprocessor',
+    _meta: {
+      title: 'OpenPose Preprocessor'
+    }
+  },
+  '95': {
+    inputs: {
+      positive: ['12', 0],
+      negative: ['18', 0],
+      control_net: ['96', 0],
+      image: ['94', 0],
+      vae: ['11', 2],
+      strength: 1.0,
+      start_percent: 0.0,
+      end_percent: 1.0
+    },
+    class_type: 'ControlNetApplyAdvanced',
+    _meta: {
+      title: 'ControlNet Apply Advanced (OpenPose)'
+    }
+  },
+  '96': {
+    inputs: {
+      control_net_name: 'OpenPoseXL2.safetensors'
+    },
+    class_type: 'ControlNetLoader',
+    _meta: {
+      title: 'Load ControlNet Model (OpenPose SDXL)'
     }
   }
 }

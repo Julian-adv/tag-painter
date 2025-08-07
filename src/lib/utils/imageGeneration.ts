@@ -328,10 +328,10 @@ function addSaveImageWebsocketNode(workflow: ComfyUIWorkflow, promptsData: Promp
     let imageSourceNodeId: string
     if (promptsData.useFaceDetailer) {
       // Use ImageCompositeMasked output (FaceDetailer result composited with original)
-      imageSourceNodeId = '93'
+      imageSourceNodeId = '106'
     } else {
-      // Use VAE Decode output directly
-      imageSourceNodeId = '19'
+      // Use VAE Decode output directly from LatentCompositeMasked
+      imageSourceNodeId = '102'
     }
     
     workflow[FINAL_SAVE_NODE_ID] = {
