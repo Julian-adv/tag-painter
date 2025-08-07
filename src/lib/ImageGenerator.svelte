@@ -164,7 +164,7 @@
     currentRandomTagResolutions = result.randomTagResolutions
   }
 
-  async function handleInpaint() {
+  async function handleInpaint(denoiseStrength: number) {
     // Check if inpainting tags exist
     let currentPromptsData: PromptsData
     promptsData.subscribe((data) => (currentPromptsData = data))()
@@ -174,10 +174,10 @@
       return
     }
 
-    await handleInpaintGeneration()
+    await handleInpaintGeneration(denoiseStrength)
   }
 
-  async function handleInpaintGeneration() {
+  async function handleInpaintGeneration(denoiseStrength: number) {
     // Add current values to options if they're not already there
     autoSaveCurrentValues()
 
@@ -228,6 +228,7 @@
       maskFilePath,
       currentImagePath: currentImageFileName,
       isInpainting: true,
+      inpaintDenoiseStrength: denoiseStrength,
       previousRandomTagResolutions: undefined,
       onLoadingChange: (loading) => {
         isLoading = loading

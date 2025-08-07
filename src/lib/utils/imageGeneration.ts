@@ -21,6 +21,7 @@ export interface GenerationOptions {
   maskFilePath: string | null
   currentImagePath: string | null
   isInpainting: boolean
+  inpaintDenoiseStrength?: number
   previousRandomTagResolutions?: {
     all: Record<string, string>
     zone1: Record<string, string>
@@ -52,6 +53,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     maskFilePath,
     currentImagePath,
     isInpainting,
+    inpaintDenoiseStrength,
     previousRandomTagResolutions,
     onLoadingChange,
     onProgressUpdate,
@@ -193,7 +195,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     generateLoraChain(selectedLoras, workflow, promptsData.loraWeight)
 
     // Configure workflow based on settings
-    configureWorkflow(workflow, promptsData, settings, isInpainting)
+    configureWorkflow(workflow, promptsData, settings, isInpainting, inpaintDenoiseStrength)
 
     // Apply seeds (either use provided seed or generate new one)
     const appliedSeed = applySeedsToWorkflow(workflow, seed, isInpainting)
@@ -245,7 +247,8 @@ function configureWorkflow(
   workflow: ComfyUIWorkflow,
   promptsData: PromptsData,
   settings: Settings,
-  isInpainting: boolean = false
+  isInpainting: boolean = false,
+  inpaintDenoiseStrength?: number
 ) {
   // Set checkpoint
   if (promptsData.selectedCheckpoint) {
@@ -257,6 +260,12 @@ function configureWorkflow(
     workflow['10'].inputs.steps = settings.steps
     workflow['10'].inputs.cfg = settings.cfgScale
     workflow['10'].inputs.sampler_name = settings.sampler
+    
+    // Apply custom denoise strength if provided, otherwise use default
+    if (inpaintDenoiseStrength !== undefined) {
+      workflow['10'].inputs.denoise = inpaintDenoiseStrength
+    }
+    
     // For inpainting, image size is determined by input image, not by EmptyLatentImage
   } else {
     // Regular workflow configuration

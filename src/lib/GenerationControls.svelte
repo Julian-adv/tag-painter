@@ -9,7 +9,7 @@
     progressData: ProgressData
     settings: Settings
     onGenerate: () => void
-    onInpaint: () => void
+    onInpaint: (denoiseStrength: number) => void
     onRegenerate: () => void
     onGenerateForever: () => void
     onStopGeneration: () => void
@@ -33,6 +33,7 @@
   }: Props = $props()
 
   let showSettingsDialog = $state(false)
+  let inpaintDenoiseStrength = $state(0.5)
 
   function openSettingsDialog() {
     showSettingsDialog = true
@@ -94,12 +95,26 @@
   <div class="flex gap-4 items-center justify-center">
     <button
       class="flex items-center justify-center gap-1 px-3 py-1.5 text-white border-none rounded-md text-sm font-semibold cursor-pointer transition-all duration-200 h-9 bg-purple-500 hover:enabled:bg-purple-600 hover:enabled:-translate-y-0.5 hover:enabled:shadow-lg active:enabled:translate-y-0 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
-      onclick={onInpaint}
+      onclick={() => onInpaint(inpaintDenoiseStrength)}
       disabled={isLoading || isGeneratingForever}
     >
       <PaintBrush class="w-4 h-4" />
       Inpaint
     </button>
+
+    <div class="flex items-center gap-2">
+      <label for="denoise-strength" class="text-sm text-gray-600 font-medium">Denoise:</label>
+      <input
+        id="denoise-strength"
+        type="number"
+        min="0.1"
+        max="1.0"
+        step="0.1"
+        bind:value={inpaintDenoiseStrength}
+        class="w-16 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+        disabled={isLoading || isGeneratingForever}
+      />
+    </div>
   </div>
 
   <!-- Progress container - always present to maintain height -->
