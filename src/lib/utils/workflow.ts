@@ -81,26 +81,30 @@ export const inpaintingWorkflowPrompt = {
   },
   '5': {
     inputs: {
-      samples: ['4', 0],
-      mask: ['91', 0]
+      positive: ['12', 0],
+      negative: ['18', 0],
+      vae: ['11', 2],
+      pixels: ['89', 0],
+      mask: ['92', 0],
+      noise_mask: true
     },
-    class_type: 'SetLatentNoiseMask',
+    class_type: 'InpaintModelConditioning',
     _meta: {
-      title: 'Set Latent Noise Mask'
+      title: 'Inpaint Model Conditioning'
     }
   },
   '10': {
     inputs: {
       seed: 0,
-      steps: 20,
-      cfg: 8.0,
-      sampler_name: 'euler',
-      scheduler: 'normal',
-      denoise: 1.0,
+      steps: 25,
+      cfg: 7.0,
+      sampler_name: 'dpmpp_2m_sde',
+      scheduler: 'karras',
+      denoise: 0.7,
       model: ['11', 0],
-      positive: ['12', 0],
-      negative: ['18', 0],
-      latent_image: ['5', 0]
+      positive: ['5', 0],
+      negative: ['5', 1],
+      latent_image: ['5', 2]
     },
     class_type: 'KSampler',
     _meta: {
@@ -172,6 +176,17 @@ export const inpaintingWorkflowPrompt = {
     class_type: 'ImageToMask',
     _meta: {
       title: 'Convert Image to Mask'
+    }
+  },
+  '92': {
+    inputs: {
+      mask: ['91', 0],
+      device: 'cpu',
+      amount: 8
+    },
+    class_type: 'MaskBlur+',
+    _meta: {
+      title: 'Blur Mask for Smooth Edges'
     }
   }
 }

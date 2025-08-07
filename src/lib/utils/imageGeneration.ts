@@ -193,13 +193,13 @@ export async function generateImage(options: GenerationOptions): Promise<{
     generateLoraChain(selectedLoras, workflow, promptsData.loraWeight)
 
     // Configure workflow based on settings
-    configureWorkflow(workflow, promptsData, settings)
+    configureWorkflow(workflow, promptsData, settings, isInpainting)
 
     // Apply seeds (either use provided seed or generate new one)
-    const appliedSeed = applySeedsToWorkflow(workflow, seed)
+    const appliedSeed = applySeedsToWorkflow(workflow, seed, isInpainting)
 
     // Add SaveImageWebsocket node for output
-    addSaveImageWebsocketNode(workflow, promptsData)
+    addSaveImageWebsocketNode(workflow, promptsData, isInpainting)
 
     // Update mask file in workflow if provided
     if (maskFilePath) {
@@ -244,15 +244,15 @@ export async function generateImage(options: GenerationOptions): Promise<{
 function configureWorkflow(
   workflow: ComfyUIWorkflow,
   promptsData: PromptsData,
-  settings: Settings
+  settings: Settings,
+  isInpainting: boolean = false
 ) {
   // Set checkpoint
   if (promptsData.selectedCheckpoint) {
     workflow['11'].inputs.ckpt_name = promptsData.selectedCheckpoint
   }
 
-  // Check if this is an inpainting workflow (has SetLatentNoiseMask node)
-  if (workflow['5'] && workflow['5'].class_type === 'SetLatentNoiseMask') {
+  if (isInpainting) {
     // Inpainting workflow configuration
     workflow['10'].inputs.steps = settings.steps
     workflow['10'].inputs.cfg = settings.cfgScale
@@ -282,12 +282,11 @@ function configureWorkflow(
   }
 }
 
-function applySeedsToWorkflow(workflow: ComfyUIWorkflow, providedSeed?: number | null): number {
+function applySeedsToWorkflow(workflow: ComfyUIWorkflow, providedSeed?: number | null, isInpainting: boolean = false): number {
   // Use provided seed or generate a new random seed
   const seed = providedSeed ?? Math.floor(Math.random() * 10000000000000000)
 
-  // Check if this is an inpainting workflow (has SetLatentNoiseMask node)
-  if (workflow['5'] && workflow['5'].class_type === 'SetLatentNoiseMask') {
+  if (isInpainting) {
     // Inpainting workflow - set seed for KSampler node
     workflow['10'].inputs.seed = seed
   } else {
@@ -309,9 +308,8 @@ function applySeedsToWorkflow(workflow: ComfyUIWorkflow, providedSeed?: number |
   return seed
 }
 
-function addSaveImageWebsocketNode(workflow: ComfyUIWorkflow, promptsData: PromptsData) {
-  // Check if this is an inpainting workflow (has SetLatentNoiseMask node)
-  if (workflow['5'] && workflow['5'].class_type === 'SetLatentNoiseMask') {
+function addSaveImageWebsocketNode(workflow: ComfyUIWorkflow, promptsData: PromptsData, isInpainting: boolean = false) {
+  if (isInpainting) {
     // Inpainting workflow - output from VAE Decode
     workflow[FINAL_SAVE_NODE_ID] = {
       inputs: { images: ['19', 0] },
