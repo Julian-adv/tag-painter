@@ -2,7 +2,6 @@
 import { writable } from 'svelte/store'
 import type { PromptsData, PromptCategory, OptionItem, TagType } from '$lib/types'
 import { savePrompts, loadPrompts } from '../utils/fileIO'
-import { updateCombinedTags } from './tagsStore'
 
 // Minimal default data for initial store state
 const defaultPromptsData: PromptsData = {
@@ -42,9 +41,6 @@ export async function initializePromptsStore() {
     // If API fails, at least we have an empty structure
     console.warn('Failed to load prompts from API')
   }
-
-  // Update combined tags after prompts data is loaded
-  await updateCombinedTags()
 }
 
 // Save prompts to file
@@ -160,9 +156,6 @@ export async function saveCustomTag(name: string, tags: string[], type: TagType 
 
   // Save to API immediately
   await savePrompts(updatedData!)
-
-  // Update combined tags to notify all subscribers
-  await updateCombinedTags()
 }
 
 export function reorderCategories(fromIndex: number, toIndex: number) {
