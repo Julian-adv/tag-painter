@@ -153,7 +153,9 @@
         : `Edit custom tag ${tag.name}`}
     >
       <span class="font-medium">{displayParts.name}</span>
-      {#if isForceOverridden}
+      {#if isTestSelected}
+        <LockClosed class="w-3 h-3 text-white ml-1" />
+      {:else if isForceOverridden}
         <LockClosed class="w-3 h-3 text-orange-500 ml-1" />
       {/if}
       {#if displayParts.content}
@@ -167,7 +169,7 @@
     </button>
     <button
       type="button"
-      class={getTagRemoveButtonClasses(tag)}
+      class={getTagRemoveButtonClasses(tag, isTestSelected)}
       tabindex="-1"
       onclick={() => onRemove(tag.name)}
       aria-label="Remove {tag.name}"

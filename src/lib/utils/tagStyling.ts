@@ -99,9 +99,21 @@ export function getTagClasses(options: TagStyleOptions): string {
     classes += ' opacity-50 scale-95'
   }
 
-  // Test selection styling - thick blue border
+  // Test selection styling - inverted colors based on tag type
   if (testSelected) {
-    classes += ' ring-3 ring-blue-500 ring-opacity-75'
+    switch (type) {
+      case 'random':
+      case 'sequential':
+        classes += ' bg-purple-600 text-white border-purple-600'
+        break
+      case 'consistent-random':
+        classes += ' bg-orange-600 text-white border-orange-600'
+        break
+      case 'regular':
+      default:
+        classes += ' bg-sky-600 text-white border-sky-600'
+        break
+    }
   }
 
   classes += ' cursor-move hover:shadow-md'
@@ -117,9 +129,13 @@ export function getTagClasses(options: TagStyleOptions): string {
 /**
  * Get remove button styling for tag items
  */
-export function getTagRemoveButtonClasses(tag: string | CustomTag): string {
+export function getTagRemoveButtonClasses(tag: string | CustomTag, testSelected = false): string {
   const type = getTagType(tag)
   const baseClasses = 'rounded-full w-4 h-4 inline-flex items-center justify-center'
+
+  if (testSelected) {
+    return `${baseClasses} text-white hover:text-gray-200 hover:bg-white hover:bg-opacity-20`
+  }
 
   switch (type) {
     case 'random':
