@@ -10,7 +10,7 @@
     id: string
     label: string
     tags: CustomTag[]
-    onTagsChange?: () => void
+    onTagsChange?: (removedTagName?: string) => void
     onCustomTagDoubleClick?: (tagName: string) => void
     currentRandomTagResolutions?: Record<string, string>
     testOverrideTag?: string

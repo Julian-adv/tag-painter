@@ -284,7 +284,7 @@
         ) as HTMLElement
         if (tagButton) {
           tagButton.scrollIntoView({
-            behavior: 'smooth',
+            behavior: 'instant',
             block: 'center'
           })
         }
@@ -355,7 +355,15 @@
     hasUnsavedChanges = false
   }
 
-  function handleTagsChange() {
+  function handleTagsChange(removedTagName?: string) {
+    // If a tag was removed and it's currently pinned for this parent tag, remove the pin
+    if (removedTagName && selectedTagName && (selectedTagType === 'random' || selectedTagType === 'consistent-random')) {
+      const currentOverrideTag = testModeStore[selectedTagName]?.overrideTag
+      if (currentOverrideTag === removedTagName) {
+        removeTestModeOverride(selectedTagName)
+      }
+    }
+    
     // Mark as having unsaved changes
     hasUnsavedChanges = true
     statusMessage = ''
@@ -767,15 +775,6 @@
               />
             </div>
 
-            <!-- Help text for right-click pin functionality -->
-            {#if selectedTagType === 'random' || selectedTagType === 'consistent-random'}
-              <div class="border-t pt-3 mt-3 border-gray-300">
-                <div class="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                  <strong>Tip:</strong> Right-click on tags in the display area to pin specific options
-                  for testing.
-                </div>
-              </div>
-            {/if}
           {:else}
             <div class="flex-1 flex items-center justify-center">
               <p class="text-gray-400 text-sm italic">Select a custom tag to edit</p>
@@ -791,6 +790,10 @@
             <span class="text-red-600">{statusMessage}</span>
           {:else if hasUnsavedChanges}
             <span class="text-orange-600">Unsaved changes</span>
+          {:else if selectedTagName && (selectedTagType === 'random' || selectedTagType === 'consistent-random')}
+            <span class="text-gray-500">
+              <strong>Tip:</strong> Right-click on tags in the display area to pin specific options for testing.
+            </span>
           {/if}
         </div>
         <div class="flex gap-3">

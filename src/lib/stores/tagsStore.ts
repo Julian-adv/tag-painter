@@ -5,8 +5,6 @@ import { get, writable } from 'svelte/store'
 let tags: string[] = []
 export const combinedTags = writable<string[]>([])
 let initPromise: Promise<void> | null = null
-let promptsDataUnsubscribe: (() => void) | null = null
-let lastCustomTagsCount = 0
 
 export async function initTags(): Promise<void> {
   // Return cached tags if already loaded
@@ -26,20 +24,6 @@ export async function initTags(): Promise<void> {
       const response = await fetch('/api/tags')
       tags = await response.json()
       updateCombinedTags()
-
-      // Set up promptsData subscription after initialization
-      if (!promptsDataUnsubscribe) {
-        promptsDataUnsubscribe = promptsData.subscribe((data) => {
-          // Only update if tags have been initialized and customTags count changed
-          if (tags.length > 0) {
-            const currentCustomTagsCount = Object.keys(data.customTags).length
-            if (currentCustomTagsCount !== lastCustomTagsCount) {
-              lastCustomTagsCount = currentCustomTagsCount
-              updateCombinedTags()
-            }
-          }
-        })
-      }
     } catch (error) {
       console.error('Failed to load tags:', error)
       updateCombinedTags()
@@ -51,7 +35,7 @@ export async function initTags(): Promise<void> {
   return initPromise
 }
 
-function updateCombinedTags(): string[] {
+export function updateCombinedTags(): string[] {
   // Build combined tags
   const currentPromptsData = get(promptsData)
   const customTagNames = Object.keys(currentPromptsData.customTags)

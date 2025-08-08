@@ -84,7 +84,9 @@
       return
     }
 
-    suggestions = $combinedTags.filter((tag) => tag.toLowerCase().includes(word.toLowerCase())).slice(0, 100)
+    suggestions = $combinedTags
+      .filter((tag) => tag.toLowerCase().includes(word.toLowerCase()))
+      .slice(0, 100)
 
     showSuggestions = suggestions.length > 0
     selectedSuggestionIndex = -1
@@ -93,7 +95,7 @@
     if (showSuggestions) {
       const lastSelected = lastSelectedSuggestions.get(word.toLowerCase())
       if (lastSelected) {
-        const index = suggestions.findIndex(suggestion => suggestion === lastSelected)
+        const index = suggestions.findIndex((suggestion) => suggestion === lastSelected)
         if (index !== -1) {
           selectedSuggestionIndex = index
           // Scroll to show the selected suggestion
@@ -185,14 +187,16 @@
 
   function scrollSelectedIntoView() {
     if (selectedSuggestionIndex < 0) return
-    
+
     // Use a small delay to ensure DOM is updated
     setTimeout(() => {
-      const suggestionElement = document.querySelector(`[data-suggestion-index="${selectedSuggestionIndex}"]`)
+      const suggestionElement = document.querySelector(
+        `[data-suggestion-index="${selectedSuggestionIndex}"]`
+      )
       if (suggestionElement) {
         suggestionElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest'
+          behavior: 'instant',
+          block: 'center'
         })
       }
     }, 0)
@@ -257,12 +261,22 @@
           event.preventDefault()
           insertSuggestion(suggestions[selectedSuggestionIndex])
           return
+        } else if (showSuggestions) {
+          // Close suggestions if no suggestion is selected
+          event.preventDefault()
+          event.stopPropagation() // Prevent event bubbling
+          showSuggestions = false
+          selectedSuggestionIndex = -1
+          return
         }
       } else if (event.key === 'Escape') {
-        event.preventDefault()
-        showSuggestions = false
-        selectedSuggestionIndex = -1
-        return
+        if (showSuggestions) {
+          event.preventDefault()
+          event.stopPropagation() // Prevent modal from closing
+          showSuggestions = false
+          selectedSuggestionIndex = -1
+          return
+        }
       }
     }
 

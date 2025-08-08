@@ -12,7 +12,7 @@
   interface Props {
     id: string
     tags: CustomTag[]
-    onTagsChange?: () => void
+    onTagsChange?: (removedTagName?: string) => void
     onCustomTagDoubleClick?: (tagName: string) => void
     currentRandomTagResolutions?: Record<string, string>
     testOverrideTag?: string
@@ -53,7 +53,7 @@
 
   function removeTag(tagNameToRemove: string) {
     tags = tags.filter((tag) => tag.name !== tagNameToRemove)
-    onTagsChange?.()
+    onTagsChange?.(tagNameToRemove)
   }
 
   function handleRightClick(event: MouseEvent, tagIndex: number) {

@@ -2,6 +2,7 @@
 import { writable } from 'svelte/store'
 import type { PromptsData, PromptCategory, OptionItem, TagType } from '$lib/types'
 import { savePrompts, loadPrompts } from '../utils/fileIO'
+import { updateCombinedTags } from './tagsStore'
 
 // Minimal default data for initial store state
 const defaultPromptsData: PromptsData = {
@@ -47,6 +48,10 @@ export async function initializePromptsStore() {
 export async function savePromptsData() {
   let currentData: PromptsData
   promptsData.subscribe((data) => (currentData = data))()
+  
+  // Update combined tags before saving prompts data for immediate UI feedback
+  updateCombinedTags()
+  
   await savePrompts(currentData!)
 }
 
