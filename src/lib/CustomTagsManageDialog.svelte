@@ -6,7 +6,6 @@
   import {
     testModeStore,
     setTestModeOverride,
-    setTagTestMode,
     removeTestModeOverride
   } from './stores/testModeStore.svelte'
   import { get } from 'svelte/store'
@@ -398,16 +397,11 @@
     await addNewTag(tagsToAdd)
   }
 
-  function handleTagClick(tagName: string) {
-    // If test mode is enabled and the current tag is random/consistent-random
-    if (
-      selectedTagTestMode.enabled &&
-      (selectedTagType === 'random' || selectedTagType === 'consistent-random')
-    ) {
-      statusMessage = `Test mode: "${selectedTagName}" will always expand to "${tagName}"`
-
-      // Set test mode override for this specific tag
-      setTestModeOverride(selectedTagName, tagName)
+  function handlePinToggle(childTagName: string, targetTag: string, shouldPin: boolean) {
+    if (shouldPin) {
+      setTestModeOverride(selectedTagName, targetTag)
+    } else {
+      removeTestModeOverride(selectedTagName)
     }
   }
 
@@ -616,7 +610,7 @@
             <div class="space-y-1">
               {#each Object.keys(customTags) as tagName, index (tagName)}
                 {@const tag = customTags[tagName]}
-                {@const isTestModeEnabled = testModeStore[tagName]?.enabled ?? false}
+                {@const isForceOverridden = !!testModeStore[tagName]?.overrideTag}
                 <div class="relative">
                   <!-- Drop indicator before this tag -->
                   {#if dropPosition === index && draggedTagName !== null}
@@ -645,8 +639,8 @@
                   >
                     <div class="flex items-center justify-between w-full">
                       <span>{tagName}</span>
-                      {#if isTestModeEnabled && (tag.type === 'random' || tag.type === 'consistent-random')}
-                        <LockClosed class="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      {#if isForceOverridden && (tag.type === 'random' || tag.type === 'consistent-random')}
+                        <LockClosed class="w-4 h-4 text-orange-500 flex-shrink-0" />
                       {/if}
                     </div>
                   </button>
@@ -767,32 +761,19 @@
                 bind:tags={selectedTagContent}
                 onTagsChange={handleTagsChange}
                 onCustomTagDoubleClick={handleCustomTagDoubleClick}
-                onTagClick={handleTagClick}
                 testOverrideTag={selectedTagTestMode.enabled ? selectedTagTestMode.overrideTag : ''}
+                parentTagType={selectedTagType}
+                onPinToggle={handlePinToggle}
               />
             </div>
 
-            <!-- Test Mode -->
+            <!-- Help text for right-click pin functionality -->
             {#if selectedTagType === 'random' || selectedTagType === 'consistent-random'}
               <div class="border-t pt-3 mt-3 border-gray-300">
-                <label class="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedTagTestMode.enabled}
-                    onchange={() => {
-                      const newState = !selectedTagTestMode.enabled
-                      setTagTestMode(selectedTagName, newState)
-                      if (!newState) {
-                        statusMessage = ''
-                        removeTestModeOverride(selectedTagName)
-                      } else {
-                        statusMessage = 'Choose a tag to force this value'
-                      }
-                    }}
-                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:outline-none"
-                  />
-                  <span class="text-gray-700 text-sm">Force Override</span>
-                </label>
+                <div class="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                  <strong>Tip:</strong> Right-click on tags in the display area to pin specific options
+                  for testing.
+                </div>
               </div>
             {/if}
           {:else}

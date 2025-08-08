@@ -12,10 +12,11 @@
     tags: CustomTag[]
     onTagsChange?: () => void
     onCustomTagDoubleClick?: (tagName: string) => void
-    onTagClick?: (tagName: string) => void
     currentRandomTagResolutions?: Record<string, string>
     testOverrideTag?: string
     disabled?: boolean
+    parentTagType?: string // Add parent tag type for context menu logic
+    onPinToggle?: (tagName: string, targetTag: string, shouldPin: boolean) => void
   }
 
   let {
@@ -24,10 +25,11 @@
     tags = $bindable(),
     onTagsChange,
     onCustomTagDoubleClick,
-    onTagClick,
     currentRandomTagResolutions = {},
     testOverrideTag = '',
-    disabled = false
+    disabled = false,
+    parentTagType = '',
+    onPinToggle
   }: Props = $props()
 
   let quickTagInput = $state('')
@@ -74,10 +76,11 @@
     bind:tags
     {onTagsChange}
     {onCustomTagDoubleClick}
-    {onTagClick}
     {currentRandomTagResolutions}
     {testOverrideTag}
     {disabled}
+    {parentTagType}
+    {onPinToggle}
   />
 
   <!-- Quick tag input with autocomplete -->

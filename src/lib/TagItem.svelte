@@ -15,8 +15,8 @@
     disabled?: boolean
     onRemove: (tagName: string) => void
     onCustomTagDoubleClick?: (tagName: string) => void
-    onTagClick?: (tagName: string) => void
     onWeightChange?: () => void
+    onRightClick: (event: MouseEvent, index: number) => void
     onDragStart: (event: DragEvent, index: number) => void
     onDragEnd: (event: DragEvent) => void
     onDragOver: (event: DragEvent, index: number) => void
@@ -35,8 +35,8 @@
     disabled = false,
     onRemove,
     onCustomTagDoubleClick,
-    onTagClick,
     onWeightChange,
+    onRightClick,
     onDragStart,
     onDragEnd,
     onDragOver,
@@ -50,12 +50,6 @@
     }
   }
 
-  function handleTagClick() {
-    if (onTagClick) {
-      onTagClick(tag.name)
-    }
-  }
-
   function handleTagKeydown(event: KeyboardEvent) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -66,7 +60,7 @@
   function handleWheel(event: WheelEvent) {
     // Don't handle weight adjustment if disabled
     if (disabled) return
-    
+
     // Only handle weight adjustment when Ctrl key is pressed
     if (!event.ctrlKey) {
       return // Let the normal scroll behavior happen
@@ -86,6 +80,10 @@
 
     // Notify parent of weight change
     onWeightChange?.()
+  }
+
+  function handleRightClick(event: MouseEvent) {
+    onRightClick(event, index)
   }
 
   let displayParts = $derived.by(() => {
@@ -128,9 +126,10 @@
     ondragleave={onDragLeave}
     ondrop={onDrop}
     onwheel={handleWheel}
+    oncontextmenu={handleRightClick}
     role="button"
     tabindex="-1"
-    aria-label="Drag to reorder tag: {tag.name}. Ctrl+Scroll to adjust weight."
+    aria-label="Drag to reorder tag: {tag.name}. Ctrl+Scroll to adjust weight. Right-click for options."
     class="inline-flex items-center gap-1 {getTagClasses({
       tag,
       dragged: draggedIndex === index,
@@ -142,15 +141,15 @@
       type="button"
       class="text-left cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit focus:outline-none flex items-center"
       tabindex="-1"
-      onclick={handleTagClick}
       ondblclick={handleTagDoubleClick}
       onkeydown={handleTagKeydown}
+      oncontextmenu={handleRightClick}
       title={tag.type === 'regular'
         ? `Double-click to create custom tag from: ${tag.name}`
-        : `Double-click to edit ${tag.name}`}
+        : `Double-click to edit ${tag.name}. Right-click for options.`}
       aria-label={tag.type === 'regular'
         ? `Create custom tag from ${tag.name}`
-        : `Edit custom tag ${tag.name}`}
+        : `Edit custom tag ${tag.name}. Right-click for options.`}
     >
       <span class="font-medium">{displayParts.name}</span>
       {#if isTestSelected}
