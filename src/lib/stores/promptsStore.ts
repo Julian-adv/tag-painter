@@ -48,10 +48,10 @@ export async function initializePromptsStore() {
 export async function savePromptsData() {
   let currentData: PromptsData
   promptsData.subscribe((data) => (currentData = data))()
-  
+
   // Update combined tags before saving prompts data for immediate UI feedback
   updateCombinedTags()
-  
+
   await savePrompts(currentData!)
 }
 

@@ -30,7 +30,7 @@ describe('TagDisplay', () => {
   it('should render empty state when no tags', () => {
     component = mount(TagDisplay, {
       target: container,
-      props: { 
+      props: {
         id: 'test-display',
         tags: []
       }
@@ -44,7 +44,7 @@ describe('TagDisplay', () => {
   it('should render tags when provided', () => {
     component = mount(TagDisplay, {
       target: container,
-      props: { 
+      props: {
         id: 'test-display',
         tags: mockTags
       }
@@ -60,7 +60,7 @@ describe('TagDisplay', () => {
   it('should have proper accessibility attributes', () => {
     component = mount(TagDisplay, {
       target: container,
-      props: { 
+      props: {
         id: 'test-display',
         tags: mockTags
       }
@@ -75,7 +75,7 @@ describe('TagDisplay', () => {
   it('should apply correct CSS classes', () => {
     component = mount(TagDisplay, {
       target: container,
-      props: { 
+      props: {
         id: 'test-display',
         tags: mockTags
       }
@@ -91,7 +91,7 @@ describe('TagDisplay', () => {
   it('should handle keyboard events', () => {
     component = mount(TagDisplay, {
       target: container,
-      props: { 
+      props: {
         id: 'test-display',
         tags: mockTags
       }
@@ -99,11 +99,11 @@ describe('TagDisplay', () => {
 
     flushSync()
     const textbox = container.querySelector('[role="textbox"]') as HTMLElement
-    
+
     // Simulate Tab key press
     textbox.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
     flushSync()
-    
+
     // Should still have classes, meaning no error occurred
     expect(textbox?.className).toContain('w-full')
   })
@@ -115,12 +115,12 @@ describe('TagDisplay', () => {
       onTagClick: vi.fn()
     }
 
-    const mockResolutions = { 'tag2': 'resolved-value' }
+    const mockResolutions = { tag2: 'resolved-value' }
     const testOverride = 'test-override'
 
     component = mount(TagDisplay, {
       target: container,
-      props: { 
+      props: {
         id: 'test-display',
         tags: mockTags,
         currentRandomTagResolutions: mockResolutions,

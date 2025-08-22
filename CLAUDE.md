@@ -217,6 +217,7 @@ npm run test:ui
 ## TODO / Future Features
 
 ### High Priority
+
 - **Mask-based Inpainting**: Implement full inpainting workflow using user-drawn masks
   - Integrate mask data with ComfyUI inpainting nodes
   - Add inpainting-specific workflow configuration
@@ -224,6 +225,7 @@ npm run test:ui
   - Implement mask refinement and preprocessing options
 
 ### Medium Priority
+
 - **ComfyUI Portable Auto-Installation**: Automatic setup of ComfyUI environment
   - Download and install ComfyUI Portable automatically
   - Configure required nodes and extensions
@@ -231,6 +233,7 @@ npm run test:ui
   - Provide installation progress feedback and error handling
 
 ### Enhancement Features
+
 - **Smart Random Tag Constraints**: Advanced random tag relationship management
   - Implement tag exclusion rules (when tag A is selected, prevent tag B/C/D)
   - Add tag dependency relationships (tag A requires tag B)
@@ -238,6 +241,7 @@ npm run test:ui
   - Provide UI for managing tag relationships and constraints
 
 ### Low Priority
+
 - **Additional Drawing Tools**: Expand mask creation capabilities
   - Add eraser tool for mask editing
   - Implement selection tools (rectangle, lasso)
@@ -257,6 +261,7 @@ npm run test:ui
   - Real-time workflow validation
 
 ### Performance & Quality of Life
+
 - **Improved Error Handling**: Better user feedback and recovery
   - Detailed error messages with solutions
   - Automatic retry mechanisms

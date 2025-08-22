@@ -114,7 +114,13 @@ describe('fileIO utilities', () => {
         json: () => Promise.resolve({ filePath: expectedFilePath })
       })
 
-      const result = await saveImage(mockImageBlob, mockPrompts, mockOutputDirectory, mockWorkflow, mockSeed)
+      const result = await saveImage(
+        mockImageBlob,
+        mockPrompts,
+        mockOutputDirectory,
+        mockWorkflow,
+        mockSeed
+      )
 
       expect(mockFetch).toHaveBeenCalledWith('/api/image', {
         method: 'POST',

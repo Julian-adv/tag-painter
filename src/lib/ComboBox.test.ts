@@ -78,7 +78,7 @@ describe('ComboBox', () => {
 
     flushSync()
     const input = container.querySelector('input') as HTMLInputElement
-    
+
     // Simulate typing 'two' to filter
     input.value = 'two'
     input.dispatchEvent(new Event('input', { bubbles: true }))
@@ -104,12 +104,12 @@ describe('ComboBox', () => {
 
     flushSync()
     const input = container.querySelector('input') as HTMLInputElement
-    
+
     // Simulate focus and ArrowDown key
     input.focus()
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
     flushSync()
-    
+
     // Simulate Enter key to select
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     flushSync()
@@ -170,18 +170,18 @@ describe('ComboBox', () => {
 
     flushSync()
     const input = container.querySelector('input') as HTMLInputElement
-    
+
     // Open dropdown
     input.click()
     flushSync()
-    
+
     // Verify dropdown is open
     expect(container.textContent).toContain('Option One')
-    
+
     // Simulate Escape key
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     flushSync()
-    
+
     // Verify dropdown is closed (options should not be visible)
     const hasOptionsVisible = container.querySelectorAll('button').length > 0
     expect(hasOptionsVisible).toBe(false)
@@ -218,7 +218,7 @@ describe('ComboBox', () => {
 
     flushSync()
     const input = container.querySelector('input') as HTMLInputElement
-    
+
     // Clear and type uppercase
     input.value = 'OPTION'
     input.dispatchEvent(new Event('input', { bubbles: true }))

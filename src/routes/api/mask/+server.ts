@@ -6,7 +6,7 @@ import type { RequestHandler } from './$types'
 export const POST: RequestHandler = async ({ request }) => {
   try {
     const { maskData } = await request.json()
-    
+
     if (!maskData || typeof maskData !== 'string') {
       return json({ error: 'Invalid mask data' }, { status: 400 })
     }
@@ -22,11 +22,11 @@ export const POST: RequestHandler = async ({ request }) => {
     // Convert base64 to buffer and save
     const base64Data = maskData.replace(/^data:image\/png;base64,/, '')
     const buffer = Buffer.from(base64Data, 'base64')
-    
+
     await writeFile(filepath, buffer)
 
-    return json({ 
-      success: true, 
+    return json({
+      success: true,
       filename,
       filepath: filepath.replace(/\\/g, '/')
     })

@@ -80,22 +80,25 @@ describe('comfyui utilities', () => {
       const mockCheckpoints = ['model1.safetensors', 'model2.ckpt', 'model3.safetensors']
       const mockResponse = {
         ok: true,
-        json: () => Promise.resolve({
-          CheckpointLoaderSimple: {
-            input: {
-              required: {
-                ckpt_name: [mockCheckpoints]
+        json: () =>
+          Promise.resolve({
+            CheckpointLoaderSimple: {
+              input: {
+                required: {
+                  ckpt_name: [mockCheckpoints]
+                }
               }
             }
-          }
-        })
+          })
       }
-      
+
       mockFetch.mockResolvedValueOnce(mockResponse)
 
       const result = await fetchCheckpoints()
 
-      expect(mockFetch).toHaveBeenCalledWith('http://127.0.0.1:8188/object_info/CheckpointLoaderSimple')
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://127.0.0.1:8188/object_info/CheckpointLoaderSimple'
+      )
       expect(result).toEqual(mockCheckpoints)
     })
 
@@ -104,7 +107,7 @@ describe('comfyui utilities', () => {
         ok: false,
         status: 500
       }
-      
+
       mockFetch.mockResolvedValueOnce(mockResponse)
 
       const result = await fetchCheckpoints()
@@ -115,11 +118,12 @@ describe('comfyui utilities', () => {
     it('should return empty array when API response has unexpected structure', async () => {
       const mockResponse = {
         ok: true,
-        json: () => Promise.resolve({
-          unexpected: 'structure'
-        })
+        json: () =>
+          Promise.resolve({
+            unexpected: 'structure'
+          })
       }
-      
+
       mockFetch.mockResolvedValueOnce(mockResponse)
 
       const result = await fetchCheckpoints()
@@ -138,15 +142,16 @@ describe('comfyui utilities', () => {
     it('should return empty array when response is missing required fields', async () => {
       const mockResponse = {
         ok: true,
-        json: () => Promise.resolve({
-          CheckpointLoaderSimple: {
-            input: {
-              // missing required field
+        json: () =>
+          Promise.resolve({
+            CheckpointLoaderSimple: {
+              input: {
+                // missing required field
+              }
             }
-          }
-        })
+          })
       }
-      
+
       mockFetch.mockResolvedValueOnce(mockResponse)
 
       const result = await fetchCheckpoints()
@@ -181,7 +186,9 @@ describe('comfyui utilities', () => {
       connectWebSocket(promptId, clientId, finalSaveNodeId, mockWorkflow, mockCallbacks)
 
       // Check that WebSocket was created with correct URL
-      expect(mockWebSocketConstructor).toHaveBeenCalledWith(`ws://127.0.0.1:8188/ws?clientId=${clientId}`)
+      expect(mockWebSocketConstructor).toHaveBeenCalledWith(
+        `ws://127.0.0.1:8188/ws?clientId=${clientId}`
+      )
     })
 
     it('should set correct binaryType on WebSocket', () => {
@@ -207,7 +214,9 @@ describe('comfyui utilities', () => {
         connectWebSocket(promptId, clientId, finalSaveNodeId, mockWorkflow, mockCallbacks)
       }).not.toThrow()
 
-      expect(mockWebSocketConstructor).toHaveBeenCalledWith(`ws://127.0.0.1:8188/ws?clientId=${clientId}`)
+      expect(mockWebSocketConstructor).toHaveBeenCalledWith(
+        `ws://127.0.0.1:8188/ws?clientId=${clientId}`
+      )
     })
 
     it('should handle workflow with missing titles', () => {

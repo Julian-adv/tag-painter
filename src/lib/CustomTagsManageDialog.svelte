@@ -1,6 +1,7 @@
 <!-- Dialog component for managing all custom tags -->
 <script lang="ts">
   import TagInput from './TagInput.svelte'
+  import TreeView from './TreeView.svelte'
   import { promptsData, saveCustomTag, savePromptsData } from './stores/promptsStore'
   import { combinedTags } from './stores/tagsStore'
   import {
@@ -28,10 +29,6 @@
   let hasUnsavedChanges = $state(false)
   let editingTagName = $state<string>('')
   let statusMessage = $state<string>('')
-
-  // Drag & drop state
-  let draggedTagName = $state<string | null>(null)
-  let dropPosition = $state<number | null>(null)
 
   // Get test mode state for the currently selected tag
   const selectedTagTestMode = $derived.by(() => {
@@ -67,6 +64,7 @@
     })
   }
 
+
   // Update custom tags when dialog opens
   $effect(() => {
     if (isOpen) {
@@ -78,15 +76,14 @@
 
   function initializeSelectedTag() {
     untrack(() => {
-      const tagNames = Object.keys(customTags)
       let tagToSelect = ''
 
       // If initialSelectedTag is provided and exists, use it
       if (initialSelectedTag && initialSelectedTag in customTags) {
         tagToSelect = initialSelectedTag
-      } else if (tagNames.length > 0) {
+      } else if (Object.keys(customTags).length > 0) {
         // Otherwise, select the first available tag
-        tagToSelect = tagNames[0]
+        tagToSelect = Object.keys(customTags)[0]
       }
 
       if (tagToSelect && (!selectedTagName || selectedTagName !== tagToSelect)) {
@@ -124,6 +121,27 @@
     if (!selectedTagName) return
 
     if (confirm(`Are you sure you want to delete the custom tag "${selectedTagName}"?`)) {
+      const tagToDelete = customTags[selectedTagName]
+      
+      // Handle parent-child relationships when deleting
+      if (tagToDelete.parentId) {
+        // Remove this tag from its parent's children list
+        const parent = customTags[tagToDelete.parentId]
+        if (parent && parent.children) {
+          parent.children = parent.children.filter(id => id !== selectedTagName)
+        }
+      }
+      
+      if (tagToDelete.children) {
+        // Make children orphans (remove their parent reference)
+        tagToDelete.children.forEach(childId => {
+          const child = customTags[childId]
+          if (child) {
+            delete child.parentId
+          }
+        })
+      }
+      
       // Remove from local state
       delete customTags[selectedTagName]
       customTags = { ...customTags }
@@ -509,45 +527,15 @@
     statusMessage = ''
   }
 
-  function handleBackdropClick(event: MouseEvent) {
-    if (event.target === event.currentTarget) {
-      handleClose()
-    }
+  // TreeView callback functions
+  function handleTreeSelect(tagName: string) {
+    selectTag(tagName)
   }
 
-  // Drag & drop handlers
-  function handleDragStart(event: DragEvent, tagName: string) {
-    draggedTagName = tagName
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move'
-      event.dataTransfer.setData('text/plain', tagName)
-    }
-  }
-
-  function handleDragEnd() {
-    draggedTagName = null
-    dropPosition = null
-  }
-
-  function handleDragOver(event: DragEvent, index: number) {
-    event.preventDefault()
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = 'move'
-    }
-    dropPosition = index
-  }
-
-  function handleDragLeave() {
-    dropPosition = null
-  }
-
-  async function handleDrop(event: DragEvent) {
-    event.preventDefault()
-
-    if (!draggedTagName || dropPosition === null) return
-
-    const tagNames = Object.keys(customTags)
-    const draggedIndex = tagNames.indexOf(draggedTagName)
+  function handleTreeReorder(draggedTagName: string, dropPosition: number) {
+    // Get the current order from Object.keys
+    const currentOrder = Object.keys(customTags)
+    const draggedIndex = currentOrder.indexOf(draggedTagName)
 
     if (draggedIndex === -1) return
 
@@ -558,24 +546,94 @@
     }
 
     // Create new order
-    const newTagNames = [...tagNames]
-    const [draggedTag] = newTagNames.splice(draggedIndex, 1)
-    newTagNames.splice(insertIndex, 0, draggedTag)
+    const newOrder = [...currentOrder]
+    const [draggedTag] = newOrder.splice(draggedIndex, 1)
+    newOrder.splice(insertIndex, 0, draggedTag)
 
     // Rebuild customTags object in new order
     const newCustomTags: Record<string, CustomTag> = {}
-    for (const tagName of newTagNames) {
+    for (const tagName of newOrder) {
       newCustomTags[tagName] = customTags[tagName]
     }
 
     customTags = newCustomTags
-
-    // Mark as having unsaved changes
     hasUnsavedChanges = true
-
-    draggedTagName = null
-    dropPosition = null
   }
+
+  function handleTreeMakeChild(childTagName: string, parentTagName: string) {
+    if (childTagName === parentTagName) return // Can't make a tag child of itself
+    
+    // Prevent circular dependencies
+    if (isDescendant(parentTagName, childTagName)) return
+    
+    const childTag = customTags[childTagName]
+    const parentTag = customTags[parentTagName]
+    
+    if (!childTag || !parentTag) return
+    
+    // Remove child from its current parent if it has one
+    if (childTag.parentId) {
+      const oldParent = customTags[childTag.parentId]
+      if (oldParent && oldParent.children) {
+        oldParent.children = oldParent.children.filter(id => id !== childTagName)
+      }
+    }
+    
+    // Set new parent-child relationship
+    childTag.parentId = parentTagName
+    if (!parentTag.children) {
+      parentTag.children = []
+    }
+    if (!parentTag.children.includes(childTagName)) {
+      parentTag.children.push(childTagName)
+    }
+    
+    customTags = { ...customTags }
+    hasUnsavedChanges = true
+  }
+
+  function isDescendant(ancestorId: string, descendantId: string): boolean {
+    const tag = customTags[descendantId]
+    if (!tag || !tag.children) return false
+    
+    return tag.children.includes(ancestorId) || 
+           tag.children.some(childId => isDescendant(ancestorId, childId))
+  }
+
+  function getTagDisplayText(tag: unknown): string {
+    return (tag as CustomTag).name
+  }
+
+  function getTagItemClasses(tag: unknown, selected: boolean, dragged: boolean): string {
+    return getTagClasses({
+      tag: tag as CustomTag,
+      selected: selected,
+      dragged: dragged,
+      additionalClasses: 'cursor-move py-1.5 pr-3'
+    })
+  }
+
+  function getTagIndicators(tag: unknown) {
+    const customTag = tag as CustomTag
+    const indicators = []
+    const isForceOverridden = !!testModeStore[customTag.name]?.overrideTag
+    
+    if (isForceOverridden && (customTag.type === 'random' || customTag.type === 'consistent-random')) {
+      indicators.push({
+        icon: LockClosed,
+        classes: 'text-orange-500 flex-shrink-0'
+      })
+    }
+    
+    return indicators
+  }
+
+  function handleBackdropClick(event: MouseEvent) {
+    if (event.target === event.currentTarget) {
+      handleClose()
+    }
+  }
+
 </script>
 
 {#if isOpen}
@@ -615,56 +673,17 @@
         <!-- Left column: Custom tags list -->
         <div class="w-1/3 border-r border-gray-300 flex flex-col">
           <div class="flex-1 p-4 overflow-y-auto" bind:this={leftColumnElement}>
-            <div class="space-y-1">
-              {#each Object.keys(customTags) as tagName, index (tagName)}
-                {@const tag = customTags[tagName]}
-                {@const isForceOverridden = !!testModeStore[tagName]?.overrideTag}
-                <div class="relative">
-                  <!-- Drop indicator before this tag -->
-                  {#if dropPosition === index && draggedTagName !== null}
-                    <div
-                      class="absolute w-full h-0.5 bg-blue-500 z-10 -top-0.5 left-0 animate-pulse"
-                    ></div>
-                  {/if}
-
-                  <button
-                    type="button"
-                    draggable="true"
-                    class="w-full text-left {getTagClasses({
-                      tag: tag,
-                      selected: selectedTagName === tagName,
-                      dragged: draggedTagName === tagName,
-                      additionalClasses: 'pl-2 pr-3 py-1.5 cursor-move'
-                    })}"
-                    data-tag-name={tagName}
-                    onclick={() => selectTag(tagName)}
-                    ondragstart={(e) => handleDragStart(e, tagName)}
-                    ondragend={handleDragEnd}
-                    ondragover={(e) => handleDragOver(e, index)}
-                    ondragleave={handleDragLeave}
-                    ondrop={handleDrop}
-                    aria-label="Drag to reorder tag: {tagName}"
-                  >
-                    <div class="flex items-center justify-between w-full">
-                      <span>{tagName}</span>
-                      {#if isForceOverridden && (tag.type === 'random' || tag.type === 'consistent-random')}
-                        <LockClosed class="w-4 h-4 text-orange-500 flex-shrink-0" />
-                      {/if}
-                    </div>
-                  </button>
-
-                  <!-- Drop indicator after this tag (for last position) -->
-                  {#if dropPosition === index + 1 && draggedTagName !== null}
-                    <div
-                      class="absolute w-full h-0.5 bg-blue-500 z-10 -bottom-0.5 left-0 animate-pulse"
-                    ></div>
-                  {/if}
-                </div>
-              {/each}
-              {#if Object.keys(customTags).length === 0}
-                <p class="text-gray-400 text-sm italic">No custom tags available</p>
-              {/if}
-            </div>
+            <TreeView
+              items={customTags}
+              getDisplayText={getTagDisplayText}
+              getItemClasses={getTagItemClasses}
+              selectedId={selectedTagName}
+              onSelect={handleTreeSelect}
+              onReorder={handleTreeReorder}
+              onMakeChild={handleTreeMakeChild}
+              getIndicators={getTagIndicators}
+              levelIndent={20}
+            />
           </div>
         </div>
 

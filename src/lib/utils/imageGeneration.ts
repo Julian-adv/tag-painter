@@ -260,12 +260,12 @@ function configureWorkflow(
     workflow['10'].inputs.steps = settings.steps
     workflow['10'].inputs.cfg = settings.cfgScale
     workflow['10'].inputs.sampler_name = settings.sampler
-    
+
     // Apply custom denoise strength if provided, otherwise use default
     if (inpaintDenoiseStrength !== undefined) {
       workflow['10'].inputs.denoise = inpaintDenoiseStrength
     }
-    
+
     // For inpainting, image size is determined by input image, not by EmptyLatentImage
   } else {
     // Regular workflow configuration
@@ -291,14 +291,18 @@ function configureWorkflow(
   }
 }
 
-function applySeedsToWorkflow(workflow: ComfyUIWorkflow, providedSeed?: number | null, isInpainting: boolean = false): number {
+function applySeedsToWorkflow(
+  workflow: ComfyUIWorkflow,
+  providedSeed?: number | null,
+  isInpainting: boolean = false
+): number {
   // Use provided seed or generate a new random seed
   const seed = providedSeed ?? Math.floor(Math.random() * 10000000000000000)
 
   if (isInpainting) {
     // Inpainting workflow - set seed for KSampler node
     workflow['10'].inputs.seed = seed
-    
+
     // Set seed for FaceDetailer if it exists
     if (workflow['56']) {
       workflow['56'].inputs.seed = seed + 1
@@ -322,7 +326,11 @@ function applySeedsToWorkflow(workflow: ComfyUIWorkflow, providedSeed?: number |
   return seed
 }
 
-function addSaveImageWebsocketNode(workflow: ComfyUIWorkflow, promptsData: PromptsData, isInpainting: boolean = false) {
+function addSaveImageWebsocketNode(
+  workflow: ComfyUIWorkflow,
+  promptsData: PromptsData,
+  isInpainting: boolean = false
+) {
   if (isInpainting) {
     // Inpainting workflow - check if FaceDetailer should be used
     let imageSourceNodeId: string
@@ -333,7 +341,7 @@ function addSaveImageWebsocketNode(workflow: ComfyUIWorkflow, promptsData: Promp
       // Use VAE Decode output directly from LatentCompositeMasked
       imageSourceNodeId = '102'
     }
-    
+
     workflow[FINAL_SAVE_NODE_ID] = {
       inputs: { images: [imageSourceNodeId, 0] },
       class_type: 'SaveImageWebsocket',

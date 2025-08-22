@@ -183,7 +183,7 @@ export function expandCustomTags(
         )
         // Merge random tag resolutions from recursive call
         Object.assign(randomTagResolutions, recursiveResult.randomTagResolutions)
-        
+
         // Apply weight to the entire sequential tag result if it has a weight
         if (tagWeight) {
           const combinedExpansion = recursiveResult.expandedTags.join(', ')
