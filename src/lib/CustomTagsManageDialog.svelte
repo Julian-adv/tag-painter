@@ -39,11 +39,12 @@
     }
   })
 
-  // Reference to the left column scroll container
-  let leftColumnElement = $state<HTMLElement>()
 
   // Reference to the tag name input field
   let tagNameInputElement = $state<HTMLInputElement>()
+  
+  // Reference to the TreeView component
+  let treeViewComponent = $state<{ scrollToItem: (itemId: string) => void } | undefined>()
 
   // Convert string array to CustomTag array
   function convertToCustomTags(tagNames: string[]): CustomTag[] {
@@ -294,20 +295,9 @@
   }
 
   function scrollToTag(tagName: string) {
-    // Wait for the DOM to update, then scroll to the tag
-    setTimeout(() => {
-      if (leftColumnElement) {
-        const tagButton = leftColumnElement.querySelector(
-          `button[data-tag-name="${tagName}"]`
-        ) as HTMLElement
-        if (tagButton) {
-          tagButton.scrollIntoView({
-            behavior: 'instant',
-            block: 'center'
-          })
-        }
-      }
-    }, 50)
+    if (treeViewComponent && treeViewComponent.scrollToItem) {
+      treeViewComponent.scrollToItem(tagName)
+    }
   }
 
   function focusTagNameInput() {
@@ -604,14 +594,6 @@
     return (tag as CustomTag).name
   }
 
-  function getTagItemClasses(tag: unknown, selected: boolean, dragged: boolean): string {
-    return getTagClasses({
-      tag: tag as CustomTag,
-      selected: selected,
-      dragged: dragged,
-      additionalClasses: 'cursor-move py-1.5 pr-3'
-    })
-  }
 
   function getTagIndicators(tag: unknown) {
     const customTag = tag as CustomTag
@@ -671,20 +653,18 @@
       <!-- Content -->
       <div class="flex-1 flex min-h-0">
         <!-- Left column: Custom tags list -->
-        <div class="w-1/3 border-r border-gray-300 flex flex-col">
-          <div class="flex-1 p-4 overflow-y-auto" bind:this={leftColumnElement}>
-            <TreeView
-              items={customTags}
-              getDisplayText={getTagDisplayText}
-              getItemClasses={getTagItemClasses}
-              selectedId={selectedTagName}
-              onSelect={handleTreeSelect}
-              onReorder={handleTreeReorder}
-              onMakeChild={handleTreeMakeChild}
-              getIndicators={getTagIndicators}
-              levelIndent={20}
-            />
-          </div>
+        <div class="w-1/3 border-r border-gray-300 flex flex-col p-4">
+          <TreeView
+            bind:this={treeViewComponent}
+            items={customTags}
+            getDisplayText={getTagDisplayText}
+            selectedId={selectedTagName}
+            onSelect={handleTreeSelect}
+            onReorder={handleTreeReorder}
+            onMakeChild={handleTreeMakeChild}
+            getIndicators={getTagIndicators}
+            levelIndent={20}
+          />
         </div>
 
         <!-- Right column: Selected tag content -->

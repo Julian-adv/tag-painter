@@ -1,6 +1,8 @@
 <!-- Generic TreeView component for hierarchical data with drag and drop -->
 <script lang="ts">
   import type { Component } from 'svelte'
+  import type { CustomTag } from './types'
+  import { getTagClasses } from './utils/tagStyling'
 
   interface TreeNode {
     id: string
@@ -13,8 +15,6 @@
     items: Record<string, unknown>
     // Function to get display text for an item
     getDisplayText: (item: unknown) => string
-    // Function to get additional classes for an item
-    getItemClasses?: (item: unknown, selected: boolean, dragged: boolean) => string
     // Currently selected item ID
     selectedId?: string
     // Callback when an item is selected
@@ -34,7 +34,6 @@
   let {
     items = {},
     getDisplayText,
-    getItemClasses,
     selectedId = '',
     onSelect,
     onReorder,
@@ -50,6 +49,9 @@
   let dropOnItem = $state<string | null>(null)
   let dragOverTarget = $state<'reorder' | 'make-child' | null>(null)
   let dragLeaveTimeout: ReturnType<typeof setTimeout> | null = null
+
+  // Reference to the scroll container
+  let scrollContainer = $state<HTMLElement>()
 
   // Build hierarchical tree structure
   const treeNodes = $derived.by(() => {
@@ -169,33 +171,33 @@
 
     // Calculate new state
     const newDropOnItem = isMiddleArea ? itemId : null
-    const newDropPosition = isMiddleArea ? null : (y < height * 0.5 ? index : index + 1)
+    const newDropPosition = isMiddleArea ? null : y < height * 0.5 ? index : index + 1
     const newDragOverTarget = isMiddleArea ? 'make-child' : 'reorder'
-    
+
     // Only update state if something actually changed
-    const stateChanged = 
+    const stateChanged =
       dropOnItem !== newDropOnItem ||
       dropPosition !== newDropPosition ||
       dragOverTarget !== newDragOverTarget
-    
+
     if (stateChanged) {
       dropOnItem = newDropOnItem
-      dropPosition = newDropPosition  
+      dropPosition = newDropPosition
       dragOverTarget = newDragOverTarget
     }
-    
+
     // Set drop effect based on whether we can actually drop here
     if (event.dataTransfer) {
-      const canDrop = 
-        (newDragOverTarget === 'make-child' && newDropOnItem && draggedItemId && !wouldCreateCircularDependency(draggedItemId, newDropOnItem) && draggedItemId !== newDropOnItem) ||
-        (newDragOverTarget === 'reorder')
-      
+      const canDrop =
+        (newDragOverTarget === 'make-child' &&
+          newDropOnItem &&
+          draggedItemId &&
+          !wouldCreateCircularDependency(draggedItemId, newDropOnItem) &&
+          draggedItemId !== newDropOnItem) ||
+        newDragOverTarget === 'reorder'
+
       event.dataTransfer.dropEffect = canDrop ? 'move' : 'none'
     }
-  }
-
-  function handleDragLeave(_event: DragEvent) {
-    // Disabled to prevent flickering - state will be cleared only on dragEnd
   }
 
   function wouldCreateCircularDependency(draggedId: string, targetId: string): boolean {
@@ -244,22 +246,42 @@
   }
 
   function getItemDisplayClasses(node: TreeNode) {
-    const baseClasses = getItemClasses
-      ? getItemClasses(node.data, selectedId === node.id, draggedItemId === node.id)
-      : 'w-full text-left py-1.5 pr-3 cursor-move hover:bg-gray-100 rounded'
-
-    return baseClasses
+    return getTagClasses({
+      tag: node.data as CustomTag,
+      selected: selectedId === node.id,
+      dragged: draggedItemId === node.id,
+      additionalClasses: 'cursor-move py-1.5 px-1.5'
+    })
   }
+
+  // Public method to scroll to a specific item
+  function scrollToItem(itemId: string) {
+    setTimeout(() => {
+      if (scrollContainer) {
+        const itemButton = scrollContainer.querySelector(
+          `button[data-item-id="${itemId}"]`
+        ) as HTMLElement
+        if (itemButton) {
+          itemButton.scrollIntoView({
+            behavior: 'instant',
+            block: 'center'
+          })
+        }
+      }
+    }, 50)
+  }
+
+  // Export the public method for parent component access
+  export { scrollToItem }
 </script>
 
-<div class="space-y-1" role="list">
+<div class="flex-1 overflow-y-auto space-y-1 flex flex-col" role="list" bind:this={scrollContainer}>
   {#each treeNodes as node, index (node.id)}
-    <div 
-      class="relative"
+    <div
+      class="relative flex justify-start"
       role="listitem"
       ondragenter={handleDragEnter}
       ondragover={(e) => handleDragOver(e, index, node.id)}
-      ondragleave={(e) => handleDragLeave(e)}
       ondrop={handleDrop}
     >
       <!-- Drop indicator before this item -->
@@ -275,37 +297,51 @@
         ></div>
       {/if}
 
-      <button
-        type="button"
-        draggable="true"
-        class={getItemDisplayClasses(node)}
-        style="padding-left: {8 + node.level * levelIndent}px"
-        data-item-id={node.id}
-        onclick={() => handleItemClick(node.id)}
-        ondragstart={(e) => handleDragStart(e, node.id)}
-        ondragend={handleDragEnd}
-        aria-label="Drag to reorder or make child: {getDisplayText(node.data)}"
-      >
-        <div class="flex items-center justify-between w-full">
-          <div class="flex items-center gap-1">
-            {#if node.level > 0}
-              <span class="text-gray-400 text-xs">└─</span>
-            {/if}
-            <span>{getDisplayText(node.data)}</span>
-          </div>
-
-          {#if getIndicators}
-            <div class="flex items-center gap-1">
-              {#each getIndicators(node.data) as indicator, idx (idx)}
-                {#if indicator.icon}
-                  {@const IconComponent = indicator.icon as Component}
-                  <IconComponent class="w-4 h-4 flex-shrink-0 {indicator.classes || ''}" />
-                {/if}
-              {/each}
+      <div class="flex items-center">
+        {#if node.level > 0}
+          {@const isFirstChild = index === 0 || treeNodes[index - 1].level < node.level}
+          <svg
+            class="flex-shrink-0 {isFirstChild ? '-mt-3' : '-mt-7'}"
+            style="margin-left: {8 + (node.level - 1) * levelIndent}px;"
+            width="16"
+            height={isFirstChild ? '34' : '60'}
+          >
+            <path
+              d="M 6 3 L 6 {isFirstChild ? '24' : '44'} L 16 {isFirstChild ? '24' : '44'}"
+              stroke="#9ca3af"
+              stroke-width="1"
+              fill="none"
+            />
+          </svg>
+        {/if}
+        <button
+          type="button"
+          draggable="true"
+          class="text-left flex-1 {getItemDisplayClasses(node)}"
+          data-item-id={node.id}
+          onclick={() => handleItemClick(node.id)}
+          ondragstart={(e) => handleDragStart(e, node.id)}
+          ondragend={handleDragEnd}
+          aria-label="Drag to reorder or make child: {getDisplayText(node.data)}"
+        >
+          <div class="flex items-center w-full">
+            <div class="flex items-center gap-1 flex-1">
+              <span>{getDisplayText(node.data)}</span>
             </div>
-          {/if}
-        </div>
-      </button>
+
+            {#if getIndicators}
+              <div class="flex items-center gap-1 ml-auto">
+                {#each getIndicators(node.data) as indicator, idx (idx)}
+                  {#if indicator.icon}
+                    {@const IconComponent = indicator.icon as Component}
+                    <IconComponent class="w-4 h-4 flex-shrink-0 {indicator.classes || ''}" />
+                  {/if}
+                {/each}
+              </div>
+            {/if}
+          </div>
+        </button>
+      </div>
 
       <!-- Drop indicator after this item (for last position) -->
       {#if dropPosition === index + 1 && draggedItemId !== null && dragOverTarget === 'reorder'}
