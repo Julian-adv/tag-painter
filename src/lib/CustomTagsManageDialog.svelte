@@ -13,7 +13,6 @@
   import { untrack } from 'svelte'
   import { Trash, DocumentDuplicate, Plus, LockClosed } from 'svelte-heros-v2'
   import type { CustomTag, TagType } from '$lib/types'
-  import { getTagClasses } from './utils/tagStyling'
 
   interface Props {
     isOpen: boolean
@@ -39,10 +38,9 @@
     }
   })
 
-
   // Reference to the tag name input field
   let tagNameInputElement = $state<HTMLInputElement>()
-  
+
   // Reference to the TreeView component
   let treeViewComponent = $state<{ scrollToItem: (itemId: string) => void } | undefined>()
 
@@ -64,7 +62,6 @@
       }
     })
   }
-
 
   // Update custom tags when dialog opens
   $effect(() => {
@@ -123,26 +120,26 @@
 
     if (confirm(`Are you sure you want to delete the custom tag "${selectedTagName}"?`)) {
       const tagToDelete = customTags[selectedTagName]
-      
+
       // Handle parent-child relationships when deleting
       if (tagToDelete.parentId) {
         // Remove this tag from its parent's children list
         const parent = customTags[tagToDelete.parentId]
         if (parent && parent.children) {
-          parent.children = parent.children.filter(id => id !== selectedTagName)
+          parent.children = parent.children.filter((id) => id !== selectedTagName)
         }
       }
-      
+
       if (tagToDelete.children) {
         // Make children orphans (remove their parent reference)
-        tagToDelete.children.forEach(childId => {
+        tagToDelete.children.forEach((childId) => {
           const child = customTags[childId]
           if (child) {
             delete child.parentId
           }
         })
       }
-      
+
       // Remove from local state
       delete customTags[selectedTagName]
       customTags = { ...customTags }
@@ -365,13 +362,17 @@
 
   function handleTagsChange(removedTagName?: string) {
     // If a tag was removed and it's currently pinned for this parent tag, remove the pin
-    if (removedTagName && selectedTagName && (selectedTagType === 'random' || selectedTagType === 'consistent-random')) {
+    if (
+      removedTagName &&
+      selectedTagName &&
+      (selectedTagType === 'random' || selectedTagType === 'consistent-random')
+    ) {
       const currentOverrideTag = testModeStore[selectedTagName]?.overrideTag
       if (currentOverrideTag === removedTagName) {
         removeTestModeOverride(selectedTagName)
       }
     }
-    
+
     // Mark as having unsaved changes
     hasUnsavedChanges = true
     statusMessage = ''
@@ -552,23 +553,23 @@
 
   function handleTreeMakeChild(childTagName: string, parentTagName: string) {
     if (childTagName === parentTagName) return // Can't make a tag child of itself
-    
+
     // Prevent circular dependencies
     if (isDescendant(parentTagName, childTagName)) return
-    
+
     const childTag = customTags[childTagName]
     const parentTag = customTags[parentTagName]
-    
+
     if (!childTag || !parentTag) return
-    
+
     // Remove child from its current parent if it has one
     if (childTag.parentId) {
       const oldParent = customTags[childTag.parentId]
       if (oldParent && oldParent.children) {
-        oldParent.children = oldParent.children.filter(id => id !== childTagName)
+        oldParent.children = oldParent.children.filter((id) => id !== childTagName)
       }
     }
-    
+
     // Set new parent-child relationship
     childTag.parentId = parentTagName
     if (!parentTag.children) {
@@ -577,7 +578,7 @@
     if (!parentTag.children.includes(childTagName)) {
       parentTag.children.push(childTagName)
     }
-    
+
     customTags = { ...customTags }
     hasUnsavedChanges = true
   }
@@ -585,28 +586,31 @@
   function isDescendant(ancestorId: string, descendantId: string): boolean {
     const tag = customTags[descendantId]
     if (!tag || !tag.children) return false
-    
-    return tag.children.includes(ancestorId) || 
-           tag.children.some(childId => isDescendant(ancestorId, childId))
+
+    return (
+      tag.children.includes(ancestorId) ||
+      tag.children.some((childId) => isDescendant(ancestorId, childId))
+    )
   }
 
-  function getTagDisplayText(tag: unknown): string {
-    return (tag as CustomTag).name
+  function getTagDisplayText(tag: CustomTag): string {
+    return tag.name
   }
 
-
-  function getTagIndicators(tag: unknown) {
-    const customTag = tag as CustomTag
+  function getTagIndicators(tag: CustomTag) {
     const indicators = []
-    const isForceOverridden = !!testModeStore[customTag.name]?.overrideTag
-    
-    if (isForceOverridden && (customTag.type === 'random' || customTag.type === 'consistent-random')) {
+    const isForceOverridden = !!testModeStore[tag.name]?.overrideTag
+
+    if (
+      isForceOverridden &&
+      (tag.type === 'random' || tag.type === 'consistent-random')
+    ) {
       indicators.push({
         icon: LockClosed,
         classes: 'text-orange-500 flex-shrink-0'
       })
     }
-    
+
     return indicators
   }
 
@@ -615,7 +619,6 @@
       handleClose()
     }
   }
-
 </script>
 
 {#if isOpen}
@@ -653,7 +656,7 @@
       <!-- Content -->
       <div class="flex-1 flex min-h-0">
         <!-- Left column: Custom tags list -->
-        <div class="w-1/3 border-r border-gray-300 flex flex-col p-4">
+        <div class="w-3/5 border-r border-gray-300 flex flex-col p-4">
           <TreeView
             bind:this={treeViewComponent}
             items={customTags}
@@ -668,7 +671,7 @@
         </div>
 
         <!-- Right column: Selected tag content -->
-        <div class="flex-1 p-4 flex flex-col gap-2">
+        <div class="w-2/5 p-4 flex flex-col gap-2">
           {#if selectedTagName}
             <div class="flex items-center justify-between">
               <input
@@ -773,7 +776,6 @@
                 onPinToggle={handlePinToggle}
               />
             </div>
-
           {:else}
             <div class="flex-1 flex items-center justify-center">
               <p class="text-gray-400 text-sm italic">Select a custom tag to edit</p>
@@ -791,7 +793,8 @@
             <span class="text-orange-600">Unsaved changes</span>
           {:else if selectedTagName && (selectedTagType === 'random' || selectedTagType === 'consistent-random')}
             <span class="text-gray-500">
-              <strong>Tip:</strong> Right-click on tags in the display area to pin specific options for testing.
+              <strong>Tip:</strong> Right-click on tags in the display area to pin specific options for
+              testing.
             </span>
           {/if}
         </div>

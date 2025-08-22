@@ -7,14 +7,14 @@
   interface TreeNode {
     id: string
     level: number
-    data: unknown
+    data: CustomTag
   }
 
   interface Props {
     // Tree data as key-value pairs with parent-child relationships
-    items: Record<string, unknown>
+    items: Record<string, CustomTag>
     // Function to get display text for an item
-    getDisplayText: (item: unknown) => string
+    getDisplayText: (item: CustomTag) => string
     // Currently selected item ID
     selectedId?: string
     // Callback when an item is selected
@@ -24,7 +24,7 @@
     // Callback when an item becomes a child of another
     onMakeChild?: (childId: string, parentId: string) => void
     // Function to determine if an item has special indicators
-    getIndicators?: (item: unknown) => { icon?: unknown; classes?: string }[]
+    getIndicators?: (item: CustomTag) => { icon?: unknown; classes?: string }[]
     // Custom styling for tree levels
     levelIndent?: number
     // Empty state content
@@ -63,20 +63,50 @@
       if (processed.has(itemId) || !items[itemId]) return
 
       processed.add(itemId)
-      nodes.push({ id: itemId, level, data: items[itemId] })
+      const customTag = items[itemId]
+      nodes.push({ id: itemId, level, data: customTag })
 
-      // Add children if they exist
-      const item = items[itemId] as { children?: string[] }
-      if (item && item.children) {
-        item.children.forEach((childId: string) => {
+      // Add CustomTag children (parentId/children relationship)
+      if (customTag.children) {
+        customTag.children.forEach((childId: string) => {
           addToTree(childId, level + 1)
         })
+      }
+
+      // Add tags as children (tag content)
+      if (customTag.tags && customTag.tags.length > 0) {
+        if (customTag.type === 'sequential' || customTag.type === 'regular') {
+          // For sequential and regular types, combine all tags into one node
+          const combinedTags = customTag.tags.join(', ')
+          const tagNodeId = `${itemId}_combined_tags`
+          nodes.push({ 
+            id: tagNodeId, 
+            level: level + 1, 
+            data: { name: combinedTags, tags: [], type: 'regular' } as CustomTag 
+          })
+        } else {
+          // For random and consistent-random types, show each tag separately
+          customTag.tags.forEach((tag: string) => {
+            // If the tag exists as a CustomTag in items, add it recursively
+            if (items[tag]) {
+              addToTree(tag, level + 1)
+            } else {
+              // If it's just a regular tag string, add it as a leaf node
+              const tagNodeId = `${itemId}_tag_${tag}`
+              nodes.push({ 
+                id: tagNodeId, 
+                level: level + 1, 
+                data: { name: tag, tags: [], type: 'regular' } as CustomTag 
+              })
+            }
+          })
+        }
       }
     }
 
     // First, add all root items (items without parent)
     Object.keys(items).forEach((itemId) => {
-      const item = items[itemId] as { parentId?: string }
+      const item = items[itemId]
       if (item && !item.parentId) {
         addToTree(itemId)
       }
@@ -247,10 +277,10 @@
 
   function getItemDisplayClasses(node: TreeNode) {
     return getTagClasses({
-      tag: node.data as CustomTag,
+      tag: node.data,
       selected: selectedId === node.id,
       dragged: draggedItemId === node.id,
-      additionalClasses: 'cursor-move py-1.5 px-1.5'
+      additionalClasses: 'cursor-move p-1.5'
     })
   }
 
@@ -275,7 +305,7 @@
   export { scrollToItem }
 </script>
 
-<div class="flex-1 overflow-y-auto space-y-1 flex flex-col" role="list" bind:this={scrollContainer}>
+<div class="flex-1 overflow-y-auto overflow-x-hidden space-y-1 flex flex-col pr-2" role="list" bind:this={scrollContainer}>
   {#each treeNodes as node, index (node.id)}
     <div
       class="relative flex justify-start"
@@ -297,7 +327,7 @@
         ></div>
       {/if}
 
-      <div class="flex items-center">
+      <div class="flex items-center min-w-0">
         {#if node.level > 0}
           {@const isFirstChild = index === 0 || treeNodes[index - 1].level < node.level}
           <svg
@@ -317,7 +347,7 @@
         <button
           type="button"
           draggable="true"
-          class="text-left flex-1 {getItemDisplayClasses(node)}"
+          class="text-left flex-1 min-w-0 {getItemDisplayClasses(node)}"
           data-item-id={node.id}
           onclick={() => handleItemClick(node.id)}
           ondragstart={(e) => handleDragStart(e, node.id)}
@@ -325,8 +355,8 @@
           aria-label="Drag to reorder or make child: {getDisplayText(node.data)}"
         >
           <div class="flex items-center w-full">
-            <div class="flex items-center gap-1 flex-1">
-              <span>{getDisplayText(node.data)}</span>
+            <div class="flex items-center gap-1 flex-1 min-w-0">
+              <span class="truncate">{getDisplayText(node.data)}</span>
             </div>
 
             {#if getIndicators}
