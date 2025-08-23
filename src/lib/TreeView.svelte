@@ -53,7 +53,6 @@
 
   // Reference to the container (used for both scrolling and SVG)
   let container = $state<HTMLElement>()
-  const nodeEls = new Map<string, HTMLElement>()
   let nodeBindings: Record<string, HTMLElement | null> = $state({})
 
   // SVG edge data
@@ -87,10 +86,10 @@
           // For sequential and regular types, combine all tags into one node
           const combinedTags = customTag.tags.join(', ')
           const tagNodeId = `${itemId}_combined_tags`
-          nodes.push({ 
-            id: tagNodeId, 
-            level: level + 1, 
-            data: { name: combinedTags, tags: [], type: 'regular' } as CustomTag 
+          nodes.push({
+            id: tagNodeId,
+            level: level + 1,
+            data: { name: combinedTags, tags: [], type: 'regular' } as CustomTag
           })
         } else {
           // For random and consistent-random types, show each tag separately
@@ -101,10 +100,10 @@
             } else {
               // If it's just a regular tag string, add it as a leaf node
               const tagNodeId = `${itemId}_tag_${tag}`
-              nodes.push({ 
-                id: tagNodeId, 
-                level: level + 1, 
-                data: { name: tag, tags: [], type: 'regular' } as CustomTag 
+              nodes.push({
+                id: tagNodeId,
+                level: level + 1,
+                data: { name: tag, tags: [], type: 'regular' } as CustomTag
               })
             }
           })
@@ -133,11 +132,11 @@
   // Collect visible edges for SVG lines
   function collectEdges() {
     const edgeList: Array<{ from: string; to: string; path: string }> = []
-    
+
     for (let i = 0; i < treeNodes.length; i++) {
       const node = treeNodes[i]
       if (node.level === 0) continue // Skip root nodes
-      
+
       // Find parent node
       let parentNode = null
       for (let j = i - 1; j >= 0; j--) {
@@ -146,7 +145,7 @@
           break
         }
       }
-      
+
       if (parentNode) {
         edgeList.push({
           from: parentNode.id,
@@ -155,24 +154,24 @@
         })
       }
     }
-    
+
     return edgeList
   }
 
   function getPorts(parentId: string, childId: string) {
     if (!container) return null
-    
+
     const cr = container.getBoundingClientRect()
-    const p = nodeEls.get(parentId)?.getBoundingClientRect()
-    const c = nodeEls.get(childId)?.getBoundingClientRect()
-    
+    const p = nodeBindings[parentId]?.getBoundingClientRect()
+    const c = nodeBindings[childId]?.getBoundingClientRect()
+
     if (!p || !c) return null
-    
+
     const px = p.left - cr.left + 8
     const py = p.bottom - cr.top
     const cx = c.left - cr.left
     const cy = c.top - cr.top + c.height / 2
-    
+
     return { px, py, cx, cy }
   }
 
@@ -183,15 +182,15 @@
 
   async function recomputeEdges() {
     if (!container) return
-    
+
     edges = collectEdges()
     await tick()
-    
-    // Update container size
+
+    // Update container size - use scrollHeight for full content height
     const rect = container.getBoundingClientRect()
     svgWidth = rect.width
-    svgHeight = rect.height
-    
+    svgHeight = container.scrollHeight
+
     // Calculate paths
     edges = edges.map((e) => {
       const ports = getPorts(e.from, e.to)
@@ -213,27 +212,17 @@
     }
     window.addEventListener('resize', handleResize, { passive: true })
   })
-  
+
   // Use $effect to watch for treeNodes changes and update nodeEls
   $effect(() => {
     // Initialize node bindings for new nodes
-    treeNodes.forEach(node => {
+    treeNodes.forEach((node) => {
       if (!(node.id in nodeBindings)) {
         nodeBindings[node.id] = null
       }
     })
   })
 
-  $effect(() => {
-    // Update nodeEls map when bindings change
-    Object.entries(nodeBindings).forEach(([id, el]) => {
-      if (el) {
-        nodeEls.set(id, el)
-      }
-    })
-    recomputeEdges()
-  })
-  
   onDestroy(() => {
     resizeObserver?.disconnect()
     window.removeEventListener('resize', handleResize)
@@ -422,25 +411,24 @@
   export { scrollToItem }
 </script>
 
-<div class="flex-1 overflow-y-auto overflow-x-hidden space-y-1 flex flex-col pr-2 relative" role="list" bind:this={container}>
-    <!-- Single overlay SVG for all tree connections -->
-    <svg 
-      class="absolute inset-0 pointer-events-none z-0" 
-      width={svgWidth} 
-      height={svgHeight}
-      aria-hidden="true"
-    >
-      {#each edges as edge (`${edge.from}-${edge.to}`)}
-        {#if edge.path}
-          <path 
-            d={edge.path} 
-            fill="none" 
-            stroke="#9ca3af" 
-            stroke-width="1"
-          />
-        {/if}
-      {/each}
-    </svg>
+<div
+  class="flex-1 overflow-y-auto overflow-x-hidden space-y-1 flex flex-col pr-2 relative"
+  role="list"
+  bind:this={container}
+>
+  <!-- Single overlay SVG for all tree connections -->
+  <svg
+    class="absolute inset-0 pointer-events-none z-0"
+    width={svgWidth}
+    height={svgHeight}
+    aria-hidden="true"
+  >
+    {#each edges as edge (`${edge.from}-${edge.to}`)}
+      {#if edge.path}
+        <path d={edge.path} fill="none" stroke="#9ca3af" stroke-width="1" />
+      {/if}
+    {/each}
+  </svg>
   {#each treeNodes as node, index (node.id)}
     <div
       class="relative flex justify-start"
