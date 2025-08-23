@@ -9,6 +9,7 @@
     id: string
     level: number
     data: CustomTag
+    parentId?: string
   }
 
   interface Props {
@@ -21,7 +22,7 @@
     // Callback when an item is selected
     onSelect?: (itemId: string) => void
     // Callback when items are reordered
-    onReorder?: (draggedId: string, newIndex: number) => void
+    onReorder?: (draggedId: string, newIndex: number, parentId?: string) => void
     // Callback when an item becomes a child of another
     onMakeChild?: (childId: string, parentId: string) => void
     // Function to determine if an item has special indicators
@@ -46,6 +47,7 @@
 
   // Drag & drop state
   let draggedItemId = $state<string | null>(null)
+  let draggedItemParent = $state<string | null>(null)
   let dropPosition = $state<number | null>(null)
   let dropOnItem = $state<string | null>(null)
   let dragOverTarget = $state<'reorder' | 'make-child' | null>(null)
@@ -65,17 +67,17 @@
     const processed = new Set<string>()
 
     // Function to add item and its children recursively
-    function addToTree(itemId: string, level: number = 0) {
+    function addToTree(itemId: string, level: number = 0, parentId?: string) {
       if (processed.has(itemId) || !items[itemId]) return
 
       processed.add(itemId)
       const customTag = items[itemId]
-      nodes.push({ id: itemId, level, data: customTag })
+      nodes.push({ id: itemId, level, data: customTag, parentId })
 
       // Add CustomTag children (parentId/children relationship)
       if (customTag.children) {
         customTag.children.forEach((childId: string) => {
-          addToTree(childId, level + 1)
+          addToTree(childId, level + 1, itemId)
         })
       }
 
@@ -88,21 +90,23 @@
           nodes.push({
             id: tagNodeId,
             level: level + 1,
-            data: { name: combinedTags, tags: [], type: 'regular' } as CustomTag
+            data: { name: combinedTags, tags: [], type: 'regular' } as CustomTag,
+            parentId: itemId
           })
         } else {
           // For random and consistent-random types, show each tag separately
           customTag.tags.forEach((tag: string) => {
             // If the tag exists as a CustomTag in items, add it recursively
             if (items[tag]) {
-              addToTree(tag, level + 1)
+              addToTree(tag, level + 1, itemId)
             } else {
               // If it's just a regular tag string, add it as a leaf node
               const tagNodeId = `${itemId}_tag_${tag}`
               nodes.push({
                 id: tagNodeId,
                 level: level + 1,
-                data: { name: tag, tags: [], type: 'regular' } as CustomTag
+                data: { name: tag, tags: [], type: 'regular' } as CustomTag,
+                parentId: itemId
               })
             }
           })
@@ -131,29 +135,11 @@
   // Collect visible edges for SVG lines
   function collectEdges() {
     const edgeList: Array<{ from: string; to: string; path: string }> = []
-
-    for (let i = 0; i < treeNodes.length; i++) {
-      const node = treeNodes[i]
-      if (node.level === 0) continue // Skip root nodes
-
-      // Find parent node
-      let parentNode = null
-      for (let j = i - 1; j >= 0; j--) {
-        if (treeNodes[j].level === node.level - 1) {
-          parentNode = treeNodes[j]
-          break
-        }
-      }
-
-      if (parentNode) {
-        edgeList.push({
-          from: parentNode.id,
-          to: node.id,
-          path: ''
-        })
+    for (const node of treeNodes) {
+      if (node.parentId) {
+        edgeList.push({ from: node.parentId, to: node.id, path: '' })
       }
     }
-
     return edgeList
   }
 
@@ -233,6 +219,11 @@
 
   function handleDragStart(event: DragEvent, itemId: string) {
     draggedItemId = itemId
+    
+    // Use precomputed parentId from tree node
+    const draggedNode = treeNodes.find((node) => node.id === itemId)
+    draggedItemParent = draggedNode?.parentId ?? null
+    
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move'
       event.dataTransfer.setData('text/plain', itemId)
@@ -241,6 +232,7 @@
 
   function handleDragEnd() {
     draggedItemId = null
+    draggedItemParent = null
     dropPosition = null
     dropOnItem = null
     dragOverTarget = null
@@ -356,8 +348,38 @@
         onMakeChild?.(draggedItemId, dropOnItem)
       }
     } else if (dragOverTarget === 'reorder' && dropPosition !== null) {
+      // Find the dragged node to get the actual tag name
+      const draggedNode = treeNodes.find(node => node.id === draggedItemId)
+      const actualTagName = draggedNode?.data.name || draggedItemId
+      
+      // Calculate relative position within siblings if there's a parent
+      let relativeDropPosition = dropPosition
+      if (draggedItemParent) {
+        // Find all siblings (nodes with same parent)
+        const siblings = treeNodes.filter(node => node.parentId === draggedItemParent)
+        const siblingIds = siblings.map(s => s.id)
+        
+        // Find the dragged item's position in siblings array
+        const draggedSiblingIndex = siblingIds.indexOf(draggedItemId)
+        
+        // Convert global dropPosition to sibling-relative position
+        let targetSiblingIndex = 0
+        for (let i = 0; i < dropPosition; i++) {
+          if (i < treeNodes.length && siblingIds.includes(treeNodes[i].id)) {
+            targetSiblingIndex++
+          }
+        }
+        
+        // Adjust for removed element
+        if (draggedSiblingIndex < targetSiblingIndex) {
+          targetSiblingIndex--
+        }
+        
+        relativeDropPosition = targetSiblingIndex
+      }
+      
       // Reorder items
-      onReorder?.(draggedItemId, dropPosition)
+      onReorder?.(actualTagName, relativeDropPosition, draggedItemParent || undefined)
     }
 
     handleDragEnd()

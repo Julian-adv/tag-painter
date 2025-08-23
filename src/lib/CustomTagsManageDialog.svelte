@@ -523,10 +523,47 @@
     selectTag(tagName)
   }
 
-  function handleTreeReorder(draggedTagName: string, dropPosition: number) {
-    // Get the current order from Object.keys
+  function handleTreeReorder(draggedItemId: string, dropPosition: number, parentTagName?: string) {
+    // If parentTagName is provided, reorder within parent's tags array
+    if (parentTagName && customTags[parentTagName]) {
+      const parentTag = customTags[parentTagName]
+      if (!parentTag.tags) return
+
+      const draggedIndex = parentTag.tags.indexOf(draggedItemId)
+      if (draggedIndex === -1) return
+
+      // Calculate the actual insertion index accounting for the removed element
+      let insertIndex = dropPosition
+      if (draggedIndex < dropPosition) {
+        insertIndex = dropPosition - 1
+      }
+
+      // Reorder tags within parent
+      const newTags = [...parentTag.tags]
+      const [draggedTag] = newTags.splice(draggedIndex, 1)
+      newTags.splice(insertIndex, 0, draggedTag)
+
+      customTags[parentTagName].tags = newTags
+      customTags = { ...customTags } // Force reactivity
+      
+      // If this is the currently selected tag, update selectedTagContent as well
+      if (parentTagName === selectedTagName) {
+        selectedTagContent = convertToCustomTags(newTags)
+      }
+      
+      // Immediately update the store as well
+      promptsData.update((data) => ({
+        ...data,
+        customTags: { ...customTags }
+      }))
+      
+      hasUnsavedChanges = true
+      return
+    }
+
+    // Otherwise, reorder at top level (existing logic)
     const currentOrder = Object.keys(customTags)
-    const draggedIndex = currentOrder.indexOf(draggedTagName)
+    const draggedIndex = currentOrder.indexOf(draggedItemId)
 
     if (draggedIndex === -1) return
 
@@ -548,6 +585,13 @@
     }
 
     customTags = newCustomTags
+    
+    // Immediately update the store as well
+    promptsData.update((data) => ({
+      ...data,
+      customTags: { ...customTags }
+    }))
+    
     hasUnsavedChanges = true
   }
 
@@ -601,10 +645,7 @@
     const indicators = []
     const isForceOverridden = !!testModeStore[tag.name]?.overrideTag
 
-    if (
-      isForceOverridden &&
-      (tag.type === 'random' || tag.type === 'consistent-random')
-    ) {
+    if (isForceOverridden && (tag.type === 'random' || tag.type === 'consistent-random')) {
       indicators.push({
         icon: LockClosed,
         classes: 'text-orange-500 flex-shrink-0'
