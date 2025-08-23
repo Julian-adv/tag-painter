@@ -3,6 +3,7 @@
   import type { Component } from 'svelte'
   import type { CustomTag } from './types'
   import { getTagClasses } from './utils/tagStyling'
+  import { onMount, onDestroy, tick } from 'svelte'
 
   interface TreeNode {
     id: string
@@ -50,8 +51,15 @@
   let dragOverTarget = $state<'reorder' | 'make-child' | null>(null)
   let dragLeaveTimeout: ReturnType<typeof setTimeout> | null = null
 
-  // Reference to the scroll container
-  let scrollContainer = $state<HTMLElement>()
+  // Reference to the container (used for both scrolling and SVG)
+  let container = $state<HTMLElement>()
+  const nodeEls = new Map<string, HTMLElement>()
+  let nodeBindings: Record<string, HTMLElement | null> = $state({})
+
+  // SVG edge data
+  let edges = $state<Array<{ from: string; to: string; path: string }>>([])
+  let svgWidth = $state(0)
+  let svgHeight = $state(0)
 
   // Build hierarchical tree structure
   const treeNodes = $derived.by(() => {
@@ -120,6 +128,115 @@
     })
 
     return nodes
+  })
+
+  // Collect visible edges for SVG lines
+  function collectEdges() {
+    const edgeList: Array<{ from: string; to: string; path: string }> = []
+    
+    for (let i = 0; i < treeNodes.length; i++) {
+      const node = treeNodes[i]
+      if (node.level === 0) continue // Skip root nodes
+      
+      // Find parent node
+      let parentNode = null
+      for (let j = i - 1; j >= 0; j--) {
+        if (treeNodes[j].level === node.level - 1) {
+          parentNode = treeNodes[j]
+          break
+        }
+      }
+      
+      if (parentNode) {
+        edgeList.push({
+          from: parentNode.id,
+          to: node.id,
+          path: ''
+        })
+      }
+    }
+    
+    return edgeList
+  }
+
+  function getPorts(parentId: string, childId: string) {
+    if (!container) return null
+    
+    const cr = container.getBoundingClientRect()
+    const p = nodeEls.get(parentId)?.getBoundingClientRect()
+    const c = nodeEls.get(childId)?.getBoundingClientRect()
+    
+    if (!p || !c) return null
+    
+    const px = p.left - cr.left + 8
+    const py = p.bottom - cr.top
+    const cx = c.left - cr.left
+    const cy = c.top - cr.top + c.height / 2
+    
+    return { px, py, cx, cy }
+  }
+
+  function toElbow({ px, py, cx, cy }: { px: number; py: number; cx: number; cy: number }) {
+    const midY = cy
+    return `M ${px} ${py} V ${midY} H ${cx}`
+  }
+
+  async function recomputeEdges() {
+    if (!container) return
+    
+    edges = collectEdges()
+    await tick()
+    
+    // Update container size
+    const rect = container.getBoundingClientRect()
+    svgWidth = rect.width
+    svgHeight = rect.height
+    
+    // Calculate paths
+    edges = edges.map((e) => {
+      const ports = getPorts(e.from, e.to)
+      if (!ports) return e
+      return { ...e, path: toElbow(ports) }
+    })
+  }
+
+  let resizeObserver: ResizeObserver | undefined
+  function handleResize() {
+    recomputeEdges()
+  }
+
+  onMount(() => {
+    recomputeEdges()
+    if (container) {
+      resizeObserver = new ResizeObserver(handleResize)
+      resizeObserver.observe(container)
+    }
+    window.addEventListener('resize', handleResize, { passive: true })
+  })
+  
+  // Use $effect to watch for treeNodes changes and update nodeEls
+  $effect(() => {
+    // Initialize node bindings for new nodes
+    treeNodes.forEach(node => {
+      if (!(node.id in nodeBindings)) {
+        nodeBindings[node.id] = null
+      }
+    })
+  })
+
+  $effect(() => {
+    // Update nodeEls map when bindings change
+    Object.entries(nodeBindings).forEach(([id, el]) => {
+      if (el) {
+        nodeEls.set(id, el)
+      }
+    })
+    recomputeEdges()
+  })
+  
+  onDestroy(() => {
+    resizeObserver?.disconnect()
+    window.removeEventListener('resize', handleResize)
   })
 
   function handleItemClick(itemId: string) {
@@ -287,8 +404,8 @@
   // Public method to scroll to a specific item
   function scrollToItem(itemId: string) {
     setTimeout(() => {
-      if (scrollContainer) {
-        const itemButton = scrollContainer.querySelector(
+      if (container) {
+        const itemButton = container.querySelector(
           `button[data-item-id="${itemId}"]`
         ) as HTMLElement
         if (itemButton) {
@@ -305,7 +422,25 @@
   export { scrollToItem }
 </script>
 
-<div class="flex-1 overflow-y-auto overflow-x-hidden space-y-1 flex flex-col pr-2" role="list" bind:this={scrollContainer}>
+<div class="flex-1 overflow-y-auto overflow-x-hidden space-y-1 flex flex-col pr-2 relative" role="list" bind:this={container}>
+    <!-- Single overlay SVG for all tree connections -->
+    <svg 
+      class="absolute inset-0 pointer-events-none z-0" 
+      width={svgWidth} 
+      height={svgHeight}
+      aria-hidden="true"
+    >
+      {#each edges as edge (`${edge.from}-${edge.to}`)}
+        {#if edge.path}
+          <path 
+            d={edge.path} 
+            fill="none" 
+            stroke="#9ca3af" 
+            stroke-width="1"
+          />
+        {/if}
+      {/each}
+    </svg>
   {#each treeNodes as node, index (node.id)}
     <div
       class="relative flex justify-start"
@@ -327,32 +462,17 @@
         ></div>
       {/if}
 
-      <div class="flex items-center min-w-0">
-        {#if node.level > 0}
-          {@const isFirstChild = index === 0 || treeNodes[index - 1].level < node.level}
-          <svg
-            class="flex-shrink-0 {isFirstChild ? '-mt-3' : '-mt-7'}"
-            style="margin-left: {8 + (node.level - 1) * levelIndent}px;"
-            width="16"
-            height={isFirstChild ? '34' : '60'}
-          >
-            <path
-              d="M 6 3 L 6 {isFirstChild ? '24' : '44'} L 16 {isFirstChild ? '24' : '44'}"
-              stroke="#9ca3af"
-              stroke-width="1"
-              fill="none"
-            />
-          </svg>
-        {/if}
+      <div class="flex items-center min-w-0" style="margin-left: {node.level * levelIndent}px;">
         <button
           type="button"
           draggable="true"
-          class="text-left flex-1 min-w-0 {getItemDisplayClasses(node)}"
+          class="text-left flex-1 min-w-0 {getItemDisplayClasses(node)} relative z-10"
           data-item-id={node.id}
           onclick={() => handleItemClick(node.id)}
           ondragstart={(e) => handleDragStart(e, node.id)}
           ondragend={handleDragEnd}
           aria-label="Drag to reorder or make child: {getDisplayText(node.data)}"
+          bind:this={nodeBindings[node.id]}
         >
           <div class="flex items-center w-full">
             <div class="flex items-center gap-1 flex-1 min-w-0">
