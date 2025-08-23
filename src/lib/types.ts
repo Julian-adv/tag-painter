@@ -49,6 +49,7 @@ export interface CustomTag {
   weight?: number // Weight for emphasis/de-emphasis (1.0 = normal, >1.0 = emphasis, <1.0 = de-emphasis)
   parentId?: string // ID of the parent tag for hierarchical structure
   children?: string[] // Array of child tag IDs
+  collapsed?: boolean // UI state for tree view expand/collapse
 }
 
 export interface PromptsData {

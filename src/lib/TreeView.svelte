@@ -10,6 +10,8 @@
     level: number
     data: CustomTag
     parentId?: string
+    collapsed?: boolean
+    hasChildren?: boolean
   }
 
   interface Props {
@@ -61,6 +63,7 @@
   let svgWidth = $state(0)
   let svgHeight = $state(0)
 
+
   // Build hierarchical tree structure
   const treeNodes = $derived.by(() => {
     const nodes: TreeNode[] = []
@@ -72,7 +75,22 @@
 
       processed.add(itemId)
       const customTag = items[itemId]
-      nodes.push({ id: itemId, level, data: customTag, parentId })
+      
+      // Check if this node has children
+      const hasChildren = !!(customTag.children?.length || customTag.tags?.length)
+      const isCollapsed = !!customTag.collapsed
+      
+      nodes.push({ 
+        id: itemId, 
+        level, 
+        data: customTag, 
+        parentId,
+        collapsed: isCollapsed,
+        hasChildren
+      })
+
+      // Only add children if not collapsed
+      if (isCollapsed) return
 
       // Add CustomTag children (parentId/children relationship)
       if (customTag.children) {
@@ -215,6 +233,16 @@
 
   function handleItemClick(itemId: string) {
     onSelect?.(itemId)
+  }
+
+  function toggleNode(nodeId: string) {
+    // Toggle collapsed state on the item itself
+    if (items[nodeId]) {
+      items[nodeId].collapsed = !items[nodeId].collapsed
+    }
+    
+    // Update SVG edges after toggling
+    setTimeout(() => recomputeEdges(), 0)
   }
 
   function handleDragStart(event: DragEvent, itemId: string) {
@@ -468,6 +496,38 @@
         >
           <div class="flex items-center w-full">
             <div class="flex items-center gap-1 flex-1 min-w-0">
+              <!-- Expand/Collapse toggle icon inside tag button -->
+              {#if node.hasChildren}
+                <div
+                  class="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0 cursor-pointer"
+                  onclick={(e) => {
+                    e.stopPropagation()
+                    toggleNode(node.id)
+                  }}
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      toggleNode(node.id)
+                    }
+                  }}
+                  role="button"
+                  tabindex="0"
+                  aria-label={node.collapsed ? 'Expand' : 'Collapse'}
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {#if node.collapsed}
+                      <!-- Right arrow (collapsed) -->
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    {:else}
+                      <!-- Down arrow (expanded) -->
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    {/if}
+                  </svg>
+                </div>
+              {:else}
+                <div class="w-4 h-4 flex-shrink-0"></div>
+              {/if}
               <span class="truncate">{getDisplayText(node.data)}</span>
             </div>
 
