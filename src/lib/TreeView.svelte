@@ -54,6 +54,7 @@
   let dropOnItem = $state<string | null>(null)
   let dragOverTarget = $state<'reorder' | 'make-child' | null>(null)
 
+
   // Reference to the container (used for both scrolling and SVG)
   let container = $state<HTMLElement>()
   let nodeBindings: Record<string, HTMLElement | null> = $state({})
@@ -76,8 +77,8 @@
       processed.add(itemId)
       const customTag = items[itemId]
       
-      // Check if this node has children
-      const hasChildren = !!(customTag.children?.length || customTag.tags?.length)
+      // Check if this node has children (tag content)
+      const hasChildren = !!(customTag.tags?.length)
       const isCollapsed = !!customTag.collapsed
       
       nodes.push({ 
@@ -92,12 +93,6 @@
       // Only add children if not collapsed
       if (isCollapsed) return
 
-      // Add CustomTag children (parentId/children relationship)
-      if (customTag.children) {
-        customTag.children.forEach((childId: string) => {
-          addToTree(childId, level + 1, itemId)
-        })
-      }
 
       // Add tags as children (tag content)
       if (customTag.tags && customTag.tags.length > 0) {
@@ -132,10 +127,23 @@
       }
     }
 
-    // First, add all root items (items without parent)
+    // Find all items that are children of other items
+    const childrenSet = new Set<string>()
+    Object.values(items).forEach(item => {
+      if (item.tags) {
+        item.tags.forEach(tag => {
+          // If this tag exists as a CustomTag item, it's a child
+          if (items[tag]) {
+            childrenSet.add(tag)
+          }
+        })
+      }
+    })
+    
+    // Add only root items (items that are not children of any other item)
     Object.keys(items).forEach((itemId) => {
       const item = items[itemId]
-      if (item && !item.parentId) {
+      if (item && !childrenSet.has(itemId)) {
         addToTree(itemId)
       }
     })
@@ -345,20 +353,13 @@
   }
 
   function wouldCreateCircularDependency(draggedId: string, targetId: string): boolean {
-    // Check if targetId is a descendant of draggedId
-    const draggedItem = items[draggedId] as { children?: string[] }
-    if (!draggedItem || !draggedItem.children) return false
-
-    function isDescendant(itemId: string, ancestorId: string): boolean {
-      if (itemId === ancestorId) return true
-
-      const item = items[itemId] as { children?: string[] }
-      if (!item || !item.children) return false
-
-      return item.children.some((childId: string) => isDescendant(childId, ancestorId))
-    }
-
-    return isDescendant(draggedId, targetId)
+    // Since we're using tags array instead of separate hierarchy, 
+    // we need to check if targetId already contains draggedId in its tags
+    const targetItem = items[targetId]
+    if (!targetItem) return false
+    
+    // Simple check: if target's tags already contain the dragged item, it would create a cycle
+    return targetItem.tags.includes(draggedId)
   }
 
   function handleDrop(event: DragEvent) {
@@ -373,6 +374,7 @@
         !wouldCreateCircularDependency(draggedItemId, dropOnItem) &&
         draggedItemId !== dropOnItem
       ) {
+        // Call the callback to handle the relationship
         onMakeChild?.(draggedItemId, dropOnItem)
       }
     } else if (dragOverTarget === 'reorder' && dropPosition !== null) {

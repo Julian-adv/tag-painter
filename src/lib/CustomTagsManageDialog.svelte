@@ -119,27 +119,6 @@
     if (!selectedTagName) return
 
     if (confirm(`Are you sure you want to delete the custom tag "${selectedTagName}"?`)) {
-      const tagToDelete = customTags[selectedTagName]
-
-      // Handle parent-child relationships when deleting
-      if (tagToDelete.parentId) {
-        // Remove this tag from its parent's children list
-        const parent = customTags[tagToDelete.parentId]
-        if (parent && parent.children) {
-          parent.children = parent.children.filter((id) => id !== selectedTagName)
-        }
-      }
-
-      if (tagToDelete.children) {
-        // Make children orphans (remove their parent reference)
-        tagToDelete.children.forEach((childId) => {
-          const child = customTags[childId]
-          if (child) {
-            delete child.parentId
-          }
-        })
-      }
-
       // Remove from local state
       delete customTags[selectedTagName]
       customTags = { ...customTags }
@@ -598,44 +577,17 @@
   function handleTreeMakeChild(childTagName: string, parentTagName: string) {
     if (childTagName === parentTagName) return // Can't make a tag child of itself
 
-    // Prevent circular dependencies
-    if (isDescendant(parentTagName, childTagName)) return
-
-    const childTag = customTags[childTagName]
     const parentTag = customTags[parentTagName]
+    if (!parentTag) return
 
-    if (!childTag || !parentTag) return
-
-    // Remove child from its current parent if it has one
-    if (childTag.parentId) {
-      const oldParent = customTags[childTag.parentId]
-      if (oldParent && oldParent.children) {
-        oldParent.children = oldParent.children.filter((id) => id !== childTagName)
-      }
+    // Add child tag to parent's tags array if not already present
+    if (!parentTag.tags.includes(childTagName)) {
+      parentTag.tags.push(childTagName)
+      customTags = { ...customTags } // Force reactivity
+      hasUnsavedChanges = true
     }
-
-    // Set new parent-child relationship
-    childTag.parentId = parentTagName
-    if (!parentTag.children) {
-      parentTag.children = []
-    }
-    if (!parentTag.children.includes(childTagName)) {
-      parentTag.children.push(childTagName)
-    }
-
-    customTags = { ...customTags }
-    hasUnsavedChanges = true
   }
 
-  function isDescendant(ancestorId: string, descendantId: string): boolean {
-    const tag = customTags[descendantId]
-    if (!tag || !tag.children) return false
-
-    return (
-      tag.children.includes(ancestorId) ||
-      tag.children.some((childId) => isDescendant(ancestorId, childId))
-    )
-  }
 
   function getTagDisplayText(tag: CustomTag): string {
     return tag.name
