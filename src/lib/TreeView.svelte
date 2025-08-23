@@ -49,7 +49,6 @@
   let dropPosition = $state<number | null>(null)
   let dropOnItem = $state<string | null>(null)
   let dragOverTarget = $state<'reorder' | 'make-child' | null>(null)
-  let dragLeaveTimeout: ReturnType<typeof setTimeout> | null = null
 
   // Reference to the container (used for both scrolling and SVG)
   let container = $state<HTMLElement>()
@@ -241,12 +240,6 @@
   }
 
   function handleDragEnd() {
-    // Clear any pending timeout
-    if (dragLeaveTimeout) {
-      clearTimeout(dragLeaveTimeout)
-      dragLeaveTimeout = null
-    }
-
     draggedItemId = null
     dropPosition = null
     dropOnItem = null
@@ -266,11 +259,6 @@
       event.dataTransfer.dropEffect = 'move'
     }
 
-    // Clear any pending dragLeave timeout
-    if (dragLeaveTimeout) {
-      clearTimeout(dragLeaveTimeout)
-      dragLeaveTimeout = null
-    }
 
     // Prevent making an item a child of itself or creating circular dependencies
     if (itemId && draggedItemId === itemId) {
@@ -356,12 +344,6 @@
   function handleDrop(event: DragEvent) {
     event.preventDefault()
     event.stopPropagation()
-
-    // Clear any pending timeout
-    if (dragLeaveTimeout) {
-      clearTimeout(dragLeaveTimeout)
-      dragLeaveTimeout = null
-    }
 
     if (!draggedItemId) return
 
