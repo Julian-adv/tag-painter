@@ -47,7 +47,6 @@ export interface CustomTag {
   tags: string[]
   type: TagType
   weight?: number // Weight for emphasis/de-emphasis (1.0 = normal, >1.0 = emphasis, <1.0 = de-emphasis)
-  collapsed?: boolean // UI state for tree view expand/collapse
 }
 
 export interface PromptsData {

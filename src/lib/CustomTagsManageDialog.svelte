@@ -2,6 +2,7 @@
 <script lang="ts">
   import TagInput from './TagInput.svelte'
   import TreeView from './TreeView.svelte'
+  import ActionButton from './ActionButton.svelte'
   import { promptsData, saveCustomTag, savePromptsData } from './stores/promptsStore'
   import { combinedTags } from './stores/tagsStore'
   import {
@@ -11,7 +12,14 @@
   } from './stores/testModeStore.svelte'
   import { get } from 'svelte/store'
   import { untrack } from 'svelte'
-  import { Trash, DocumentDuplicate, Plus, LockClosed } from 'svelte-heros-v2'
+  import {
+    Trash,
+    DocumentDuplicate,
+    Plus,
+    LockClosed,
+    ChevronDown,
+    ChevronRight
+  } from 'svelte-heros-v2'
   import type { CustomTag, TagType } from '$lib/types'
 
   interface Props {
@@ -28,6 +36,8 @@
   let hasUnsavedChanges = $state(false)
   let editingTagName = $state<string>('')
   let statusMessage = $state<string>('')
+  // UI-only collapsed state (persists across dialog open/close)
+  let collapsedNodes = $state<Set<string>>(new Set())
 
   // Get test mode state for the currently selected tag
   const selectedTagTestMode = $derived.by(() => {
@@ -42,7 +52,14 @@
   let tagNameInputElement = $state<HTMLInputElement>()
 
   // Reference to the TreeView component
-  let treeViewComponent = $state<{ scrollToItem: (itemId: string) => void } | undefined>()
+  let treeViewComponent = $state<
+    | {
+        scrollToItem: (itemId: string) => void
+        collapseAll: () => void
+        expandAll: () => void
+      }
+    | undefined
+  >()
 
   // Convert string array to CustomTag array
   function convertToCustomTags(tagNames: string[]): CustomTag[] {
@@ -98,7 +115,7 @@
     })
   }
 
-  async function selectTag(tagName: string) {
+  async function selectTag(tagName: string, shouldScroll: boolean = true) {
     // Save current changes before switching
     if (selectedTagName && hasUnsavedChanges) {
       await saveTagContent()
@@ -111,8 +128,10 @@
     editingTagName = tagName
     hasUnsavedChanges = false
 
-    // Scroll to the selected tag
-    scrollToTag(tagName)
+    // Only scroll if requested (for programmatic calls)
+    if (shouldScroll) {
+      scrollToTag(tagName)
+    }
   }
 
   async function deleteSelectedTag() {
@@ -370,8 +389,8 @@
 
     // Check if the clicked tag already exists as a custom tag
     if (tagName in customTags) {
-      // Navigate to edit the existing custom tag
-      await selectTag(tagName)
+      // Navigate to edit the existing custom tag - don't scroll since it's user interaction
+      await selectTag(tagName, false)
       return
     }
 
@@ -499,7 +518,8 @@
 
   // TreeView callback functions
   function handleTreeSelect(tagName: string) {
-    selectTag(tagName)
+    // User clicked on TreeView item - don't scroll
+    selectTag(tagName, false)
   }
 
   function handleTreeReorder(draggedItemId: string, dropPosition: number, parentTagName?: string) {
@@ -524,18 +544,18 @@
 
       customTags[parentTagName].tags = newTags
       customTags = { ...customTags } // Force reactivity
-      
+
       // If this is the currently selected tag, update selectedTagContent as well
       if (parentTagName === selectedTagName) {
         selectedTagContent = convertToCustomTags(newTags)
       }
-      
+
       // Immediately update the store as well
       promptsData.update((data) => ({
         ...data,
         customTags: { ...customTags }
       }))
-      
+
       hasUnsavedChanges = true
       return
     }
@@ -564,13 +584,13 @@
     }
 
     customTags = newCustomTags
-    
+
     // Immediately update the store as well
     promptsData.update((data) => ({
       ...data,
       customTags: { ...customTags }
     }))
-    
+
     hasUnsavedChanges = true
   }
 
@@ -584,10 +604,25 @@
     if (!parentTag.tags.includes(childTagName)) {
       parentTag.tags.push(childTagName)
       customTags = { ...customTags } // Force reactivity
+
+      // If this is the currently selected tag, update selectedTagContent as well
+      if (parentTagName === selectedTagName) {
+        selectedTagContent = convertToCustomTags(parentTag.tags)
+      }
+
       hasUnsavedChanges = true
     }
   }
 
+  function handleTreeToggleCollapsed(itemId: string, collapsed: boolean) {
+    if (collapsed) {
+      collapsedNodes.add(itemId)
+    } else {
+      collapsedNodes.delete(itemId)
+    }
+    // Force reactivity for Set changes
+    collapsedNodes = new Set(collapsedNodes)
+  }
 
   function getTagDisplayText(tag: CustomTag): string {
     return tag.name
@@ -628,7 +663,27 @@
     <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full h-[600px] flex flex-col">
       <!-- Header -->
       <div class="flex items-center justify-between p-6 border-b border-gray-300">
-        <h2 class="text-lg font-semibold text-gray-900">Manage Custom Tags</h2>
+        <div class="flex items-center gap-2">
+          <h2 class="text-lg font-semibold text-gray-900">Manage Custom Tags</h2>
+          <ActionButton
+            onclick={() => addNewTag()}
+            variant="green"
+            icon={Plus}
+            title="Add new custom tag"
+          />
+          <ActionButton
+            onclick={() => treeViewComponent?.expandAll()}
+            variant="gray"
+            icon={ChevronDown}
+            title="Expand all tags"
+          />
+          <ActionButton
+            onclick={() => treeViewComponent?.collapseAll()}
+            variant="gray"
+            icon={ChevronRight}
+            title="Collapse all tags"
+          />
+        </div>
         <button
           type="button"
           class="text-gray-400 hover:text-gray-600 transition-colors"
@@ -649,22 +704,24 @@
       <!-- Content -->
       <div class="flex-1 flex min-h-0">
         <!-- Left column: Custom tags list -->
-        <div class="w-3/5 border-r border-gray-300 flex flex-col p-4">
+        <div class="w-1/2 border-r border-gray-300 flex flex-col p-4">
           <TreeView
             bind:this={treeViewComponent}
             items={customTags}
             getDisplayText={getTagDisplayText}
+            {collapsedNodes}
             selectedId={selectedTagName}
             onSelect={handleTreeSelect}
             onReorder={handleTreeReorder}
             onMakeChild={handleTreeMakeChild}
+            onToggleCollapsed={handleTreeToggleCollapsed}
             getIndicators={getTagIndicators}
             levelIndent={20}
           />
         </div>
 
         <!-- Right column: Selected tag content -->
-        <div class="w-2/5 p-4 flex flex-col gap-2">
+        <div class="w-1/2 p-4 flex flex-col gap-2">
           {#if selectedTagName}
             <div class="flex items-center justify-between">
               <input
@@ -678,33 +735,18 @@
                 placeholder="Custom tag name"
               />
               <div class="flex gap-2">
-                <button
-                  type="button"
-                  onclick={() => addNewTag()}
-                  class="inline-flex items-center gap-1 p-1.5 bg-green-200 text-green-600 rounded-md hover:bg-green-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors text-sm"
-                  tabindex="-1"
-                  title="Add new custom tag"
-                >
-                  <Plus class="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
+                <ActionButton
                   onclick={duplicateSelectedTag}
-                  class="inline-flex items-center gap-1 p-1.5 bg-blue-200 text-blue-600 rounded-md hover:bg-blue-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-sm"
-                  tabindex="-1"
+                  variant="blue"
+                  icon={DocumentDuplicate}
                   title="Duplicate this custom tag"
-                >
-                  <DocumentDuplicate class="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
+                />
+                <ActionButton
                   onclick={deleteSelectedTag}
-                  class="inline-flex items-center gap-1 p-1.5 bg-red-200 text-red-500 rounded-md hover:bg-red-600 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors text-sm"
-                  tabindex="-1"
+                  variant="red"
+                  icon={Trash}
                   title="Delete this custom tag"
-                >
-                  <Trash class="w-4 h-4" />
-                </button>
+                />
               </div>
             </div>
 

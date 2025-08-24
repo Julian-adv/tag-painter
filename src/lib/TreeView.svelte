@@ -19,6 +19,10 @@
     items: Record<string, CustomTag>
     // Function to get display text for an item
     getDisplayText: (item: CustomTag) => string
+    // External collapsed nodes state (for persistence across component recreation)
+    collapsedNodes: Set<string>
+    // Callback when collapse state changes
+    onToggleCollapsed: (itemId: string, collapsed: boolean) => void
     // Currently selected item ID
     selectedId?: string
     // Callback when an item is selected
@@ -38,6 +42,8 @@
   let {
     items = {},
     getDisplayText,
+    collapsedNodes,
+    onToggleCollapsed,
     selectedId = '',
     onSelect,
     onReorder,
@@ -79,7 +85,7 @@
       
       // Check if this node has children (tag content)
       const hasChildren = !!(customTag.tags?.length)
-      const isCollapsed = !!customTag.collapsed
+      const isCollapsed = collapsedNodes.has(itemId)
       
       nodes.push({ 
         id: itemId, 
@@ -244,10 +250,8 @@
   }
 
   function toggleNode(nodeId: string) {
-    // Toggle collapsed state on the item itself
-    if (items[nodeId]) {
-      items[nodeId].collapsed = !items[nodeId].collapsed
-    }
+    const currentCollapsed = collapsedNodes.has(nodeId)
+    onToggleCollapsed(nodeId, !currentCollapsed)
     
     // Update SVG edges after toggling
     setTimeout(() => recomputeEdges(), 0)
@@ -441,8 +445,38 @@
     }, 50)
   }
 
-  // Export the public method for parent component access
-  export { scrollToItem }
+  // Collapse all nodes (exposed for external use)
+  function collapseAll() {
+    Object.keys(items).forEach(itemId => {
+      const item = items[itemId]
+      if (item && item.tags && item.tags.length > 0) {
+        // Only collapse if not already collapsed
+        if (!collapsedNodes.has(itemId)) {
+          onToggleCollapsed(itemId, true)
+        }
+      }
+    })
+    // Recompute edges after collapsing all nodes
+    setTimeout(() => recomputeEdges(), 50)
+  }
+
+  // Expand all nodes (exposed for external use)  
+  function expandAll() {
+    Object.keys(items).forEach(itemId => {
+      const item = items[itemId]
+      if (item && item.tags && item.tags.length > 0) {
+        // Only expand if currently collapsed
+        if (collapsedNodes.has(itemId)) {
+          onToggleCollapsed(itemId, false)
+        }
+      }
+    })
+    // Recompute edges after expanding all nodes
+    setTimeout(() => recomputeEdges(), 50)
+  }
+
+  // Export the public methods for parent component access
+  export { scrollToItem, collapseAll, expandAll }
 </script>
 
 <div
