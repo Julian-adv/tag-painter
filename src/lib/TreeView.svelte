@@ -60,7 +60,6 @@
   let dropOnItem = $state<string | null>(null)
   let dragOverTarget = $state<'reorder' | 'make-child' | null>(null)
 
-
   // Reference to the container (used for both scrolling and SVG)
   let container = $state<HTMLElement>()
   let nodeBindings: Record<string, HTMLElement | null> = $state({})
@@ -70,11 +69,31 @@
   let svgWidth = $state(0)
   let svgHeight = $state(0)
 
-
   // Build hierarchical tree structure
   const treeNodes = $derived.by(() => {
     const nodes: TreeNode[] = []
     const processed = new Set<string>()
+
+    // Helper function to recursively mark all children as processed
+    function markChildrenAsProcessed(itemId: string) {
+      const customTag = items[itemId]
+      if (!customTag?.tags?.length) return
+
+      if (customTag.type === 'sequential' || customTag.type === 'regular') {
+        const tagNodeId = `${itemId}_combined_tags`
+        processed.add(tagNodeId)
+      } else {
+        customTag.tags.forEach((tag: string) => {
+          if (items[tag]) {
+            processed.add(tag)
+            markChildrenAsProcessed(tag)
+          } else {
+            const tagNodeId = `${itemId}_tag_${tag}`
+            processed.add(tagNodeId)
+          }
+        })
+      }
+    }
 
     // Function to add item and its children recursively
     function addToTree(itemId: string, level: number = 0, parentId?: string) {
@@ -82,15 +101,20 @@
 
       processed.add(itemId)
       const customTag = items[itemId]
-      
+
       // Check if this node has children (tag content)
-      const hasChildren = !!(customTag.tags?.length)
+      const hasChildren = !!customTag.tags?.length
       const isCollapsed = collapsedNodes.has(itemId)
-      
-      nodes.push({ 
-        id: itemId, 
-        level, 
-        data: customTag, 
+
+      // If collapsed, mark all children as processed so they don't get processed elsewhere
+      if (isCollapsed && hasChildren) {
+        markChildrenAsProcessed(itemId)
+      }
+
+      nodes.push({
+        id: itemId,
+        level,
+        data: customTag,
         parentId,
         collapsed: isCollapsed,
         hasChildren
@@ -98,7 +122,6 @@
 
       // Only add children if not collapsed
       if (isCollapsed) return
-
 
       // Add tags as children (tag content)
       if (customTag.tags && customTag.tags.length > 0) {
@@ -135,9 +158,9 @@
 
     // Find all items that are children of other items
     const childrenSet = new Set<string>()
-    Object.values(items).forEach(item => {
+    Object.values(items).forEach((item) => {
       if (item.tags) {
-        item.tags.forEach(tag => {
+        item.tags.forEach((tag) => {
           // If this tag exists as a CustomTag item, it's a child
           if (items[tag]) {
             childrenSet.add(tag)
@@ -145,11 +168,12 @@
         })
       }
     })
-    
+
     // Add only root items (items that are not children of any other item)
     Object.keys(items).forEach((itemId) => {
       const item = items[itemId]
       if (item && !childrenSet.has(itemId)) {
+        console.log('Adding root item to tree:', itemId)
         addToTree(itemId)
       }
     })
@@ -252,18 +276,18 @@
   function toggleNode(nodeId: string) {
     const currentCollapsed = collapsedNodes.has(nodeId)
     onToggleCollapsed(nodeId, !currentCollapsed)
-    
+
     // Update SVG edges after toggling
     setTimeout(() => recomputeEdges(), 0)
   }
 
   function handleDragStart(event: DragEvent, itemId: string) {
     draggedItemId = itemId
-    
+
     // Use precomputed parentId from tree node
     const draggedNode = treeNodes.find((node) => node.id === itemId)
     draggedItemParent = draggedNode?.parentId ?? null
-    
+
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move'
       event.dataTransfer.setData('text/plain', itemId)
@@ -290,7 +314,6 @@
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'move'
     }
-
 
     // Prevent making an item a child of itself or creating circular dependencies
     if (itemId && draggedItemId === itemId) {
@@ -357,11 +380,11 @@
   }
 
   function wouldCreateCircularDependency(draggedId: string, targetId: string): boolean {
-    // Since we're using tags array instead of separate hierarchy, 
+    // Since we're using tags array instead of separate hierarchy,
     // we need to check if targetId already contains draggedId in its tags
     const targetItem = items[targetId]
     if (!targetItem) return false
-    
+
     // Simple check: if target's tags already contain the dragged item, it would create a cycle
     return targetItem.tags.includes(draggedId)
   }
@@ -383,19 +406,19 @@
       }
     } else if (dragOverTarget === 'reorder' && dropPosition !== null) {
       // Find the dragged node to get the actual tag name
-      const draggedNode = treeNodes.find(node => node.id === draggedItemId)
+      const draggedNode = treeNodes.find((node) => node.id === draggedItemId)
       const actualTagName = draggedNode?.data.name || draggedItemId
-      
+
       // Calculate relative position within siblings if there's a parent
       let relativeDropPosition = dropPosition
       if (draggedItemParent) {
         // Find all siblings (nodes with same parent)
-        const siblings = treeNodes.filter(node => node.parentId === draggedItemParent)
-        const siblingIds = siblings.map(s => s.id)
-        
+        const siblings = treeNodes.filter((node) => node.parentId === draggedItemParent)
+        const siblingIds = siblings.map((s) => s.id)
+
         // Find the dragged item's position in siblings array
         const draggedSiblingIndex = siblingIds.indexOf(draggedItemId)
-        
+
         // Convert global dropPosition to sibling-relative position
         let targetSiblingIndex = 0
         for (let i = 0; i < dropPosition; i++) {
@@ -403,15 +426,15 @@
             targetSiblingIndex++
           }
         }
-        
+
         // Adjust for removed element
         if (draggedSiblingIndex < targetSiblingIndex) {
           targetSiblingIndex--
         }
-        
+
         relativeDropPosition = targetSiblingIndex
       }
-      
+
       // Reorder items
       onReorder?.(actualTagName, relativeDropPosition, draggedItemParent || undefined)
     }
@@ -447,7 +470,7 @@
 
   // Collapse all nodes (exposed for external use)
   function collapseAll() {
-    Object.keys(items).forEach(itemId => {
+    Object.keys(items).forEach((itemId) => {
       const item = items[itemId]
       if (item && item.tags && item.tags.length > 0) {
         // Only collapse if not already collapsed
@@ -460,9 +483,9 @@
     setTimeout(() => recomputeEdges(), 50)
   }
 
-  // Expand all nodes (exposed for external use)  
+  // Expand all nodes (exposed for external use)
   function expandAll() {
-    Object.keys(items).forEach(itemId => {
+    Object.keys(items).forEach((itemId) => {
       const item = items[itemId]
       if (item && item.tags && item.tags.length > 0) {
         // Only expand if currently collapsed
@@ -554,10 +577,20 @@
                   <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {#if node.collapsed}
                       <!-- Right arrow (collapsed) -->
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M9 5l7 7-7 7"
+                      ></path>
                     {:else}
                       <!-- Down arrow (expanded) -->
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M19 9l-7 7-7-7"
+                      ></path>
                     {/if}
                   </svg>
                 </div>
