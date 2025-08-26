@@ -33,7 +33,7 @@ class MockWebSocket {
   }
 
   // Helper method to simulate receiving messages
-  simulateMessage(data: any) {
+  simulateMessage(data: string | ArrayBuffer | Blob) {
     if (this.onmessage) {
       this.onmessage(new MessageEvent('message', { data }))
     }
@@ -64,7 +64,7 @@ Object.assign(mockWebSocketConstructor, {
   CLOSED: 3,
   prototype: MockWebSocket.prototype
 })
-global.WebSocket = mockWebSocketConstructor as any
+global.WebSocket = mockWebSocketConstructor as unknown as typeof WebSocket
 
 describe('comfyui utilities', () => {
   beforeEach(() => {

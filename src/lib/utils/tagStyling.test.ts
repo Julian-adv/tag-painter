@@ -83,7 +83,7 @@ describe('tagStyling utilities', () => {
     it('should apply test selected styling', () => {
       const result = getTagClasses({ tag: 'regular-tag', testSelected: true })
 
-      expect(result).toContain('ring-3 ring-blue-500 ring-opacity-75')
+      expect(result).toContain('bg-sky-600 text-white border-sky-600')
     })
 
     it('should include additional classes', () => {

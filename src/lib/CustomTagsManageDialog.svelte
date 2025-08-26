@@ -71,6 +71,12 @@
         return customTag
       }
 
+      // Check if the tag exists in customTags to preserve its type
+      const existingTag = customTags[tagName]
+      if (existingTag) {
+        return existingTag
+      }
+
       // Create regular tag object for non-custom tags
       return {
         name: tagName,
