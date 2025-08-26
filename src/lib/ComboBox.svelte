@@ -90,12 +90,12 @@
     const target = event.target as HTMLInputElement
     inputValue = target.value
     updateDropdown()
-    
+
     // Only update value if there's an exact match
     const exactMatch = options.find(
       (option) => option.title.toLowerCase() === inputValue.toLowerCase()
     )
-    
+
     if (exactMatch) {
       value = { ...exactMatch }
       onValueChange(value)
@@ -152,12 +152,12 @@
       const exactMatch = options.find(
         (option) => option.title.toLowerCase() === inputValue.toLowerCase()
       )
-      
+
       if (!exactMatch) {
         // Reset to current selected value
         inputValue = value.title || ''
       }
-      
+
       showDropdown = false
       selectedIndex = -1
     }, 150)

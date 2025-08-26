@@ -73,8 +73,6 @@
           />
         </div>
 
-
-
         <div class="category-manager-actions">
           <button type="button" class="btn-cancel" onclick={onClose}> Cancel </button>
           <button

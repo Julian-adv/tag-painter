@@ -41,9 +41,13 @@ export function fromYAML(text: string): TreeModel {
       return n
     }
     const id = uid()
-    const leafValue = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null 
-      ? value 
-      : String(value)
+    const leafValue =
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean' ||
+      value === null
+        ? value
+        : String(value)
     const n: LeafNode = { id, name, kind: 'leaf', value: leafValue }
     nodes[id] = n
     return n

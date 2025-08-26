@@ -613,7 +613,7 @@
         const index = tag.tags.indexOf(childTagName)
         if (index > -1) {
           tag.tags.splice(index, 1)
-          
+
           // If current parent was selected, update its selectedTagContent
           if (tagId === selectedTagName) {
             selectedTagContent = convertToCustomTags(tag.tags)
@@ -625,13 +625,13 @@
     // Add child tag to new parent's tags array if not already present
     if (!parentTag.tags.includes(childTagName)) {
       parentTag.tags.push(childTagName)
-      
+
       // Auto-change parent tag type to random when child is added via drag & drop
       // But preserve consistent-random if it's already set
       if (parentTag.type !== 'consistent-random') {
         parentTag.type = 'random'
       }
-      
+
       customTags = { ...customTags } // Force reactivity
 
       // If this is the currently selected tag, update selectedTagContent and selectedTagType as well

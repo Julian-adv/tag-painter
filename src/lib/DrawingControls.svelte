@@ -14,7 +14,7 @@
     class="flex items-center justify-center w-9 h-9 border rounded-full cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 {isDrawingMode
       ? 'bg-sky-500 text-white border-blue-400 hover:bg-blue-600'
       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'}"
-    onclick={() => isDrawingMode = !isDrawingMode}
+    onclick={() => (isDrawingMode = !isDrawingMode)}
     aria-label="Draw mask"
   >
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -30,7 +30,7 @@
         'brush'
           ? 'bg-teal-500 text-white shadow-sm rounded-full'
           : 'text-gray-700 hover:bg-gray-200 rounded-full'}"
-        onclick={() => drawingTool = 'brush'}
+        onclick={() => (drawingTool = 'brush')}
         aria-label="Brush mode"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -44,7 +44,7 @@
         'fill'
           ? 'bg-teal-500 text-white shadow-sm rounded-full'
           : 'text-gray-700 hover:bg-gray-200 rounded-full'}"
-        onclick={() => drawingTool = 'fill'}
+        onclick={() => (drawingTool = 'fill')}
         aria-label="Fill mode"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">

@@ -74,9 +74,8 @@
 
   // Check if new option title already exists
   let titleAlreadyExists = $derived(
-    newOptionTitle.trim() && options.some(
-      (option) => option.title.toLowerCase() === newOptionTitle.trim().toLowerCase()
-    )
+    newOptionTitle.trim() &&
+      options.some((option) => option.title.toLowerCase() === newOptionTitle.trim().toLowerCase())
   )
 
   function scrollToSelectedOption() {
@@ -211,7 +210,7 @@
     // Generate unique title by adding number suffix
     let duplicateTitle = selectedOption.title
     let counter = 2
-    while (options.some(option => option.title.toLowerCase() === duplicateTitle.toLowerCase())) {
+    while (options.some((option) => option.title.toLowerCase() === duplicateTitle.toLowerCase())) {
       duplicateTitle = `${selectedOption.title} ${counter}`
       counter++
     }
@@ -222,7 +221,7 @@
     }
 
     // Insert duplicated option right after the original option
-    const currentIndex = options.findIndex(option => option.title === selectedOption.title)
+    const currentIndex = options.findIndex((option) => option.title === selectedOption.title)
     const updatedOptions = [...options]
     updatedOptions.splice(currentIndex + 1, 0, duplicatedOption)
     onOptionsChange(updatedOptions)
@@ -531,7 +530,14 @@
       </div>
       <div class="dialog-footer">
         <button type="button" class="delete-category-btn" onclick={handleDeleteCategory}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <polyline points="3,6 5,6 21,6"></polyline>
             <path
               d="M19,6V20a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6M8,6V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2V6"

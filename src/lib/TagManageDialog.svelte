@@ -39,14 +39,14 @@
     // Save as custom tag if user entered a name
     if (newTagInput.trim()) {
       const customTagName = newTagInput.trim()
-      const currentDialogTagNames = dialogTags.map(tag => tag.name) // Convert to string array
-      
+      const currentDialogTagNames = dialogTags.map((tag) => tag.name) // Convert to string array
+
       // Save the custom tag
       await saveCustomTag(customTagName, currentDialogTagNames)
-      
+
       // Pass the custom tag name and original tags to parent for processing
       onSave(customTagName, currentDialogTagNames)
-      
+
       isOpen = false
     }
   }
@@ -62,7 +62,6 @@
       handleCancel()
     }
   }
-
 </script>
 
 {#if isOpen}
@@ -76,9 +75,7 @@
     onkeydown={(e) => e.key === 'Escape' && handleCancel()}
   >
     <!-- Modal content -->
-    <div 
-      class="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
-    >
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
       <!-- Header -->
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-lg font-semibold text-gray-900">{title}</h2>
@@ -119,10 +116,7 @@
         <label for="dialog-tags" class="block text-sm font-medium text-gray-700 mb-2 text-left"
           >Current Tags</label
         >
-        <TagDisplay
-          id="dialog-tags"
-          bind:tags={dialogTags}
-        />
+        <TagDisplay id="dialog-tags" bind:tags={dialogTags} />
       </div>
 
       <!-- Action buttons -->

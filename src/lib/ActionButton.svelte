@@ -37,25 +37,18 @@
     lg: 'px-4 py-2 text-base'
   }
 
-  const baseClasses = 'inline-flex items-center gap-1 rounded-md focus:outline-none focus:ring-2 transition-colors font-medium'
+  const baseClasses =
+    'inline-flex items-center gap-1 rounded-md focus:outline-none focus:ring-2 transition-colors font-medium'
   const disabledClasses = 'opacity-50 cursor-not-allowed'
 
-  const buttonClasses = $derived([
-    baseClasses,
-    variantClasses[variant],
-    sizeClasses[size],
-    disabled ? disabledClasses : ''
-  ].join(' '))
+  const buttonClasses = $derived(
+    [baseClasses, variantClasses[variant], sizeClasses[size], disabled ? disabledClasses : ''].join(
+      ' '
+    )
+  )
 </script>
 
-<button
-  type="button"
-  class={buttonClasses}
-  {onclick}
-  {title}
-  {disabled}
-  {tabindex}
->
+<button type="button" class={buttonClasses} {onclick} {title} {disabled} {tabindex}>
   {#if icon}
     {@const IconComponent = icon}
     <IconComponent class="w-4 h-4" />

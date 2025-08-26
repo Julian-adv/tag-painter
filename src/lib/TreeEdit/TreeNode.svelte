@@ -10,6 +10,7 @@
   } from './model'
   import type { ArrayNode, LeafNode, ObjectNode, RefNode, TreeModel } from './model'
   import TreeNode from './TreeNode.svelte'
+  import { ChevronDown, ChevronRight } from 'svelte-heros-v2'
 
   let { model, id }: { model: TreeModel; id: string } = $props()
 
@@ -18,9 +19,11 @@
   function onToggle() {
     toggle(model, id)
   }
+
   function onDelete() {
     removeNode(model, id)
   }
+
   function addLeaf() {
     const parent = get(id)
     if (!parent || !isContainer(parent)) return
@@ -32,6 +35,7 @@
     } as LeafNode
     addChild(model, id, child)
   }
+
   function addObject() {
     const child: ObjectNode = {
       id: crypto.randomUUID(),
@@ -42,6 +46,7 @@
     }
     addChild(model, id, child)
   }
+
   function addArray() {
     const child: ArrayNode = {
       id: crypto.randomUUID(),
@@ -52,6 +57,7 @@
     }
     addChild(model, id, child)
   }
+
   function addRef() {
     const name = prompt('참조할 이름 ($ref):')
     if (name) upsertRef(model, id, name)
@@ -62,12 +68,20 @@
   {@const n = get(id)}
   <div class="node">
     <div class="row">
-      <button class="toggle" onclick={onToggle}>{n.collapsed ? '▶' : '▼'}</button>
-      <input
-        class="name"
-        value={n.name}
-        onchange={(e) => renameNode(model, id, (e.target as HTMLInputElement).value)}
-      />
+      <div class="node-header">
+        <button class="toggle" onclick={onToggle}>
+          {#if n.collapsed}
+            <ChevronRight class="w-4 h-4" />
+          {:else}
+            <ChevronDown class="w-4 h-4" />
+          {/if}
+        </button>
+        <input
+          class="name"
+          value={n.name}
+          onchange={(e) => renameNode(model, id, (e.target as HTMLInputElement).value)}
+        />
+      </div>
 
       {#if n.kind === 'leaf'}
         <span class="sep">:</span>
@@ -137,11 +151,40 @@
     align-items: center;
     gap: 0.5rem;
   }
+  .node-header {
+    display: flex;
+    align-items: center;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background-color: #f9fafb;
+    overflow: hidden;
+  }
   .toggle {
-    width: 1.5rem;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #6b7280;
+    border-radius: 0;
+  }
+  .toggle:hover {
+    color: #374151;
+    background-color: #e5e7eb;
   }
   .name {
     width: 10rem;
+    border: none;
+    background: transparent;
+    outline: none;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+  }
+  .name:focus {
+    background-color: #ffffff;
   }
   .value {
     width: 12rem;

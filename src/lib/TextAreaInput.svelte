@@ -93,7 +93,12 @@
   }
 </script>
 
-<div class="input-group" class:disabled={isDisabled} class:non-random={value.title !== '[Random]'} class:random={value.title === '[Random]'}>
+<div
+  class="input-group"
+  class:disabled={isDisabled}
+  class:non-random={value.title !== '[Random]'}
+  class:random={value.title === '[Random]'}
+>
   <div
     class="label-container"
     draggable="true"

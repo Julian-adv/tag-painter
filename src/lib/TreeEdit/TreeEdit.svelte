@@ -3,7 +3,9 @@
   import type { TreeModel } from './model'
   import { fromYAML, toYAML } from './yaml-io'
 
-  let { initialYAML = 'a: 1\nlist:\n - x\n - y\nobj:\n k: v\n ref: { $ref: obj }\n' }: { initialYAML?: string } = $props()
+  let {
+    initialYAML = 'a: 1\nlist:\n - x\n - y\nobj:\n k: v\n ref: { $ref: obj }\n'
+  }: { initialYAML?: string } = $props()
 
   let model: TreeModel = $state(fromYAML(initialYAML))
   let yamlOut = $derived(toYAML(model))
