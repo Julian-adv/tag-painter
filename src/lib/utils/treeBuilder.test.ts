@@ -101,9 +101,9 @@ describe('treeBuilder', () => {
       const result = buildTreeNodes(items, collapsedNodes)
 
       // Should have parent and root as level 0 (root items), child as level 1 (under parent)
-      const parentNode = result.find(n => n.id === 'parent')
-      const childNode = result.find(n => n.id === 'child')
-      const rootNode = result.find(n => n.id === 'root')
+      const parentNode = result.find((n) => n.id === 'parent')
+      const childNode = result.find((n) => n.id === 'child')
+      const rootNode = result.find((n) => n.id === 'root')
 
       expect(parentNode?.level).toBe(0)
       expect(childNode?.level).toBe(1) // child is referenced in parent's tags, so it's a child

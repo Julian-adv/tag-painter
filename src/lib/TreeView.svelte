@@ -70,8 +70,12 @@
   function collectEdges() {
     const edgeList: Array<{ from: string; to: string; path: string }> = []
     for (const node of treeNodes) {
-      if (node.parentId) {
-        edgeList.push({ from: node.parentId, to: node.id, path: '' })
+      // Don't draw edges to/from root type tags
+      if (node.parentId && node.data.type !== 'root') {
+        const parentItem = items[node.parentId]
+        if (parentItem && parentItem.type !== 'root') {
+          edgeList.push({ from: node.parentId, to: node.id, path: '' })
+        }
       }
     }
     return edgeList
@@ -152,6 +156,12 @@
   }
 
   function toggleNode(nodeId: string) {
+    // Prevent root type tags from being collapsed
+    const item = items[nodeId]
+    if (item?.type === 'root') {
+      return // Don't allow root tags to be collapsed
+    }
+
     const currentCollapsed = collapsedNodes.has(nodeId)
     onToggleCollapsed(nodeId, !currentCollapsed)
 
@@ -350,8 +360,8 @@
   function collapseAll() {
     Object.keys(items).forEach((itemId) => {
       const item = items[itemId]
-      if (item && item.tags && item.tags.length > 0) {
-        // Only collapse if not already collapsed
+      if (item && item.tags && item.tags.length > 0 && item.type !== 'root') {
+        // Only collapse if not already collapsed and not a root type
         if (!collapsedNodes.has(itemId)) {
           onToggleCollapsed(itemId, true)
         }
@@ -401,6 +411,7 @@
   {#each treeNodes as node, index (node.id)}
     <div
       class="relative flex justify-start"
+      class:hidden={node.data.type === 'root'}
       role="listitem"
       ondragenter={handleDragEnter}
       ondragover={(e) => handleDragOver(e, index, node.id)}
@@ -419,7 +430,10 @@
         ></div>
       {/if}
 
-      <div class="flex items-center min-w-0" style="margin-left: {node.level * levelIndent}px;">
+      <div
+        class="flex items-center min-w-0"
+        style="margin-left: {(node.level - 1) * levelIndent}px;"
+      >
         <button
           type="button"
           draggable="true"
@@ -433,8 +447,8 @@
         >
           <div class="flex items-center w-full">
             <div class="flex items-center gap-1 flex-1 min-w-0">
-              <!-- Expand/Collapse toggle icon inside tag button -->
-              {#if node.hasChildren}
+              <!-- Expand/Collapse toggle icon inside tag button (hidden for root type) -->
+              {#if node.hasChildren && node.data.type !== 'root'}
                 <div
                   class="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0 cursor-pointer"
                   onclick={(e) => {
