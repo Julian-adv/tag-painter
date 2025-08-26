@@ -1,0 +1,80 @@
+import { parse, stringify } from 'yaml'
+import type { AnyNode, ArrayNode, LeafNode, NodeId, ObjectNode, RefNode, TreeModel } from './model'
+import { uid } from './model'
+
+export function fromYAML(text: string): TreeModel {
+  const data = parse(text ?? '') ?? {}
+  const nodes: Record<NodeId, AnyNode> = {}
+  const symbols: Record<string, NodeId> = {}
+  const refIndex: Record<string, NodeId[]> = {}
+
+  function build(name: string, value: unknown): AnyNode {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const id = uid()
+      const n: ObjectNode = { id, name, kind: 'object', children: [], collapsed: false }
+      nodes[id] = n
+      for (const [k, v] of Object.entries(value)) {
+        if (k === '$ref' && typeof v === 'string') {
+          const rid = uid()
+          const r: RefNode = { id: rid, name: v, kind: 'ref', refName: v }
+          nodes[rid] = r
+          refIndex[v] ||= []
+          refIndex[v].push(rid)
+          n.children.push(rid)
+        } else {
+          const c = build(k, v)
+          n.children.push(c.id)
+        }
+      }
+      // 심볼 정의로 취급 (동일 이름 하나 가정)
+      symbols[name] = id
+      return n
+    }
+    if (Array.isArray(value)) {
+      const id = uid()
+      const n: ArrayNode = { id, name, kind: 'array', children: [], collapsed: false }
+      nodes[id] = n
+      value.forEach((v, i) => {
+        const c = build(String(i), v)
+        n.children.push(c.id)
+      })
+      return n
+    }
+    const id = uid()
+    const leafValue = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null 
+      ? value 
+      : String(value)
+    const n: LeafNode = { id, name, kind: 'leaf', value: leafValue }
+    nodes[id] = n
+    return n
+  }
+
+  const root = build('root', data)
+  return { rootId: root.id, nodes, symbols, refIndex }
+}
+
+export function toYAML(model: TreeModel): string {
+  function materialize(nodeId: NodeId): unknown {
+    const n = model.nodes[nodeId]
+    if (!n) return null
+    if (n.kind === 'leaf') return (n as LeafNode).value
+    if (n.kind === 'ref') return { $ref: (n as RefNode).refName }
+    if (n.kind === 'object') {
+      const obj: Record<string, unknown> = {}
+      for (const cid of (n as ObjectNode).children) {
+        const c = model.nodes[cid]
+        if (!c) continue
+        obj[c.name] = materialize(cid)
+      }
+      return obj
+    }
+    if (n.kind === 'array') {
+      const arr: unknown[] = []
+      for (const cid of (n as ArrayNode).children) arr.push(materialize(cid))
+      return arr
+    }
+  }
+
+  const root = materialize(model.rootId)
+  return stringify(root ?? {})
+}

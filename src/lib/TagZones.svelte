@@ -2,6 +2,7 @@
 <script lang="ts">
   import TagInput from './TagInput.svelte'
   import CustomTagsManageDialog from './CustomTagsManageDialog.svelte'
+  import TestDialog from './TreeEdit/TestDialog.svelte'
   import { promptsData, updateTags, savePromptsData } from './stores/promptsStore'
   import { onMount } from 'svelte'
   import { Tag } from 'svelte-heros-v2'
@@ -28,6 +29,7 @@
   let negativeTags = $state<CustomTag[]>([])
   let inpaintingTags = $state<CustomTag[]>([])
   let showCustomTagsDialog = $state(false)
+  let showTreeEditDialog = $state(false)
   let selectedCustomTagName = $state<string>('')
 
   // Parse weight from tag string
@@ -100,6 +102,10 @@
     showCustomTagsDialog = true
   }
 
+  function openTreeEditDialog() {
+    showTreeEditDialog = true
+  }
+
   function handleCustomTagDoubleClick(tagName: string) {
     selectedCustomTagName = tagName
     showCustomTagsDialog = true
@@ -111,7 +117,7 @@
     <h3 class="text-sm font-bold text-gray-800 text-left">Tags</h3>
     <button
       type="button"
-      onclick={openCustomTagsDialog}
+      onclick={openTreeEditDialog}
       class="w-5 h-5 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-1 transition-colors flex items-center justify-center"
       title="Manage custom tags"
     >
@@ -173,6 +179,9 @@
     bind:isOpen={showCustomTagsDialog}
     initialSelectedTag={selectedCustomTagName}
   />
+
+  <!-- TreeEdit test dialog -->
+  <TestDialog bind:isOpen={showTreeEditDialog} />
 </div>
 
 <style>

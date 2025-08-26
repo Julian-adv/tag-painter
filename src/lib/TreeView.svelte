@@ -293,9 +293,17 @@
         onMakeChild?.(draggedItemId, dropOnItem)
       }
     } else if (dragOverTarget === 'reorder' && dropPosition !== null) {
-      // Find the dragged node to get the actual tag name
-      const draggedNode = treeNodes.find((node) => node.id === draggedItemId)
-      const actualTagName = draggedNode?.data.name || draggedItemId
+      // For combined tag nodes (like "parent_combined_tags"), use the parent ID
+      let actualTagName = draggedItemId
+      if (draggedItemId.endsWith('_combined_tags')) {
+        actualTagName = draggedItemId.replace('_combined_tags', '')
+      } else if (draggedItemId.includes('_tag_')) {
+        // For individual tag nodes (like "parent_tag_tagname"), use the parent ID
+        actualTagName = draggedItemId.split('_tag_')[0]
+      } else {
+        // For regular custom tag nodes, use the node ID directly
+        actualTagName = draggedItemId
+      }
 
       // Calculate relative position within siblings if there's a parent
       let relativeDropPosition = dropPosition
