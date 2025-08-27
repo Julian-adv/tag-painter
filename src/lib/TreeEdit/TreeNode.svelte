@@ -8,11 +8,13 @@
     removeNode,
     upsertRef
   } from './model'
-  import type { ArrayNode, LeafNode, ObjectNode, RefNode, TreeModel } from './model'
+  import type { ArrayNode, LeafNode, NodeKind, ObjectNode, RefNode, TreeModel } from './model'
   import TreeNode from './TreeNode.svelte'
-  import { ChevronDown, ChevronRight } from 'svelte-heros-v2'
+  import ActionButton from '../ActionButton.svelte'
+  import InlineEditor from './InlineEditor.svelte'
+  import { ChevronDown, ChevronRight, Trash, Plus } from 'svelte-heros-v2'
 
-  let { model, id }: { model: TreeModel; id: string } = $props()
+  let { model, id, parentKind }: { model: TreeModel; id: string; parentKind?: NodeKind } = $props()
 
   const get = (id: string) => model.nodes[id]
 
@@ -22,6 +24,11 @@
 
   function onDelete() {
     removeNode(model, id)
+  }
+
+  function handleAddChild() {
+    // 기본적으로 leaf 노드를 추가
+    addLeaf()
   }
 
   function addLeaf() {
@@ -68,72 +75,63 @@
   {@const n = get(id)}
   <div class="node">
     <div class="row">
-      <div class="node-header">
-        <button class="toggle" onclick={onToggle}>
-          {#if n.collapsed}
-            <ChevronRight class="w-4 h-4" />
-          {:else}
-            <ChevronDown class="w-4 h-4" />
-          {/if}
-        </button>
-        <input
-          class="name"
-          value={n.name}
-          onchange={(e) => renameNode(model, id, (e.target as HTMLInputElement).value)}
-        />
-      </div>
-
-      {#if n.kind === 'leaf'}
-        <span class="sep">:</span>
-        <input
-          class="value"
-          value={(n as LeafNode).value ?? ''}
-          onchange={(e) => setLeafValue(model, id, (e.target as HTMLInputElement).value)}
-        />
-      {:else if n.kind === 'ref'}
-        <span class="ref">$ref → {(n as RefNode).refName}</span>
-      {:else}
-        <div class="actions">
-          <button
-            title="leaf 추가"
-            onclick={(e) => {
-              e.stopPropagation()
-              addLeaf()
-            }}>＋leaf</button
-          >
-          <button
-            title="object 추가"
-            onclick={(e) => {
-              e.stopPropagation()
-              addObject()
-            }}>＋obj</button
-          >
-          <button
-            title="array 추가"
-            onclick={(e) => {
-              e.stopPropagation()
-              addArray()
-            }}>＋arr</button
-          >
-          <button
-            title="ref 추가"
-            onclick={(e) => {
-              e.stopPropagation()
-              addRef()
-            }}>＋ref</button
-          >
+      {#if parentKind !== 'array'}
+        <div class="node-header array-type">
+          <button class="toggle" onclick={onToggle}>
+            {#if isContainer(n) && (n as ObjectNode | ArrayNode).children.length > 0}
+              {#if n.collapsed}
+                <ChevronRight class="w-3 h-3" />
+              {:else}
+                <ChevronDown class="w-3 h-3" />
+              {/if}
+            {/if}
+          </button>
+          <InlineEditor
+            value={n.name}
+            onSave={(newValue) => renameNode(model, id, newValue)}
+            className="name-editor"
+          />
         </div>
       {/if}
 
+      {#if n.kind === 'leaf' && parentKind !== 'array'}
+        <span class="sep">:</span>
+      {/if}
+
+      {#if n.kind === 'leaf'}
+        <div class="value-wrapper">
+          <InlineEditor
+            value={String((n as LeafNode).value ?? '')}
+            onSave={(newValue) => setLeafValue(model, id, newValue)}
+            className="value-editor"
+            placeholder="Enter value"
+          />
+        </div>
+      {:else if n.kind === 'ref'}
+        <span class="ref">$ref → {(n as RefNode).refName}</span>
+      {/if}
+
+      <div class="spacer"></div>
+
+      {#if isContainer(n)}
+        <ActionButton
+          onclick={handleAddChild}
+          variant="green"
+          size="sm"
+          icon={Plus}
+          title="Add child"
+        />
+      {/if}
+
       {#if id !== model.rootId}
-        <button class="del" onclick={onDelete}>🗑</button>
+        <ActionButton onclick={onDelete} variant="red" icon={Trash} title="Delete node" />
       {/if}
     </div>
 
     {#if isContainer(n) && !n.collapsed}
       <div class="children">
         {#each (n as ObjectNode | ArrayNode).children as cid (cid)}
-          <TreeNode {model} id={cid} />
+          <TreeNode {model} id={cid} parentKind={n.kind} />
         {/each}
       </div>
     {/if}
@@ -142,26 +140,56 @@
 
 <style>
   .node {
-    padding-left: 0.5rem;
-    border-left: 1px dashed var(--muted, #ccc);
+    padding-left: 0.25rem;
     margin: 0.25rem 0;
+    position: relative;
+  }
+  .node::before {
+    content: '';
+    position: absolute;
+    left: -0.5rem;
+    top: 0;
+    width: 0.5rem;
+    height: 1rem;
+    border-left: 1px dashed var(--muted, #ccc);
+    border-bottom: 1px dashed var(--muted, #ccc);
+  }
+  .node::after {
+    content: '';
+    position: absolute;
+    left: -0.5rem;
+    top: 1rem;
+    bottom: 0;
+    width: 0;
+    border-left: 1px dashed var(--muted, #ccc);
+  }
+  .node:last-child::after {
+    display: none;
   }
   .row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.25rem;
   }
   .node-header {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
+    border: 1px dashed #d1d5db;
+    border-radius: 0.375rem;
     background-color: #f9fafb;
     overflow: hidden;
   }
+  .node-header.array-type {
+    background-color: #f3e8ff;
+    color: #6b21a8;
+    border-color: #c084fc;
+  }
+  .node-header.array-type:hover {
+    background-color: #e9d5ff;
+  }
   .toggle {
-    width: 2rem;
-    height: 2rem;
+    width: 1.25rem;
+    height: 1.25rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -175,31 +203,26 @@
     color: #374151;
     background-color: #e5e7eb;
   }
-  .name {
-    width: 10rem;
-    border: none;
-    background: transparent;
-    outline: none;
-    padding: 0.5rem;
-    font-size: 0.875rem;
+  .value-wrapper {
+    display: inline-flex;
+    align-items: center;
+    border: 1px dashed #d1d5db;
+    border-radius: 0.375rem;
+    background-color: #e0f2fe;
+    color: #075985;
+    overflow: hidden;
   }
-  .name:focus {
-    background-color: #ffffff;
-  }
-  .value {
-    width: 12rem;
-  }
-  .actions button {
-    font-size: 0.8rem;
+  .value-wrapper:hover {
+    background-color: #bae6fd;
   }
   .ref {
     font-style: italic;
     opacity: 0.8;
   }
-  .del {
-    margin-left: auto;
-  }
   .children {
     margin-left: 1.25rem;
+  }
+  .spacer {
+    flex: 1;
   }
 </style>

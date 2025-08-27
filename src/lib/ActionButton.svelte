@@ -1,6 +1,6 @@
 <!-- Reusable action button component -->
 <script lang="ts">
-  import type { Component } from 'svelte'
+  import type { Component, Snippet } from 'svelte'
 
   interface Props {
     onclick: () => void
@@ -8,7 +8,7 @@
     variant?: 'green' | 'blue' | 'red' | 'gray'
     size?: 'sm' | 'md' | 'lg'
     icon?: Component
-    children?: import('svelte').Snippet
+    children?: Snippet
     disabled?: boolean
     tabindex?: number
   }
