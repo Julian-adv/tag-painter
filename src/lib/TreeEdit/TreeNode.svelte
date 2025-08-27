@@ -7,7 +7,8 @@
     addChild,
     removeNode,
     upsertRef,
-    moveChild
+    moveChild,
+    convertLeafToArray
   } from './model'
   import type { ArrayNode, LeafNode, NodeKind, ObjectNode, RefNode, TreeModel } from './model'
   import TreeNode from './TreeNode.svelte'
@@ -19,13 +20,33 @@
     model,
     id,
     parentKind,
-    isRootChild = false
-  }: { model: TreeModel; id: string; parentKind?: NodeKind; isRootChild?: boolean } = $props()
+    isRootChild = false,
+    autoEditName = false
+  }: { model: TreeModel; id: string; parentKind?: NodeKind; isRootChild?: boolean; autoEditName?: boolean } = $props()
 
   const get = (id: string) => model.nodes[id]
 
   let isDragging = $state(false)
   let dragOverPosition = $state<'before' | 'after' | null>(null)
+  let newlyAddedChildId = $state<string | null>(null)
+
+  // Refs to inline editors for programmatic activation
+  let nameEditorRef: { activate: () => void } | null = $state(null)
+  let valueEditorRef: { activate: () => void } | null = $state(null)
+
+  // Run once to auto-activate editor when requested (used for freshly added node)
+  let autoEditApplied = $state(false)
+  $effect(() => {
+    if (autoEditName && !autoEditApplied) {
+      // Prefer name editor when present; otherwise try value editor (e.g., array children)
+      if (nameEditorRef && parentKind !== 'array') {
+        nameEditorRef.activate()
+      } else if (valueEditorRef) {
+        valueEditorRef.activate()
+      }
+      autoEditApplied = true
+    }
+  })
 
   function onToggle() {
     toggle(model, id)
@@ -40,6 +61,25 @@
     addLeaf()
   }
 
+  function handleConvertLeafToArray() {
+    const firstChildId = convertLeafToArray(model, id)
+    if (firstChildId) {
+      // After converting, the current node becomes an array. Add an empty child and focus it.
+      const parent = get(id)
+      if (parent && isContainer(parent)) {
+        const nextIndexName = String((parent.children?.length ?? 1))
+        const newChild: LeafNode = {
+          id: crypto.randomUUID(),
+          name: nextIndexName,
+          kind: 'leaf',
+          value: ''
+        } as LeafNode
+        addChild(model, id, newChild)
+        newlyAddedChildId = newChild.id
+      }
+    }
+  }
+
   function addLeaf() {
     const parent = get(id)
     if (!parent || !isContainer(parent)) return
@@ -50,6 +90,8 @@
       value: ''
     } as LeafNode
     addChild(model, id, child)
+    // Mark the newly added child so it renders in editing mode and focuses
+    newlyAddedChildId = child.id
   }
 
   function addObject() {
@@ -189,6 +231,7 @@
               value={n.name}
               onSave={(newValue) => renameNode(model, id, newValue)}
               className="name-editor"
+              bind:this={nameEditorRef}
             />
           </div>
         {/if}
@@ -204,6 +247,7 @@
               onSave={(newValue) => setLeafValue(model, id, newValue)}
               className="value-editor"
               placeholder="Enter value"
+              bind:this={valueEditorRef}
             />
           </div>
         {:else if n.kind === 'ref'}
@@ -220,6 +264,14 @@
             icon={Plus}
             title="Add child"
           />
+        {:else if n.kind === 'leaf' && parentKind !== 'array'}
+          <ActionButton
+            onclick={handleConvertLeafToArray}
+            variant="green"
+            size="sm"
+            icon={Plus}
+            title="Convert to array"
+          />
         {/if}
 
         {#if id !== model.rootId}
@@ -231,7 +283,13 @@
     {#if isContainer(n) && !n.collapsed}
       <div class="children" class:root-child={id === model.rootId}>
         {#each (n as ObjectNode | ArrayNode).children as cid (cid)}
-          <TreeNode {model} id={cid} parentKind={n.kind} isRootChild={id === model.rootId} />
+          <TreeNode
+            {model}
+            id={cid}
+            parentKind={n.kind}
+            isRootChild={id === model.rootId}
+            autoEditName={cid === newlyAddedChildId}
+          />
         {/each}
       </div>
     {/if}

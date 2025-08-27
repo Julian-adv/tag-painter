@@ -8,8 +8,11 @@
 
   let { value, onSave, placeholder = '', className = '' }: Props = $props()
 
+  import { tick } from 'svelte'
+
   let isEditing = $state(false)
   let editingValue = $state('')
+  let inputElement: HTMLInputElement | null = $state(null)
 
   function startEditing() {
     editingValue = value
@@ -37,6 +40,16 @@
       cancelEditing()
     }
   }
+
+  export async function activate() {
+    // Programmatically start editing and focus/select input
+    startEditing()
+    await tick()
+    if (inputElement) {
+      inputElement.focus()
+      inputElement.select()
+    }
+  }
 </script>
 
 {#if isEditing}
@@ -46,6 +59,7 @@
     onblur={finishEditing}
     onkeydown={handleKeydown}
     {placeholder}
+    bind:this={inputElement}
   />
 {:else}
   <span
@@ -79,8 +93,5 @@
     font-size: 0.875rem;
     min-width: 1.5rem;
     border-radius: 0.25rem;
-  }
-  .inline-editor-input:focus {
-    box-shadow: 0 0 0 2px #3b82f6;
   }
 </style>

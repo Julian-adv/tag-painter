@@ -58,6 +58,31 @@ export function addChild(model: TreeModel, parentId: NodeId, child: AnyNode) {
   }
 }
 
+export function convertLeafToArray(model: TreeModel, id: NodeId): NodeId | null {
+  const node = model.nodes[id]
+  if (!node || node.kind !== 'leaf') return null
+  const oldValue = (node as LeafNode).value
+  // Create first child leaf using prior value
+  const childId = uid()
+  const firstChild: LeafNode = {
+    id: childId,
+    name: '0',
+    kind: 'leaf',
+    value: oldValue
+  }
+  model.nodes[childId] = firstChild
+  // Replace current node with an array node, preserving name and id
+  const newArray: ArrayNode = {
+    id,
+    name: node.name,
+    kind: 'array',
+    children: [childId],
+    collapsed: false
+  }
+  model.nodes[id] = newArray
+  return childId
+}
+
 export function removeNode(model: TreeModel, id: NodeId) {
   const target = model.nodes[id]
   if (!target) return
