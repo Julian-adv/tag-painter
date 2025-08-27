@@ -6,7 +6,8 @@
     renameNode,
     addChild,
     removeNode,
-    upsertRef
+    upsertRef,
+    moveChild
   } from './model'
   import type { ArrayNode, LeafNode, NodeKind, ObjectNode, RefNode, TreeModel } from './model'
   import TreeNode from './TreeNode.svelte'
@@ -17,6 +18,9 @@
   let { model, id, parentKind }: { model: TreeModel; id: string; parentKind?: NodeKind } = $props()
 
   const get = (id: string) => model.nodes[id]
+
+  let isDragging = $state(false)
+  let dragOverPosition = $state<'before' | 'after' | null>(null)
 
   function onToggle() {
     toggle(model, id)
@@ -69,12 +73,100 @@
     const name = prompt('참조할 이름 ($ref):')
     if (name) upsertRef(model, id, name)
   }
+
+  function handleDragStart(event: DragEvent) {
+    isDragging = true
+    event.dataTransfer!.effectAllowed = 'move'
+    event.dataTransfer!.setData('text/plain', id)
+  }
+
+  function handleDragEnd() {
+    isDragging = false
+  }
+
+  function handleDragOver(event: DragEvent) {
+    event.preventDefault()
+    event.dataTransfer!.dropEffect = 'move'
+
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    const y = event.clientY - rect.top
+    const height = rect.height
+
+    dragOverPosition = y < height / 2 ? 'before' : 'after'
+  }
+
+  function handleDragLeave() {
+    dragOverPosition = null
+  }
+
+  function handleDrop(event: DragEvent) {
+    event.preventDefault()
+    const draggedId = event.dataTransfer!.getData('text/plain')
+
+    if (draggedId === id) {
+      dragOverPosition = null
+      return
+    }
+
+    // Find the parent of both nodes
+    let parentId: string | null = null
+    let draggedIndex = -1
+    let targetIndex = -1
+
+    for (const [nodeId, node] of Object.entries(model.nodes)) {
+      if (isContainer(node)) {
+        const children = (node as ObjectNode | ArrayNode).children
+        const draggedIdx = children.indexOf(draggedId)
+        const targetIdx = children.indexOf(id)
+
+        if (draggedIdx !== -1 && targetIdx !== -1) {
+          parentId = nodeId
+          draggedIndex = draggedIdx
+          targetIndex = targetIdx
+          break
+        }
+      }
+    }
+
+    if (parentId && draggedIndex !== -1 && targetIndex !== -1) {
+      let newIndex = targetIndex
+      if (dragOverPosition === 'after') {
+        newIndex = targetIndex + 1
+      }
+
+      // Adjust for removal of dragged item
+      if (draggedIndex < newIndex) {
+        newIndex -= 1
+      }
+
+      moveChild(model, parentId, draggedIndex, newIndex)
+    }
+
+    dragOverPosition = null
+  }
 </script>
 
 {#if get(id)}
   {@const n = get(id)}
-  <div class="node">
-    <div class="row">
+  <div
+    class="node"
+    class:drag-over-before={dragOverPosition === 'before'}
+    class:drag-over-after={dragOverPosition === 'after'}
+  >
+    <div
+      class="row"
+      draggable={id !== model.rootId}
+      ondragstart={handleDragStart}
+      ondragend={handleDragEnd}
+      ondragover={handleDragOver}
+      ondragleave={handleDragLeave}
+      ondrop={handleDrop}
+      class:dragging={isDragging}
+      role="treeitem"
+      aria-grabbed={isDragging}
+      aria-selected="false"
+      tabindex="0"
+    >
       {#if parentKind !== 'array'}
         <div class="node-header array-type">
           <button class="toggle" onclick={onToggle}>
@@ -170,6 +262,7 @@
     display: flex;
     align-items: center;
     gap: 0.25rem;
+    position: relative;
   }
   .node-header {
     display: inline-flex;
@@ -224,5 +317,37 @@
   }
   .spacer {
     flex: 1;
+  }
+
+  /* Drag and drop styles */
+  .row.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+  }
+
+  .row[draggable='true'] {
+    cursor: grab;
+  }
+
+  .node.drag-over-before > .row::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: 0;
+    width: calc(100%);
+    height: 2px;
+    background-color: #3b82f6;
+    z-index: 10;
+  }
+
+  .node.drag-over-after > .row::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 0;
+    width: calc(100%);
+    height: 2px;
+    background-color: #3b82f6;
+    z-index: 10;
   }
 </style>
