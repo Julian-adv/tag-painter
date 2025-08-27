@@ -135,10 +135,11 @@ export function upsertRef(model: TreeModel, parentId: NodeId, refName: string) {
 export function moveChild(model: TreeModel, parentId: NodeId, fromIndex: number, toIndex: number) {
   const parent = model.nodes[parentId]
   if (!parent || !isContainer(parent)) return
-  
+
   const children = parent.children
-  if (fromIndex < 0 || fromIndex >= children.length || toIndex < 0 || toIndex >= children.length) return
-  
+  if (fromIndex < 0 || fromIndex >= children.length || toIndex < 0 || toIndex >= children.length)
+    return
+
   const [moved] = children.splice(fromIndex, 1)
   children.splice(toIndex, 0, moved)
 }

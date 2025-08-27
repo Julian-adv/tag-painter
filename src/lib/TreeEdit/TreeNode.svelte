@@ -15,7 +15,12 @@
   import InlineEditor from './InlineEditor.svelte'
   import { ChevronDown, ChevronRight, Trash, Plus } from 'svelte-heros-v2'
 
-  let { model, id, parentKind }: { model: TreeModel; id: string; parentKind?: NodeKind } = $props()
+  let {
+    model,
+    id,
+    parentKind,
+    isRootChild = false
+  }: { model: TreeModel; id: string; parentKind?: NodeKind; isRootChild?: boolean } = $props()
 
   const get = (id: string) => model.nodes[id]
 
@@ -150,80 +155,83 @@
   {@const n = get(id)}
   <div
     class="node"
+    class:root-child={isRootChild}
     class:drag-over-before={dragOverPosition === 'before'}
     class:drag-over-after={dragOverPosition === 'after'}
   >
-    <div
-      class="row"
-      draggable={id !== model.rootId}
-      ondragstart={handleDragStart}
-      ondragend={handleDragEnd}
-      ondragover={handleDragOver}
-      ondragleave={handleDragLeave}
-      ondrop={handleDrop}
-      class:dragging={isDragging}
-      role="treeitem"
-      aria-grabbed={isDragging}
-      aria-selected="false"
-      tabindex="0"
-    >
-      {#if parentKind !== 'array'}
-        <div class="node-header array-type">
-          <button class="toggle" onclick={onToggle}>
-            {#if isContainer(n) && (n as ObjectNode | ArrayNode).children.length > 0}
-              {#if n.collapsed}
-                <ChevronRight class="w-3 h-3" />
-              {:else}
-                <ChevronDown class="w-3 h-3" />
+    {#if id !== model.rootId}
+      <div
+        class="row"
+        draggable={id !== model.rootId}
+        ondragstart={handleDragStart}
+        ondragend={handleDragEnd}
+        ondragover={handleDragOver}
+        ondragleave={handleDragLeave}
+        ondrop={handleDrop}
+        class:dragging={isDragging}
+        role="treeitem"
+        aria-grabbed={isDragging}
+        aria-selected="false"
+        tabindex="0"
+      >
+        {#if parentKind !== 'array'}
+          <div class="node-header array-type">
+            <button class="toggle" onclick={onToggle}>
+              {#if isContainer(n) && (n as ObjectNode | ArrayNode).children.length > 0}
+                {#if n.collapsed}
+                  <ChevronRight class="w-3 h-3" />
+                {:else}
+                  <ChevronDown class="w-3 h-3" />
+                {/if}
               {/if}
-            {/if}
-          </button>
-          <InlineEditor
-            value={n.name}
-            onSave={(newValue) => renameNode(model, id, newValue)}
-            className="name-editor"
+            </button>
+            <InlineEditor
+              value={n.name}
+              onSave={(newValue) => renameNode(model, id, newValue)}
+              className="name-editor"
+            />
+          </div>
+        {/if}
+
+        {#if n.kind === 'leaf' && parentKind !== 'array'}
+          <span class="sep">:</span>
+        {/if}
+
+        {#if n.kind === 'leaf'}
+          <div class="value-wrapper">
+            <InlineEditor
+              value={String((n as LeafNode).value ?? '')}
+              onSave={(newValue) => setLeafValue(model, id, newValue)}
+              className="value-editor"
+              placeholder="Enter value"
+            />
+          </div>
+        {:else if n.kind === 'ref'}
+          <span class="ref">$ref → {(n as RefNode).refName}</span>
+        {/if}
+
+        <div class="spacer"></div>
+
+        {#if isContainer(n)}
+          <ActionButton
+            onclick={handleAddChild}
+            variant="green"
+            size="sm"
+            icon={Plus}
+            title="Add child"
           />
-        </div>
-      {/if}
+        {/if}
 
-      {#if n.kind === 'leaf' && parentKind !== 'array'}
-        <span class="sep">:</span>
-      {/if}
-
-      {#if n.kind === 'leaf'}
-        <div class="value-wrapper">
-          <InlineEditor
-            value={String((n as LeafNode).value ?? '')}
-            onSave={(newValue) => setLeafValue(model, id, newValue)}
-            className="value-editor"
-            placeholder="Enter value"
-          />
-        </div>
-      {:else if n.kind === 'ref'}
-        <span class="ref">$ref → {(n as RefNode).refName}</span>
-      {/if}
-
-      <div class="spacer"></div>
-
-      {#if isContainer(n)}
-        <ActionButton
-          onclick={handleAddChild}
-          variant="green"
-          size="sm"
-          icon={Plus}
-          title="Add child"
-        />
-      {/if}
-
-      {#if id !== model.rootId}
-        <ActionButton onclick={onDelete} variant="red" icon={Trash} title="Delete node" />
-      {/if}
-    </div>
+        {#if id !== model.rootId}
+          <ActionButton onclick={onDelete} variant="red" icon={Trash} title="Delete node" />
+        {/if}
+      </div>
+    {/if}
 
     {#if isContainer(n) && !n.collapsed}
-      <div class="children">
+      <div class="children" class:root-child={id === model.rootId}>
         {#each (n as ObjectNode | ArrayNode).children as cid (cid)}
-          <TreeNode {model} id={cid} parentKind={n.kind} />
+          <TreeNode {model} id={cid} parentKind={n.kind} isRootChild={id === model.rootId} />
         {/each}
       </div>
     {/if}
@@ -236,7 +244,7 @@
     margin: 0.25rem 0;
     position: relative;
   }
-  .node::before {
+  .node:not(.root-child)::before {
     content: '';
     position: absolute;
     left: -0.5rem;
@@ -246,7 +254,7 @@
     border-left: 1px dashed var(--muted, #ccc);
     border-bottom: 1px dashed var(--muted, #ccc);
   }
-  .node::after {
+  .node:not(.root-child)::after {
     content: '';
     position: absolute;
     left: -0.5rem;
@@ -312,7 +320,7 @@
     font-style: italic;
     opacity: 0.8;
   }
-  .children {
+  .children:not(.root-child) {
     margin-left: 1.25rem;
   }
   .spacer {

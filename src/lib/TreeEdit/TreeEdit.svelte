@@ -23,7 +23,7 @@
   <section>
     <h3>Tree</h3>
     <div class="tree">
-      <TreeNode {model} id={model.rootId} />
+      <TreeNode {model} id={model.rootId} isRootChild={true} />
     </div>
   </section>
 
