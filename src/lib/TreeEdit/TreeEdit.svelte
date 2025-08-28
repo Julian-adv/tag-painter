@@ -110,7 +110,19 @@
 <div class="grid">
   <section>
     <h3>{fileName}</h3>
-    <div class="tree">
+    <div
+      class="tree"
+      role="button"
+      aria-label="Clear selection"
+      onclick={() => (selectedId = null)}
+      tabindex="-1"
+      onkeydown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          selectedId = null
+        }
+      }}
+    >
       <TreeNode
         {model}
         id={model.rootId}
@@ -155,6 +167,7 @@
     border-radius: 0.5rem;
     max-height: 70vh;
     overflow: auto;
+    text-align: left; /* ensure inline-flex rows align left */
   }
   h3 {
     margin: 0.25rem 0 0.5rem;

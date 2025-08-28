@@ -33,6 +33,7 @@
   let dragOverPosition = $state<'before' | 'after' | null>(null)
   let newlyAddedChildId = $state<string | null>(null)
   let isValueEditing = $state(false)
+  let isNameEditing = $state(false)
 
   // Refs to inline editors for programmatic activation
   let nameEditorRef: { activate: () => void } | null = $state(null)
@@ -166,6 +167,9 @@
       <div
         class="row"
         class:selected={id === selectedId}
+        class:editing={isNameEditing || isValueEditing}
+        class:name-editing={isNameEditing}
+        class:value-editing={isValueEditing}
         draggable={id !== model.rootId}
         ondragstart={handleDragStart}
         ondragend={handleDragEnd}
@@ -177,7 +181,10 @@
         aria-grabbed={isDragging}
         aria-selected="false"
         tabindex="0"
-        onclick={() => onSelect(id)}
+        onclick={(e) => {
+          e.stopPropagation()
+          onSelect(id)
+        }}
         onkeydown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
@@ -211,6 +218,8 @@
               onTab={() => valueEditorRef?.activate()}
               className="name-editor"
               bind:this={nameEditorRef}
+              onEditingChange={(editing) => (isNameEditing = editing)}
+              expandOnEdit={true}
             />
           </div>
         {/if}
@@ -238,7 +247,7 @@
           <span class="ref">$ref → {(n as RefNode).refName}</span>
         {/if}
 
-        <div class="spacer"></div>
+        <!-- spacer removed to allow row to shrink to content -->
       </div>
     {/if}
 
@@ -291,10 +300,15 @@
     display: none;
   }
   .row {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 0.25rem;
     position: relative;
+  }
+  .row.name-editing,
+  .row.value-editing {
+    display: flex;
+    width: 100%;
   }
   .row.selected {
     outline: 2px solid #3b82f6;
@@ -346,15 +360,23 @@
   .value-wrapper:hover {
     background-color: #bae6fd;
   }
-  /* Expand value editor only while editing */
+  /* Default: keep value editor content-sized while editing */
   .value-wrapper.editing {
+    flex: 0 1 auto;
+    width: auto;
+  }
+  /* When value is editing, expand value editor to fill remaining width */
+  .row.value-editing .value-wrapper.editing {
     flex: 1 1 auto;
     width: 100%;
   }
-  /* When value is editing, let it take the space instead of spacer */
-  .value-wrapper.editing ~ .spacer {
-    flex: 0 0 auto;
+
+  /* When name is being edited, allow header/editor to grow */
+  .row.name-editing .node-header {
+    flex: 1 1 auto;
+    min-width: 0;
   }
+  /* Removed unused selectors targeting child component internals */
 
   .sep {
     flex-shrink: 0; /* keep colon visible */
@@ -366,9 +388,7 @@
   .children:not(.root-child) {
     margin-left: 1.25rem;
   }
-  .spacer {
-    flex: 1;
-  }
+  /* spacer removed */
 
   /* Drag and drop styles */
   .row.dragging {

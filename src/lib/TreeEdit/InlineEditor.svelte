@@ -7,6 +7,7 @@
     onTab?: () => void
     enableAutocomplete?: boolean
     onEditingChange?: (editing: boolean) => void
+    expandOnEdit?: boolean
   }
 
   let {
@@ -16,7 +17,8 @@
     className = '',
     onTab,
     enableAutocomplete = false,
-    onEditingChange
+    onEditingChange,
+    expandOnEdit = false
   }: Props = $props()
 
   import { tick } from 'svelte'
@@ -70,6 +72,8 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
+    // Prevent bubbling to parent row handlers (e.g., space/enter on row)
+    event.stopPropagation()
     if (event.key === 'Enter') {
       event.preventDefault()
       finishEditing()
@@ -115,6 +119,7 @@
         class={'inline-editor-input ' + className}
         onValueChange={(v) => (editingValue = v)}
         onkeydown={(event: KeyboardEvent) => {
+          event.stopPropagation()
           if (event.key === 'Enter') {
             event.preventDefault()
             finishEditing()
@@ -133,7 +138,7 @@
     </div>
   {:else}
     <input
-      class="inline-editor-input {className}"
+      class="inline-editor-input {className} {expandOnEdit ? 'full-width' : ''}"
       bind:value={editingValue}
       onblur={finishEditing}
       onkeydown={handleKeydown}
@@ -172,5 +177,8 @@
     padding: 0.125rem 0.25rem;
     font-size: 0.875rem;
     min-width: 1.5rem;
+  }
+  .inline-editor-input.full-width {
+    width: 100%;
   }
 </style>
