@@ -27,7 +27,7 @@
   let inputElement: HTMLInputElement | null = $state(null)
   let acWrapper: HTMLDivElement | null = $state(null)
 
-  async function startEditing() {
+  async function startEditing(behavior: 'selectAll' | 'caretEnd' = 'selectAll') {
     editingValue = value
     isEditing = true
     onEditingChange?.(true)
@@ -36,11 +36,22 @@
       const ta = acWrapper?.querySelector('textarea') as HTMLTextAreaElement | null
       if (ta) {
         ta.focus()
-        ta.select()
+        if (behavior === 'selectAll') {
+          ta.select()
+        } else {
+          const end = ta.value?.length ?? 0
+          ta.selectionStart = end
+          ta.selectionEnd = end
+        }
       }
     } else if (inputElement) {
       inputElement.focus()
-      inputElement.select()
+      if (behavior === 'selectAll') {
+        inputElement.select()
+      } else {
+        const end = inputElement.value?.length ?? 0
+        inputElement.setSelectionRange?.(end, end)
+      }
     }
   }
 
@@ -133,7 +144,7 @@
 {:else}
   <span
     class="inline-editor-display {className}"
-    ondblclick={startEditing}
+    ondblclick={() => startEditing('caretEnd')}
     role="button"
     tabindex="0"
     onkeydown={(e) => e.key === 'Enter' && startEditing()}
