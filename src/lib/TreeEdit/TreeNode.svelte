@@ -254,6 +254,7 @@
                 renameNode(model, id, newValue)
                 onMutate()
               }}
+              onTab={() => valueEditorRef?.activate()}
               className="name-editor"
               bind:this={nameEditorRef}
             />

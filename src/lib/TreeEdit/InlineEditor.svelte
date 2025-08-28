@@ -4,9 +4,10 @@
     onSave: (newValue: string) => void
     placeholder?: string
     className?: string
+    onTab?: () => void
   }
 
-  let { value, onSave, placeholder = '', className = '' }: Props = $props()
+  let { value, onSave, placeholder = '', className = '', onTab }: Props = $props()
 
   import { tick } from 'svelte'
 
@@ -38,6 +39,15 @@
     } else if (event.key === 'Escape') {
       event.preventDefault()
       cancelEditing()
+    } else if (event.key === 'Tab' && !event.shiftKey) {
+      // Commit current change and advance focus if requested
+      if (onTab) {
+        event.preventDefault()
+        // Finish editing to persist the current value
+        finishEditing()
+        // Let parent move focus/start editing next field
+        onTab()
+      }
     }
   }
 
