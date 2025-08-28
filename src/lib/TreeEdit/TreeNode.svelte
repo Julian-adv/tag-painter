@@ -1,20 +1,9 @@
 <script lang="ts">
-  import {
-    isContainer,
-    setLeafValue,
-    toggle,
-    renameNode,
-    addChild,
-    removeNode,
-    upsertRef,
-    moveChild,
-    convertLeafToArray
-  } from './model'
+  import { isContainer, setLeafValue, toggle, renameNode, moveChild } from './model'
   import type { ArrayNode, LeafNode, NodeKind, ObjectNode, RefNode, TreeModel } from './model'
   import TreeNode from './TreeNode.svelte'
-  import ActionButton from '../ActionButton.svelte'
   import InlineEditor from './InlineEditor.svelte'
-  import { ChevronDown, ChevronRight, Trash, Plus } from 'svelte-heros-v2'
+  import { ChevronDown, ChevronRight } from 'svelte-heros-v2'
 
   let {
     model,
@@ -23,7 +12,9 @@
     isRootChild = false,
     autoEditName = false,
     autoEditChildId = null,
-    onMutate
+    onMutate,
+    selectedId = null,
+    onSelect
   }: {
     model: TreeModel
     id: string
@@ -32,6 +23,8 @@
     autoEditName?: boolean
     autoEditChildId?: string | null
     onMutate: () => void
+    selectedId?: string | null
+    onSelect: (id: string) => void
   } = $props()
 
   const get = (id: string) => model.nodes[id]
@@ -65,82 +58,9 @@
     onMutate()
   }
 
-  function onDelete() {
-    removeNode(model, id)
-    onMutate()
-  }
+  // Removed unused per-node handlers: onDelete, handleAddChild, handleConvertLeafToArray
 
-  function handleAddChild() {
-    // 기본적으로 leaf 노드를 추가
-    addLeaf()
-  }
-
-  function handleConvertLeafToArray() {
-    const firstChildId = convertLeafToArray(model, id)
-    if (firstChildId) {
-      // After converting, the current node becomes an array. Add an empty child and focus it.
-      const parent = get(id)
-      if (parent && isContainer(parent)) {
-        const nextIndexName = String(parent.children?.length ?? 1)
-        const newChild: LeafNode = {
-          id: crypto.randomUUID(),
-          name: nextIndexName,
-          kind: 'leaf',
-          value: ''
-        } as LeafNode
-        addChild(model, id, newChild)
-        newlyAddedChildId = newChild.id
-      }
-      onMutate()
-    }
-  }
-
-  function addLeaf() {
-    const parent = get(id)
-    if (!parent || !isContainer(parent)) return
-    const child: LeafNode = {
-      id: crypto.randomUUID(),
-      name: 'newKey',
-      kind: 'leaf',
-      value: ''
-    } as LeafNode
-    addChild(model, id, child)
-    // Mark the newly added child so it renders in editing mode and focuses
-    newlyAddedChildId = child.id
-    onMutate()
-  }
-
-  function addObject() {
-    const child: ObjectNode = {
-      id: crypto.randomUUID(),
-      name: 'obj',
-      kind: 'object',
-      children: [],
-      collapsed: false
-    }
-    addChild(model, id, child)
-    onMutate()
-  }
-
-  function addArray() {
-    const child: ArrayNode = {
-      id: crypto.randomUUID(),
-      name: 'list',
-      kind: 'array',
-      children: [],
-      collapsed: false
-    }
-    addChild(model, id, child)
-    onMutate()
-  }
-
-  function addRef() {
-    const name = prompt('참조할 이름 ($ref):')
-    if (name) {
-      upsertRef(model, id, name)
-      onMutate()
-    }
-  }
+  // Removed unused add* helpers after moving actions to TreeEdit
 
   function handleDragStart(event: DragEvent) {
     isDragging = true
@@ -226,6 +146,7 @@
     {#if id !== model.rootId}
       <div
         class="row"
+        class:selected={id === selectedId}
         draggable={id !== model.rootId}
         ondragstart={handleDragStart}
         ondragend={handleDragEnd}
@@ -237,10 +158,23 @@
         aria-grabbed={isDragging}
         aria-selected="false"
         tabindex="0"
+        onclick={() => onSelect(id)}
+        onkeydown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onSelect(id)
+          }
+        }}
       >
         {#if parentKind !== 'array'}
           <div class="node-header array-type">
-            <button class="toggle" onclick={onToggle}>
+            <button
+              class="toggle"
+              onclick={(e) => {
+                e.stopPropagation()
+                onToggle()
+              }}
+            >
               {#if isContainer(n) && (n as ObjectNode | ArrayNode).children.length > 0}
                 {#if n.collapsed}
                   <ChevronRight class="h-3 w-3" />
@@ -286,28 +220,6 @@
         {/if}
 
         <div class="spacer"></div>
-
-        {#if isContainer(n)}
-          <ActionButton
-            onclick={handleAddChild}
-            variant="green"
-            size="sm"
-            icon={Plus}
-            title="Add child"
-          />
-        {:else if n.kind === 'leaf' && parentKind !== 'array'}
-          <ActionButton
-            onclick={handleConvertLeafToArray}
-            variant="green"
-            size="sm"
-            icon={Plus}
-            title="Convert to array"
-          />
-        {/if}
-
-        {#if id !== model.rootId}
-          <ActionButton onclick={onDelete} variant="red" icon={Trash} title="Delete node" />
-        {/if}
       </div>
     {/if}
 
@@ -321,6 +233,8 @@
             isRootChild={id === model.rootId}
             autoEditName={cid === newlyAddedChildId || cid === autoEditChildId}
             {onMutate}
+            {selectedId}
+            {onSelect}
           />
         {/each}
       </div>
@@ -361,6 +275,11 @@
     align-items: center;
     gap: 0.25rem;
     position: relative;
+  }
+  .row.selected {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+    border-radius: 0.375rem;
   }
   .node-header {
     display: inline-flex;

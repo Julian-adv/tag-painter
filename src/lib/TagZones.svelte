@@ -97,11 +97,6 @@
     await savePromptsData()
   }
 
-  function openCustomTagsDialog() {
-    selectedCustomTagName = ''
-    showCustomTagsDialog = true
-  }
-
   function openTreeEditDialog() {
     showTreeEditDialog = true
   }

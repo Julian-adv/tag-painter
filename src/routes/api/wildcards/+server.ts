@@ -1,4 +1,4 @@
-import { json } from '@sveltejs/kit'
+import { json, type RequestEvent } from '@sveltejs/kit'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -13,7 +13,7 @@ async function ensureDir() {
   }
 }
 
-export async function POST({ request }) {
+export async function POST({ request }: RequestEvent) {
   await ensureDir()
   try {
     const text = await request.text()
@@ -25,13 +25,17 @@ export async function POST({ request }) {
   }
 }
 
+function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
+  return typeof error === 'object' && error !== null && 'code' in error
+}
+
 export async function GET() {
   await ensureDir()
   try {
     const text = await fs.readFile(filePath, 'utf-8')
     return new Response(text, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
-  } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && (error as any).code === 'ENOENT') {
+  } catch (error: unknown) {
+    if (isErrnoException(error) && error.code === 'ENOENT') {
       return new Response('', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
     }
     console.error('Error reading wildcards.yaml:', error)

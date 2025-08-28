@@ -12,7 +12,7 @@ describe('ComboBox', () => {
 
   const mockValue: OptionItem = { title: 'Option One', value: 'option1' }
   let container: HTMLElement
-  let component: any
+  let component: ReturnType<typeof mount> | null = null
 
   beforeEach(() => {
     container = document.createElement('div')

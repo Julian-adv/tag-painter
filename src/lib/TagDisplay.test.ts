@@ -11,7 +11,7 @@ describe('TagDisplay', () => {
   ]
 
   let container: HTMLElement
-  let component: any
+  let component: ReturnType<typeof mount> | null = null
 
   beforeEach(() => {
     container = document.createElement('div')
