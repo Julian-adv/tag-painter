@@ -7,6 +7,7 @@ export interface BaseNode {
   id: NodeId
   name: string // 키 이름 (object/array item 표시용)
   kind: NodeKind
+  parentId: NodeId | null // 부모 노드 id (루트는 null)
   collapsed?: boolean // 접힘 상태
 }
 
@@ -50,6 +51,8 @@ export function addChild(model: TreeModel, parentId: NodeId, child: AnyNode) {
   const p = model.nodes[parentId]
   if (!p || !isContainer(p)) return
   ;(p as ObjectNode | ArrayNode).children.push(child.id)
+  // track parent on node
+  child.parentId = parentId
   model.nodes[child.id] = child
   // ref 인덱스 관리
   if (child.kind === 'ref') {
@@ -68,6 +71,7 @@ export function convertLeafToArray(model: TreeModel, id: NodeId): NodeId | null 
     id: childId,
     name: '0',
     kind: 'leaf',
+    parentId: id,
     value: oldValue
   }
   model.nodes[childId] = firstChild
@@ -76,6 +80,7 @@ export function convertLeafToArray(model: TreeModel, id: NodeId): NodeId | null 
     id,
     name: node.name,
     kind: 'array',
+    parentId: node.parentId,
     children: [childId],
     collapsed: false
   }
@@ -89,11 +94,13 @@ export function removeNode(model: TreeModel, id: NodeId) {
   // 루트는 삭제 금지
   if (id === model.rootId) return
 
-  // 부모에서 탈착
-  for (const n of Object.values(model.nodes)) {
-    if (isContainer(n)) {
-      const idx = n.children.indexOf(id)
-      if (idx !== -1) n.children.splice(idx, 1)
+  // 부모에서 탈착 (node.parentId 활용)
+  const parentId = target.parentId
+  if (parentId) {
+    const parent = model.nodes[parentId]
+    if (parent && isContainer(parent)) {
+      const idx = parent.children.indexOf(id)
+      if (idx !== -1) parent.children.splice(idx, 1)
     }
   }
 
@@ -152,6 +159,7 @@ export function upsertRef(model: TreeModel, parentId: NodeId, refName: string) {
     id: uid(),
     name: `ref_${refName}`,
     kind: 'ref',
+    parentId,
     refName
   }
   addChild(model, parentId, refNode)

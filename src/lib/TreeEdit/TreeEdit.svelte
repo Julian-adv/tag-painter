@@ -75,10 +75,12 @@
       id: uid(),
       name: childName,
       kind: 'leaf',
+      parentId: targetId,
       value: ''
     }
     addChild(model, targetId, child)
     newlyAddedRootChildId = child.id
+    selectedId = child.id
     hasUnsavedChanges = true
   }
 
@@ -87,6 +89,21 @@
     removeNode(model, selectedId)
     selectedId = null
     hasUnsavedChanges = true
+  }
+
+  function getParentOf(nodeId: string): string | null {
+    return model.nodes[nodeId]?.parentId ?? null
+  }
+
+  function isAddDisabled(): boolean {
+    if (!selectedId) return false
+    const sel = model.nodes[selectedId]
+    if (!sel) return false
+    if (sel.kind === 'ref') return true
+    const pid = getParentOf(selectedId)
+    if (!pid) return false
+    const p = model.nodes[pid]
+    return !!p && p.kind === 'array'
   }
 </script>
 
@@ -114,7 +131,7 @@
     size="md"
     icon={Plus}
     title={selectedId ? 'Add child to selected' : 'Add top-level node'}
-    disabled={!!selectedId && model.nodes[selectedId]?.kind === 'ref'}
+    disabled={isAddDisabled()}
   />
   <ActionButton
     onclick={deleteBySelection}

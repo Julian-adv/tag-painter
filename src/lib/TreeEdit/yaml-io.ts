@@ -8,21 +8,21 @@ export function fromYAML(text: string): TreeModel {
   const symbols: Record<string, NodeId> = {}
   const refIndex: Record<string, NodeId[]> = {}
 
-  function build(name: string, value: unknown): AnyNode {
+  function build(name: string, value: unknown, parentId: NodeId | null): AnyNode {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       const id = uid()
-      const n: ObjectNode = { id, name, kind: 'object', children: [], collapsed: false }
+      const n: ObjectNode = { id, name, kind: 'object', parentId, children: [], collapsed: false }
       nodes[id] = n
       for (const [k, v] of Object.entries(value)) {
         if (k === '$ref' && typeof v === 'string') {
           const rid = uid()
-          const r: RefNode = { id: rid, name: v, kind: 'ref', refName: v }
+          const r: RefNode = { id: rid, name: v, kind: 'ref', parentId: id, refName: v }
           nodes[rid] = r
           refIndex[v] ||= []
           refIndex[v].push(rid)
           n.children.push(rid)
         } else {
-          const c = build(k, v)
+          const c = build(k, v, id)
           n.children.push(c.id)
         }
       }
@@ -32,10 +32,10 @@ export function fromYAML(text: string): TreeModel {
     }
     if (Array.isArray(value)) {
       const id = uid()
-      const n: ArrayNode = { id, name, kind: 'array', children: [], collapsed: false }
+      const n: ArrayNode = { id, name, kind: 'array', parentId, children: [], collapsed: false }
       nodes[id] = n
       value.forEach((v, i) => {
-        const c = build(String(i), v)
+        const c = build(String(i), v, id)
         n.children.push(c.id)
       })
       return n
@@ -48,12 +48,12 @@ export function fromYAML(text: string): TreeModel {
       value === null
         ? value
         : String(value)
-    const n: LeafNode = { id, name, kind: 'leaf', value: leafValue }
+    const n: LeafNode = { id, name, kind: 'leaf', parentId, value: leafValue }
     nodes[id] = n
     return n
   }
 
-  const root = build('root', data)
+  const root = build('root', data, null)
   return { rootId: root.id, nodes, symbols, refIndex }
 }
 

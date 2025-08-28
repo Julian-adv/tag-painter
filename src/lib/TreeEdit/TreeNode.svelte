@@ -96,39 +96,58 @@
       return
     }
 
-    // Find the parent of both nodes
-    let parentId: string | null = null
-    let draggedIndex = -1
-    let targetIndex = -1
+    // Determine target parent (container of the target row)
+    const targetParentId = model.nodes[id]?.parentId ?? null
+    const draggedParentId = model.nodes[draggedId]?.parentId ?? null
 
-    for (const [nodeId, node] of Object.entries(model.nodes)) {
-      if (isContainer(node)) {
-        const children = (node as ObjectNode | ArrayNode).children
-        const draggedIdx = children.indexOf(draggedId)
-        const targetIdx = children.indexOf(id)
-
-        if (draggedIdx !== -1 && targetIdx !== -1) {
-          parentId = nodeId
-          draggedIndex = draggedIdx
-          targetIndex = targetIdx
-          break
-        }
+    if (targetParentId) {
+      const targetParent = model.nodes[targetParentId]
+      if (!targetParent || !isContainer(targetParent)) {
+        dragOverPosition = null
+        return
       }
-    }
+      const children = (targetParent as ObjectNode | ArrayNode).children
+      const targetIndex = children.indexOf(id)
+      if (targetIndex === -1) {
+        dragOverPosition = null
+        return
+      }
 
-    if (parentId && draggedIndex !== -1 && targetIndex !== -1) {
       let newIndex = targetIndex
-      if (dragOverPosition === 'after') {
-        newIndex = targetIndex + 1
-      }
+      if (dragOverPosition === 'after') newIndex = targetIndex + 1
 
-      // Adjust for removal of dragged item
-      if (draggedIndex < newIndex) {
-        newIndex -= 1
+      if (draggedParentId === targetParentId) {
+        // Same-parent reorder
+        const draggedIndex = children.indexOf(draggedId)
+        if (draggedIndex === -1) {
+          dragOverPosition = null
+          return
+        }
+        if (draggedIndex < newIndex) newIndex -= 1
+        moveChild(model, targetParentId, draggedIndex, newIndex)
+        onMutate()
+      } else {
+        // Cross-parent move
+        const draggedNode = model.nodes[draggedId]
+        if (!draggedNode) {
+          dragOverPosition = null
+          return
+        }
+        // Remove from old parent
+        if (draggedParentId) {
+          const oldParent = model.nodes[draggedParentId]
+          if (oldParent && isContainer(oldParent)) {
+            const oldChildren = (oldParent as ObjectNode | ArrayNode).children
+            const oldIdx = oldChildren.indexOf(draggedId)
+            if (oldIdx !== -1) oldChildren.splice(oldIdx, 1)
+          }
+        }
+        // Insert into new parent
+        children.splice(newIndex, 0, draggedId)
+        // Update parent link
+        draggedNode.parentId = targetParentId
+        onMutate()
       }
-
-      moveChild(model, parentId, draggedIndex, newIndex)
-      onMutate()
     }
 
     dragOverPosition = null
@@ -232,6 +251,7 @@
             parentKind={n.kind}
             isRootChild={id === model.rootId}
             autoEditName={cid === newlyAddedChildId || cid === autoEditChildId}
+            {autoEditChildId}
             {onMutate}
             {selectedId}
             {onSelect}
