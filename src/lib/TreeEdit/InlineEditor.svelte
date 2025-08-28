@@ -5,19 +5,32 @@
     placeholder?: string
     className?: string
     onTab?: () => void
+    enableAutocomplete?: boolean
+    onEditingChange?: (editing: boolean) => void
   }
 
-  let { value, onSave, placeholder = '', className = '', onTab }: Props = $props()
+  let {
+    value,
+    onSave,
+    placeholder = '',
+    className = '',
+    onTab,
+    enableAutocomplete = false,
+    onEditingChange
+  }: Props = $props()
 
   import { tick } from 'svelte'
+  import AutoCompleteTextarea from '../AutoCompleteTextarea.svelte'
 
   let isEditing = $state(false)
   let editingValue = $state('')
   let inputElement: HTMLInputElement | null = $state(null)
+  let acWrapper: HTMLDivElement | null = $state(null)
 
   function startEditing() {
     editingValue = value
     isEditing = true
+    onEditingChange?.(true)
   }
 
   function finishEditing() {
@@ -25,11 +38,13 @@
       onSave(editingValue.trim())
     }
     isEditing = false
+    onEditingChange?.(false)
   }
 
   function cancelEditing() {
     isEditing = false
     editingValue = ''
+    onEditingChange?.(false)
   }
 
   function handleKeydown(event: KeyboardEvent) {
@@ -55,7 +70,14 @@
     // Programmatically start editing and focus/select input
     startEditing()
     await tick()
-    if (inputElement) {
+    if (enableAutocomplete) {
+      // Focus the inner textarea of AutoCompleteTextarea
+      const ta = acWrapper?.querySelector('textarea') as HTMLTextAreaElement | null
+      if (ta) {
+        ta.focus()
+        ta.select()
+      }
+    } else if (inputElement) {
       inputElement.focus()
       inputElement.select()
     }
@@ -63,14 +85,40 @@
 </script>
 
 {#if isEditing}
-  <input
-    class="inline-editor-input {className}"
-    bind:value={editingValue}
-    onblur={finishEditing}
-    onkeydown={handleKeydown}
-    {placeholder}
-    bind:this={inputElement}
-  />
+  {#if enableAutocomplete}
+    <div bind:this={acWrapper} onfocusout={finishEditing} class="w-full" style="width: 100%;">
+      <AutoCompleteTextarea
+        value={editingValue}
+        {placeholder}
+        class={'inline-editor-input ' + className}
+        onValueChange={(v) => (editingValue = v)}
+        onkeydown={(event: KeyboardEvent) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            finishEditing()
+          } else if (event.key === 'Escape') {
+            event.preventDefault()
+            cancelEditing()
+          } else if (event.key === 'Tab' && !event.shiftKey) {
+            if (onTab) {
+              event.preventDefault()
+              finishEditing()
+              onTab()
+            }
+          }
+        }}
+      />
+    </div>
+  {:else}
+    <input
+      class="inline-editor-input {className}"
+      bind:value={editingValue}
+      onblur={finishEditing}
+      onkeydown={handleKeydown}
+      {placeholder}
+      bind:this={inputElement}
+    />
+  {/if}
 {:else}
   <span
     class="inline-editor-display {className}"
@@ -102,6 +150,5 @@
     padding: 0.125rem 0.25rem;
     font-size: 0.875rem;
     min-width: 1.5rem;
-    border-radius: 0.25rem;
   }
 </style>

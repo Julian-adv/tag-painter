@@ -39,6 +39,7 @@
   let isDragging = $state(false)
   let dragOverPosition = $state<'before' | 'after' | null>(null)
   let newlyAddedChildId = $state<string | null>(null)
+  let isValueEditing = $state(false)
 
   // Refs to inline editors for programmatic activation
   let nameEditorRef: { activate: () => void } | null = $state(null)
@@ -266,15 +267,17 @@
         {/if}
 
         {#if n.kind === 'leaf'}
-          <div class="value-wrapper">
+          <div class="value-wrapper" class:editing={isValueEditing}>
             <InlineEditor
               value={String((n as LeafNode).value ?? '')}
               onSave={(newValue) => {
                 setLeafValue(model, id, newValue)
                 onMutate()
               }}
+              enableAutocomplete={true}
               className="value-editor"
               placeholder="Enter value"
+              onEditingChange={(editing) => (isValueEditing = editing)}
               bind:this={valueEditorRef}
             />
           </div>
@@ -366,6 +369,7 @@
     border-radius: 0.375rem;
     background-color: #f9fafb;
     overflow: hidden;
+    flex-shrink: 0; /* prevent shrinking when value expands */
   }
   .node-header.array-type {
     background-color: #f3e8ff;
@@ -402,6 +406,19 @@
   }
   .value-wrapper:hover {
     background-color: #bae6fd;
+  }
+  /* Expand value editor only while editing */
+  .value-wrapper.editing {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  /* When value is editing, let it take the space instead of spacer */
+  .value-wrapper.editing ~ .spacer {
+    flex: 0 0 auto;
+  }
+
+  .sep {
+    flex-shrink: 0; /* keep colon visible */
   }
   .ref {
     font-style: italic;
