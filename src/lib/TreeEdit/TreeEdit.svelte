@@ -1,15 +1,22 @@
 <script lang="ts">
   import TreeNode from './TreeNode.svelte'
-  import type { TreeModel } from './model'
+  import type { TreeModel, LeafNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
+  import ActionButton from '../ActionButton.svelte'
+  import { Plus } from 'svelte-heros-v2'
+  import { addChild, isContainer, uid } from './model'
   import { onMount } from 'svelte'
 
   let {
     initialYAML = 'a: 1\nlist:\n - x\n - y\nobj:\n k: v\n ref: { $ref: obj }\n'
   }: { initialYAML?: string } = $props()
 
+  // Current file name for display
+  const fileName = 'wildcards.yaml'
+
   let model: TreeModel = $state(fromYAML(initialYAML))
   let yamlOut = $derived(toYAML(model))
+  let newlyAddedRootChildId: string | null = $state(null)
 
   function loadYaml(text: string) {
     model = fromYAML(text)
@@ -42,29 +49,49 @@
         console.error('Save failed:', err)
       })
   }
+
+  // Expose save so parent dialog can trigger it
+  export function save() {
+    exportYaml()
+  }
+
+  function addRootChild() {
+    const root = model.nodes[model.rootId]
+    if (!root || !isContainer(root)) return
+    const child: LeafNode = {
+      id: uid(),
+      name: 'newKey',
+      kind: 'leaf',
+      value: ''
+    }
+    addChild(model, model.rootId, child)
+    newlyAddedRootChildId = child.id
+  }
 </script>
 
 <div class="grid">
   <section>
-    <h3>Tree</h3>
+    <h3>{fileName}</h3>
     <div class="tree">
-      <TreeNode {model} id={model.rootId} isRootChild={true} />
+      <TreeNode
+        {model}
+        id={model.rootId}
+        isRootChild={true}
+        autoEditChildId={newlyAddedRootChildId}
+      />
     </div>
   </section>
 
-  <section>
-    <h3>YAML 입/출력</h3>
-    <textarea bind:value={initialYAML} rows={12}></textarea>
-    <div class="btns">
-      <button
-        onclick={exportYaml}
-        class="rounded-md bg-blue-500 px-4 py-2 text-white transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-      >
-        Save
-      </button>
-    </div>
-    <textarea readonly rows={12} value={yamlOut}></textarea>
-  </section>
+</div>
+
+<div class="btns">
+  <ActionButton
+    onclick={addRootChild}
+    variant="green"
+    size="md"
+    icon={Plus}
+    title="Add top-level node"
+  />
 </div>
 
 <style>
@@ -72,10 +99,6 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
-  }
-  textarea {
-    width: 100%;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   .tree {
     border: 1px solid #ddd;
@@ -86,6 +109,7 @@
   }
   h3 {
     margin: 0.25rem 0 0.5rem;
+    text-align: left;
   }
   .btns {
     display: flex;

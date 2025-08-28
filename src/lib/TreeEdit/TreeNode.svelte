@@ -21,13 +21,15 @@
     id,
     parentKind,
     isRootChild = false,
-    autoEditName = false
+    autoEditName = false,
+    autoEditChildId = null
   }: {
     model: TreeModel
     id: string
     parentKind?: NodeKind
     isRootChild?: boolean
     autoEditName?: boolean
+    autoEditChildId?: string | null
   } = $props()
 
   const get = (id: string) => model.nodes[id]
@@ -294,7 +296,7 @@
             id={cid}
             parentKind={n.kind}
             isRootChild={id === model.rootId}
-            autoEditName={cid === newlyAddedChildId}
+            autoEditName={cid === newlyAddedChildId || cid === autoEditChildId}
           />
         {/each}
       </div>
