@@ -17,8 +17,39 @@
     isOpen = false
   }
 
-  // Reference to child TreeEdit to trigger save
-  let tree: { save: () => void } | null = $state(null)
+  // Reference to child TreeEdit to load/get/mark saved
+  let tree: { load: (t: string) => void; getYaml: () => string; markSaved: () => void } | null =
+    $state(null)
+  let hasUnsavedChanges = $state(false)
+
+  // When dialog opens, load YAML from server and populate child
+  $effect(() => {
+    if (isOpen) {
+      fetch('/api/wildcards')
+        .then((res) => (res.ok ? res.text() : ''))
+        .then((text) => {
+          if (tree && typeof text === 'string') {
+            tree.load(text)
+          }
+        })
+        .catch((err) => console.error('Failed to load wildcards.yaml:', err))
+    }
+  })
+
+  function onSave() {
+    if (!tree) return
+    const body = tree.getYaml()
+    fetch('/api/wildcards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      body
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to save')
+        tree?.markSaved()
+      })
+      .catch((err) => console.error('Save failed:', err))
+  }
 </script>
 
 {#if isOpen}
@@ -55,15 +86,16 @@
 
       <!-- Content -->
       <div class="flex-1 overflow-auto p-6">
-        <TreeEdit bind:this={tree} />
+        <TreeEdit bind:this={tree} bind:hasUnsavedChanges />
       </div>
 
       <!-- Footer -->
       <div class="flex items-center justify-end gap-2 border-t border-gray-300 p-4">
         <button
           type="button"
-          class="rounded-md bg-blue-500 px-4 py-2 text-white transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          onclick={() => tree?.save()}
+          class="rounded-md bg-blue-500 px-4 py-2 text-white transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-default disabled:opacity-50 disabled:hover:bg-blue-500 disabled:focus:ring-0"
+          onclick={onSave}
+          disabled={!hasUnsavedChanges}
         >
           Save
         </button>

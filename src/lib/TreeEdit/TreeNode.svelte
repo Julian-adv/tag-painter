@@ -22,7 +22,8 @@
     parentKind,
     isRootChild = false,
     autoEditName = false,
-    autoEditChildId = null
+    autoEditChildId = null,
+    onMutate
   }: {
     model: TreeModel
     id: string
@@ -30,6 +31,7 @@
     isRootChild?: boolean
     autoEditName?: boolean
     autoEditChildId?: string | null
+    onMutate: () => void
   } = $props()
 
   const get = (id: string) => model.nodes[id]
@@ -44,6 +46,7 @@
 
   // Run once to auto-activate editor when requested (used for freshly added node)
   let autoEditApplied = $state(false)
+
   $effect(() => {
     if (autoEditName && !autoEditApplied) {
       // Prefer name editor when present; otherwise try value editor (e.g., array children)
@@ -58,10 +61,12 @@
 
   function onToggle() {
     toggle(model, id)
+    onMutate()
   }
 
   function onDelete() {
     removeNode(model, id)
+    onMutate()
   }
 
   function handleAddChild() {
@@ -85,6 +90,7 @@
         addChild(model, id, newChild)
         newlyAddedChildId = newChild.id
       }
+      onMutate()
     }
   }
 
@@ -100,6 +106,7 @@
     addChild(model, id, child)
     // Mark the newly added child so it renders in editing mode and focuses
     newlyAddedChildId = child.id
+    onMutate()
   }
 
   function addObject() {
@@ -111,6 +118,7 @@
       collapsed: false
     }
     addChild(model, id, child)
+    onMutate()
   }
 
   function addArray() {
@@ -122,11 +130,15 @@
       collapsed: false
     }
     addChild(model, id, child)
+    onMutate()
   }
 
   function addRef() {
     const name = prompt('참조할 이름 ($ref):')
-    if (name) upsertRef(model, id, name)
+    if (name) {
+      upsertRef(model, id, name)
+      onMutate()
+    }
   }
 
   function handleDragStart(event: DragEvent) {
@@ -195,6 +207,7 @@
       }
 
       moveChild(model, parentId, draggedIndex, newIndex)
+      onMutate()
     }
 
     dragOverPosition = null
@@ -237,7 +250,10 @@
             </button>
             <InlineEditor
               value={n.name}
-              onSave={(newValue) => renameNode(model, id, newValue)}
+              onSave={(newValue) => {
+                renameNode(model, id, newValue)
+                onMutate()
+              }}
               className="name-editor"
               bind:this={nameEditorRef}
             />
@@ -252,7 +268,10 @@
           <div class="value-wrapper">
             <InlineEditor
               value={String((n as LeafNode).value ?? '')}
-              onSave={(newValue) => setLeafValue(model, id, newValue)}
+              onSave={(newValue) => {
+                setLeafValue(model, id, newValue)
+                onMutate()
+              }}
               className="value-editor"
               placeholder="Enter value"
               bind:this={valueEditorRef}
@@ -297,6 +316,7 @@
             parentKind={n.kind}
             isRootChild={id === model.rootId}
             autoEditName={cid === newlyAddedChildId || cid === autoEditChildId}
+            {onMutate}
           />
         {/each}
       </div>

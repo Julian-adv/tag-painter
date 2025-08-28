@@ -5,55 +5,43 @@
   import ActionButton from '../ActionButton.svelte'
   import { Plus } from 'svelte-heros-v2'
   import { addChild, isContainer, uid } from './model'
-  import { onMount } from 'svelte'
 
   let {
-    initialYAML = 'a: 1\nlist:\n - x\n - y\nobj:\n k: v\n ref: { $ref: obj }\n'
-  }: { initialYAML?: string } = $props()
+    initialYAML = '',
+    hasUnsavedChanges = $bindable(false)
+  }: { initialYAML?: string; hasUnsavedChanges?: boolean } = $props()
 
   // Current file name for display
   const fileName = 'wildcards.yaml'
 
   let model: TreeModel = $state(fromYAML(initialYAML))
-  let yamlOut = $derived(toYAML(model))
   let newlyAddedRootChildId: string | null = $state(null)
 
   function loadYaml(text: string) {
     model = fromYAML(text)
   }
 
-  onMount(() => {
-    // Load YAML from server file on mount
-    fetch('/api/wildcards')
-      .then((res) => (res.ok ? res.text() : ''))
-      .then((text) => {
-        if (typeof text === 'string' && text.length > 0) {
-          initialYAML = text
-          loadYaml(text)
-        }
-      })
-      .catch((err) => console.error('Failed to load wildcards.yaml:', err))
-  })
+  // Loading is handled by parent dialog now
 
-  function exportYaml() {
-    // Save the current YAML to server-side file
-    fetch('/api/wildcards', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      body: yamlOut
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to save')
-      })
-      .catch((err) => {
-        console.error('Save failed:', err)
-      })
+  // Expose helpers for parent dialog
+  export function load(text: string) {
+    initialYAML = text
+    loadYaml(text)
+    hasUnsavedChanges = false
   }
 
-  // Expose save so parent dialog can trigger it
-  export function save() {
-    exportYaml()
+  export function getYaml() {
+    // Compute YAML only when needed
+    return toYAML(model)
   }
+
+  export function markSaved() {
+    hasUnsavedChanges = false
+  }
+
+  // hasUnsavedChanges is updated by child mutations and load/save helpers
+
+  // Saving handled by parent
 
   function addRootChild() {
     const root = model.nodes[model.rootId]
@@ -66,6 +54,7 @@
     }
     addChild(model, model.rootId, child)
     newlyAddedRootChildId = child.id
+    hasUnsavedChanges = true
   }
 </script>
 
@@ -78,10 +67,10 @@
         id={model.rootId}
         isRootChild={true}
         autoEditChildId={newlyAddedRootChildId}
+        onMutate={() => (hasUnsavedChanges = true)}
       />
     </div>
   </section>
-
 </div>
 
 <div class="btns">
