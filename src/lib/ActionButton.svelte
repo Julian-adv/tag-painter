@@ -51,7 +51,7 @@
 <button type="button" class={buttonClasses} {onclick} {title} {disabled} {tabindex}>
   {#if icon}
     {@const IconComponent = icon}
-    <IconComponent class="w-4 h-4" />
+    <IconComponent class="h-4 w-4" />
   {/if}
   {#if children}
     {@render children()}

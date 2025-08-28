@@ -11,9 +11,9 @@
 
 <div class="flex items-center gap-2">
   <button
-    class="flex items-center justify-center w-9 h-9 border rounded-full cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 {isDrawingMode
-      ? 'bg-sky-500 text-white border-blue-400 hover:bg-blue-600'
-      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'}"
+    class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border transition-all duration-200 hover:scale-105 active:scale-95 {isDrawingMode
+      ? 'border-blue-400 bg-sky-500 text-white hover:bg-blue-600'
+      : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50'}"
     onclick={() => (isDrawingMode = !isDrawingMode)}
     aria-label="Draw mask"
   >
@@ -24,12 +24,12 @@
     </svg>
   </button>
   {#if isDrawingMode}
-    <div class="flex border border-gray-300 rounded-full bg-gray-50 overflow-hidden w-20">
+    <div class="flex w-20 overflow-hidden rounded-full border border-gray-300 bg-gray-50">
       <button
-        class="flex items-center justify-center flex-1 h-8 cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 {drawingTool ===
+        class="flex h-8 flex-1 cursor-pointer items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 {drawingTool ===
         'brush'
-          ? 'bg-teal-500 text-white shadow-sm rounded-full'
-          : 'text-gray-700 hover:bg-gray-200 rounded-full'}"
+          ? 'rounded-full bg-teal-500 text-white shadow-sm'
+          : 'rounded-full text-gray-700 hover:bg-gray-200'}"
         onclick={() => (drawingTool = 'brush')}
         aria-label="Brush mode"
       >
@@ -40,10 +40,10 @@
         </svg>
       </button>
       <button
-        class="flex items-center justify-center flex-1 h-8 cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 {drawingTool ===
+        class="flex h-8 flex-1 cursor-pointer items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 {drawingTool ===
         'fill'
-          ? 'bg-teal-500 text-white shadow-sm rounded-full'
-          : 'text-gray-700 hover:bg-gray-200 rounded-full'}"
+          ? 'rounded-full bg-teal-500 text-white shadow-sm'
+          : 'rounded-full text-gray-700 hover:bg-gray-200'}"
         onclick={() => (drawingTool = 'fill')}
         aria-label="Fill mode"
       >
@@ -56,7 +56,7 @@
       </button>
     </div>
     <button
-      class="flex items-center justify-center w-8 h-8 border border-red-300 rounded-full bg-red-50 text-red-600 cursor-pointer transition-all duration-200 hover:bg-red-100 hover:border-red-400 hover:scale-105 active:scale-95"
+      class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-red-300 bg-red-50 text-red-600 transition-all duration-200 hover:scale-105 hover:border-red-400 hover:bg-red-100 active:scale-95"
       onclick={onClearMask}
       aria-label="Clear mask"
     >

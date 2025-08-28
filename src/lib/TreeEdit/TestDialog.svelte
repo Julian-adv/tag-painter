@@ -21,7 +21,7 @@
 {#if isOpen}
   <!-- Modal backdrop -->
   <div
-    class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
@@ -29,17 +29,17 @@
     onkeydown={(e) => e.key === 'Escape' && handleClose()}
   >
     <!-- Modal content -->
-    <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full h-[700px] flex flex-col">
+    <div class="flex h-[700px] w-full max-w-5xl flex-col rounded-lg bg-white shadow-xl">
       <!-- Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-300">
+      <div class="flex items-center justify-between border-b border-gray-300 p-6">
         <h2 class="text-lg font-semibold text-gray-900">TreeEdit Test Dialog</h2>
         <button
           type="button"
-          class="text-gray-400 hover:text-gray-600 transition-colors"
+          class="text-gray-400 transition-colors hover:text-gray-600"
           onclick={handleClose}
           aria-label="Close dialog"
         >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -51,7 +51,7 @@
       </div>
 
       <!-- Content -->
-      <div class="flex-1 p-6 overflow-auto">
+      <div class="flex-1 overflow-auto p-6">
         <TreeEdit />
       </div>
     </div>

@@ -22,7 +22,13 @@
     parentKind,
     isRootChild = false,
     autoEditName = false
-  }: { model: TreeModel; id: string; parentKind?: NodeKind; isRootChild?: boolean; autoEditName?: boolean } = $props()
+  }: {
+    model: TreeModel
+    id: string
+    parentKind?: NodeKind
+    isRootChild?: boolean
+    autoEditName?: boolean
+  } = $props()
 
   const get = (id: string) => model.nodes[id]
 
@@ -67,7 +73,7 @@
       // After converting, the current node becomes an array. Add an empty child and focus it.
       const parent = get(id)
       if (parent && isContainer(parent)) {
-        const nextIndexName = String((parent.children?.length ?? 1))
+        const nextIndexName = String(parent.children?.length ?? 1)
         const newChild: LeafNode = {
           id: crypto.randomUUID(),
           name: nextIndexName,
@@ -221,9 +227,9 @@
             <button class="toggle" onclick={onToggle}>
               {#if isContainer(n) && (n as ObjectNode | ArrayNode).children.length > 0}
                 {#if n.collapsed}
-                  <ChevronRight class="w-3 h-3" />
+                  <ChevronRight class="h-3 w-3" />
                 {:else}
-                  <ChevronDown class="w-3 h-3" />
+                  <ChevronDown class="h-3 w-3" />
                 {/if}
               {/if}
             </button>

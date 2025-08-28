@@ -114,7 +114,7 @@
   <!-- Drop indicator before this tag -->
   {#if dropPosition === index && draggedIndex !== null}
     <div
-      class="absolute w-0.5 h-8 bg-blue-500 z-10 -left-1 top-1/2 -translate-y-1/2 animate-pulse"
+      class="absolute top-1/2 -left-1 z-10 h-8 w-0.5 -translate-y-1/2 animate-pulse bg-blue-500"
     ></div>
   {/if}
 
@@ -134,12 +134,12 @@
       tag,
       dragged: draggedIndex === index,
       testSelected: isTestSelected,
-      additionalClasses: 'pl-1.5 pr-0.5 py-0.5'
+      additionalClasses: 'py-0.5 pr-0.5 pl-1.5'
     })}"
   >
     <button
       type="button"
-      class="text-left cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit focus:outline-none flex items-center"
+      class="font-inherit flex cursor-pointer items-center border-none bg-transparent p-0 text-left text-inherit focus:outline-none"
       tabindex="-1"
       ondblclick={handleTagDoubleClick}
       onkeydown={handleTagKeydown}
@@ -153,16 +153,16 @@
     >
       <span class="font-medium">{displayParts.name}</span>
       {#if isTestSelected}
-        <LockClosed class="w-3 h-3 text-white ml-1" />
+        <LockClosed class="ml-1 h-3 w-3 text-white" />
       {:else if isForceOverridden}
-        <LockClosed class="w-3 h-3 text-orange-500 ml-1" />
+        <LockClosed class="ml-1 h-3 w-3 text-orange-500" />
       {/if}
       {#if displayParts.content}
-        <span class="border-l border-dashed border-gray-400 mx-1 self-stretch"></span>
+        <span class="mx-1 self-stretch border-l border-dashed border-gray-400"></span>
         <span class="text-gray-600">{displayParts.content}</span>
       {/if}
       {#if displayParts.weight}
-        <span class="border-l border-dashed border-gray-400 mx-1 self-stretch"></span>
+        <span class="mx-1 self-stretch border-l border-dashed border-gray-400"></span>
         <span class="font-semibold text-blue-600">{displayParts.weight}</span>
       {/if}
     </button>
@@ -173,14 +173,14 @@
       onclick={() => onRemove(tag.name)}
       aria-label="Remove {tag.name}"
     >
-      <XMark class="w-3 h-3" />
+      <XMark class="h-3 w-3" />
     </button>
   </div>
 
   <!-- Drop indicator after this tag (for last position) -->
   {#if dropPosition === index + 1 && draggedIndex !== null}
     <div
-      class="absolute w-0.5 h-8 bg-blue-500 z-10 -right-1 top-1/2 -translate-y-1/2 animate-pulse"
+      class="absolute top-1/2 -right-1 z-10 h-8 w-0.5 -translate-y-1/2 animate-pulse bg-blue-500"
     ></div>
   {/if}
 </div>

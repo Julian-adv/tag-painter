@@ -335,24 +335,24 @@
 </script>
 
 <main
-  class="h-screen w-screen m-0 p-4 bg-gradient-to-br from-gray-100 to-gray-200 box-border flex flex-col"
+  class="m-0 box-border flex h-screen w-screen flex-col bg-gradient-to-br from-gray-100 to-gray-200 p-4"
 >
-  <div class="grid grid-cols-[1fr_minmax(0,832px)] gap-4 w-full h-full max-lg:grid-cols-1">
-    <section class="min-w-0 h-full overflow-auto flex flex-col gap-2">
+  <div class="grid h-full w-full grid-cols-[1fr_minmax(0,832px)] gap-4 max-lg:grid-cols-1">
+    <section class="flex h-full min-w-0 flex-col gap-2 overflow-auto">
       <CompositionSelector bind:this={compositionSelector} />
 
-      <div class="flex flex-1 min-h-0 flex-shrink-1">
+      <div class="flex min-h-0 flex-1 flex-shrink-1">
         <TagZones {currentRandomTagResolutions} />
       </div>
 
-      <div class="flex flex-col gap-1 flex-shrink-0">
+      <div class="flex flex-shrink-0 flex-col gap-1">
         <div class="flex flex-col gap-2">
-          <label for="checkpoint" class="font-bold text-sm text-black text-left">Checkpoint</label>
+          <label for="checkpoint" class="text-left text-sm font-bold text-black">Checkpoint</label>
           <select
             id="checkpoint"
             value={$promptsData.selectedCheckpoint || ''}
             onchange={(e) => updateCheckpoint((e.target as HTMLSelectElement).value)}
-            class="w-full p-1 rounded border border-gray-300 text-xs bg-white box-border transition-colors duration-200 focus:outline-none focus:border-green-500 focus:shadow-[0_0_0_2px_rgba(76,175,80,0.2)]"
+            class="box-border w-full rounded border border-gray-300 bg-white p-1 text-xs transition-colors duration-200 focus:border-green-500 focus:shadow-[0_0_0_2px_rgba(76,175,80,0.2)] focus:outline-none"
           >
             <option value="">Select checkpoint...</option>
             {#each availableCheckpoints as checkpoint (checkpoint)}
@@ -372,7 +372,7 @@
         </div>
 
         <div class="flex flex-col gap-2">
-          <label class="flex flex-row items-center gap-2 cursor-pointer font-normal text-xs">
+          <label class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal">
             <input
               type="checkbox"
               checked={$promptsData.useUpscale}
@@ -384,10 +384,10 @@
         </div>
 
         <div class="flex flex-col gap-2">
-          <label class="flex flex-row items-center gap-2 cursor-pointer font-normal text-xs">
+          <label class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal">
             <input
               type="checkbox"
-              class="accent-sky-600 m-0 cursor-pointer"
+              class="m-0 cursor-pointer accent-sky-600"
               checked={$promptsData.useFaceDetailer}
               onchange={(e) => updateFaceDetailer((e.target as HTMLInputElement).checked)}
             />

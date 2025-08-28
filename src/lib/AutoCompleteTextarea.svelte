@@ -293,8 +293,8 @@
     {placeholder}
     {readonly}
     rows={1}
-    class="block w-full p-1 rounded border border-gray-300 text-sm resize-y box-border bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200 {readonly
-      ? 'bg-gray-100 text-gray-600 cursor-not-allowed'
+    class="box-border block w-full resize-y rounded border border-gray-300 bg-white p-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200 focus:outline-none {readonly
+      ? 'cursor-not-allowed bg-gray-100 text-gray-600'
       : ''} {className}"
     oninput={handleInput}
     onclick={handleClick}
@@ -305,14 +305,14 @@
 
   {#if showSuggestions}
     <div
-      class="fixed bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto overflow-x-hidden z-[9999] min-w-[120px] max-w-[250px]"
+      class="fixed z-[9999] max-h-48 max-w-[250px] min-w-[120px] overflow-x-hidden overflow-y-auto rounded border border-gray-300 bg-white shadow-lg"
       style="top: {suggestionPosition.top}px; left: {suggestionPosition.left}px;"
     >
       {#each suggestions as suggestion, index (suggestion)}
         <button
           type="button"
           data-suggestion-index={index}
-          class="py-1.5 px-3 cursor-pointer text-sm border-none bg-none w-full text-left my-0.5 transition-colors duration-150 whitespace-nowrap overflow-hidden text-ellipsis box-border hover:bg-gray-100 {index ===
+          class="my-0.5 box-border w-full cursor-pointer overflow-hidden border-none bg-none px-3 py-1.5 text-left text-sm text-ellipsis whitespace-nowrap transition-colors duration-150 hover:bg-gray-100 {index ===
           selectedSuggestionIndex
             ? isCustomTag(suggestion)
               ? 'bg-pink-50 text-pink-700'

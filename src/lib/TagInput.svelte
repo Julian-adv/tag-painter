@@ -63,8 +63,8 @@
   }
 </script>
 
-<div class={disabled ? 'opacity-50 pointer-events-none' : ''}>
-  <div class="flex items-center justify-between mb-1">
+<div class={disabled ? 'pointer-events-none opacity-50' : ''}>
+  <div class="mb-1 flex items-center justify-between">
     <label
       for={id}
       class="text-xs font-medium {disabled ? 'text-gray-400' : 'text-gray-700'} text-left"
@@ -90,7 +90,7 @@
       bind:value={quickTagInput}
       placeholder="Type tags to add (press Enter to add)..."
       rows={1}
-      class="w-full p-1 border border-gray-200 rounded text-sm focus:ring-sky-500 focus:border-sky-500"
+      class="w-full rounded border border-gray-200 p-1 text-sm focus:border-sky-500 focus:ring-sky-500"
       readonly={disabled}
       onValueChange={handleQuickTagChange}
       onkeydown={handleQuickTagKeydown}

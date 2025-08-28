@@ -99,7 +99,7 @@
         step="0.1"
         value={loraWeight}
         onchange={(e) => handleWeightChange(parseFloat((e.target as HTMLInputElement).value))}
-        class="w-16 px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+        class="w-16 rounded border border-gray-300 bg-white px-1 py-0.5 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
       />
     </div>
   </div>

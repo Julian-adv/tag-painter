@@ -112,21 +112,21 @@
   }
 </script>
 
-<div class="w-full h-full flex flex-col flex-shrink-1">
+<div class="flex h-full w-full flex-shrink-1 flex-col">
   <div class="flex items-center justify-between pb-2">
-    <h3 class="text-sm font-bold text-gray-800 text-left">Tags</h3>
+    <h3 class="text-left text-sm font-bold text-gray-800">Tags</h3>
     <button
       type="button"
       onclick={openTreeEditDialog}
-      class="w-5 h-5 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-1 transition-colors flex items-center justify-center"
+      class="flex h-5 w-5 items-center justify-center rounded bg-gray-300 text-gray-700 transition-colors hover:bg-gray-400 focus:ring-2 focus:ring-gray-300 focus:ring-offset-1 focus:outline-none"
       title="Manage custom tags"
     >
-      <Tag class="w-3 h-3" />
+      <Tag class="h-3 w-3" />
     </button>
   </div>
 
   <!-- Tag zones input sections -->
-  <div class="flex-1 space-y-4 p-2 overflow-y-auto border-y-1 border-gray-300 tags-scroll">
+  <div class="tags-scroll flex-1 space-y-4 overflow-y-auto border-y-1 border-gray-300 p-2">
     <TagInput
       id="all-tags"
       label="All"

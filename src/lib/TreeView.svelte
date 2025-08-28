@@ -399,13 +399,13 @@
 </script>
 
 <div
-  class="flex-1 overflow-y-auto overflow-x-hidden space-y-1 flex flex-col pr-2 relative"
+  class="relative flex flex-1 flex-col space-y-1 overflow-x-hidden overflow-y-auto pr-2"
   role="list"
   bind:this={container}
 >
   <!-- Single overlay SVG for all tree connections -->
   <svg
-    class="absolute inset-0 pointer-events-none z-0"
+    class="pointer-events-none absolute inset-0 z-0"
     width={svgWidth}
     height={svgHeight}
     aria-hidden="true"
@@ -427,25 +427,25 @@
     >
       <!-- Drop indicator before this item -->
       {#if dropPosition === index && draggedItemId !== null && dragOverTarget === 'reorder'}
-        <div class="absolute w-full h-0.5 bg-blue-500 z-10 -top-0.5 left-0 animate-pulse"></div>
+        <div class="absolute -top-0.5 left-0 z-10 h-0.5 w-full animate-pulse bg-blue-500"></div>
       {/if}
 
       <!-- Drop indicator for making child -->
       {#if dropOnItem === node.id && draggedItemId !== null && dragOverTarget === 'make-child'}
         <div
-          class="absolute inset-0 bg-green-200 border-2 border-green-500 border-dashed z-10 rounded transition-opacity duration-100"
+          class="absolute inset-0 z-10 rounded border-2 border-dashed border-green-500 bg-green-200 transition-opacity duration-100"
           style="animation: pulse 1s infinite;"
         ></div>
       {/if}
 
       <div
-        class="flex items-center min-w-0"
+        class="flex min-w-0 items-center"
         style="margin-left: {(node.level - 1) * levelIndent}px;"
       >
         <button
           type="button"
           draggable="true"
-          class="text-left flex-1 min-w-0 {getItemDisplayClasses(node)} relative z-10"
+          class="min-w-0 flex-1 text-left {getItemDisplayClasses(node)} relative z-10"
           data-item-id={node.id}
           onclick={() => handleItemClick(node.id)}
           ondragstart={(e) => handleDragStart(e, node.id)}
@@ -453,12 +453,12 @@
           aria-label="Drag to reorder or make child: {getDisplayText(node.data)}"
           bind:this={nodeBindings[node.id]}
         >
-          <div class="flex items-center w-full">
-            <div class="flex items-center gap-1 flex-1 min-w-0">
+          <div class="flex w-full items-center">
+            <div class="flex min-w-0 flex-1 items-center gap-1">
               <!-- Expand/Collapse toggle icon inside tag button (hidden for root type) -->
               {#if node.hasChildren && node.data.type !== 'root'}
                 <div
-                  class="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0 cursor-pointer"
+                  class="flex h-4 w-4 flex-shrink-0 cursor-pointer items-center justify-center text-gray-400 hover:text-gray-600"
                   onclick={(e) => {
                     e.stopPropagation()
                     toggleNode(node.id)
@@ -474,7 +474,7 @@
                   tabindex="0"
                   aria-label={node.collapsed ? 'Expand' : 'Collapse'}
                 >
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {#if node.collapsed}
                       <!-- Right arrow (collapsed) -->
                       <path
@@ -495,17 +495,17 @@
                   </svg>
                 </div>
               {:else}
-                <div class="w-4 h-4 flex-shrink-0"></div>
+                <div class="h-4 w-4 flex-shrink-0"></div>
               {/if}
               <span class="truncate">{getDisplayText(node.data)}</span>
             </div>
 
             {#if getIndicators}
-              <div class="flex items-center gap-1 ml-auto">
+              <div class="ml-auto flex items-center gap-1">
                 {#each getIndicators(node.data) as indicator, idx (idx)}
                   {#if indicator.icon}
                     {@const IconComponent = indicator.icon as Component}
-                    <IconComponent class="w-4 h-4 flex-shrink-0 {indicator.classes || ''}" />
+                    <IconComponent class="h-4 w-4 flex-shrink-0 {indicator.classes || ''}" />
                   {/if}
                 {/each}
               </div>
@@ -516,7 +516,7 @@
 
       <!-- Drop indicator after this item (for last position) -->
       {#if dropPosition === index + 1 && draggedItemId !== null && dragOverTarget === 'reorder'}
-        <div class="absolute w-full h-0.5 bg-blue-500 z-10 -bottom-0.5 left-0 animate-pulse"></div>
+        <div class="absolute -bottom-0.5 left-0 z-10 h-0.5 w-full animate-pulse bg-blue-500"></div>
       {/if}
     </div>
   {/each}
@@ -525,7 +525,7 @@
     {#if empty}
       {@render empty()}
     {:else}
-      <p class="text-gray-400 text-sm italic">No custom tags available</p>
+      <p class="text-sm text-gray-400 italic">No custom tags available</p>
     {/if}
   {/if}
 </div>

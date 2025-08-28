@@ -158,43 +158,43 @@
   }
 </script>
 
-<div class="w-full mx-auto flex flex-col items-center gap-4">
+<div class="mx-auto flex w-full flex-col items-center gap-4">
   {#if imageUrl}
     <div class="relative inline-block">
       <img
         bind:this={imageElement}
         src={imageUrl}
         alt=""
-        class="max-w-full max-h-[calc(100vh-2rem)] object-contain rounded-lg shadow-md block"
+        class="block max-h-[calc(100vh-2rem)] max-w-full rounded-lg object-contain shadow-md"
         onload={() => {}}
       />
       {#if $maskOverlay.isVisible && $maskOverlay.maskSrc}
         <img
           src={$maskOverlay.maskSrc}
           alt="Mask overlay"
-          class="absolute top-0 left-0 w-full h-full object-contain opacity-40 pointer-events-none rounded-lg mix-blend-multiply"
+          class="pointer-events-none absolute top-0 left-0 h-full w-full rounded-lg object-contain opacity-40 mix-blend-multiply"
         />
       {/if}
       <DrawingCanvas bind:this={drawingCanvas} {isDrawingMode} {drawingTool} {imageElement} />
     </div>
   {:else}
     <div
-      class="flex items-center justify-center w-[832px] h-[1216px] bg-gray-100 rounded-lg text-gray-500 text-lg"
+      class="flex h-[1216px] w-[832px] items-center justify-center rounded-lg bg-gray-100 text-lg text-gray-500"
     >
       <p>No image to display</p>
     </div>
   {/if}
 
-  <div class="flex justify-between items-center w-full">
+  <div class="flex w-full items-center justify-between">
     <div class="flex items-center gap-2">
       {#if imageUrl}
         <DrawingControls bind:isDrawingMode bind:drawingTool onClearMask={clearMask} />
       {/if}
     </div>
 
-    <div class="flex justify-center items-center gap-4">
+    <div class="flex items-center justify-center gap-4">
       <button
-        class="flex items-center justify-center w-9 h-9 border border-gray-300 rounded-full bg-gray-100 text-gray-600 cursor-pointer transition-all duration-200 hover:bg-gray-200 hover:border-gray-400 hover:scale-105 active:scale-95"
+        class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-gray-300 bg-gray-100 text-gray-600 transition-all duration-200 hover:scale-105 hover:border-gray-400 hover:bg-gray-200 active:scale-95"
         onclick={goToPreviousImage}
         aria-label="Previous image"
       >
@@ -208,12 +208,12 @@
         </svg>
       </button>
 
-      <span class="text-sm text-gray-600 font-medium min-w-[60px] text-center">
+      <span class="min-w-[60px] text-center text-sm font-medium text-gray-600">
         {currentIndex >= 0 ? currentIndex + 1 : 0} / {allFiles.length}
       </span>
 
       <button
-        class="flex items-center justify-center w-9 h-9 border border-gray-300 rounded-full bg-gray-100 text-gray-600 cursor-pointer transition-all duration-200 hover:bg-gray-200 hover:border-gray-400 hover:scale-105 active:scale-95"
+        class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-gray-300 bg-gray-100 text-gray-600 transition-all duration-200 hover:scale-105 hover:border-gray-400 hover:bg-gray-200 active:scale-95"
         onclick={goToNextImage}
         aria-label="Next image"
       >

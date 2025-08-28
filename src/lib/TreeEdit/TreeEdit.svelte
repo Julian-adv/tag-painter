@@ -2,6 +2,7 @@
   import TreeNode from './TreeNode.svelte'
   import type { TreeModel } from './model'
   import { fromYAML, toYAML } from './yaml-io'
+  import { onMount } from 'svelte'
 
   let {
     initialYAML = 'a: 1\nlist:\n - x\n - y\nobj:\n k: v\n ref: { $ref: obj }\n'
@@ -13,9 +14,33 @@
   function loadYaml(text: string) {
     model = fromYAML(text)
   }
+
+  onMount(() => {
+    // Load YAML from server file on mount
+    fetch('/api/wildcards')
+      .then((res) => (res.ok ? res.text() : ''))
+      .then((text) => {
+        if (typeof text === 'string' && text.length > 0) {
+          initialYAML = text
+          loadYaml(text)
+        }
+      })
+      .catch((err) => console.error('Failed to load wildcards.yaml:', err))
+  })
+
   function exportYaml() {
-    // yamlOut is now automatically updated via $derived
-    // This function could be removed, but keeping for explicit export action
+    // Save the current YAML to server-side file
+    fetch('/api/wildcards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      body: yamlOut
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to save')
+      })
+      .catch((err) => {
+        console.error('Save failed:', err)
+      })
   }
 </script>
 
@@ -31,8 +56,12 @@
     <h3>YAML 입/출력</h3>
     <textarea bind:value={initialYAML} rows={12}></textarea>
     <div class="btns">
-      <button onclick={() => loadYaml(initialYAML)}>YAML 불러오기</button>
-      <button onclick={exportYaml}>YAML 내보내기</button>
+      <button
+        onclick={exportYaml}
+        class="rounded-md bg-blue-500 px-4 py-2 text-white transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+      >
+        Save
+      </button>
     </div>
     <textarea readonly rows={12} value={yamlOut}></textarea>
   </section>

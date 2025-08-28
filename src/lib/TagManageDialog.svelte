@@ -67,7 +67,7 @@
 {#if isOpen}
   <!-- Modal backdrop -->
   <div
-    class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
@@ -75,17 +75,17 @@
     onkeydown={(e) => e.key === 'Escape' && handleCancel()}
   >
     <!-- Modal content -->
-    <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
       <!-- Header -->
-      <div class="flex items-center justify-between mb-4">
+      <div class="mb-4 flex items-center justify-between">
         <h2 class="text-lg font-semibold text-gray-900">{title}</h2>
         <button
           type="button"
-          class="text-gray-400 hover:text-gray-600 transition-colors"
+          class="text-gray-400 transition-colors hover:text-gray-600"
           onclick={handleCancel}
           aria-label="Close dialog"
         >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -98,7 +98,7 @@
 
       <!-- New tag input -->
       <div class="mb-4">
-        <label for="new-tag-input" class="block text-sm font-medium text-gray-700 mb-2 text-left">
+        <label for="new-tag-input" class="mb-2 block text-left text-sm font-medium text-gray-700">
           Custom Tag Name (optional)
         </label>
         <input
@@ -106,14 +106,14 @@
           type="text"
           bind:value={newTagInput}
           placeholder="Enter custom tag name to save..."
-          class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
           onkeydown={handleKeydown}
         />
       </div>
 
       <!-- Current tags display -->
       <div class="mb-6">
-        <label for="dialog-tags" class="block text-sm font-medium text-gray-700 mb-2 text-left"
+        <label for="dialog-tags" class="mb-2 block text-left text-sm font-medium text-gray-700"
           >Current Tags</label
         >
         <TagDisplay id="dialog-tags" bind:tags={dialogTags} />
@@ -124,14 +124,14 @@
         <button
           type="button"
           onclick={handleCancel}
-          class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+          class="rounded-md bg-gray-200 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:outline-none"
         >
           Cancel
         </button>
         <button
           type="button"
           onclick={handleSave}
-          class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+          class="rounded-md bg-blue-500 px-4 py-2 text-white transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
         >
           Save
         </button>

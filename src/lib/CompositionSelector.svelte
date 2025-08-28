@@ -42,12 +42,12 @@
 </script>
 
 <div class="border-gray-200">
-  <h3 class="text-sm font-bold text-gray-800 text-left">Composition</h3>
-  <div class="flex gap-1 flex-wrap bg-gray-200 p-1 m-2 rounded-lg">
+  <h3 class="text-left text-sm font-bold text-gray-800">Composition</h3>
+  <div class="m-2 flex flex-wrap gap-1 rounded-lg bg-gray-200 p-1">
     {#each getCompositions() as composition (composition.id)}
       <button
         type="button"
-        class="border-2 border-transparent rounded-lg p-1 cursor-pointer transition-all duration-200 flex items-center justify-center hover:border-sky-300 hover:bg-sky-50 {$promptsData.selectedComposition ===
+        class="flex cursor-pointer items-center justify-center rounded-lg border-2 border-transparent p-1 transition-all duration-200 hover:border-sky-300 hover:bg-sky-50 {$promptsData.selectedComposition ===
         composition.id
           ? 'border-sky-500 bg-sky-200'
           : ''}"
@@ -56,7 +56,7 @@
         onmouseleave={handleMouseLeave}
         title={composition.alt}
       >
-        <img src={composition.src} alt={composition.alt} class="w-12 h-auto block" />
+        <img src={composition.src} alt={composition.alt} class="block h-auto w-12" />
       </button>
     {/each}
   </div>

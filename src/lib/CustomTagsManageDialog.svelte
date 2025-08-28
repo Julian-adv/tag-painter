@@ -688,7 +688,7 @@
 {#if isOpen}
   <!-- Modal backdrop -->
   <div
-    class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
@@ -696,9 +696,9 @@
     onkeydown={(e) => e.key === 'Escape' && handleClose()}
   >
     <!-- Modal content -->
-    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full h-[600px] flex flex-col">
+    <div class="flex h-[600px] w-full max-w-4xl flex-col rounded-lg bg-white shadow-xl">
       <!-- Header -->
-      <div class="flex items-center justify-between p-6 border-b border-gray-300">
+      <div class="flex items-center justify-between border-b border-gray-300 p-6">
         <div class="flex items-center gap-2">
           <h2 class="text-lg font-semibold text-gray-900">Manage Custom Tags</h2>
           <ActionButton
@@ -722,11 +722,11 @@
         </div>
         <button
           type="button"
-          class="text-gray-400 hover:text-gray-600 transition-colors"
+          class="text-gray-400 transition-colors hover:text-gray-600"
           onclick={handleClose}
           aria-label="Close dialog"
         >
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -738,9 +738,9 @@
       </div>
 
       <!-- Content -->
-      <div class="flex-1 flex min-h-0">
+      <div class="flex min-h-0 flex-1">
         <!-- Left column: Custom tags list -->
-        <div class="w-1/2 border-r border-gray-300 flex flex-col p-4">
+        <div class="flex w-1/2 flex-col border-r border-gray-300 p-4">
           <TreeView
             bind:this={treeViewComponent}
             items={customTags}
@@ -757,14 +757,14 @@
         </div>
 
         <!-- Right column: Selected tag content -->
-        <div class="w-1/2 p-4 flex flex-col gap-2">
+        <div class="flex w-1/2 flex-col gap-2 p-4">
           {#if selectedTagName}
             <div class="flex items-center justify-between">
               <input
                 type="text"
                 bind:value={editingTagName}
                 bind:this={tagNameInputElement}
-                class="text-sm font-semibold text-gray-900 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 px-3 py-2 flex-1 mr-2"
+                class="mr-2 flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 tabindex="0"
                 onkeydown={handleNameKeydown}
                 onblur={saveTagName}
@@ -799,7 +799,7 @@
                     selectedTagType = 'sequential'
                     handleTagTypeChange()
                   }}
-                  class="w-4 h-4 text-pink-600 bg-gray-100 border-gray-300 focus:outline-none"
+                  class="h-4 w-4 border-gray-300 bg-gray-100 text-pink-600 focus:outline-none"
                 />
                 <span class="text-gray-700">Sequential</span>
               </label>
@@ -814,7 +814,7 @@
                     selectedTagType = 'random'
                     handleTagTypeChange()
                   }}
-                  class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:outline-none"
+                  class="h-4 w-4 border-gray-300 bg-gray-100 text-purple-600 focus:outline-none"
                 />
                 <span class="text-gray-700">Random</span>
               </label>
@@ -829,13 +829,13 @@
                     selectedTagType = 'consistent-random'
                     handleTagTypeChange()
                   }}
-                  class="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 focus:outline-none"
+                  class="h-4 w-4 border-gray-300 bg-gray-100 text-orange-600 focus:outline-none"
                 />
                 <span class="text-gray-700">Consistent Random</span>
               </label>
             </div>
 
-            <div class="flex-1 overflow-y-auto max-h-80">
+            <div class="max-h-80 flex-1 overflow-y-auto">
               <TagInput
                 id="custom-tag-content"
                 label=""
@@ -848,15 +848,15 @@
               />
             </div>
           {:else}
-            <div class="flex-1 flex items-center justify-center">
-              <p class="text-gray-400 text-sm italic">Select a custom tag to edit</p>
+            <div class="flex flex-1 items-center justify-center">
+              <p class="text-sm text-gray-400 italic">Select a custom tag to edit</p>
             </div>
           {/if}
         </div>
       </div>
 
       <!-- Footer -->
-      <div class="flex justify-between items-center p-6 border-t border-gray-300">
+      <div class="flex items-center justify-between border-t border-gray-300 p-6">
         <div class="text-sm">
           {#if statusMessage}
             <span class="text-red-600">{statusMessage}</span>
@@ -873,9 +873,9 @@
           <button
             type="button"
             onclick={saveAllChanges}
-            class="px-4 py-2 bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors {hasUnsavedChanges
+            class="rounded-md bg-blue-500 px-4 py-2 transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none {hasUnsavedChanges
               ? 'text-white'
-              : 'bg-gray-200 hover:bg-gray-200 text-gray-700'}"
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-200'}"
             disabled={!hasUnsavedChanges}
           >
             Save
@@ -883,7 +883,7 @@
           <button
             type="button"
             onclick={handleClose}
-            class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+            class="rounded-md bg-gray-200 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:outline-none"
           >
             Close
           </button>

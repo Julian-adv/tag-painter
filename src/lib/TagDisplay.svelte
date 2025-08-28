@@ -209,14 +209,14 @@
 
 <div
   {id}
-  class="w-full min-h-[6rem] p-1 border border-gray-300 rounded-lg bg-white"
+  class="min-h-[6rem] w-full rounded-lg border border-gray-300 bg-white p-1"
   tabindex="-1"
   role="textbox"
   aria-label="Tag display area"
   onkeydown={handleKeydown}
 >
   {#if tags.length > 0}
-    <div class="flex flex-wrap gap-1 text-left relative">
+    <div class="relative flex flex-wrap gap-1 text-left">
       {#each tags as tag, index (tag.name)}
         <TagItem
           bind:tag={tags[index]}
@@ -245,18 +245,18 @@
 <!-- Context Menu -->
 {#if contextMenuState.visible}
   <div
-    class="fixed bg-white border border-gray-300 rounded-lg shadow-lg py-1 z-[100] min-w-40"
+    class="fixed z-[100] min-w-40 rounded-lg border border-gray-300 bg-white py-1 shadow-lg"
     style="left: {contextMenuState.x}px; top: {contextMenuState.y}px;"
   >
     <button
       type="button"
-      class="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+      class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-100"
       onclick={handlePinToggle}
     >
       {#if contextMenuState.tagIndex >= 0}
         {@const tag = tags[contextMenuState.tagIndex]}
         {@const isForceOverridden = !!testModeStore[tag.name]?.overrideTag}
-        <LockClosed class="w-4 h-4 {isForceOverridden ? 'text-orange-500' : 'text-gray-500'}" />
+        <LockClosed class="h-4 w-4 {isForceOverridden ? 'text-orange-500' : 'text-gray-500'}" />
         <span>
           {isForceOverridden ? 'Unpin this option' : 'Pin this option'}
         </span>
@@ -268,12 +268,12 @@
       {@const displayContent = currentRandomTagResolutions[tag.name]}
 
       {#if displayContent && !isForceOverridden}
-        <div class="px-3 py-1 text-xs text-gray-500 border-t border-gray-200">
+        <div class="border-t border-gray-200 px-3 py-1 text-xs text-gray-500">
           Will pin: <span class="font-medium">{displayContent}</span>
         </div>
       {/if}
       {#if isForceOverridden && testModeStore[tag.name]?.overrideTag}
-        <div class="px-3 py-1 text-xs text-gray-500 border-t border-gray-200">
+        <div class="border-t border-gray-200 px-3 py-1 text-xs text-gray-500">
           Pinned to: <span class="font-medium">{testModeStore[tag.name].overrideTag}</span>
         </div>
       {/if}
