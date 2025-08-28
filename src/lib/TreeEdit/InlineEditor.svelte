@@ -27,10 +27,21 @@
   let inputElement: HTMLInputElement | null = $state(null)
   let acWrapper: HTMLDivElement | null = $state(null)
 
-  function startEditing() {
+  async function startEditing() {
     editingValue = value
     isEditing = true
     onEditingChange?.(true)
+    await tick()
+    if (enableAutocomplete) {
+      const ta = acWrapper?.querySelector('textarea') as HTMLTextAreaElement | null
+      if (ta) {
+        ta.focus()
+        ta.select()
+      }
+    } else if (inputElement) {
+      inputElement.focus()
+      inputElement.select()
+    }
   }
 
   function finishEditing() {
