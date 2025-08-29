@@ -11,9 +11,6 @@
     hasUnsavedChanges = $bindable(false)
   }: { initialYAML?: string; hasUnsavedChanges?: boolean } = $props()
 
-  // Current file name for display
-  const fileName = 'wildcards.yaml'
-
   let model: TreeModel = $state(fromYAML(initialYAML))
   let newlyAddedRootChildId: string | null = $state(null)
   let selectedId: string | null = $state(null)
@@ -107,66 +104,87 @@
   }
 </script>
 
-<div class="grid">
-  <section>
-    <h3>{fileName}</h3>
-    <div
-      class="tree"
-      role="button"
-      aria-label="Clear selection"
-      onclick={() => (selectedId = null)}
-      tabindex="-1"
-      onkeydown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          selectedId = null
-        }
-      }}
-    >
-      <TreeNode
-        {model}
-        id={model.rootId}
-        isRootChild={true}
-        autoEditChildId={newlyAddedRootChildId}
-        onMutate={() => (hasUnsavedChanges = true)}
-        {selectedId}
-        onSelect={selectNode}
-      />
-    </div>
-  </section>
-</div>
+<div class="tree-root">
+  <div class="grid">
+    <section>
+      <div
+        class="tree"
+        role="button"
+        aria-label="Clear selection"
+        onclick={() => (selectedId = null)}
+        tabindex="-1"
+        onkeydown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            selectedId = null
+          }
+        }}
+      >
+        <TreeNode
+          {model}
+          id={model.rootId}
+          isRootChild={true}
+          autoEditChildId={newlyAddedRootChildId}
+          onMutate={() => (hasUnsavedChanges = true)}
+          {selectedId}
+          onSelect={selectNode}
+        />
+      </div>
+    </section>
+    <div class="col-divider" aria-hidden="true"></div>
+  </div>
 
-<div class="btns">
-  <ActionButton
-    onclick={addBySelection}
-    variant="green"
-    size="md"
-    icon={Plus}
-    title={selectedId ? 'Add child to selected' : 'Add top-level node'}
-    disabled={isAddDisabled()}
-  />
-  <ActionButton
-    onclick={deleteBySelection}
-    variant="red"
-    size="md"
-    icon={Trash}
-    title="Delete selected node"
-    disabled={!selectedId || selectedId === model.rootId}
-  />
+  <div class="btns">
+    <ActionButton
+      onclick={addBySelection}
+      variant="green"
+      size="md"
+      icon={Plus}
+      title={selectedId ? 'Add child to selected' : 'Add top-level node'}
+      disabled={isAddDisabled()}
+    />
+    <ActionButton
+      onclick={deleteBySelection}
+      variant="red"
+      size="md"
+      icon={Trash}
+      title="Delete selected node"
+      disabled={!selectedId || selectedId === model.rootId}
+    />
+  </div>
 </div>
 
 <style>
+  .tree-root {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* allow internal scrolling */
+  }
   .grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    grid-template-columns: minmax(0, 60%) 1px 1fr; /* left | divider | right */
+    gap: 0.25rem;
+    flex: 1 1 auto; /* fill available space in root */
+    min-height: 0; /* allow children to shrink within flex parent */
+  }
+  .col-divider {
+    background-color: #e5e7eb; /* gray-300 */
+    align-self: stretch; /* span full height of the grid row */
+  }
+  .grid > section {
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* enable internal scrolling */
   }
   .tree {
-    border: 1px solid #ddd;
+    /* remove border; rely on column divider instead */
     padding: 0.5rem;
     border-radius: 0.5rem;
-    max-height: 70vh;
-    overflow: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto; /* scroll only vertically inside left column */
+    overflow-x: hidden;
     text-align: left; /* ensure inline-flex rows align left */
   }
   h3 {

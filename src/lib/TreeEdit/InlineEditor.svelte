@@ -147,7 +147,7 @@
     />
   {/if}
 {:else}
-  <span
+  <div
     class="inline-editor-display {className}"
     ondblclick={() => startEditing('caretEnd')}
     role="button"
@@ -155,7 +155,7 @@
     onkeydown={(e) => e.key === 'Enter' && startEditing()}
   >
     {value || placeholder}
-  </span>
+  </div>
 {/if}
 
 <style>
@@ -163,7 +163,10 @@
     padding: 0.125rem 0.25rem;
     font-size: 0.875rem;
     cursor: pointer;
-    white-space: nowrap;
+    /* Allow wrapping across multiple lines when content exceeds parent width */
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     user-select: none;
     min-width: 1.5rem;
   }
