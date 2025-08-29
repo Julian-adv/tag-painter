@@ -51,7 +51,9 @@ export function fromYAML(text: string): TreeModel {
       if (name !== 'root') pathSymbols[currentPath] = id
       return n
     }
-    const id = uid()
+    // Distinguish between object key (name: value) and array item context
+    // If parent is an array, keep this as a plain leaf item
+    const parentNode = parentId ? nodes[parentId] : undefined
     const leafValue =
       typeof value === 'string' ||
       typeof value === 'number' ||
@@ -59,9 +61,27 @@ export function fromYAML(text: string): TreeModel {
       value === null
         ? value
         : String(value)
-    const n: LeafNode = { id, name, kind: 'leaf', parentId, value: leafValue }
-    nodes[id] = n
-    return n
+    if (parentNode && parentNode.kind === 'array') {
+      const id = uid()
+      const n: LeafNode = { id, name, kind: 'leaf', parentId, value: leafValue }
+      nodes[id] = n
+      return n
+    }
+
+    // For object key context (name: value), treat as an array with a single child
+    const arrId = uid()
+    const arr: ArrayNode = { id: arrId, name, kind: 'array', parentId, children: [], collapsed: false }
+    nodes[arrId] = arr
+
+    const leafId = uid()
+    const child: LeafNode = { id: leafId, name: '0', kind: 'leaf', parentId: arrId, value: leafValue }
+    nodes[leafId] = child
+    arr.children.push(leafId)
+
+    // Register as symbols and pathSymbols like other containers
+    symbols[name] = arrId
+    if (name !== 'root') pathSymbols[currentPath] = arrId
+    return arr
   }
 
   const root = build('root', data, null, '')
