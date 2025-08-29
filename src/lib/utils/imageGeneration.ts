@@ -11,6 +11,7 @@ import {
   generateLoraChain
 } from './workflow'
 import { expandCustomTags } from './tagExpansion'
+import { getWildcardModel } from '../stores/tagsStore'
 import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow } from '$lib/types'
 
 export interface GenerationOptions {
@@ -75,18 +76,13 @@ export async function generateImage(options: GenerationOptions): Promise<{
 
     // Expand custom tags and create prompt parts, using previous resolutions if regenerating
     const previousAll = previousRandomTagResolutions?.all || {}
-    const allResult = expandCustomTags(
-      promptsData.tags.all,
-      promptsData.customTags,
-      new Set(),
-      {},
-      previousAll
-    )
+    const model = getWildcardModel()
+    const allResult = expandCustomTags(promptsData.tags.all, model, new Set(), {}, previousAll)
 
     const previousZone1 = previousRandomTagResolutions?.zone1 || {}
     const zone1Result = expandCustomTags(
       promptsData.tags.zone1,
-      promptsData.customTags,
+      model,
       new Set(),
       { ...allResult.randomTagResolutions },
       previousZone1
@@ -95,7 +91,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const previousZone2 = previousRandomTagResolutions?.zone2 || {}
     const zone2Result = expandCustomTags(
       promptsData.tags.zone2,
-      promptsData.customTags,
+      model,
       new Set(),
       { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions },
       previousZone2
@@ -104,7 +100,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const previousNegative = previousRandomTagResolutions?.negative || {}
     const negativeResult = expandCustomTags(
       promptsData.tags.negative,
-      promptsData.customTags,
+      model,
       new Set(),
       {
         ...allResult.randomTagResolutions,
@@ -117,7 +113,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const previousInpainting = previousRandomTagResolutions?.inpainting || {}
     const inpaintingResult = expandCustomTags(
       promptsData.tags.inpainting,
-      promptsData.customTags,
+      model,
       new Set(),
       {
         ...allResult.randomTagResolutions,

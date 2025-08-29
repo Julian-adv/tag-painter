@@ -7,7 +7,7 @@ let tags: string[] = []
 // Index: wildcard name -> predominant kind ('array' > 'object' > 'leaf')
 let wildcardNameIndex: Map<string, 'array' | 'object' | 'leaf'> = new Map()
 // Keep parsed TreeModel to query node kinds directly (for advanced features)
-let wildcardModel: TreeModel | null = null
+let wildcardModel: TreeModel = fromYAML('')
 export const combinedTags = writable<string[]>([])
 let initPromise: Promise<void> | null = null
 
@@ -53,12 +53,12 @@ export async function initTags(): Promise<void> {
         } catch (e) {
           console.error('Failed to parse wildcards.yaml:', e)
           wildcardNameIndex = new Map()
-          wildcardModel = null
+          wildcardModel = fromYAML('')
         }
       } else {
         // If not found or failed, fall back to empty
         wildcardNameIndex = new Map()
-        wildcardModel = null
+        wildcardModel = fromYAML('')
         if (wcRes.status === 'rejected') {
           console.error('Failed to load wildcards.yaml:', wcRes.reason)
         }
@@ -149,7 +149,7 @@ export function updateWildcardsFromText(text: string) {
   } catch (e) {
     console.error('updateWildcardsFromText failed:', e)
     wildcardNameIndex = new Map()
-    wildcardModel = null
+    wildcardModel = fromYAML('')
   }
   updateCombinedTags()
 }
@@ -165,9 +165,14 @@ export async function refreshWildcardsFromServer() {
     console.error('refreshWildcardsFromServer failed:', e)
     // On fetch failure, reset state
     wildcardNameIndex = new Map()
-    wildcardModel = null
+    wildcardModel = fromYAML('')
     updateCombinedTags()
   }
+}
+
+// Expose the parsed TreeModel for consumers that need structure-based logic
+export function getWildcardModel(): TreeModel {
+  return wildcardModel
 }
 
 // Public helper to check if a wildcard name corresponds to an array node

@@ -1,8 +1,8 @@
 /**
- * Tag expansion utilities for handling custom tags
+ * Tag expansion utilities using TreeModel (wildcards.yaml)
  */
 
-import type { CustomTag } from '../types'
+import type { AnyNode, TreeModel } from '$lib/TreeEdit/model'
 import { testModeStore } from '../stores/testModeStore.svelte'
 
 /**
@@ -17,48 +17,7 @@ function getSecureRandomIndex(max: number): number {
 /**
  * Helper function to handle random tag selection and expansion
  */
-function expandRandomTag(
-  tag: string,
-  customTag: CustomTag,
-  customTags: Record<string, CustomTag>,
-  visitedTags: Set<string>,
-  existingRandomResolutions: Record<string, string>,
-  previousZoneRandomResults: Record<string, string>
-): { expandedTags: string[]; resolution: string } {
-  // Check for test mode override first (user can always override even during regen)
-  let selectedTag: string
-  const overrideTag = testModeStore[tag]?.overrideTag
-  if (overrideTag) {
-    // Use the test override tag
-    selectedTag = overrideTag
-  } else if (previousZoneRandomResults[tag]) {
-    // Use previous zone random result for regen if no override
-    const previousResult = previousZoneRandomResults[tag]
-    const previousTags = previousResult.split(', ')
-    return {
-      expandedTags: previousTags,
-      resolution: previousResult
-    }
-  } else {
-    // Use crypto.getRandomValues for better randomness
-    const randomIndex = getSecureRandomIndex(customTag.tags.length)
-    selectedTag = customTag.tags[randomIndex]
-  }
-
-  // Recursively expand the selected tag
-  const recursiveResult = expandCustomTags(
-    [selectedTag],
-    customTags,
-    visitedTags,
-    existingRandomResolutions,
-    previousZoneRandomResults
-  )
-
-  return {
-    expandedTags: recursiveResult.expandedTags,
-    resolution: recursiveResult.expandedTags.join(', ')
-  }
-}
+// CustomTag branch removed — we only support TreeModel-driven expansion.
 
 /**
  * Parse weight from tag string
@@ -88,7 +47,7 @@ function applyWeight(tagName: string, weight?: number): string {
  */
 export function expandCustomTags(
   tags: string[],
-  customTags: Record<string, CustomTag>,
+  model: TreeModel,
   visitedTags: Set<string> = new Set(),
   existingRandomResolutions: Record<string, string> = {},
   previousZoneRandomResults: Record<string, string> = {}
@@ -98,6 +57,82 @@ export function expandCustomTags(
 } {
   const expandedTags: string[] = []
   const randomTagResolutions: Record<string, string> = {}
+  // Model is the sole source of truth
+
+  function findNodeByName(m: TreeModel, name: string): AnyNode | undefined {
+    // Prefer a direct symbol match first (objects), fallback to first node with the same name
+    const symId = m.symbols[name]
+    if (symId) return m.nodes[symId]
+    for (const n of Object.values(m.nodes)) {
+      if (n.name === name) return n
+    }
+    return undefined
+  }
+
+  function expandNodeOnce(m: TreeModel, node: AnyNode): string[] {
+    if (node.kind === 'leaf') {
+      const val = node.value
+      return [String(val)]
+    }
+    if (node.kind === 'ref') {
+      const refName = node.refName
+      const target = findNodeByName(m, refName)
+      if (!target) return [refName]
+      return expandNodeOnce(m, target)
+    }
+    // For object/array nodes that are not directly expanded here, return their name as a regular tag
+    return [node.name]
+  }
+
+  function expandRandomArrayTag(
+    tag: string,
+    m: TreeModel,
+    visited: Set<string>
+  ): { expandedTags: string[]; resolution: string } {
+    // Check overrides or previous results
+    let selected: string | null = null
+    const overrideTag = testModeStore[tag]?.overrideTag
+    if (overrideTag) {
+      selected = overrideTag
+    } else if (previousZoneRandomResults[tag]) {
+      const previousResult = previousZoneRandomResults[tag]
+      const previousTags = previousResult.split(', ')
+      return { expandedTags: previousTags, resolution: previousResult }
+    }
+
+    // Compute candidate options from array children
+    const arrNode = findNodeByName(m, tag)
+    if (!arrNode || arrNode.kind !== 'array') {
+      // Fallback to regular behavior
+      return { expandedTags: [tag], resolution: tag }
+    }
+    const children = arrNode.children
+    const options: string[] = []
+    for (const cid of children) {
+      const childNode = m.nodes[cid]
+      if (!childNode) continue
+      const tokens = expandNodeOnce(m, childNode)
+      // Join tokens for a single option (keeps comma-containing strings intact as single unit)
+      options.push(tokens.join(', '))
+    }
+    if (options.length === 0) return { expandedTags: [], resolution: '' }
+
+    // Select option if not fixed by override/previous
+    if (!selected) {
+      const idx = getSecureRandomIndex(options.length)
+      selected = options[idx]
+    }
+
+    // Recursively expand the selected option (to resolve any nested wildcard names)
+    const recursive = expandCustomTags(
+      [selected!],
+      m,
+      visited,
+      existingRandomResolutions,
+      previousZoneRandomResults
+    )
+    return { expandedTags: recursive.expandedTags, resolution: recursive.expandedTags.join(', ') }
+  }
 
   for (const tagString of tags) {
     const { name: tag, weight: tagWeight } = parseTagWithWeight(tagString)
@@ -108,102 +143,28 @@ export function expandCustomTags(
       continue
     }
 
-    if (tag in customTags) {
-      const customTag = customTags[tag]
+    // Branch: TreeModel-driven expansion
+    const node = findNodeByName(model, tag)
+    if (node && node.kind === 'array') {
       visitedTags.add(tag)
-
-      if (customTag.type === 'random') {
-        // For random tags, select one random tag from the list
-        if (customTag.tags.length > 0) {
-          const result = expandRandomTag(
-            tag,
-            customTag,
-            customTags,
-            visitedTags,
-            existingRandomResolutions,
-            previousZoneRandomResults
-          )
-          // Apply weight to the entire expanded result if it has a weight
-          if (tagWeight) {
-            const combinedExpansion = result.expandedTags.join(', ')
-            const weightedExpansion = applyWeight(combinedExpansion, tagWeight)
-            expandedTags.push(weightedExpansion)
-            randomTagResolutions[tag] = combinedExpansion
-          } else {
-            expandedTags.push(...result.expandedTags)
-            randomTagResolutions[tag] = result.resolution
-          }
-        }
-      } else if (customTag.type === 'consistent-random') {
-        // For consistent-random tags, use existing resolution if available, otherwise select randomly
-        if (customTag.tags.length > 0) {
-          if (existingRandomResolutions[tag]) {
-            // Use the existing resolution directly
-            const existingResult = existingRandomResolutions[tag]
-            // Apply weight to existing resolution if tagWeight exists
-            if (tagWeight) {
-              const weightedExpansion = applyWeight(existingResult, tagWeight)
-              expandedTags.push(weightedExpansion)
-              randomTagResolutions[tag] = existingResult
-            } else {
-              const existingTags = existingResult.split(', ')
-              expandedTags.push(...existingTags)
-              randomTagResolutions[tag] = existingResult
-            }
-          } else {
-            // No existing resolution, select randomly
-            const result = expandRandomTag(
-              tag,
-              customTag,
-              customTags,
-              visitedTags,
-              existingRandomResolutions,
-              previousZoneRandomResults
-            )
-            // Apply weight to the entire expanded result if it has a weight
-            if (tagWeight) {
-              const combinedExpansion = result.expandedTags.join(', ')
-              const weightedExpansion = applyWeight(combinedExpansion, tagWeight)
-              expandedTags.push(weightedExpansion)
-              randomTagResolutions[tag] = combinedExpansion
-            } else {
-              expandedTags.push(...result.expandedTags)
-              randomTagResolutions[tag] = result.resolution
-            }
-          }
-        }
-      } else {
-        // For sequential tags, expand all constituent tags recursively
-        const recursiveResult = expandCustomTags(
-          customTag.tags,
-          customTags,
-          visitedTags,
-          existingRandomResolutions,
-          previousZoneRandomResults
-        )
-        // Merge random tag resolutions from recursive call
-        Object.assign(randomTagResolutions, recursiveResult.randomTagResolutions)
-
-        // Apply weight to the entire sequential tag result if it has a weight
-        if (tagWeight) {
-          const combinedExpansion = recursiveResult.expandedTags.join(', ')
-          const weightedExpansion = applyWeight(combinedExpansion, tagWeight)
-          expandedTags.push(weightedExpansion)
-          randomTagResolutions[tag] = combinedExpansion
-        } else {
-          expandedTags.push(...recursiveResult.expandedTags)
-          randomTagResolutions[tag] = recursiveResult.expandedTags.join(', ')
-        }
-      }
-
-      visitedTags.delete(tag)
-    } else {
-      // This is a regular tag, apply weight if it exists
+      const result = expandRandomArrayTag(tag, model, visitedTags)
       if (tagWeight) {
-        expandedTags.push(applyWeight(tag, tagWeight))
+        const weightedExpansion = applyWeight(result.expandedTags.join(', '), tagWeight)
+        expandedTags.push(weightedExpansion)
+        randomTagResolutions[tag] = result.expandedTags.join(', ')
       } else {
-        expandedTags.push(tag)
+        expandedTags.push(...result.expandedTags)
+        randomTagResolutions[tag] = result.resolution
       }
+      visitedTags.delete(tag)
+      continue
+    }
+
+    // Not an array wildcard or not found: treat as regular tag for now
+    if (tagWeight) {
+      expandedTags.push(applyWeight(tag, tagWeight))
+    } else {
+      expandedTags.push(tag)
     }
   }
 
