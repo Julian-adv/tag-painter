@@ -5,6 +5,7 @@
   import ActionButton from '../ActionButton.svelte'
   import { Plus, Trash } from 'svelte-heros-v2'
   import { addChild, isContainer, uid, removeNode, convertLeafToArray } from './model'
+  import { tick } from 'svelte'
 
   let {
     initialYAML = '',
@@ -15,6 +16,7 @@
   let newlyAddedRootChildId: string | null = $state(null)
   let selectedId: string | null = $state(null)
   let autoEditChildId: string | null = $state(null)
+  let treeContainer: HTMLDivElement | null = $state(null)
 
   function loadYaml(text: string) {
     model = fromYAML(text)
@@ -51,6 +53,14 @@
     autoEditChildId = id
   }
 
+  function scrollSelectedIntoView() {
+    if (!treeContainer) return
+    const el = treeContainer.querySelector('.row.selected') as HTMLElement | null
+    if (el) {
+      el.scrollIntoView({ block: 'center', inline: 'nearest' })
+    }
+  }
+
   // Allow parent to programmatically select a node by name
   export function selectByName(name: string) {
     if (!name) return
@@ -67,7 +77,16 @@
       }
     }
     if (targetId) {
+      // Expand ancestor containers so target is rendered
+      let cur = model.nodes[targetId] || null
+      while (cur && cur.parentId) {
+        const parent = model.nodes[cur.parentId]
+        if (parent && isContainer(parent)) parent.collapsed = false
+        cur = parent || null
+      }
       selectedId = targetId
+      // Wait for DOM update then scroll to the selected row
+      tick().then(() => scrollSelectedIntoView())
     }
   }
 
@@ -139,6 +158,7 @@
         aria-label="Clear selection"
         onclick={() => (selectedId = null)}
         tabindex="-1"
+        bind:this={treeContainer}
         onkeydown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
