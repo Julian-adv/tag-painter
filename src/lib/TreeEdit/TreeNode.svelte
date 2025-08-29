@@ -36,6 +36,7 @@
   let newlyAddedChildId = $state<string | null>(null)
   let isValueEditing = $state(false)
   let isNameEditing = $state(false)
+  let rowEl: HTMLDivElement | null = $state(null)
 
   // Refs to inline editors for programmatic activation
   let nameEditorRef: { activate: () => void } | null = $state(null)
@@ -46,11 +47,11 @@
 
   $effect(() => {
     if (autoEditName && !autoEditApplied) {
-      // Prefer value editor for leaves; fallback to name editor
-      if (valueEditorRef) {
-        valueEditorRef.activate()
-      } else if (nameEditorRef && parentKind !== 'array') {
+      // Prefer name editor when available (non-array parents), otherwise use value editor.
+      if (nameEditorRef && parentKind !== 'array') {
         nameEditorRef.activate()
+      } else if (valueEditorRef) {
+        valueEditorRef.activate()
       }
       autoEditApplied = true
     }
@@ -215,6 +216,7 @@
         class:name-editing={isNameEditing}
         class:value-editing={isValueEditing}
         draggable={id !== model.rootId}
+        bind:this={rowEl}
         ondragstart={handleDragStart}
         ondragend={handleDragEnd}
         ondragover={handleDragOver}
@@ -266,19 +268,23 @@
                 {/if}
               {/if}
             </button>
-            <InlineEditor
-              value={n.name}
-              onSave={(newValue) => {
-                renameNode(model, id, newValue)
-                onMutate()
-              }}
-              onTab={() => valueEditorRef?.activate()}
-              className="name-editor"
-              bind:this={nameEditorRef}
-              onEditingChange={(editing) => (isNameEditing = editing)}
-              expandOnEdit={true}
-              enterStartsEditing={n.kind !== 'leaf'}
-            />
+          <InlineEditor
+            value={n.name}
+            onSave={(newValue) => {
+              renameNode(model, id, newValue)
+              onMutate()
+            }}
+            onTab={() => valueEditorRef?.activate()}
+            className="name-editor"
+            bind:this={nameEditorRef}
+            onEditingChange={(editing) => (isNameEditing = editing)}
+            onFinish={() => {
+              onSelect(id)
+              rowEl?.focus()
+            }}
+            expandOnEdit={true}
+            enterStartsEditing={n.kind !== 'leaf'}
+          />
           </div>
         {/if}
 
@@ -299,6 +305,10 @@
               placeholder="Enter value"
               onEditingChange={(editing) => (isValueEditing = editing)}
               bind:this={valueEditorRef}
+              onFinish={() => {
+                onSelect(id)
+                rowEl?.focus()
+              }}
               enterStartsEditing={false}
             />
           </div>

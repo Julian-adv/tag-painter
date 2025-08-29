@@ -9,6 +9,7 @@
     onEditingChange?: (editing: boolean) => void
     expandOnEdit?: boolean
     enterStartsEditing?: boolean
+    onFinish?: () => void
   }
 
   let {
@@ -20,7 +21,8 @@
     enableAutocomplete = false,
     onEditingChange,
     expandOnEdit = false,
-    enterStartsEditing = true
+    enterStartsEditing = true,
+    onFinish
   }: Props = $props()
 
   import { tick } from 'svelte'
@@ -65,12 +67,14 @@
     }
     isEditing = false
     onEditingChange?.(false)
+    onFinish?.()
   }
 
   function cancelEditing() {
     isEditing = false
     editingValue = ''
     onEditingChange?.(false)
+    onFinish?.()
   }
 
   function handleKeydown(event: KeyboardEvent) {
