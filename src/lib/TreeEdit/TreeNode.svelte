@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isContainer, setLeafValue, toggle, renameNode, moveChild } from './model'
+  import { isContainer, setLeafValue, toggle, renameNode, moveChild, addChild, uid } from './model'
   import type { ArrayNode, LeafNode, NodeKind, ObjectNode, RefNode, TreeModel } from './model'
   import TreeNode from './TreeNode.svelte'
   import InlineEditor from './InlineEditor.svelte'
@@ -14,7 +14,8 @@
     autoEditChildId = null,
     onMutate,
     selectedId = null,
-    onSelect
+    onSelect,
+    setAutoEditChildId
   }: {
     model: TreeModel
     id: string
@@ -25,6 +26,7 @@
     onMutate: () => void
     selectedId?: string | null
     onSelect: (id: string) => void
+    setAutoEditChildId?: (id: string | null) => void
   } = $props()
 
   const get = (id: string) => model.nodes[id]
@@ -44,11 +46,11 @@
 
   $effect(() => {
     if (autoEditName && !autoEditApplied) {
-      // Prefer name editor when present; otherwise try value editor (e.g., array children)
-      if (nameEditorRef && parentKind !== 'array') {
-        nameEditorRef.activate()
-      } else if (valueEditorRef) {
+      // Prefer value editor for leaves; fallback to name editor
+      if (valueEditorRef) {
         valueEditorRef.activate()
+      } else if (nameEditorRef && parentKind !== 'array') {
+        nameEditorRef.activate()
       }
       autoEditApplied = true
     }
@@ -153,6 +155,48 @@
 
     dragOverPosition = null
   }
+
+  function addSiblingAfterCurrentLeaf() {
+    const node = model.nodes[id]
+    if (!node || node.kind !== 'leaf') return
+    const parentId = node.parentId
+    if (!parentId) return
+    const parent = model.nodes[parentId]
+    if (!parent || !isContainer(parent)) return
+
+    // Ensure parent is expanded so the new item is visible
+    parent.collapsed = false
+
+    const children = (parent as ObjectNode | ArrayNode).children
+    const currentIndex = children.indexOf(id)
+    const insertIndex = currentIndex >= 0 ? currentIndex + 1 : children.length
+
+    const newId = uid()
+    const newLeaf: LeafNode = {
+      id: newId,
+      name: parent.kind === 'array' ? String(children.length) : 'newKey',
+      kind: 'leaf',
+      parentId,
+      value: ''
+    }
+
+    // Append first, then move to the desired position to keep indices valid
+    addChild(model, parentId, newLeaf)
+    const appendedIndex = (parent as ObjectNode | ArrayNode).children.length - 1
+    moveChild(
+      model,
+      parentId,
+      appendedIndex,
+      Math.min(insertIndex, (parent as ObjectNode | ArrayNode).children.length - 1)
+    )
+
+    onMutate()
+    // Request auto-edit for the newly created leaf
+    setAutoEditChildId?.(newId)
+    onSelect(newId)
+  }
+
+  
 </script>
 
 {#if get(id)}
@@ -186,7 +230,20 @@
           onSelect(id)
         }}
         onkeydown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (e.key === 'Enter') {
+            // Handle before children so InlineEditor doesn't start editing
+            e.preventDefault()
+            // Only act when not already editing
+            if (!isNameEditing && !isValueEditing) {
+              const n = model.nodes[id]
+              if (n && n.kind === 'leaf') {
+                addSiblingAfterCurrentLeaf()
+                return
+              }
+              onSelect(id)
+              return
+            }
+          } else if (e.key === ' ') {
             e.preventDefault()
             onSelect(id)
           }
@@ -220,6 +277,7 @@
               bind:this={nameEditorRef}
               onEditingChange={(editing) => (isNameEditing = editing)}
               expandOnEdit={true}
+              enterStartsEditing={n.kind !== 'leaf'}
             />
           </div>
         {/if}
@@ -241,6 +299,7 @@
               placeholder="Enter value"
               onEditingChange={(editing) => (isValueEditing = editing)}
               bind:this={valueEditorRef}
+              enterStartsEditing={false}
             />
           </div>
         {:else if n.kind === 'ref'}
@@ -264,6 +323,7 @@
             {onMutate}
             {selectedId}
             {onSelect}
+            {setAutoEditChildId}
           />
         {/each}
       </div>

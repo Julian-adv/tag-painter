@@ -8,6 +8,7 @@
     enableAutocomplete?: boolean
     onEditingChange?: (editing: boolean) => void
     expandOnEdit?: boolean
+    enterStartsEditing?: boolean
   }
 
   let {
@@ -18,7 +19,8 @@
     onTab,
     enableAutocomplete = false,
     onEditingChange,
-    expandOnEdit = false
+    expandOnEdit = false,
+    enterStartsEditing = true
   }: Props = $props()
 
   import { tick } from 'svelte'
@@ -152,7 +154,13 @@
     ondblclick={() => startEditing('caretEnd')}
     role="button"
     tabindex="0"
-    onkeydown={(e) => e.key === 'Enter' && startEditing()}
+    onkeydown={(e) => {
+      if (e.key === 'Enter' && enterStartsEditing) {
+        e.preventDefault()
+        e.stopPropagation()
+        startEditing()
+      }
+    }}
   >
     {value || placeholder}
   </div>

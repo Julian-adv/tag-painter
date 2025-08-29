@@ -14,6 +14,7 @@
   let model: TreeModel = $state(fromYAML(initialYAML))
   let newlyAddedRootChildId: string | null = $state(null)
   let selectedId: string | null = $state(null)
+  let autoEditChildId: string | null = $state(null)
 
   function loadYaml(text: string) {
     model = fromYAML(text)
@@ -43,6 +44,11 @@
 
   function selectNode(id: string) {
     selectedId = id
+  }
+
+  // Allow descendants to request auto-editing of a specific child id
+  function setAutoEditChildId(id: string | null) {
+    autoEditChildId = id
   }
 
   // Allow parent to programmatically select a node by name
@@ -144,10 +150,11 @@
           {model}
           id={model.rootId}
           isRootChild={true}
-          autoEditChildId={newlyAddedRootChildId}
+          autoEditChildId={autoEditChildId ?? newlyAddedRootChildId}
           onMutate={() => (hasUnsavedChanges = true)}
           {selectedId}
           onSelect={selectNode}
+          {setAutoEditChildId}
         />
       </div>
     </section>
