@@ -34,6 +34,16 @@ interface PngChunk {
   data: Uint8Array
 }
 
+// Replace characters outside Latin-1 with '?' to satisfy PNG tEXt constraints
+function toLatin1(input: string): string {
+  let out = ''
+  for (let i = 0; i < input.length; i++) {
+    const code = input.charCodeAt(i)
+    out += code <= 0xff ? input[i] : '?'
+  }
+  return out
+}
+
 export async function GET({ url }) {
   try {
     const imagePath = url.searchParams.get('path')
@@ -94,7 +104,8 @@ export async function GET({ url }) {
       contentType = 'image/webp'
     }
 
-    return new Response(imageBuffer, {
+    // Cast Buffer to a Uint8Array to satisfy BodyInit type
+    return new Response(new Uint8Array(imageBuffer), {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=86400' // Cache for 24 hours
@@ -229,7 +240,8 @@ Steps: ${steps}, Sampler: ${samplerName}, Schedule type: ${scheduleType}, CFG sc
       const chunks = extractChunks(processedBuffer)
 
       // Create a text chunk with parameters (WebUI style)
-      const parametersChunk = textChunk.encode('parameters', parametersText)
+      // PNG tEXt must be Latin-1; replace non-Latin-1 chars to avoid errors
+      const parametersChunk = textChunk.encode('parameters', toLatin1(parametersText))
 
       // Insert the text chunk before the IEND chunk
       const iendIndex = chunks.findIndex((chunk: PngChunk) => chunk.name === 'IEND')
