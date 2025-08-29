@@ -42,7 +42,7 @@
   let nameEditorRef: { activate: () => void } | null = $state(null)
   let valueEditorRef: { activate: () => void } | null = $state(null)
 
-  // Run once to auto-activate editor when requested (used for freshly added node)
+  // One-shot auto edit trigger per node instance
   let autoEditApplied = $state(false)
 
   $effect(() => {
@@ -196,8 +196,6 @@
     setAutoEditChildId?.(newId)
     onSelect(newId)
   }
-
-  
 </script>
 
 {#if get(id)}
@@ -268,23 +266,36 @@
                 {/if}
               {/if}
             </button>
-          <InlineEditor
-            value={n.name}
-            onSave={(newValue) => {
-              renameNode(model, id, newValue)
-              onMutate()
-            }}
-            onTab={() => valueEditorRef?.activate()}
-            className="name-editor"
-            bind:this={nameEditorRef}
-            onEditingChange={(editing) => (isNameEditing = editing)}
-            onFinish={() => {
-              onSelect(id)
-              rowEl?.focus()
-            }}
-            expandOnEdit={true}
-            enterStartsEditing={n.kind !== 'leaf'}
-          />
+            <InlineEditor
+              value={n.name}
+              onSave={(newValue) => {
+                renameNode(model, id, newValue)
+                onMutate()
+              }}
+              onTab={() => {
+                if (n.kind === 'leaf') {
+                  // Move from name to value editor on leaves
+                  valueEditorRef?.activate()
+                } else if (n.kind === 'array' && autoEditName) {
+                  const children = (n as ArrayNode).children
+                  if (children && children.length > 0) {
+                    const firstChildId = children[0]
+                    // Request auto-editing on first child and select it
+                    setAutoEditChildId?.(firstChildId)
+                    onSelect(firstChildId)
+                  }
+                }
+              }}
+              className="name-editor"
+              bind:this={nameEditorRef}
+              onEditingChange={(editing) => (isNameEditing = editing)}
+              onFinish={() => {
+                onSelect(id)
+                rowEl?.focus()
+              }}
+              expandOnEdit={true}
+              enterStartsEditing={n.kind !== 'leaf'}
+            />
           </div>
         {/if}
 

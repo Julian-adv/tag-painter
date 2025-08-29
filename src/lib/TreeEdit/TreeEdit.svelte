@@ -1,6 +1,6 @@
 <script lang="ts">
   import TreeNode from './TreeNode.svelte'
-  import type { TreeModel, LeafNode } from './model'
+  import type { TreeModel, LeafNode, ArrayNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
   import ActionButton from '../ActionButton.svelte'
   import { Plus, Trash } from 'svelte-heros-v2'
@@ -58,6 +58,8 @@
     const el = treeContainer.querySelector('.row.selected') as HTMLElement | null
     if (el) {
       el.scrollIntoView({ block: 'center', inline: 'nearest' })
+      // Move keyboard focus to the selected row so keyboard nav (Tab/Enter) applies to it
+      el.focus()
     }
   }
 
@@ -91,7 +93,39 @@
   }
 
   function addBySelection() {
-    const targetId = selectedId ?? model.rootId
+    // Special case: no selection -> add an Array node at root with one empty item
+    if (!selectedId) {
+      const rootId = model.rootId
+      const root = model.nodes[rootId]
+      if (!root || !isContainer(root)) return
+
+      const arrayNode: ArrayNode = {
+        id: uid(),
+        name: 'newKey',
+        kind: 'array',
+        parentId: rootId,
+        children: [],
+        collapsed: false
+      }
+      addChild(model, rootId, arrayNode)
+
+      const firstItem: LeafNode = {
+        id: uid(),
+        name: '0',
+        kind: 'leaf',
+        parentId: arrayNode.id,
+        value: ''
+      }
+      addChild(model, arrayNode.id, firstItem)
+
+      // Auto-edit the new array node's name
+      newlyAddedRootChildId = arrayNode.id
+      selectedId = arrayNode.id
+      hasUnsavedChanges = true
+      return
+    }
+
+    const targetId = selectedId
     const parent = model.nodes[targetId]
     if (!parent) return
     // Disallow adding under ref nodes
@@ -159,6 +193,7 @@
         onclick={() => (selectedId = null)}
         tabindex="-1"
         bind:this={treeContainer}
+        data-tree-root
         onkeydown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
