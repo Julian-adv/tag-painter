@@ -70,7 +70,7 @@
     <div class="flex h-[700px] w-full max-w-5xl flex-col rounded-lg bg-white shadow-xl">
       <!-- Header -->
       <div class="flex items-center justify-between border-b border-gray-300 p-6">
-        <h2 class="text-lg font-semibold text-gray-900">TreeEdit Test Dialog</h2>
+        <h2 class="text-lg font-semibold text-gray-900">Wildcards Editor</h2>
         <button
           type="button"
           class="text-gray-400 transition-colors hover:text-gray-600"

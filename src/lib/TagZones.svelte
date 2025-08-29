@@ -2,7 +2,7 @@
 <script lang="ts">
   import TagInput from './TagInput.svelte'
   import CustomTagsManageDialog from './CustomTagsManageDialog.svelte'
-  import TestDialog from './TreeEdit/TestDialog.svelte'
+  import WildcardsEditorDialog from './TreeEdit/WildcardsEditorDialog.svelte'
   import { promptsData, updateTags, savePromptsData } from './stores/promptsStore'
   import { wildcardTagType } from './stores/tagsStore'
   import { onMount } from 'svelte'
@@ -177,8 +177,8 @@
     initialSelectedTag={selectedCustomTagName}
   />
 
-  <!-- TreeEdit test dialog -->
-  <TestDialog bind:isOpen={showTreeEditDialog} />
+  <!-- Wildcards editor dialog -->
+  <WildcardsEditorDialog bind:isOpen={showTreeEditDialog} />
 </div>
 
 <style>
