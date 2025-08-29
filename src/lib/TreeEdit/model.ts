@@ -38,6 +38,8 @@ export interface TreeModel {
   nodes: Record<NodeId, AnyNode>
   // Symbol name → defining node id (assumes single definition)
   symbols: Record<string, NodeId>
+  // Full path (e.g., "a/b/c") → defining node id (unique per path)
+  pathSymbols: Record<string, NodeId>
   // refName → list of ref node ids (reverse index)
   refIndex: Record<string, NodeId[]>
 }

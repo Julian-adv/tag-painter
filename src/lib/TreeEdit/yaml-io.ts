@@ -6,9 +6,16 @@ export function fromYAML(text: string): TreeModel {
   const data = parse(text ?? '') ?? {}
   const nodes: Record<NodeId, AnyNode> = {}
   const symbols: Record<string, NodeId> = {}
+  const pathSymbols: Record<string, NodeId> = {}
   const refIndex: Record<string, NodeId[]> = {}
 
-  function build(name: string, value: unknown, parentId: NodeId | null): AnyNode {
+  function build(
+    name: string,
+    value: unknown,
+    parentId: NodeId | null,
+    parentPath: string
+  ): AnyNode {
+    const currentPath = parentPath ? `${parentPath}/${name}` : name
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       const id = uid()
       const n: ObjectNode = { id, name, kind: 'object', parentId, children: [], collapsed: false }
@@ -22,12 +29,13 @@ export function fromYAML(text: string): TreeModel {
           refIndex[v].push(rid)
           n.children.push(rid)
         } else {
-          const c = build(k, v, id)
+          const c = build(k, v, id, currentPath)
           n.children.push(c.id)
         }
       }
       // Treat as a symbol definition (assumes a single definition per name)
       symbols[name] = id
+      if (name !== 'root') pathSymbols[currentPath] = id
       return n
     }
     if (Array.isArray(value)) {
@@ -35,9 +43,12 @@ export function fromYAML(text: string): TreeModel {
       const n: ArrayNode = { id, name, kind: 'array', parentId, children: [], collapsed: false }
       nodes[id] = n
       value.forEach((v, i) => {
-        const c = build(String(i), v, id)
+        const c = build(String(i), v, id, currentPath)
         n.children.push(c.id)
       })
+      // Treat array containers as symbol definitions too (by key name)
+      symbols[name] = id
+      if (name !== 'root') pathSymbols[currentPath] = id
       return n
     }
     const id = uid()
@@ -53,8 +64,8 @@ export function fromYAML(text: string): TreeModel {
     return n
   }
 
-  const root = build('root', data, null)
-  return { rootId: root.id, nodes, symbols, refIndex }
+  const root = build('root', data, null, '')
+  return { rootId: root.id, nodes, symbols, pathSymbols, refIndex }
 }
 
 export function toYAML(model: TreeModel): string {

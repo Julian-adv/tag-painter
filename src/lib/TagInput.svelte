@@ -2,7 +2,7 @@
 <script lang="ts">
   import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
   import TagDisplay from './TagDisplay.svelte'
-  import { isWildcardArray } from './stores/tagsStore'
+  import { wildcardTagType } from './stores/tagsStore'
   import type { CustomTag } from './types'
 
   interface Props {
@@ -43,8 +43,8 @@
       const newTag: CustomTag = {
         name: tagName,
         tags: [tagName],
-        // Determine type using wildcards.yaml: ArrayNode => 'random', otherwise 'regular'
-        type: isWildcardArray(tagName) ? 'random' : 'regular'
+        // Determine type using wildcards.yaml: ArrayNode => random/consistent-random, otherwise regular
+        type: wildcardTagType(tagName)
       }
       tags = [...tags, newTag]
       quickTagInput = ''

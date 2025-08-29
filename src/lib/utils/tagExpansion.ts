@@ -107,8 +107,20 @@ export function expandCustomTags(
       return { expandedTags: [tag], resolution: tag }
     }
     const children = arrNode.children
+    let startIndex = 0
+    let isConsistent = false
+    if (children.length > 0) {
+      const first = m.nodes[children[0]]
+      if (first && first.kind === 'leaf' && typeof first.value === 'string') {
+        if (first.value === '__consistent-random__') {
+          isConsistent = true
+          startIndex = 1
+        }
+      }
+    }
     const options: string[] = []
-    for (const cid of children) {
+    for (let i = startIndex; i < children.length; i++) {
+      const cid = children[i]
       const childNode = m.nodes[cid]
       if (!childNode) continue
       const tokens = expandNodeOnce(m, childNode)
@@ -118,6 +130,13 @@ export function expandCustomTags(
     if (options.length === 0) return { expandedTags: [], resolution: '' }
 
     // Select option if not fixed by override/previous
+    if (!selected) {
+      // For consistent-random, reuse existing resolution if provided
+      if (isConsistent && existingRandomResolutions[tag]) {
+        selected = existingRandomResolutions[tag]
+      }
+    }
+
     if (!selected) {
       const idx = getSecureRandomIndex(options.length)
       selected = options[idx]

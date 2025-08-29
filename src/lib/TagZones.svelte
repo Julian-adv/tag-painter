@@ -4,7 +4,7 @@
   import CustomTagsManageDialog from './CustomTagsManageDialog.svelte'
   import TestDialog from './TreeEdit/TestDialog.svelte'
   import { promptsData, updateTags, savePromptsData } from './stores/promptsStore'
-  import { isWildcardArray } from './stores/tagsStore'
+  import { wildcardTagType } from './stores/tagsStore'
   import { onMount } from 'svelte'
   import { Tag } from 'svelte-heros-v2'
   import { get } from 'svelte/store'
@@ -60,8 +60,8 @@
       return {
         name,
         tags: [name],
-        // If this is a wildcard array in wildcards.yaml, treat as random
-        type: isWildcardArray(name) ? 'random' : 'regular',
+        // Determine via wildcards.yaml array behavior (random or consistent-random)
+        type: wildcardTagType(name),
         weight
       }
     })

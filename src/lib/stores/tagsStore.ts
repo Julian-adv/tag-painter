@@ -2,10 +2,11 @@
 import { get, writable } from 'svelte/store'
 import { fromYAML } from '../TreeEdit/yaml-io'
 import type { AnyNode, TreeModel } from '../TreeEdit/model'
+import type { TagType } from '$lib/types'
 
 let tags: string[] = []
-// Index: wildcard name -> predominant kind ('array' > 'object' > 'leaf')
-let wildcardNameIndex: Map<string, 'array' | 'object' | 'leaf'> = new Map()
+// Names present in wildcards.yaml (containers + selected leaf keys)
+let wildcardNameSet: Set<string> = new Set()
 // Keep parsed TreeModel to query node kinds directly (for advanced features)
 let wildcardModel: TreeModel = fromYAML('')
 export const combinedTags = writable<string[]>([])
@@ -47,17 +48,16 @@ export async function initTags(): Promise<void> {
       if (wcRes.status === 'fulfilled' && wcRes.value.ok) {
         try {
           const text = await wcRes.value.text()
-          const info = extractWildcardIndexAndModel(text)
-          wildcardNameIndex = info.index
-          wildcardModel = info.model
+          wildcardModel = fromYAML(text ?? '')
+          wildcardNameSet = computeWildcardNames(wildcardModel)
         } catch (e) {
           console.error('Failed to parse wildcards.yaml:', e)
-          wildcardNameIndex = new Map()
+          wildcardNameSet = new Set()
           wildcardModel = fromYAML('')
         }
       } else {
         // If not found or failed, fall back to empty
-        wildcardNameIndex = new Map()
+        wildcardNameSet = new Set()
         wildcardModel = fromYAML('')
         if (wcRes.status === 'rejected') {
           console.error('Failed to load wildcards.yaml:', wcRes.reason)
@@ -79,7 +79,7 @@ export async function initTags(): Promise<void> {
 export function updateCombinedTags(): string[] {
   // Build combined tags from wildcard names + danbooru tags
   // Allow duplicates: concatenate wildcards and danbooru tags
-  const newCombinedTags = [...wildcardNameIndex.keys(), ...(tags || [])]
+  const newCombinedTags = [...wildcardNameSet, ...(tags || [])]
 
   // Update the store and notify subscribers
   combinedTags.set(newCombinedTags)
@@ -89,66 +89,36 @@ export function updateCombinedTags(): string[] {
 
 // Check if a tag is a custom tag
 export function isCustomTag(tag: string): boolean {
-  return wildcardNameIndex.has(tag)
+  return wildcardNameSet.has(tag)
 }
 
-// Extract wildcard name → kind index from wildcards.yaml text, and return with the parsed model
-function extractWildcardIndexAndModel(
-  text: string
-): { index: Map<string, 'array' | 'object' | 'leaf'>; model: TreeModel } {
-  try {
-    const model: TreeModel = fromYAML(text ?? '')
-    const nodes = model.nodes
-    const index = new Map<string, 'array' | 'object' | 'leaf'>()
-
-    const isObject = (n: AnyNode) => n.kind === 'object'
-    const isArray = (n: AnyNode) => n.kind === 'array'
-    const isLeaf = (n: AnyNode) => n.kind === 'leaf'
-
-    for (const node of Object.values(nodes)) {
-      // Skip root placeholder
-      if (node.name === 'root') continue
-      // Exclude ref nodes from suggestions
-      if (node.kind === 'ref') continue
-
-      // Always include keys for object/array containers
-      if (isObject(node) || isArray(node)) {
-        // Prefer 'array' over existing kind, then 'object', then 'leaf'
-        const prev = index.get(node.name)
-        if (isArray(node)) {
-          index.set(node.name, 'array')
-        } else if (!prev || prev === 'leaf') {
-          index.set(node.name, 'object')
-        }
-        continue
-      }
-
-      // For leaf nodes, include only if parent is an object (i.e., a real key),
-      // and exclude array indices like '0', '1', ...
-      if (isLeaf(node) && node.parentId) {
-        const parent = nodes[node.parentId]
-        if (parent && parent.kind === 'object') {
-          if (!index.has(node.name)) index.set(node.name, 'leaf')
-        }
-      }
+// Compute wildcard names from the model: include container keys and leaf keys under objects
+function computeWildcardNames(model: TreeModel): Set<string> {
+  const names = new Set<string>()
+  const nodes = model.nodes
+  for (const node of Object.values(nodes)) {
+    if (node.name === 'root') continue
+    if (node.kind === 'ref') continue
+    if (node.kind === 'object' || node.kind === 'array') {
+      names.add(node.name)
+      continue
     }
-
-    return { index, model }
-  } catch (e) {
-    console.error('extractWildcardNames error:', e)
-    return { index: new Map(), model: fromYAML('') }
+    if (node.kind === 'leaf' && node.parentId) {
+      const parent = nodes[node.parentId]
+      if (parent && parent.kind === 'object') names.add(node.name)
+    }
   }
+  return names
 }
 
 // Public helper to refresh wildcards from provided YAML text
 export function updateWildcardsFromText(text: string) {
   try {
-    const info = extractWildcardIndexAndModel(text)
-    wildcardNameIndex = info.index
-    wildcardModel = info.model
+    wildcardModel = fromYAML(text ?? '')
+    wildcardNameSet = computeWildcardNames(wildcardModel)
   } catch (e) {
     console.error('updateWildcardsFromText failed:', e)
-    wildcardNameIndex = new Map()
+    wildcardNameSet = new Set()
     wildcardModel = fromYAML('')
   }
   updateCombinedTags()
@@ -164,7 +134,7 @@ export async function refreshWildcardsFromServer() {
   } catch (e) {
     console.error('refreshWildcardsFromServer failed:', e)
     // On fetch failure, reset state
-    wildcardNameIndex = new Map()
+    wildcardNameSet = new Set()
     wildcardModel = fromYAML('')
     updateCombinedTags()
   }
@@ -177,6 +147,33 @@ export function getWildcardModel(): TreeModel {
 
 // Public helper to check if a wildcard name corresponds to an array node
 export function isWildcardArray(tag: string): boolean {
-  // Fast path using the name → kind index
-  return wildcardNameIndex.get(tag) === 'array'
+  const symId = wildcardModel.symbols[tag]
+  const node = symId ? wildcardModel.nodes[symId] : undefined
+  return !!node && node.kind === 'array'
+}
+
+// Determine tag type using wildcards.yaml structure
+export function wildcardTagType(name: string): TagType {
+  // If not an array node, treat as regular
+  const symId = wildcardModel.symbols[name]
+  let node: AnyNode | undefined = symId ? wildcardModel.nodes[symId] : undefined
+  if (!node) {
+    for (const n of Object.values(wildcardModel.nodes)) {
+      if (n.name === name) {
+        node = n
+        break
+      }
+    }
+  }
+  if (!node || node.kind !== 'array') return 'regular'
+
+  // Check first child for consistent-random directive
+  const children = node.children
+  if (children && children.length > 0) {
+    const first = wildcardModel.nodes[children[0]]
+    if (first && first.kind === 'leaf' && typeof first.value === 'string') {
+      if (first.value === '__consistent-random__') return 'consistent-random'
+    }
+  }
+  return 'random'
 }
