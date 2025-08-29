@@ -29,6 +29,7 @@
   let negativeTags = $state<CustomTag[]>([])
   let inpaintingTags = $state<CustomTag[]>([])
   let showTreeEditDialog = $state(false)
+  let preselectTagName = $state('')
 
   // Parse weight from tag string
   function parseTagWithWeight(tagString: string): { name: string; weight?: number } {
@@ -100,7 +101,8 @@
     showTreeEditDialog = true
   }
 
-  function handleCustomTagDoubleClick(_tagName: string) {
+  function handleCustomTagDoubleClick(tagName: string) {
+    preselectTagName = tagName
     showTreeEditDialog = true
   }
 </script>
@@ -168,7 +170,7 @@
   </div>
 
   <!-- Wildcards editor dialog (single instance, opened from button or double-click) -->
-  <WildcardsEditorDialog bind:isOpen={showTreeEditDialog} />
+  <WildcardsEditorDialog bind:isOpen={showTreeEditDialog} initialSelectedName={preselectTagName} />
 </div>
 
 <style>

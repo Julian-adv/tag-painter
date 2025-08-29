@@ -45,6 +45,26 @@
     selectedId = id
   }
 
+  // Allow parent to programmatically select a node by name
+  export function selectByName(name: string) {
+    if (!name) return
+    let targetId: string | null = null
+    const sym = model.symbols[name]
+    if (sym) {
+      targetId = sym
+    } else {
+      for (const n of Object.values(model.nodes)) {
+        if (n.name === name) {
+          targetId = n.id
+          break
+        }
+      }
+    }
+    if (targetId) {
+      selectedId = targetId
+    }
+  }
+
   function addBySelection() {
     const targetId = selectedId ?? model.rootId
     const parent = model.nodes[targetId]
@@ -186,10 +206,6 @@
     overflow-y: auto; /* scroll only vertically inside left column */
     overflow-x: hidden;
     text-align: left; /* ensure inline-flex rows align left */
-  }
-  h3 {
-    margin: 0.25rem 0 0.5rem;
-    text-align: left;
   }
   .btns {
     display: flex;

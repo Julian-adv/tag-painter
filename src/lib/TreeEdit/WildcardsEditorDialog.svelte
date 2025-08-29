@@ -4,9 +4,10 @@
 
   interface Props {
     isOpen: boolean
+    initialSelectedName?: string
   }
 
-  let { isOpen = $bindable() }: Props = $props()
+  let { isOpen = $bindable(), initialSelectedName = '' }: Props = $props()
 
   function handleBackdropClick(event: MouseEvent) {
     if (event.target === event.currentTarget) {
@@ -19,8 +20,12 @@
   }
 
   // Reference to child TreeEdit to load/get/mark saved
-  let tree: { load: (t: string) => void; getYaml: () => string; markSaved: () => void } | null =
-    $state(null)
+  let tree: {
+    load: (t: string) => void
+    getYaml: () => string
+    markSaved: () => void
+    selectByName: (n: string) => void
+  } | null = $state(null)
   let hasUnsavedChanges = $state(false)
 
   // When dialog opens, load YAML from server and populate child
@@ -31,6 +36,10 @@
         .then((text) => {
           if (tree && typeof text === 'string') {
             tree.load(text)
+            if (initialSelectedName) {
+              // Slightly defer to allow render
+              setTimeout(() => tree?.selectByName(initialSelectedName!), 0)
+            }
           }
         })
         .catch((err) => console.error('Failed to load wildcards.yaml:', err))
@@ -89,7 +98,7 @@
       </div>
 
       <!-- Content -->
-      <div class="flex-1 overflow-hidden p-4 min-h-0">
+      <div class="min-h-0 flex-1 overflow-hidden p-4">
         <TreeEdit bind:this={tree} bind:hasUnsavedChanges />
       </div>
 
