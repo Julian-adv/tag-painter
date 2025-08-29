@@ -1,5 +1,6 @@
 <script lang="ts">
   import TreeEdit from './TreeEdit.svelte'
+  import { updateWildcardsFromText } from '../stores/tagsStore'
 
   interface Props {
     isOpen: boolean
@@ -39,6 +40,9 @@
   function onSave() {
     if (!tree) return
     const body = tree.getYaml()
+    // Immediately reflect changes in combinedTags using the text we save
+    // (avoids waiting for a subsequent fetch)
+    updateWildcardsFromText(body)
     fetch('/api/wildcards', {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
