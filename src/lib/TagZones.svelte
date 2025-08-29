@@ -1,7 +1,6 @@
 <!-- Component for tag input zones -->
 <script lang="ts">
   import TagInput from './TagInput.svelte'
-  import CustomTagsManageDialog from './CustomTagsManageDialog.svelte'
   import WildcardsEditorDialog from './TreeEdit/WildcardsEditorDialog.svelte'
   import { promptsData, updateTags, savePromptsData } from './stores/promptsStore'
   import { wildcardTagType } from './stores/tagsStore'
@@ -171,11 +170,8 @@
     />
   </div>
 
-  <!-- Custom tags management dialog -->
-  <CustomTagsManageDialog
-    bind:isOpen={showCustomTagsDialog}
-    initialSelectedTag={selectedCustomTagName}
-  />
+  <!-- Wildcards editor dialog (opened from custom tag double-click) -->
+  <WildcardsEditorDialog bind:isOpen={showCustomTagsDialog} />
 
   <!-- Wildcards editor dialog -->
   <WildcardsEditorDialog bind:isOpen={showTreeEditDialog} />
