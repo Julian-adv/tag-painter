@@ -308,7 +308,7 @@
       class="fixed z-[9999] max-h-48 max-w-[250px] min-w-[120px] overflow-x-hidden overflow-y-auto rounded border border-gray-300 bg-white shadow-lg"
       style="top: {suggestionPosition.top}px; left: {suggestionPosition.left}px;"
     >
-      {#each suggestions as suggestion, index (suggestion)}
+      {#each suggestions as suggestion, index (index)}
         <button
           type="button"
           data-suggestion-index={index}
