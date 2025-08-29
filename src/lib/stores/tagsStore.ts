@@ -3,6 +3,7 @@ import { get, writable } from 'svelte/store'
 import { fromYAML } from '../TreeEdit/yaml-io'
 import type { AnyNode, TreeModel } from '../TreeEdit/model'
 import type { TagType } from '$lib/types'
+import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
 
 let tags: string[] = []
 // Names present in wildcards.yaml (containers + selected leaf keys)
@@ -172,7 +173,7 @@ export function wildcardTagType(name: string): TagType {
   if (children && children.length > 0) {
     const first = wildcardModel.nodes[children[0]]
     if (first && first.kind === 'leaf' && typeof first.value === 'string') {
-      if (first.value === '__consistent-random__') return 'consistent-random'
+      if (first.value === CONSISTENT_RANDOM_MARKER) return 'consistent-random'
     }
   }
   return 'random'

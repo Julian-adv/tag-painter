@@ -3,6 +3,7 @@
  */
 
 import type { AnyNode, TreeModel } from '$lib/TreeEdit/model'
+import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
 
 /**
@@ -112,7 +113,7 @@ export function expandCustomTags(
     if (children.length > 0) {
       const first = m.nodes[children[0]]
       if (first && first.kind === 'leaf' && typeof first.value === 'string') {
-        if (first.value === '__consistent-random__') {
+        if (first.value === CONSISTENT_RANDOM_MARKER) {
           isConsistent = true
           startIndex = 1
         }
