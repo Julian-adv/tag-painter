@@ -26,7 +26,7 @@ export function fromYAML(text: string): TreeModel {
           n.children.push(c.id)
         }
       }
-      // 심볼 정의로 취급 (동일 이름 하나 가정)
+      // Treat as a symbol definition (assumes a single definition per name)
       symbols[name] = id
       return n
     }

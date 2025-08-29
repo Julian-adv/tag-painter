@@ -1,14 +1,14 @@
-// 노드 타입 및 편의 유틸
+// Node types and helper utilities
 export type NodeKind = 'object' | 'array' | 'leaf' | 'ref'
 
 export type NodeId = string
 
 export interface BaseNode {
   id: NodeId
-  name: string // 키 이름 (object/array item 표시용)
+  name: string // Key name (used for object keys / array item labels)
   kind: NodeKind
-  parentId: NodeId | null // 부모 노드 id (루트는 null)
-  collapsed?: boolean // 접힘 상태
+  parentId: NodeId | null // Parent node id (root is null)
+  collapsed?: boolean // Collapsed state for UI
 }
 
 export interface LeafNode extends BaseNode {
@@ -18,17 +18,17 @@ export interface LeafNode extends BaseNode {
 
 export interface ObjectNode extends BaseNode {
   kind: 'object'
-  children: NodeId[] // 키-값 쌍이 자식으로 들어감
+  children: NodeId[] // Key-value pairs represented as child node ids
 }
 
 export interface ArrayNode extends BaseNode {
   kind: 'array'
-  children: NodeId[] // 배열 항목이 자식으로 들어감
+  children: NodeId[] // Array items represented as child node ids
 }
 
 export interface RefNode extends BaseNode {
   kind: 'ref'
-  refName: string // 심볼 이름으로 참조
+  refName: string // Reference by symbol name
 }
 
 export type AnyNode = LeafNode | ObjectNode | ArrayNode | RefNode
@@ -36,9 +36,9 @@ export type AnyNode = LeafNode | ObjectNode | ArrayNode | RefNode
 export interface TreeModel {
   rootId: NodeId
   nodes: Record<NodeId, AnyNode>
-  // 이름(심볼) → 정의 노드 id (단일 정의 가정)
+  // Symbol name → defining node id (assumes single definition)
   symbols: Record<string, NodeId>
-  // refName → ref 노드 id[] (역인덱스)
+  // refName → list of ref node ids (reverse index)
   refIndex: Record<string, NodeId[]>
 }
 
@@ -51,10 +51,10 @@ export function addChild(model: TreeModel, parentId: NodeId, child: AnyNode) {
   const p = model.nodes[parentId]
   if (!p || !isContainer(p)) return
   ;(p as ObjectNode | ArrayNode).children.push(child.id)
-  // track parent on node
+  // Track parent on the child node
   child.parentId = parentId
   model.nodes[child.id] = child
-  // ref 인덱스 관리
+  // Maintain ref reverse index
   if (child.kind === 'ref') {
     model.refIndex[child.refName] ||= []
     model.refIndex[child.refName].push(child.id)
@@ -65,7 +65,7 @@ export function convertLeafToArray(model: TreeModel, id: NodeId): NodeId | null 
   const node = model.nodes[id]
   if (!node || node.kind !== 'leaf') return null
   const oldValue = (node as LeafNode).value
-  // Create first child leaf using prior value
+  // Create first child leaf using the previous value
   const childId = uid()
   const firstChild: LeafNode = {
     id: childId,
@@ -75,7 +75,7 @@ export function convertLeafToArray(model: TreeModel, id: NodeId): NodeId | null 
     value: oldValue
   }
   model.nodes[childId] = firstChild
-  // Replace current node with an array node, preserving name and id
+  // Replace the current node with an array node, preserving name and id
   const newArray: ArrayNode = {
     id,
     name: node.name,
@@ -91,10 +91,10 @@ export function convertLeafToArray(model: TreeModel, id: NodeId): NodeId | null 
 export function removeNode(model: TreeModel, id: NodeId) {
   const target = model.nodes[id]
   if (!target) return
-  // 루트는 삭제 금지
+  // Do not allow removing the root
   if (id === model.rootId) return
 
-  // 부모에서 탈착 (node.parentId 활용)
+  // Detach from parent (using node.parentId)
   const parentId = target.parentId
   if (parentId) {
     const parent = model.nodes[parentId]
@@ -104,7 +104,7 @@ export function removeNode(model: TreeModel, id: NodeId) {
     }
   }
 
-  // 하위 전체 제거
+  // Remove the entire subtree
   const queue = [id]
   while (queue.length) {
     const cur = queue.pop()!
@@ -118,7 +118,7 @@ export function removeNode(model: TreeModel, id: NodeId) {
       if (arr) model.refIndex[node.refName] = arr.filter((x) => x !== node.id)
     }
     if (node.kind !== 'ref') {
-      // 정의 노드 삭제 시 심볼 테이블에서 제거
+      // If a defining node is removed, drop it from the symbol table
       if (model.symbols[node.name] === node.id) delete model.symbols[node.name]
     }
 
@@ -146,7 +146,7 @@ export function renameNode(model: TreeModel, id: NodeId, newName: string) {
     const oldName = node.name
     node.name = newName
 
-    // 심볼 테이블 업데이트 (정의 노드가 아닌 ref 노드는 제외)
+    // Update the symbol table (exclude ref nodes which are not definitions)
     if (node.kind !== 'ref' && model.symbols[oldName] === id) {
       delete model.symbols[oldName]
       model.symbols[newName] = id

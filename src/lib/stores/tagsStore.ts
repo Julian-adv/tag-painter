@@ -4,7 +4,10 @@ import { fromYAML } from '../TreeEdit/yaml-io'
 import type { AnyNode, TreeModel } from '../TreeEdit/model'
 
 let tags: string[] = []
-let wildcardNames: string[] = []
+// Index: wildcard name -> predominant kind ('array' > 'object' > 'leaf')
+let wildcardNameIndex: Map<string, 'array' | 'object' | 'leaf'> = new Map()
+// Keep parsed TreeModel to query node kinds directly (for advanced features)
+let wildcardModel: TreeModel | null = null
 export const combinedTags = writable<string[]>([])
 let initPromise: Promise<void> | null = null
 
@@ -44,14 +47,18 @@ export async function initTags(): Promise<void> {
       if (wcRes.status === 'fulfilled' && wcRes.value.ok) {
         try {
           const text = await wcRes.value.text()
-          wildcardNames = extractWildcardNames(text)
+          const info = extractWildcardIndexAndModel(text)
+          wildcardNameIndex = info.index
+          wildcardModel = info.model
         } catch (e) {
           console.error('Failed to parse wildcards.yaml:', e)
-          wildcardNames = []
+          wildcardNameIndex = new Map()
+          wildcardModel = null
         }
       } else {
         // If not found or failed, fall back to empty
-        wildcardNames = []
+        wildcardNameIndex = new Map()
+        wildcardModel = null
         if (wcRes.status === 'rejected') {
           console.error('Failed to load wildcards.yaml:', wcRes.reason)
         }
@@ -71,7 +78,8 @@ export async function initTags(): Promise<void> {
 
 export function updateCombinedTags(): string[] {
   // Build combined tags from wildcard names + danbooru tags
-  const newCombinedTags = [...new Set([...(wildcardNames || []), ...(tags || [])])]
+  // Allow duplicates: concatenate wildcards and danbooru tags
+  const newCombinedTags = [...wildcardNameIndex.keys(), ...(tags || [])]
 
   // Update the store and notify subscribers
   combinedTags.set(newCombinedTags)
@@ -81,15 +89,17 @@ export function updateCombinedTags(): string[] {
 
 // Check if a tag is a custom tag
 export function isCustomTag(tag: string): boolean {
-  return (wildcardNames || []).includes(tag)
+  return wildcardNameIndex.has(tag)
 }
 
-// Extract wildcard names from wildcards.yaml text
-function extractWildcardNames(text: string): string[] {
+// Extract wildcard name → kind index from wildcards.yaml text, and return with the parsed model
+function extractWildcardIndexAndModel(
+  text: string
+): { index: Map<string, 'array' | 'object' | 'leaf'>; model: TreeModel } {
   try {
     const model: TreeModel = fromYAML(text ?? '')
     const nodes = model.nodes
-    const names = new Set<string>()
+    const index = new Map<string, 'array' | 'object' | 'leaf'>()
 
     const isObject = (n: AnyNode) => n.kind === 'object'
     const isArray = (n: AnyNode) => n.kind === 'array'
@@ -103,7 +113,13 @@ function extractWildcardNames(text: string): string[] {
 
       // Always include keys for object/array containers
       if (isObject(node) || isArray(node)) {
-        names.add(node.name)
+        // Prefer 'array' over existing kind, then 'object', then 'leaf'
+        const prev = index.get(node.name)
+        if (isArray(node)) {
+          index.set(node.name, 'array')
+        } else if (!prev || prev === 'leaf') {
+          index.set(node.name, 'object')
+        }
         continue
       }
 
@@ -112,25 +128,28 @@ function extractWildcardNames(text: string): string[] {
       if (isLeaf(node) && node.parentId) {
         const parent = nodes[node.parentId]
         if (parent && parent.kind === 'object') {
-          names.add(node.name)
+          if (!index.has(node.name)) index.set(node.name, 'leaf')
         }
       }
     }
 
-    return Array.from(names)
+    return { index, model }
   } catch (e) {
     console.error('extractWildcardNames error:', e)
-    return []
+    return { index: new Map(), model: fromYAML('') }
   }
 }
 
 // Public helper to refresh wildcards from provided YAML text
 export function updateWildcardsFromText(text: string) {
   try {
-    wildcardNames = extractWildcardNames(text)
+    const info = extractWildcardIndexAndModel(text)
+    wildcardNameIndex = info.index
+    wildcardModel = info.model
   } catch (e) {
     console.error('updateWildcardsFromText failed:', e)
-    wildcardNames = []
+    wildcardNameIndex = new Map()
+    wildcardModel = null
   }
   updateCombinedTags()
 }
@@ -140,10 +159,19 @@ export async function refreshWildcardsFromServer() {
   try {
     const res = await fetch('/api/wildcards')
     const text = await res.text()
-    wildcardNames = extractWildcardNames(text)
+    // Reuse common updater to parse and set state
+    updateWildcardsFromText(text)
   } catch (e) {
     console.error('refreshWildcardsFromServer failed:', e)
-    wildcardNames = []
+    // On fetch failure, reset state
+    wildcardNameIndex = new Map()
+    wildcardModel = null
+    updateCombinedTags()
   }
-  updateCombinedTags()
+}
+
+// Public helper to check if a wildcard name corresponds to an array node
+export function isWildcardArray(tag: string): boolean {
+  // Fast path using the name → kind index
+  return wildcardNameIndex.get(tag) === 'array'
 }
