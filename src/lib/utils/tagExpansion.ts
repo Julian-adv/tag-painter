@@ -56,7 +56,7 @@ export function expandCustomTags(
   expandedTags: string[]
   randomTagResolutions: Record<string, string>
 } {
-  const expandedTags: string[] = []
+  let expandedTags: string[] = []
   const randomTagResolutions: Record<string, string> = {}
   // Model is the sole source of truth
 
@@ -186,6 +186,43 @@ export function expandCustomTags(
     } else {
       expandedTags.push(tag)
     }
+  }
+
+  // Post-process placeholder tokens like __TagName__ recursively.
+  // Detect placeholders anywhere within a string (e.g., "a, __b__, c").
+  // Stop when no placeholders remain or after 100 iterations to avoid infinite loops.
+  // Support Unicode letters (e.g., Korean), digits, underscore, hyphen, and spaces
+  const placeholderAny = /__([\p{L}\p{N}_\- ]+)__/gu
+  let safetyCounter = 0
+  while (safetyCounter < 100) {
+    safetyCounter++
+    let changed = false
+    const next: string[] = []
+    for (const t of expandedTags) {
+      if (placeholderAny.test(t)) {
+        let merged = t
+        placeholderAny.lastIndex = 0
+        merged = merged.replace(placeholderAny, (_full, name: string) => {
+          const nested = expandCustomTags(
+            [name],
+            model,
+            visitedTags,
+            existingRandomResolutions,
+            previousZoneRandomResults
+          )
+          for (const [k, v] of Object.entries(nested.randomTagResolutions)) {
+            randomTagResolutions[k] = v
+          }
+          changed = true
+          return nested.expandedTags.join(', ')
+        })
+        next.push(merged)
+      } else {
+        next.push(t)
+      }
+    }
+    expandedTags = next
+    if (!changed) break
   }
 
   return { expandedTags, randomTagResolutions }
