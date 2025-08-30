@@ -4,6 +4,7 @@
   import TreeNode from './TreeNode.svelte'
   import InlineEditor from './InlineEditor.svelte'
   import { ChevronDown, ChevronRight } from 'svelte-heros-v2'
+  import { isConsistentRandomArray } from './utils'
 
   let {
     model,
@@ -157,6 +158,10 @@
     dragOverPosition = null
   }
 
+  function isConsistentRandomNode(): boolean {
+    return isConsistentRandomArray(model, id)
+  }
+
   function addSiblingAfterCurrentLeaf() {
     const node = model.nodes[id]
     if (!node || node.kind !== 'leaf') return
@@ -250,7 +255,11 @@
         }}
       >
         {#if parentKind !== 'array'}
-          <div class="node-header array-type">
+          <div
+            class="node-header"
+            class:array-type={n.kind === 'array'}
+            class:consistent-array={n.kind === 'array' && isConsistentRandomNode()}
+          >
             <button
               class="toggle"
               onclick={(e) => {
@@ -412,6 +421,14 @@
   }
   .node-header.array-type:hover {
     background-color: #e9d5ff;
+  }
+  .node-header.array-type.consistent-array {
+    background-color: #ffedd5; /* bg-orange-100 */
+    color: #9a3412; /* text-orange-800 */
+    border-color: #fb923c; /* border-orange-400 */
+  }
+  .node-header.array-type.consistent-array:hover {
+    background-color: #fed7aa; /* hover:bg-orange-200 */
   }
   .toggle {
     width: 1.25rem;

@@ -7,6 +7,7 @@
   import { addChild, isContainer, uid, removeNode, convertLeafToArray } from './model'
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
+  import { isConsistentRandomArray } from './utils'
 
   let {
     initialYAML = '',
@@ -178,12 +179,8 @@
   }
 
   function isSelectedConsistentRandom(): boolean {
-    const n = getSelectedNode()
-    if (!n || n.kind !== 'array') return false
-    const firstId = n.children?.[0]
-    if (!firstId) return false
-    const first = model.nodes[firstId]
-    return !!first && first.kind === 'leaf' && String(first.value) === CONSISTENT_RANDOM_MARKER
+    if (!selectedId) return false
+    return isConsistentRandomArray(model, selectedId)
   }
 
   function setSelectedArrayMode(mode: 'random' | 'consistent-random') {
