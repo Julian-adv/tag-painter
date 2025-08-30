@@ -75,7 +75,6 @@ export function expandCustomTags(
   const randomTagResolutions: Record<string, string> = {}
   // Model is the sole source of truth
 
-  
   // Recursively expand placeholders like __Name__ in a set of strings until stable.
   function expandPlaceholdersDeep(
     inputs: string[],
@@ -145,6 +144,9 @@ export function expandCustomTags(
     const overrideTag = testModeStore[tag]?.overrideTag
     if (overrideTag) {
       selected = overrideTag
+    } else if (existingRandomResolutions[tag]) {
+      // Reuse resolution chosen earlier in this generation (e.g., from ALL zone)
+      selected = existingRandomResolutions[tag]
     } else if (previousRunResults[tag]) {
       const previousResult = previousRunResults[tag]
       const previousTags = previousResult.split(', ')
