@@ -1,6 +1,7 @@
 // Shared store for auto-completion tags
 import { get, writable } from 'svelte/store'
 import { fromYAML } from '../TreeEdit/yaml-io'
+import { fetchWildcardsText } from '../api/wildcards'
 import type { AnyNode, TreeModel } from '../TreeEdit/model'
 import type { TagType } from '$lib/types'
 import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
@@ -31,7 +32,7 @@ export async function initTags(): Promise<void> {
       // Load both danbooru tags and wildcards.yaml
       const [tagsRes, wcRes] = await Promise.allSettled([
         fetch('/api/tags'),
-        fetch('/api/wildcards')
+        fetchWildcardsText()
       ])
 
       if (tagsRes.status === 'fulfilled' && tagsRes.value.ok) {
@@ -46,10 +47,10 @@ export async function initTags(): Promise<void> {
         tags = []
       }
 
-      if (wcRes.status === 'fulfilled' && wcRes.value.ok) {
+      if (wcRes.status === 'fulfilled') {
         try {
-          const text = await wcRes.value.text()
-          wildcardModel = fromYAML(text ?? '')
+          const text = wcRes.value ?? ''
+          wildcardModel = fromYAML(text)
           wildcardNameSet = computeWildcardNames(wildcardModel)
         } catch (e) {
           console.error('Failed to parse wildcards.yaml:', e)
@@ -57,12 +58,10 @@ export async function initTags(): Promise<void> {
           wildcardModel = fromYAML('')
         }
       } else {
-        // If not found or failed, fall back to empty
+        // If failed, fall back to empty
         wildcardNameSet = new Set()
         wildcardModel = fromYAML('')
-        if (wcRes.status === 'rejected') {
-          console.error('Failed to load wildcards.yaml:', wcRes.reason)
-        }
+        console.error('Failed to load wildcards.yaml:', wcRes.reason)
       }
 
       updateCombinedTags()
@@ -128,13 +127,10 @@ export function updateWildcardsFromText(text: string) {
 // Public helper to re-fetch wildcards from server and refresh combined tags
 export async function refreshWildcardsFromServer() {
   try {
-    const res = await fetch('/api/wildcards')
-    const text = await res.text()
-    // Reuse common updater to parse and set state
+    const text = await fetchWildcardsText()
     updateWildcardsFromText(text)
   } catch (e) {
     console.error('refreshWildcardsFromServer failed:', e)
-    // On fetch failure, reset state
     wildcardNameSet = new Set()
     wildcardModel = fromYAML('')
     updateCombinedTags()
