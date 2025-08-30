@@ -6,6 +6,7 @@
   import { Plus, Trash } from 'svelte-heros-v2'
   import { addChild, isContainer, uid, removeNode, convertLeafToArray } from './model'
   import { tick } from 'svelte'
+  import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
 
   let {
     initialYAML = '',
@@ -167,6 +168,53 @@
     hasUnsavedChanges = true
   }
 
+  function getSelectedNode() {
+    return selectedId ? model.nodes[selectedId] : null
+  }
+
+  function isSelectedArrayNode(): boolean {
+    const n = getSelectedNode()
+    return !!n && n.kind === 'array'
+  }
+
+  function isSelectedConsistentRandom(): boolean {
+    const n = getSelectedNode()
+    if (!n || n.kind !== 'array') return false
+    const firstId = n.children?.[0]
+    if (!firstId) return false
+    const first = model.nodes[firstId]
+    return !!first && first.kind === 'leaf' && String(first.value) === CONSISTENT_RANDOM_MARKER
+  }
+
+  function setSelectedArrayMode(mode: 'random' | 'consistent-random') {
+    const n = getSelectedNode()
+    if (!n || n.kind !== 'array') return
+    if (mode === 'consistent-random') {
+      if (!isSelectedConsistentRandom()) {
+        const markerId = uid()
+        addChild(model, n.id, {
+          id: markerId,
+          name: String(n.children?.length ?? 0),
+          kind: 'leaf',
+          parentId: n.id,
+          value: CONSISTENT_RANDOM_MARKER
+        })
+        const children = n.children
+        const appendedIndex = children.length - 1
+        const [moved] = children.splice(appendedIndex, 1)
+        children.splice(0, 0, moved)
+        hasUnsavedChanges = true
+      }
+      return
+    }
+    // mode === 'random'
+    if (isSelectedConsistentRandom()) {
+      const firstId = n.children[0]
+      removeNode(model, firstId)
+      hasUnsavedChanges = true
+    }
+  }
+
   function getParentOf(nodeId: string): string | null {
     return model.nodes[nodeId]?.parentId ?? null
   }
@@ -214,7 +262,33 @@
       </div>
     </section>
     <div class="col-divider" aria-hidden="true"></div>
-    <section>
+    <section class="right-col">
+      <div class="array-mode" aria-label="Array selection mode">
+        <fieldset class:disabled={!isSelectedArrayNode()} disabled={!isSelectedArrayNode()}>
+          <legend class="sr-only">Array mode</legend>
+          <label class="mode-option">
+            <input
+              type="radio"
+              name="arrayMode"
+              value="random"
+              checked={isSelectedArrayNode() && !isSelectedConsistentRandom()}
+              onchange={() => setSelectedArrayMode('random')}
+            />
+            <span>Random</span>
+          </label>
+          <label class="mode-option">
+            <input
+              type="radio"
+              name="arrayMode"
+              value="consistent-random"
+              checked={isSelectedConsistentRandom()}
+              onchange={() => setSelectedArrayMode('consistent-random')}
+            />
+            <span>Consistent Random</span>
+          </label>
+        </fieldset>
+      </div>
+
       <div class="btns">
         <ActionButton
           onclick={addBySelection}
@@ -279,5 +353,40 @@
     gap: 0.5rem;
     margin: 0.25rem 0;
     padding: 0.5rem;
+  }
+  .right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    align-items: flex-start; /* left-align controls */
+  }
+  .array-mode fieldset {
+    display: inline-flex;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.25rem 0;
+  }
+  .array-mode fieldset.disabled {
+    opacity: 0.5;
+  }
+  .mode-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.875rem;
+    color: #374151;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
   }
 </style>
