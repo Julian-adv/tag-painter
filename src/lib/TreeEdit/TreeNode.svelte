@@ -3,8 +3,9 @@
   import type { ArrayNode, LeafNode, NodeKind, ObjectNode, RefNode, TreeModel } from './model'
   import TreeNode from './TreeNode.svelte'
   import InlineEditor from './InlineEditor.svelte'
-  import { ChevronDown, ChevronRight } from 'svelte-heros-v2'
-  import { isConsistentRandomArray } from './utils'
+  import { ChevronDown, ChevronRight, LockClosed } from 'svelte-heros-v2'
+  import { isConsistentRandomArray, isLeafPinned } from './utils'
+  import { testModeStore } from '../stores/testModeStore.svelte'
 
   let {
     model,
@@ -200,6 +201,13 @@
     setAutoEditChildId?.(newId)
     onSelect(newId)
   }
+
+  function isArrayPinned(): boolean {
+    const node = model.nodes[id]
+    if (!node || node.kind !== 'array') return false
+    const parentName = node.name
+    return !!testModeStore[parentName]?.overrideTag
+  }
 </script>
 
 {#if get(id)}
@@ -304,6 +312,9 @@
               expandOnEdit={true}
               enterStartsEditing={n.kind !== 'leaf'}
             />
+            {#if n.kind === 'array' && isArrayPinned()}
+              <span class="lock-icon"><LockClosed size="12" /></span>
+            {/if}
           </div>
         {/if}
 
@@ -330,6 +341,9 @@
               }}
               enterStartsEditing={false}
             />
+            {#if isLeafPinned(model, id)}
+              <span class="lock-icon"><LockClosed size="12" /></span>
+            {/if}
           </div>
         {:else if n.kind === 'ref'}
           <span class="ref">$ref → {(n as RefNode).refName}</span>
@@ -404,6 +418,14 @@
     outline-offset: 2px;
     border-radius: 0.375rem;
   }
+  .lock-icon {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0; /* prevent shrinking in inline-flex rows */
+    color: #d97706; /* text-orange-600 */
+    margin-right: 0.25rem; /* mr-1 */
+  }
+  /* size applied via LockClosed size prop */
   .node-header {
     display: inline-flex;
     align-items: center;

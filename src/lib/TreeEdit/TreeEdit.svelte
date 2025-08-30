@@ -3,11 +3,16 @@
   import type { TreeModel, LeafNode, ArrayNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
   import ActionButton from '../ActionButton.svelte'
-  import { Plus, Trash, ChevronDown, ChevronRight } from 'svelte-heros-v2'
+  import { Plus, Trash, ChevronDown, ChevronRight, LockClosed } from 'svelte-heros-v2'
   import { addChild, isContainer, uid, removeNode, convertLeafToArray } from './model'
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
-  import { isConsistentRandomArray } from './utils'
+  import { isConsistentRandomArray, isLeafPinned } from './utils'
+  import {
+    testModeStore,
+    setTestModeOverride,
+    removeTestModeOverride
+  } from '../stores/testModeStore.svelte'
 
   let {
     initialYAML = '',
@@ -169,6 +174,33 @@
     hasUnsavedChanges = true
   }
 
+  function canPinSelected(): boolean {
+    if (!selectedId) return false
+    const n = model.nodes[selectedId]
+    if (!n || n.kind !== 'leaf') return false
+    const pid = getParentOf(selectedId)
+    if (!pid) return false
+    const p = model.nodes[pid]
+    return !!p && p.kind === 'array'
+  }
+
+  function togglePinSelected() {
+    if (!selectedId) return
+    const n = model.nodes[selectedId]
+    if (!n || n.kind !== 'leaf') return
+    const pid = getParentOf(selectedId)
+    if (!pid) return
+    const p = model.nodes[pid]
+    if (!p || p.kind !== 'array') return
+    const parentName = p.name
+    const val = String(n.value ?? '')
+    if (testModeStore[parentName]?.overrideTag === val) {
+      removeTestModeOverride(parentName)
+    } else {
+      setTestModeOverride(parentName, val)
+    }
+  }
+
   function expandAll() {
     for (const node of Object.values(model.nodes)) {
       if (node && isContainer(node)) node.collapsed = false
@@ -299,6 +331,20 @@
       </div>
 
       <div class="btns">
+        <ActionButton
+          onclick={togglePinSelected}
+          variant="gray"
+          size="md"
+          icon={LockClosed}
+          title={selectedId
+            ? isLeafPinned(model, selectedId)
+              ? 'Unpin this option'
+              : 'Pin this option'
+            : 'Pin this option'}
+          disabled={!canPinSelected()}
+        >
+          {selectedId ? (isLeafPinned(model, selectedId) ? 'Unpin' : 'Pin') : 'Pin'}
+        </ActionButton>
         <ActionButton
           onclick={expandAll}
           variant="gray"

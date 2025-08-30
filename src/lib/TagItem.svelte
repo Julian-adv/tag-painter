@@ -153,9 +153,9 @@
     >
       <span class="font-medium">{displayParts.name}</span>
       {#if isTestSelected}
-        <LockClosed class="ml-1 h-3 w-3 text-white" />
+        <LockClosed class="ml-1 h-3 w-3 flex-shrink-0 text-white" />
       {:else if isForceOverridden}
-        <LockClosed class="ml-1 h-3 w-3 text-orange-500" />
+        <LockClosed class="ml-1 h-3 w-3 flex-shrink-0 text-orange-500" />
       {/if}
       {#if displayParts.content}
         <span class="mx-1 self-stretch border-l border-dashed border-gray-400"></span>
