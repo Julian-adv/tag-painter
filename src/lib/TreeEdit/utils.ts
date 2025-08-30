@@ -1,4 +1,4 @@
-import type { NodeId, TreeModel } from './model'
+import type { AnyNode, NodeId, TreeModel } from './model'
 import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
 
@@ -27,4 +27,14 @@ export function isLeafPinned(model: TreeModel, id: NodeId): boolean {
   const parentName = parent.name
   const val = String(node.value ?? '')
   return testModeStore[parentName]?.overrideTag === val
+}
+
+export function findNodeByName(model: TreeModel, name: string): AnyNode | undefined {
+  const q = String(name).trim()
+  const bySym = model.symbols[q] || model.pathSymbols[q]
+  if (bySym) return model.nodes[bySym]
+  for (const n of Object.values(model.nodes)) {
+    if (n.name === q) return n
+  }
+  return undefined
 }
