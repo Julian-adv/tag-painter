@@ -3,7 +3,7 @@
   import type { TreeModel, LeafNode, ArrayNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
   import ActionButton from '../ActionButton.svelte'
-  import { Plus, Trash } from 'svelte-heros-v2'
+  import { Plus, Trash, ChevronDown, ChevronRight } from 'svelte-heros-v2'
   import { addChild, isContainer, uid, removeNode, convertLeafToArray } from './model'
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
@@ -169,6 +169,18 @@
     hasUnsavedChanges = true
   }
 
+  function expandAll() {
+    for (const node of Object.values(model.nodes)) {
+      if (node && isContainer(node)) node.collapsed = false
+    }
+  }
+
+  function collapseAll() {
+    for (const node of Object.values(model.nodes)) {
+      if (node && isContainer(node) && node.id !== model.rootId) node.collapsed = true
+    }
+  }
+
   function getSelectedNode() {
     return selectedId ? model.nodes[selectedId] : null
   }
@@ -262,7 +274,7 @@
     <section class="right-col">
       <div class="array-mode" aria-label="Array selection mode">
         <fieldset class:disabled={!isSelectedArrayNode()} disabled={!isSelectedArrayNode()}>
-          <legend class="sr-only">Array mode</legend>
+          <legend class="section-label">Node type</legend>
           <label class="mode-option">
             <input
               type="radio"
@@ -287,6 +299,24 @@
       </div>
 
       <div class="btns">
+        <ActionButton
+          onclick={expandAll}
+          variant="gray"
+          size="md"
+          icon={ChevronDown}
+          title="Expand all nodes"
+        >
+          Expand all
+        </ActionButton>
+        <ActionButton
+          onclick={collapseAll}
+          variant="gray"
+          size="md"
+          icon={ChevronRight}
+          title="Collapse all nodes"
+        >
+          Collapse all
+        </ActionButton>
         <ActionButton
           onclick={addBySelection}
           variant="green"
@@ -347,6 +377,7 @@
   }
   .btns {
     display: flex;
+    flex-direction: column;
     gap: 0.5rem;
     margin: 0.25rem 0;
     padding: 0.5rem;
@@ -375,15 +406,11 @@
     font-size: 0.875rem;
     color: #374151;
   }
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border-width: 0;
+  .section-label {
+    font-size: 0.875rem; /* same or larger than radio labels */
+    color: #6b7280;
+    font-weight: 400; /* not bold */
+    text-align: left;
+    margin-bottom: 0.25rem;
   }
 </style>
