@@ -60,7 +60,6 @@
 
   function onToggle() {
     toggle(model, id)
-    onMutate()
   }
 
   // Removed unused per-node handlers: onDelete, handleAddChild, handleConvertLeafToArray
