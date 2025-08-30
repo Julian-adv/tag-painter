@@ -45,14 +45,28 @@ function applyWeight(tagName: string, weight?: number): string {
 }
 
 /**
- * Expand custom tags to their constituent tags recursively
+ * Expand custom tags to their constituent tags recursively.
+ *
+ * Parameters:
+ * - tags: Input tag strings (may include weights like "name:1.2" and placeholders like "__Name__").
+ * - model: TreeModel from wildcards.yaml; source of array/ref/leaf structures.
+ * - visitedTags: Tracks tags during this call to prevent circular references. Pass a fresh Set().
+ * - existingRandomResolutions: Decisions made earlier in this run (e.g., ALL → FIRST/SECOND). Used to
+ *   keep consistent-random tags identical across zones in the same generation. Only applied when the
+ *   target array is marked consistent (CONSISTENT_RANDOM_MARKER).
+ * - previousRunResults: Decisions from a previous generation pass (regen). Used to keep the
+ *   same zone stable across regenerations; takes precedence after explicit overrides.
+ *
+ * Returns:
+ * - expandedTags: Final list of tags after full placeholder expansion.
+ * - randomTagResolutions: Map of array tag name → fully-expanded chosen value (no placeholders).
  */
 export function expandCustomTags(
   tags: string[],
   model: TreeModel,
   visitedTags: Set<string> = new Set(),
   existingRandomResolutions: Record<string, string> = {},
-  previousZoneRandomResults: Record<string, string> = {}
+  previousRunResults: Record<string, string> = {}
 ): {
   expandedTags: string[]
   randomTagResolutions: Record<string, string>
@@ -62,6 +76,50 @@ export function expandCustomTags(
   // Model is the sole source of truth
 
   
+  // Recursively expand placeholders like __Name__ in a set of strings until stable.
+  function expandPlaceholdersDeep(
+    inputs: string[],
+    m: TreeModel,
+    visited: Set<string>,
+    existing: Record<string, string>,
+    previousRun: Record<string, string>,
+    resolutionsAcc: Record<string, string>
+  ): string[] {
+    const placeholderAny = /__([\p{L}\p{N}_\- ]+)__/gu
+    let out = inputs.slice()
+    let safetyCounter = 0
+    while (safetyCounter < 100) {
+      safetyCounter++
+      let changed = false
+      const next: string[] = []
+      for (const t of out) {
+        if (placeholderAny.test(t)) {
+          let merged = t
+          placeholderAny.lastIndex = 0
+          merged = merged.replace(placeholderAny, (_full, name: string) => {
+            const nested = expandCustomTags(
+              [name],
+              m,
+              visited,
+              { ...existing, ...resolutionsAcc },
+              previousRun
+            )
+            for (const [k, v] of Object.entries(nested.randomTagResolutions)) {
+              resolutionsAcc[k] = v
+            }
+            changed = true
+            return nested.expandedTags.join(', ')
+          })
+          next.push(merged)
+        } else {
+          next.push(t)
+        }
+      }
+      out = next
+      if (!changed) break
+    }
+    return out
+  }
 
   function expandNodeOnce(m: TreeModel, node: AnyNode): string[] {
     if (node.kind === 'leaf') {
@@ -80,16 +138,15 @@ export function expandCustomTags(
 
   function expandRandomArrayTag(
     tag: string,
-    m: TreeModel,
-    visited: Set<string>
+    m: TreeModel
   ): { expandedTags: string[]; resolution: string } {
     // Check overrides or previous results
     let selected: string | null = null
     const overrideTag = testModeStore[tag]?.overrideTag
     if (overrideTag) {
       selected = overrideTag
-    } else if (previousZoneRandomResults[tag]) {
-      const previousResult = previousZoneRandomResults[tag]
+    } else if (previousRunResults[tag]) {
+      const previousResult = previousRunResults[tag]
       const previousTags = previousResult.split(', ')
       return { expandedTags: previousTags, resolution: previousResult }
     }
@@ -125,9 +182,13 @@ export function expandCustomTags(
 
     // Select option if not fixed by override/previous
     if (!selected) {
-      // For consistent-random, reuse existing resolution if provided
+      // Only reuse prior zone decisions for consistent-random arrays
       if (isConsistent && existingRandomResolutions[tag]) {
         selected = existingRandomResolutions[tag]
+      }
+      // Within the same expansion call, keep consistent-random stable if already chosen
+      if (!selected && isConsistent && randomTagResolutions[tag]) {
+        selected = randomTagResolutions[tag]
       }
     }
 
@@ -136,15 +197,8 @@ export function expandCustomTags(
       selected = options[idx]
     }
 
-    // Recursively expand the selected option (to resolve any nested wildcard names)
-    const recursive = expandCustomTags(
-      [selected!],
-      m,
-      visited,
-      existingRandomResolutions,
-      previousZoneRandomResults
-    )
-    return { expandedTags: recursive.expandedTags, resolution: recursive.expandedTags.join(', ') }
+    // Defer placeholder expansion; return raw selection and let caller fully expand
+    return { expandedTags: [selected!], resolution: selected! }
   }
 
   for (const tagString of tags) {
@@ -160,14 +214,25 @@ export function expandCustomTags(
     const node = findNodeByName(model, tag)
     if (node && node.kind === 'array') {
       visitedTags.add(tag)
-      const result = expandRandomArrayTag(tag, model, visitedTags)
+      const result = expandRandomArrayTag(tag, model)
+      // 2. Fully expand placeholders like __b__ inside the chosen option(s)
+      const finalized = expandPlaceholdersDeep(
+        result.expandedTags,
+        model,
+        visitedTags,
+        { ...existingRandomResolutions, ...randomTagResolutions },
+        previousRunResults,
+        randomTagResolutions
+      )
       if (tagWeight) {
-        const weightedExpansion = applyWeight(result.expandedTags.join(', '), tagWeight)
+        const weightedExpansion = applyWeight(finalized.join(', '), tagWeight)
         expandedTags.push(weightedExpansion)
-        randomTagResolutions[tag] = result.expandedTags.join(', ')
+        // 3. Remember fully expanded text for this tag
+        randomTagResolutions[tag] = finalized.join(', ')
       } else {
-        expandedTags.push(...result.expandedTags)
-        randomTagResolutions[tag] = result.resolution
+        expandedTags.push(...finalized)
+        // 3. Remember fully expanded text for this tag
+        randomTagResolutions[tag] = finalized.join(', ')
       }
       visitedTags.delete(tag)
       continue
@@ -181,42 +246,15 @@ export function expandCustomTags(
     }
   }
 
-  // Post-process placeholder tokens like __TagName__ recursively.
-  // Detect placeholders anywhere within a string (e.g., "a, __b__, c").
-  // Stop when no placeholders remain or after 100 iterations to avoid infinite loops.
-  // Support Unicode letters (e.g., Korean), digits, underscore, hyphen, and spaces
-  const placeholderAny = /__([\p{L}\p{N}_\- ]+)__/gu
-  let safetyCounter = 0
-  while (safetyCounter < 100) {
-    safetyCounter++
-    let changed = false
-    const next: string[] = []
-    for (const t of expandedTags) {
-      if (placeholderAny.test(t)) {
-        let merged = t
-        placeholderAny.lastIndex = 0
-        merged = merged.replace(placeholderAny, (_full, name: string) => {
-          const nested = expandCustomTags(
-            [name],
-            model,
-            visitedTags,
-            existingRandomResolutions,
-            previousZoneRandomResults
-          )
-          for (const [k, v] of Object.entries(nested.randomTagResolutions)) {
-            randomTagResolutions[k] = v
-          }
-          changed = true
-          return nested.expandedTags.join(', ')
-        })
-        next.push(merged)
-      } else {
-        next.push(t)
-      }
-    }
-    expandedTags = next
-    if (!changed) break
-  }
+  // 4. Final global pass for any regular tags that may contain placeholders
+  expandedTags = expandPlaceholdersDeep(
+    expandedTags,
+    model,
+    visitedTags,
+    { ...existingRandomResolutions, ...randomTagResolutions },
+    previousRunResults,
+    randomTagResolutions
+  )
 
   return { expandedTags, randomTagResolutions }
 }
