@@ -1,6 +1,7 @@
 <script lang="ts">
   import TreeEdit from './TreeEdit.svelte'
   import { updateWildcardsFromText } from '../stores/tagsStore'
+  import { fetchWildcardsText, saveWildcardsText } from '../api/wildcards'
 
   interface Props {
     isOpen: boolean
@@ -31,10 +32,9 @@
   // When dialog opens, load YAML from server and populate child
   $effect(() => {
     if (isOpen) {
-      fetch('/api/wildcards')
-        .then((res) => (res.ok ? res.text() : ''))
+      fetchWildcardsText()
         .then((text) => {
-          if (tree && typeof text === 'string') {
+          if (tree) {
             tree.load(text)
             if (initialSelectedName) {
               // Slightly defer to allow render
@@ -52,15 +52,8 @@
     // Immediately reflect changes in combinedTags using the text we save
     // (avoids waiting for a subsequent fetch)
     updateWildcardsFromText(body)
-    fetch('/api/wildcards', {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      body
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to save')
-        tree?.markSaved()
-      })
+    saveWildcardsText(body)
+      .then(() => tree?.markSaved())
       .catch((err) => console.error('Save failed:', err))
   }
 </script>
