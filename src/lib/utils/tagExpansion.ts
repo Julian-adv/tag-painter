@@ -5,6 +5,7 @@
 import type { AnyNode, TreeModel } from '$lib/TreeEdit/model'
 import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
+import { findNodeByName } from '$lib/TreeEdit/utils'
 
 /**
  * Generate a cryptographically secure random number for better randomness
@@ -60,15 +61,7 @@ export function expandCustomTags(
   const randomTagResolutions: Record<string, string> = {}
   // Model is the sole source of truth
 
-  function findNodeByName(m: TreeModel, name: string): AnyNode | undefined {
-    // Prefer a direct symbol match first (objects), fallback to first node with the same name
-    const symId = m.symbols[name]
-    if (symId) return m.nodes[symId]
-    for (const n of Object.values(m.nodes)) {
-      if (n.name === name) return n
-    }
-    return undefined
-  }
+  
 
   function expandNodeOnce(m: TreeModel, node: AnyNode): string[] {
     if (node.kind === 'leaf') {

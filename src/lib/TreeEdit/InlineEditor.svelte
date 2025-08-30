@@ -1,4 +1,9 @@
 <script lang="ts">
+  import { tick } from 'svelte'
+  import AutoCompleteTextarea from '../AutoCompleteTextarea.svelte'
+  import PlaceholderChipDisplay from './PlaceholderChipDisplay.svelte'
+  import type { TreeModel } from './model'
+
   interface Props {
     value: string
     onSave: (newValue: string) => void
@@ -10,6 +15,7 @@
     expandOnEdit?: boolean
     enterStartsEditing?: boolean
     onFinish?: () => void
+    model: TreeModel | null
   }
 
   let {
@@ -22,11 +28,9 @@
     onEditingChange,
     expandOnEdit = false,
     enterStartsEditing = true,
-    onFinish
+    onFinish,
+    model = null
   }: Props = $props()
-
-  import { tick } from 'svelte'
-  import AutoCompleteTextarea from '../AutoCompleteTextarea.svelte'
 
   let isEditing = $state(false)
   let editingValue = $state('')
@@ -166,7 +170,7 @@
       }
     }}
   >
-    {value || placeholder}
+    <PlaceholderChipDisplay {value} {placeholder} {model} />
   </div>
 {/if}
 

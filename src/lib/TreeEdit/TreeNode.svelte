@@ -303,6 +303,7 @@
                 }
               }}
               className="name-editor"
+              model={model}
               bind:this={nameEditorRef}
               onEditingChange={(editing) => (isNameEditing = editing)}
               onFinish={() => {
@@ -334,6 +335,7 @@
               className="value-editor"
               placeholder="Enter value"
               onEditingChange={(editing) => (isValueEditing = editing)}
+              model={model}
               bind:this={valueEditorRef}
               onFinish={() => {
                 onSelect(id)
