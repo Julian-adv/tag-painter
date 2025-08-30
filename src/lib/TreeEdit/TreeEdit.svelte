@@ -214,25 +214,30 @@
       </div>
     </section>
     <div class="col-divider" aria-hidden="true"></div>
-  </div>
-
-  <div class="btns">
-    <ActionButton
-      onclick={addBySelection}
-      variant="green"
-      size="md"
-      icon={Plus}
-      title={selectedId ? 'Add child to selected' : 'Add top-level node'}
-      disabled={isAddDisabled()}
-    />
-    <ActionButton
-      onclick={deleteBySelection}
-      variant="red"
-      size="md"
-      icon={Trash}
-      title="Delete selected node"
-      disabled={!selectedId || selectedId === model.rootId}
-    />
+    <section>
+      <div class="btns">
+        <ActionButton
+          onclick={addBySelection}
+          variant="green"
+          size="md"
+          icon={Plus}
+          title={selectedId ? 'Add child to selected' : 'Add top-level node'}
+          disabled={isAddDisabled()}
+        >
+          {selectedId ? 'Add child' : 'Add top level'}
+        </ActionButton>
+        <ActionButton
+          onclick={deleteBySelection}
+          variant="red"
+          size="md"
+          icon={Trash}
+          title="Delete selected node"
+          disabled={!selectedId || selectedId === model.rootId}
+        >
+          Delete
+        </ActionButton>
+      </div>
+    </section>
   </div>
 </div>
 
@@ -273,5 +278,6 @@
     display: flex;
     gap: 0.5rem;
     margin: 0.25rem 0;
+    padding: 0.5rem;
   }
 </style>

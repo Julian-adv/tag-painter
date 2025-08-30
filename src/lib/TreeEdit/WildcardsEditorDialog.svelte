@@ -91,7 +91,7 @@
       </div>
 
       <!-- Content -->
-      <div class="min-h-0 flex-1 overflow-hidden p-4">
+      <div class="min-h-0 flex-1 overflow-hidden">
         <TreeEdit bind:this={tree} bind:hasUnsavedChanges />
       </div>
 
