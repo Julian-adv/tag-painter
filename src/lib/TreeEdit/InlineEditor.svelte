@@ -187,6 +187,13 @@
     word-break: break-word;
     user-select: none;
     min-width: 1.5rem;
+    min-height: 1.25rem; /* Ensure minimum height for empty values */
+  }
+
+  /* Ensure empty values have proper height by adding content */
+  .inline-editor-display:empty::before {
+    content: '\200B'; /* Zero-width space to maintain height */
+    display: inline-block;
   }
   .inline-editor-display:hover {
     background-color: rgba(255, 255, 255, 0.5);

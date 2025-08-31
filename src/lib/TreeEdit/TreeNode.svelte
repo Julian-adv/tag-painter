@@ -370,7 +370,6 @@
               onSave={handleValueSave}
               enableAutocomplete={true}
               className="value-editor"
-              placeholder="Enter value"
               onEditingChange={(editing) => (isValueEditing = editing)}
               {model}
               bind:this={valueEditorRef}
