@@ -10,23 +10,16 @@
     onLoraSelect: (lora: string) => void
   }
 
-  let {
-    isOpen,
-    availableLoras,
-    selectedLoras,
-    onClose,
-    onLoraSelect
-  }: Props = $props()
+  let { isOpen, availableLoras, selectedLoras, onClose, onLoraSelect }: Props = $props()
 
   let searchQuery = $state('')
 
   // Filter available loras based on search and exclude already selected ones
   let filteredLoras = $derived.by(() => {
     return availableLoras
-      .filter(lora => !selectedLoras.includes(lora))
-      .filter(lora => 
-        searchQuery === '' || 
-        lora.toLowerCase().includes(searchQuery.toLowerCase())
+      .filter((lora) => !selectedLoras.includes(lora))
+      .filter(
+        (lora) => searchQuery === '' || lora.toLowerCase().includes(searchQuery.toLowerCase())
       )
   })
 
@@ -94,10 +87,10 @@
             {#each filteredLoras as lora (lora)}
               <button
                 type="button"
-                class="inline-flex items-center gap-1 rounded-md border border-purple-300 bg-purple-50 px-3 py-0.5 text-sm text-purple-800 hover:bg-purple-100 focus:bg-purple-100 focus:outline-none max-w-full cursor-pointer"
+                class="inline-flex max-w-full cursor-pointer items-center gap-1 rounded-md border border-purple-300 bg-purple-50 px-3 py-0.5 text-sm text-purple-800 hover:bg-purple-100 focus:bg-purple-100 focus:outline-none"
                 onclick={() => handleLoraClick(lora)}
               >
-                <span class="font-medium break-words min-w-0 flex-1" title={lora}>
+                <span class="min-w-0 flex-1 font-medium break-words" title={lora}>
                   {lora.endsWith('.safetensors') ? lora.slice(0, -12) : lora}
                 </span>
               </button>

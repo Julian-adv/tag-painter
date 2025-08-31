@@ -20,4 +20,3 @@ export async function saveWildcardsText(text: string): Promise<void> {
   })
   if (!res.ok) throw new Error('Failed to save wildcards.yaml')
 }
-

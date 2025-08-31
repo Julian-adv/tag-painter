@@ -14,12 +14,7 @@
     onWeightChange: (loraName: string, weight: number) => void
   }
 
-  let {
-    lora,
-    disabled = false,
-    onRemove,
-    onWeightChange
-  }: Props = $props()
+  let { lora, disabled = false, onRemove, onWeightChange }: Props = $props()
 
   function handleWheel(event: WheelEvent) {
     // Don't handle weight adjustment if disabled
@@ -46,9 +41,7 @@
   let displayParts = $derived.by(() => {
     const weight = lora.weight ?? 1.0
     // Remove .safetensors extension from display name
-    const displayName = lora.name.endsWith('.safetensors') 
-      ? lora.name.slice(0, -12) 
-      : lora.name
+    const displayName = lora.name.endsWith('.safetensors') ? lora.name.slice(0, -12) : lora.name
     return {
       name: displayName,
       weight: weight !== 1.0 ? weight.toString() : ''
@@ -61,20 +54,30 @@
   role="button"
   tabindex="-1"
   aria-label="LoRA: {lora.name}. Weight: {lora.weight}. Ctrl+Scroll to adjust weight."
-  class="inline-flex items-center gap-1 rounded-md border border-purple-300 bg-purple-50 px-3 py-0.5 pr-0.5 pl-1.5 text-sm text-purple-800 hover:bg-purple-100 max-w-full"
+  class="relative inline-block max-w-full rounded-md border border-purple-300 bg-purple-50 px-3 py-0.5 pr-1 pl-1.5 text-left text-sm text-purple-800 hover:bg-purple-100"
 >
-  <span class="font-medium break-words min-w-0 flex-1">{displayParts.name}</span>
-  {#if displayParts.weight}
-    <span class="mx-1 self-stretch border-l border-dashed border-purple-400"></span>
-    <span class="font-semibold text-purple-600">{displayParts.weight}</span>
-  {/if}
-  <button
-    type="button"
-    class="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-transparent text-purple-600 hover:bg-purple-200 hover:text-purple-800"
-    tabindex="-1"
-    onclick={() => onRemove(lora.name)}
-    aria-label="Remove {lora.name}"
-  >
-    <XMark class="h-3 w-3" />
-  </button>
+  <div class="inline-block">
+    <span class="min-w-0 font-medium break-words">{displayParts.name}</span>
+    <!-- Invisible dummy to reserve right-edge space for weight + X -->
+    <span class="invisible align-top whitespace-nowrap" aria-hidden="true"
+      >{#if displayParts.weight}
+        <span class="font-semibold text-purple-600">{displayParts.weight}</span>
+      {/if}xxx</span
+    >
+  </div>
+  <!-- Real weight + X pinned to bottom-right corner -->
+  <span class="absolute right-1 bottom-0.5 z-20 inline-flex items-center gap-0.5 whitespace-nowrap">
+    {#if displayParts.weight}
+      <span class="font-semibold text-purple-600">{displayParts.weight}</span>
+    {/if}
+    <button
+      type="button"
+      class="flex h-4 w-4 items-center justify-center rounded-full bg-transparent text-purple-600 hover:bg-purple-200 hover:text-purple-800"
+      tabindex="-1"
+      onclick={() => onRemove(lora.name)}
+      aria-label="Remove {lora.name}"
+    >
+      <XMark class="h-3 w-3" />
+    </button>
+  </span>
 </div>

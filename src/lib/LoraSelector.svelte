@@ -57,9 +57,7 @@
   }
 
   function handleLoraWeightChange(loraName: string, weight: number) {
-    const newSelectedLoras = selectedLoras.map((l) => 
-      l.name === loraName ? { ...l, weight } : l
-    )
+    const newSelectedLoras = selectedLoras.map((l) => (l.name === loraName ? { ...l, weight } : l))
     onLoraChange(newSelectedLoras)
   }
 
@@ -94,11 +92,7 @@
       {#if selectedLoras.length > 0}
         <div class="flex flex-wrap gap-1">
           {#each selectedLoras as lora (lora.name)}
-            <LoraItem
-              lora={lora}
-              onRemove={handleLoraRemove}
-              onWeightChange={handleLoraWeightChange}
-            />
+            <LoraItem {lora} onRemove={handleLoraRemove} onWeightChange={handleLoraWeightChange} />
           {/each}
         </div>
       {/if}
@@ -127,7 +121,7 @@
 <LoraSelectionModal
   isOpen={isModalOpen}
   {availableLoras}
-  selectedLoras={selectedLoras.map(l => l.name)}
+  selectedLoras={selectedLoras.map((l) => l.name)}
   onClose={closeModal}
   onLoraSelect={handleLoraAdd}
 />

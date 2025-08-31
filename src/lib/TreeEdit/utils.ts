@@ -2,10 +2,7 @@ import type { AnyNode, NodeId, TreeModel } from './model'
 import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
 
-export function isConsistentRandomArray(
-  model: TreeModel,
-  id: NodeId
-): boolean {
+export function isConsistentRandomArray(model: TreeModel, id: NodeId): boolean {
   const node = model.nodes[id]
   if (!node || node.kind !== 'array') return false
   const firstId = node.children?.[0]

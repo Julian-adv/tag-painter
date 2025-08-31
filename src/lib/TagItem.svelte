@@ -187,25 +187,23 @@
       role="button"
     >
       <div class="inline-block">
-        <span class="invisible px-1 font-medium">{displayParts.name}</span
-        >{#if isTestSelected}<LockClosed
-            class="ml-1 inline-block h-3 w-3 text-white"
-          />{:else if isForceOverridden}<LockClosed
-            class="ml-1 inline-block h-3 w-3 text-orange-500"
-          />{/if}<!--
-        -->{#if displayParts.content}
-          <span class="text-gray-600">{displayParts.content}</span>{/if}
+        <span class="invisible px-1 font-medium">{displayParts.name}</span>
+        {#if isTestSelected}
+          <LockClosed class="ml-1 inline-block h-3 w-3 text-white" />
+        {:else if isForceOverridden}
+          <LockClosed class="ml-1 inline-block h-3 w-3 text-orange-500" />
+        {/if}
+        {#if displayParts.content}
+          <span class="text-gray-600">{displayParts.content}</span>
+        {/if}
         <!-- 2) Invisible dummy to reserve right-edge space for weight + X -->
-        <span class="invisible align-top whitespace-nowrap" aria-hidden="true"
-          >{#if displayParts.weight}
+        <span class="invisible align-top whitespace-nowrap" aria-hidden="true">
+          {#if displayParts.weight}
             <span class="font-semibold text-blue-600">{displayParts.weight}</span>
           {/if}xx</span
         >
       </div>
-      <!--
-    --></span
-    ><!--
-    -->
+    </span>
     <!-- 1+3) Real weight + X pinned to top-right corner -->
     <span
       class="absolute right-1 bottom-0.5 z-20 inline-flex items-center gap-0.5 whitespace-nowrap"

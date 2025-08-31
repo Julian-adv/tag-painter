@@ -70,11 +70,24 @@ export function fromYAML(text: string): TreeModel {
 
     // For object key context (name: value), treat as an array with a single child
     const arrId = uid()
-    const arr: ArrayNode = { id: arrId, name, kind: 'array', parentId, children: [], collapsed: false }
+    const arr: ArrayNode = {
+      id: arrId,
+      name,
+      kind: 'array',
+      parentId,
+      children: [],
+      collapsed: false
+    }
     nodes[arrId] = arr
 
     const leafId = uid()
-    const child: LeafNode = { id: leafId, name: '0', kind: 'leaf', parentId: arrId, value: leafValue }
+    const child: LeafNode = {
+      id: leafId,
+      name: '0',
+      kind: 'leaf',
+      parentId: arrId,
+      value: leafValue
+    }
     nodes[leafId] = child
     arr.children.push(leafId)
 

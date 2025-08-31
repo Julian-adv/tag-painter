@@ -30,10 +30,7 @@ export async function initTags(): Promise<void> {
   initPromise = (async () => {
     try {
       // Load both danbooru tags and wildcards.yaml
-      const [tagsRes, wcRes] = await Promise.allSettled([
-        fetch('/api/tags'),
-        fetchWildcardsText()
-      ])
+      const [tagsRes, wcRes] = await Promise.allSettled([fetch('/api/tags'), fetchWildcardsText()])
 
       if (tagsRes.status === 'fulfilled' && tagsRes.value.ok) {
         try {
@@ -43,7 +40,10 @@ export async function initTags(): Promise<void> {
           tags = []
         }
       } else {
-        console.error('Failed to load tags:', tagsRes.status === 'rejected' ? tagsRes.reason : tagsRes.value.status)
+        console.error(
+          'Failed to load tags:',
+          tagsRes.status === 'rejected' ? tagsRes.reason : tagsRes.value.status
+        )
         tags = []
       }
 
