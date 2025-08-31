@@ -238,7 +238,7 @@
         role="treeitem"
         aria-grabbed={isDragging}
         aria-selected="false"
-        tabindex="0"
+        tabindex="-1"
         onclick={(e) => {
           e.stopPropagation()
           onSelect(id, e.shiftKey)
@@ -326,7 +326,7 @@
         {/if}
 
         {#if n.kind === 'leaf'}
-          <div class="value-wrapper" class:editing={isValueEditing}>
+          <div class="value-wrapper" class:editing={isValueEditing} tabindex="-1">
             <InlineEditor
               value={String((n as LeafNode).value ?? '')}
               onSave={(newValue) => {
@@ -369,7 +369,7 @@
             autoEditName={cid === newlyAddedChildId || cid === autoEditChildId}
             {autoEditChildId}
             {onMutate}
-            selectedIds={selectedIds}
+            {selectedIds}
             {onSelect}
             {setAutoEditChildId}
             {onChipDoubleClick}
@@ -421,7 +421,6 @@
   }
   .row.selected {
     outline: 2px solid #3b82f6;
-    outline-offset: 2px;
     border-radius: 0.375rem;
   }
   .lock-icon {
@@ -512,6 +511,11 @@
   }
   .children:not(.root-child) {
     margin-left: 1.25rem;
+  }
+  /* Increase spacing between sibling children by 1px over base */
+  .children > :global(.node) {
+    margin-top: calc(0.25rem + 1px);
+    margin-bottom: calc(0.25rem + 1px);
   }
   /* spacer removed */
 

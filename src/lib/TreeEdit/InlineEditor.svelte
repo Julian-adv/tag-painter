@@ -163,7 +163,7 @@
     class="inline-editor-display {className}"
     ondblclick={() => startEditing('caretEnd')}
     role="button"
-    tabindex="0"
+    tabindex="-1"
     onkeydown={(e) => {
       if (e.key === 'Enter' && enterStartsEditing) {
         e.preventDefault()
