@@ -25,6 +25,10 @@
   let lastSelectedId: string | null = $state(null) // For shift-click range selection
   let autoEditChildId: string | null = $state(null)
   let treeContainer: HTMLDivElement | null = $state(null)
+  // Track Tab navigation state to sync selection with keyboard focus only
+  let tabbingActive: boolean = $state(false)
+  // Track whether the last Tab press included Shift to enable range selection
+  let lastTabWasWithShift: boolean = $state(false)
 
   function loadYaml(text: string) {
     model = fromYAML(text)
@@ -337,6 +341,25 @@
             selectedIds = []
             lastSelectedId = null
           }
+          // Record Shift+Tab to enable range selection on focus movement
+          if (e.key === 'Tab') {
+            tabbingActive = true
+            lastTabWasWithShift = !!e.shiftKey
+          } else {
+            tabbingActive = false
+            lastTabWasWithShift = false
+          }
+        }}
+        onkeyup={(e) => {
+          if (e.key === 'Tab') {
+            tabbingActive = false
+            lastTabWasWithShift = false
+          }
+        }}
+        onmousedown={() => {
+          // Mouse interactions should not trigger focus-driven selection
+          tabbingActive = false
+          lastTabWasWithShift = false
         }}
       >
         <TreeNode
@@ -349,6 +372,8 @@
           onSelect={selectNode}
           {setAutoEditChildId}
           onChipDoubleClick={selectByName}
+          tabbingActive={tabbingActive}
+          shiftTabActive={lastTabWasWithShift}
         />
       </div>
     </section>

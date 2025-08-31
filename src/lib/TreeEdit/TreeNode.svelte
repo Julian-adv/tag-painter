@@ -18,7 +18,9 @@
     selectedIds = [],
     onSelect,
     setAutoEditChildId,
-    onChipDoubleClick
+    onChipDoubleClick,
+    tabbingActive = false,
+    shiftTabActive = false
   }: {
     model: TreeModel
     id: string
@@ -31,6 +33,8 @@
     onSelect: (id: string, shiftKey?: boolean) => void
     setAutoEditChildId?: (id: string | null) => void
     onChipDoubleClick?: (tagName: string) => void
+    tabbingActive?: boolean
+    shiftTabActive?: boolean
   } = $props()
 
   const get = (id: string) => model.nodes[id]
@@ -238,7 +242,14 @@
         role="treeitem"
         aria-grabbed={isDragging}
         aria-selected="false"
-        tabindex="-1"
+        tabindex="0"
+        onfocusin={() => {
+          // Only sync selection when focus is moved via Tab navigation,
+          // not when focusing due to mouse or programmatic focus.
+          if (tabbingActive) {
+            onSelect(id, shiftTabActive)
+          }
+        }}
         onclick={(e) => {
           e.stopPropagation()
           onSelect(id, e.shiftKey)
@@ -326,7 +337,7 @@
         {/if}
 
         {#if n.kind === 'leaf'}
-          <div class="value-wrapper" class:editing={isValueEditing} tabindex="-1">
+          <div class="value-wrapper" class:editing={isValueEditing}>
             <InlineEditor
               value={String((n as LeafNode).value ?? '')}
               onSave={(newValue) => {
@@ -373,6 +384,8 @@
             {onSelect}
             {setAutoEditChildId}
             {onChipDoubleClick}
+            tabbingActive={tabbingActive}
+            {shiftTabActive}
           />
         {/each}
       </div>
