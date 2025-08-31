@@ -151,7 +151,7 @@ export function isWildcardArray(tag: string): boolean {
 
 // Determine tag type using wildcards.yaml structure
 export function wildcardTagType(name: string): TagType {
-  // If not an array node, treat as regular
+  // Resolve node by name
   const symId = wildcardModel.symbols[name]
   let node: AnyNode | undefined = symId ? wildcardModel.nodes[symId] : undefined
   if (!node) {
@@ -162,15 +162,24 @@ export function wildcardTagType(name: string): TagType {
       }
     }
   }
-  if (!node || node.kind !== 'array') return 'regular'
+  if (!node) return 'regular'
 
-  // Check first child for consistent-random directive
-  const children = node.children
-  if (children && children.length > 0) {
-    const first = wildcardModel.nodes[children[0]]
-    if (first && first.kind === 'leaf' && typeof first.value === 'string') {
-      if (first.value === CONSISTENT_RANDOM_MARKER) return 'consistent-random'
+  // Array → random or consistent-random
+  if (node.kind === 'array') {
+    const children = node.children
+    if (children && children.length > 0) {
+      const first = wildcardModel.nodes[children[0]]
+      if (first && first.kind === 'leaf' && typeof first.value === 'string') {
+        if (first.value === CONSISTENT_RANDOM_MARKER) return 'consistent-random'
+      }
     }
+    return 'random'
   }
-  return 'random'
+
+  // Object → treat as random (purple). Loader guarantees leaves are under arrays.
+  if (node.kind === 'object') {
+    return 'random'
+  }
+
+  return 'regular'
 }

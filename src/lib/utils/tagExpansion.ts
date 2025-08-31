@@ -200,6 +200,45 @@ export function expandCustomTags(
     return { expandedTags: [selected!], resolution: selected! }
   }
 
+  function expandRandomObjectOfArraysTag(
+    tag: string,
+    m: TreeModel
+  ): { expandedTags: string[]; resolution: string } {
+    // Try previous run resolution for this object tag
+    if (previousRunResults[tag]) {
+      const previousResult = previousRunResults[tag]
+      const previousTags = previousResult.split(', ')
+      return { expandedTags: previousTags, resolution: previousResult }
+    }
+
+    const node = findNodeByName(m, tag)
+    if (!node || node.kind !== 'object') return { expandedTags: [tag], resolution: tag }
+
+    // Collect all descendant arrays (depth-first) under this object
+    const arrays: AnyNode[] = []
+    const seen = new Set<string>()
+    const stack: string[] = [...(node.children || [])]
+    while (stack.length) {
+      const cid = stack.pop() as string
+      if (seen.has(cid)) continue
+      seen.add(cid)
+      const child = m.nodes[cid]
+      if (!child) continue
+      if (child.kind === 'array') {
+        arrays.push(child)
+      } else if (child.kind === 'object') {
+        stack.push(...(child.children || []))
+      }
+    }
+    if (arrays.length === 0) return { expandedTags: [tag], resolution: tag }
+
+    // Choose one descendant array at random and expand it using the array logic
+    const idx = getSecureRandomIndex(arrays.length)
+    const chosenArray = arrays[idx]
+    const result = expandRandomArrayTag(chosenArray.name, m)
+    return { expandedTags: result.expandedTags, resolution: result.resolution }
+  }
+
   for (const tagString of tags) {
     const { name: tag, weight: tagWeight } = parseTagWithWeight(tagString)
 
@@ -231,6 +270,29 @@ export function expandCustomTags(
       } else {
         expandedTags.push(...finalized)
         // 3. Remember fully expanded text for this tag
+        randomTagResolutions[tag] = finalized.join(', ')
+      }
+      visitedTags.delete(tag)
+      continue
+    }
+    // Treat any object as a random tag by choosing from its descendant arrays
+    if (node && node.kind === 'object') {
+      visitedTags.add(tag)
+      const result = expandRandomObjectOfArraysTag(tag, model)
+      const finalized = expandPlaceholdersDeep(
+        result.expandedTags,
+        model,
+        visitedTags,
+        { ...existingRandomResolutions, ...randomTagResolutions },
+        previousRunResults,
+        randomTagResolutions
+      )
+      if (tagWeight) {
+        const weightedExpansion = applyWeight(finalized.join(', '), tagWeight)
+        expandedTags.push(weightedExpansion)
+        randomTagResolutions[tag] = finalized.join(', ')
+      } else {
+        expandedTags.push(...finalized)
         randomTagResolutions[tag] = finalized.join(', ')
       }
       visitedTags.delete(tag)
