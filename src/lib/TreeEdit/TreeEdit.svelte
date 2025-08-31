@@ -1,6 +1,6 @@
 <script lang="ts">
   import TreeNode from './TreeNode.svelte'
-  import type { TreeModel, LeafNode, ArrayNode } from './model'
+  import type { TreeModel, LeafNode, ArrayNode, ObjectNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
   import ActionButton from '../ActionButton.svelte'
   import { Plus, Trash, ChevronDown, ChevronRight, LockClosed } from 'svelte-heros-v2'
@@ -21,7 +21,8 @@
 
   let model: TreeModel = $state(fromYAML(initialYAML))
   let newlyAddedRootChildId: string | null = $state(null)
-  let selectedId: string | null = $state(null)
+  let selectedIds: string[] = $state([])
+  let lastSelectedId: string | null = $state(null) // For shift-click range selection
   let autoEditChildId: string | null = $state(null)
   let treeContainer: HTMLDivElement | null = $state(null)
 
@@ -51,8 +52,39 @@
 
   // Saving handled by parent
 
-  function selectNode(id: string) {
-    selectedId = id
+  function selectNode(id: string, shiftKey = false) {
+    if (shiftKey && lastSelectedId && selectedIds.length > 0) {
+      // Range selection: find nodes between lastSelectedId and id with same parent
+      const lastNode = model.nodes[lastSelectedId]
+      const currentNode = model.nodes[id]
+      
+      if (lastNode && currentNode && lastNode.parentId === currentNode.parentId) {
+        const parentId = lastNode.parentId
+        if (parentId) {
+          const parent = model.nodes[parentId]
+          if (parent && isContainer(parent)) {
+            const children = (parent as ObjectNode | ArrayNode).children
+            const lastIndex = children.indexOf(lastSelectedId)
+            const currentIndex = children.indexOf(id)
+            
+            if (lastIndex !== -1 && currentIndex !== -1) {
+              const start = Math.min(lastIndex, currentIndex)
+              const end = Math.max(lastIndex, currentIndex)
+              const rangeIds = children.slice(start, end + 1)
+              
+              // Add range to selection (union with existing selection)
+              const newSelection = [...new Set([...selectedIds, ...rangeIds])]
+              selectedIds = newSelection
+              return
+            }
+          }
+        }
+      }
+    }
+    
+    // Regular single selection
+    selectedIds = [id]
+    lastSelectedId = id
   }
 
   // Allow descendants to request auto-editing of a specific child id
@@ -62,7 +94,7 @@
 
   function scrollSelectedIntoView() {
     if (!treeContainer) return
-    const el = treeContainer.querySelector('.row.selected') as HTMLElement | null
+    const el = treeContainer.querySelector('.row.selected:first-of-type') as HTMLElement | null
     if (el) {
       el.scrollIntoView({ block: 'center', inline: 'nearest' })
       // Move keyboard focus to the selected row so keyboard nav (Tab/Enter) applies to it
@@ -93,7 +125,8 @@
         if (parent && isContainer(parent)) parent.collapsed = false
         cur = parent || null
       }
-      selectedId = targetId
+      selectedIds = [targetId]
+      lastSelectedId = targetId
       // Wait for DOM update then scroll to the selected row
       tick().then(() => scrollSelectedIntoView())
     }
@@ -101,7 +134,7 @@
 
   function addBySelection() {
     // Special case: no selection -> add an Array node at root with one empty item
-    if (!selectedId) {
+    if (selectedIds.length === 0) {
       const rootId = model.rootId
       const root = model.nodes[rootId]
       if (!root || !isContainer(root)) return
@@ -127,12 +160,14 @@
 
       // Auto-edit the new array node's name
       newlyAddedRootChildId = arrayNode.id
-      selectedId = arrayNode.id
+      selectedIds = [arrayNode.id]
+      lastSelectedId = arrayNode.id
       hasUnsavedChanges = true
       return
     }
 
-    const targetId = selectedId
+    const targetId = selectedIds.length === 1 ? selectedIds[0] : null
+    if (!targetId) return
     const parent = model.nodes[targetId]
     if (!parent) return
     // Disallow adding under ref nodes
@@ -163,19 +198,26 @@
     }
     addChild(model, targetId, child)
     newlyAddedRootChildId = child.id
-    selectedId = child.id
+    selectedIds = [child.id]
+    lastSelectedId = child.id
     hasUnsavedChanges = true
   }
 
   function deleteBySelection() {
-    if (!selectedId || selectedId === model.rootId) return
-    removeNode(model, selectedId)
-    selectedId = null
+    if (selectedIds.length === 0 || selectedIds.includes(model.rootId)) return
+    // Delete all selected nodes (filter out root if somehow included)
+    const validIds = selectedIds.filter(id => id !== model.rootId)
+    for (const id of validIds) {
+      removeNode(model, id)
+    }
+    selectedIds = []
+    lastSelectedId = null
     hasUnsavedChanges = true
   }
 
   function canPinSelected(): boolean {
-    if (!selectedId) return false
+    if (selectedIds.length !== 1) return false
+    const selectedId = selectedIds[0]
     const n = model.nodes[selectedId]
     if (!n || n.kind !== 'leaf') return false
     const pid = getParentOf(selectedId)
@@ -185,7 +227,8 @@
   }
 
   function togglePinSelected() {
-    if (!selectedId) return
+    if (selectedIds.length !== 1) return
+    const selectedId = selectedIds[0]
     const n = model.nodes[selectedId]
     if (!n || n.kind !== 'leaf') return
     const pid = getParentOf(selectedId)
@@ -214,7 +257,7 @@
   }
 
   function getSelectedNode() {
-    return selectedId ? model.nodes[selectedId] : null
+    return selectedIds.length === 1 ? model.nodes[selectedIds[0]] : null
   }
 
   function isSelectedArrayNode(): boolean {
@@ -223,8 +266,8 @@
   }
 
   function isSelectedConsistentRandom(): boolean {
-    if (!selectedId) return false
-    return isConsistentRandomArray(model, selectedId)
+    if (selectedIds.length !== 1) return false
+    return isConsistentRandomArray(model, selectedIds[0])
   }
 
   function setSelectedArrayMode(mode: 'random' | 'consistent-random') {
@@ -261,7 +304,9 @@
   }
 
   function isAddDisabled(): boolean {
-    if (!selectedId) return false
+    if (selectedIds.length === 0) return false
+    if (selectedIds.length > 1) return true // Disable add for multiple selection
+    const selectedId = selectedIds[0]
     const sel = model.nodes[selectedId]
     if (!sel) return false
     if (sel.kind === 'ref') return true
@@ -279,14 +324,18 @@
         class="tree"
         role="button"
         aria-label="Clear selection"
-        onclick={() => (selectedId = null)}
+        onclick={() => {
+          selectedIds = []
+          lastSelectedId = null
+        }}
         tabindex="-1"
         bind:this={treeContainer}
         data-tree-root
         onkeydown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            selectedId = null
+            selectedIds = []
+            lastSelectedId = null
           }
         }}
       >
@@ -296,7 +345,7 @@
           isRootChild={true}
           autoEditChildId={autoEditChildId ?? newlyAddedRootChildId}
           onMutate={() => (hasUnsavedChanges = true)}
-          {selectedId}
+          selectedIds={selectedIds}
           onSelect={selectNode}
           {setAutoEditChildId}
           onChipDoubleClick={selectByName}
@@ -337,14 +386,14 @@
           variant="gray"
           size="md"
           icon={LockClosed}
-          title={selectedId
-            ? isLeafPinned(model, selectedId)
+          title={selectedIds.length === 1
+            ? isLeafPinned(model, selectedIds[0])
               ? 'Unpin this option'
               : 'Pin this option'
             : 'Pin this option'}
           disabled={!canPinSelected()}
         >
-          {selectedId ? (isLeafPinned(model, selectedId) ? 'Unpin' : 'Pin') : 'Pin'}
+          {selectedIds.length === 1 ? (isLeafPinned(model, selectedIds[0]) ? 'Unpin' : 'Pin') : 'Pin'}
         </ActionButton>
         <ActionButton
           onclick={expandAll}
@@ -369,10 +418,10 @@
           variant="green"
           size="md"
           icon={Plus}
-          title={selectedId ? 'Add child to selected' : 'Add top-level node'}
+          title={selectedIds.length === 1 ? 'Add child to selected' : 'Add top-level node'}
           disabled={isAddDisabled()}
         >
-          {selectedId ? 'Add child' : 'Add top level'}
+          {selectedIds.length === 1 ? 'Add child' : 'Add top level'}
         </ActionButton>
         <ActionButton
           onclick={deleteBySelection}
@@ -380,7 +429,7 @@
           size="md"
           icon={Trash}
           title="Delete selected node"
-          disabled={!selectedId || selectedId === model.rootId}
+          disabled={selectedIds.length === 0 || selectedIds.includes(model.rootId)}
         >
           Delete
         </ActionButton>

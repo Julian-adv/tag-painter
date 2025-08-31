@@ -15,7 +15,7 @@
     autoEditName = false,
     autoEditChildId = null,
     onMutate,
-    selectedId = null,
+    selectedIds = [],
     onSelect,
     setAutoEditChildId,
     onChipDoubleClick
@@ -27,8 +27,8 @@
     autoEditName?: boolean
     autoEditChildId?: string | null
     onMutate: () => void
-    selectedId?: string | null
-    onSelect: (id: string) => void
+    selectedIds?: string[]
+    onSelect: (id: string, shiftKey?: boolean) => void
     setAutoEditChildId?: (id: string | null) => void
     onChipDoubleClick?: (tagName: string) => void
   } = $props()
@@ -223,7 +223,7 @@
     {#if id !== model.rootId}
       <div
         class="row"
-        class:selected={id === selectedId}
+        class:selected={selectedIds.includes(id)}
         class:editing={isNameEditing || isValueEditing}
         class:name-editing={isNameEditing}
         class:value-editing={isValueEditing}
@@ -241,7 +241,7 @@
         tabindex="0"
         onclick={(e) => {
           e.stopPropagation()
-          onSelect(id)
+          onSelect(id, e.shiftKey)
         }}
         onkeydown={(e) => {
           if (e.key === 'Enter') {
@@ -369,7 +369,7 @@
             autoEditName={cid === newlyAddedChildId || cid === autoEditChildId}
             {autoEditChildId}
             {onMutate}
-            {selectedId}
+            selectedIds={selectedIds}
             {onSelect}
             {setAutoEditChildId}
             {onChipDoubleClick}
