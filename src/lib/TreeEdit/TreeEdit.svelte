@@ -1,15 +1,14 @@
 <script lang="ts">
   import TreeNode from './TreeNode.svelte'
+  import TreeEditControlPanel from './TreeEditControlPanel.svelte'
   import type { TreeModel, LeafNode, ArrayNode, ObjectNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
-  import ActionButton from '../ActionButton.svelte'
-  import { Plus, Trash, ChevronDown, ChevronRight, LockClosed } from 'svelte-heros-v2'
   import { addChild, isContainer, uid, removeNode, convertLeafToArray } from './model'
-  import { groupSelectedNodes, canGroupSelected } from './operations'
+  import { groupSelectedNodes } from './operations'
   import { getParentOf } from './utils'
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
-  import { isConsistentRandomArray, isLeafPinned } from './utils'
+  import { isConsistentRandomArray } from './utils'
   import {
     testModeStore,
     setTestModeOverride,
@@ -221,16 +220,6 @@
     hasUnsavedChanges = true
   }
 
-  function canPinSelected(): boolean {
-    if (selectedIds.length !== 1) return false
-    const selectedId = selectedIds[0]
-    const n = model.nodes[selectedId]
-    if (!n || n.kind !== 'leaf') return false
-    const pid = getParentOf(model, selectedId)
-    if (!pid) return false
-    const p = model.nodes[pid]
-    return !!p && p.kind === 'array'
-  }
 
   function togglePinSelected() {
     if (selectedIds.length !== 1) return
@@ -250,37 +239,15 @@
     }
   }
 
-  function expandAll() {
-    for (const node of Object.values(model.nodes)) {
-      if (node && isContainer(node)) node.collapsed = false
-    }
-  }
-
-  function collapseAll() {
-    for (const node of Object.values(model.nodes)) {
-      if (node && isContainer(node) && node.id !== model.rootId) node.collapsed = true
-    }
-  }
-
   function getSelectedNode() {
     return selectedIds.length === 1 ? model.nodes[selectedIds[0]] : null
-  }
-
-  function isSelectedArrayNode(): boolean {
-    const n = getSelectedNode()
-    return !!n && n.kind === 'array'
-  }
-
-  function isSelectedConsistentRandom(): boolean {
-    if (selectedIds.length !== 1) return false
-    return isConsistentRandomArray(model, selectedIds[0])
   }
 
   function setSelectedArrayMode(mode: 'random' | 'consistent-random') {
     const n = getSelectedNode()
     if (!n || n.kind !== 'array') return
     if (mode === 'consistent-random') {
-      if (!isSelectedConsistentRandom()) {
+      if (!isConsistentRandomArray(model, selectedIds[0])) {
         const markerId = uid()
         addChild(model, n.id, {
           id: markerId,
@@ -298,25 +265,13 @@
       return
     }
     // mode === 'random'
-    if (isSelectedConsistentRandom()) {
+    if (isConsistentRandomArray(model, selectedIds[0])) {
       const firstId = n.children[0]
       removeNode(model, firstId)
       hasUnsavedChanges = true
     }
   }
 
-  function isAddDisabled(): boolean {
-    if (selectedIds.length === 0) return false
-    if (selectedIds.length > 1) return true // Disable add for multiple selection
-    const selectedId = selectedIds[0]
-    const sel = model.nodes[selectedId]
-    if (!sel) return false
-    if (sel.kind === 'ref') return true
-    const pid = getParentOf(model, selectedId)
-    if (!pid) return false
-    const p = model.nodes[pid]
-    return !!p && p.kind === 'array'
-  }
 
   function groupSelected() {
     const result = groupSelectedNodes(model, selectedIds)
@@ -392,101 +347,15 @@
       </div>
     </section>
     <div class="col-divider" aria-hidden="true"></div>
-    <section class="right-col">
-      <div class="array-mode" aria-label="Array selection mode">
-        <fieldset class:disabled={!isSelectedArrayNode()} disabled={!isSelectedArrayNode()}>
-          <legend class="section-label">Node type</legend>
-          <label class="mode-option">
-            <input
-              type="radio"
-              name="arrayMode"
-              value="random"
-              checked={isSelectedArrayNode() && !isSelectedConsistentRandom()}
-              onchange={() => setSelectedArrayMode('random')}
-            />
-            <span>Random</span>
-          </label>
-          <label class="mode-option">
-            <input
-              type="radio"
-              name="arrayMode"
-              value="consistent-random"
-              checked={isSelectedConsistentRandom()}
-              onchange={() => setSelectedArrayMode('consistent-random')}
-            />
-            <span>Consistent Random</span>
-          </label>
-        </fieldset>
-      </div>
-
-      <div class="btns">
-        <ActionButton
-          onclick={togglePinSelected}
-          variant="gray"
-          size="md"
-          icon={LockClosed}
-          title={selectedIds.length === 1
-            ? isLeafPinned(model, selectedIds[0])
-              ? 'Unpin this option'
-              : 'Pin this option'
-            : 'Pin this option'}
-          disabled={!canPinSelected()}
-        >
-          {selectedIds.length === 1
-            ? isLeafPinned(model, selectedIds[0])
-              ? 'Unpin'
-              : 'Pin'
-            : 'Pin'}
-        </ActionButton>
-        <ActionButton
-          onclick={expandAll}
-          variant="gray"
-          size="md"
-          icon={ChevronDown}
-          title="Expand all nodes"
-        >
-          Expand all
-        </ActionButton>
-        <ActionButton
-          onclick={collapseAll}
-          variant="gray"
-          size="md"
-          icon={ChevronRight}
-          title="Collapse all nodes"
-        >
-          Collapse all
-        </ActionButton>
-        <ActionButton
-          onclick={groupSelected}
-          variant="blue"
-          size="md"
-          title="Group selected leaves"
-          disabled={!canGroupSelected(model, selectedIds)}
-        >
-          Group
-        </ActionButton>
-        <ActionButton
-          onclick={addBySelection}
-          variant="green"
-          size="md"
-          icon={Plus}
-          title={selectedIds.length === 1 ? 'Add child to selected' : 'Add top-level node'}
-          disabled={isAddDisabled()}
-        >
-          {selectedIds.length === 1 ? 'Add child' : 'Add top level'}
-        </ActionButton>
-        <ActionButton
-          onclick={deleteBySelection}
-          variant="red"
-          size="md"
-          icon={Trash}
-          title="Delete selected node"
-          disabled={selectedIds.length === 0 || selectedIds.includes(model.rootId)}
-        >
-          Delete
-        </ActionButton>
-      </div>
-    </section>
+    <TreeEditControlPanel
+      {model}
+      {selectedIds}
+      {setSelectedArrayMode}
+      {togglePinSelected}
+      {groupSelected}
+      {addBySelection}
+      {deleteBySelection}
+    />
   </div>
 </div>
 
@@ -522,43 +391,5 @@
     overflow-y: auto; /* scroll only vertically inside left column */
     overflow-x: hidden;
     text-align: left; /* ensure inline-flex rows align left */
-  }
-  .btns {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    margin: 0.25rem 0;
-    padding: 0.5rem;
-  }
-  .right-col {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    align-items: flex-start; /* left-align controls */
-  }
-  .array-mode fieldset {
-    display: inline-flex;
-    justify-content: flex-start;
-    gap: 0.75rem;
-    align-items: center;
-    padding: 0.25rem 0;
-  }
-  .array-mode fieldset.disabled {
-    opacity: 0.5;
-  }
-  .mode-option {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.875rem;
-    color: #374151;
-  }
-  .section-label {
-    font-size: 0.875rem; /* same or larger than radio labels */
-    color: #6b7280;
-    font-weight: 400; /* not bold */
-    text-align: left;
-    margin-bottom: 0.25rem;
   }
 </style>

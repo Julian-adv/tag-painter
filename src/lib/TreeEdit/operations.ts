@@ -3,7 +3,7 @@
  */
 
 import type { TreeModel, ArrayNode, ObjectNode } from './model'
-import { uid } from './model'
+import { uid, isContainer } from './model'
 import { getParentOf } from './utils'
 
 /**
@@ -141,4 +141,24 @@ export function canGroupSelected(model: TreeModel, selectedIds: string[]): boole
     else if (parentId !== pid) return false
   }
   return true
+}
+
+/**
+ * Expand all container nodes in the tree
+ * @param model The TreeModel to modify
+ */
+export function expandAll(model: TreeModel): void {
+  for (const node of Object.values(model.nodes)) {
+    if (node && isContainer(node)) node.collapsed = false
+  }
+}
+
+/**
+ * Collapse all container nodes except root
+ * @param model The TreeModel to modify
+ */
+export function collapseAll(model: TreeModel): void {
+  for (const node of Object.values(model.nodes)) {
+    if (node && isContainer(node) && node.id !== model.rootId) node.collapsed = true
+  }
 }
