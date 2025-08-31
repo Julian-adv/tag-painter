@@ -16,6 +16,7 @@
     enterStartsEditing?: boolean
     onFinish?: () => void
     model: TreeModel | null
+    onChipDoubleClick?: (tagName: string) => void
   }
 
   let {
@@ -29,7 +30,8 @@
     expandOnEdit = false,
     enterStartsEditing = true,
     onFinish,
-    model = null
+    model = null,
+    onChipDoubleClick
   }: Props = $props()
 
   let isEditing = $state(false)
@@ -170,7 +172,7 @@
       }
     }}
   >
-    <PlaceholderChipDisplay {value} {placeholder} {model} />
+    <PlaceholderChipDisplay {value} {placeholder} {model} {onChipDoubleClick} />
   </div>
 {/if}
 

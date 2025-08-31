@@ -299,6 +299,7 @@
           {selectedId}
           onSelect={selectNode}
           {setAutoEditChildId}
+          onChipDoubleClick={selectByName}
         />
       </div>
     </section>

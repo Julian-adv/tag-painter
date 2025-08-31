@@ -17,7 +17,8 @@
     onMutate,
     selectedId = null,
     onSelect,
-    setAutoEditChildId
+    setAutoEditChildId,
+    onChipDoubleClick
   }: {
     model: TreeModel
     id: string
@@ -29,6 +30,7 @@
     selectedId?: string | null
     onSelect: (id: string) => void
     setAutoEditChildId?: (id: string | null) => void
+    onChipDoubleClick?: (tagName: string) => void
   } = $props()
 
   const get = (id: string) => model.nodes[id]
@@ -342,6 +344,7 @@
                 rowEl?.focus()
               }}
               enterStartsEditing={false}
+              {onChipDoubleClick}
             />
             {#if isLeafPinned(model, id)}
               <span class="lock-icon"><LockClosed size="12" /></span>
@@ -369,6 +372,7 @@
             {selectedId}
             {onSelect}
             {setAutoEditChildId}
+            {onChipDoubleClick}
           />
         {/each}
       </div>

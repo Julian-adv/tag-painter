@@ -6,9 +6,10 @@
     value: string
     placeholder: string
     model: TreeModel | null
+    onChipDoubleClick?: (tagName: string) => void
   }
 
-  let { value, placeholder, model }: Props = $props()
+  let { value, placeholder, model, onChipDoubleClick }: Props = $props()
 
   // Split text into text segments and placeholder chips
   type Seg =
@@ -61,6 +62,12 @@
               ? 'consistent'
               : 'unknown'}"
           title={seg.type}
+          ondblclick={(e) => {
+            e.stopPropagation()
+            onChipDoubleClick?.(seg.name)
+          }}
+          role="button"
+          tabindex="-1"
         >
           {seg.name}
         </span>
@@ -81,20 +88,31 @@
     border-radius: 0.375rem;
     border: 1px dashed #d1d5db;
     white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
   }
   .chip.random {
     background-color: #f3e8ff;
     color: #6b21a8;
     border-color: #c084fc;
   }
+  .chip.random:hover {
+    background-color: #e9d5ff;
+  }
   .chip.consistent {
     background-color: #ffedd5;
     color: #9a3412;
     border-color: #fb923c;
   }
+  .chip.consistent:hover {
+    background-color: #fed7aa;
+  }
   .chip.unknown {
     background-color: #e5e7eb;
     color: #374151;
     border-color: #d1d5db;
+  }
+  .chip.unknown:hover {
+    background-color: #d1d5db;
   }
 </style>
