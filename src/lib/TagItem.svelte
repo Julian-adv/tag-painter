@@ -169,7 +169,7 @@
     <span
       class="pointer-events-none font-medium {getNameBackgroundClass(
         tag
-      )} absolute top-0 left-0 z-10 rounded-none rounded-tl rounded-bl px-1 pt-0 pb-1"
+      )} absolute top-0 left-0 z-10 rounded-tl rounded-bl px-1 pt-0.5 pb-0.5"
       >{displayParts.name}</span
     >
     <span
@@ -195,12 +195,21 @@
           />{/if}<!--
         -->{#if displayParts.content}
           <span class="text-gray-600">{displayParts.content}</span>{/if}
+        <!-- 2) Invisible dummy to reserve right-edge space for weight + X -->
+        <span class="invisible align-top whitespace-nowrap" aria-hidden="true"
+          >{#if displayParts.weight}
+            <span class="font-semibold text-blue-600">{displayParts.weight}</span>
+          {/if}xx</span
+        >
       </div>
       <!--
     --></span
     ><!--
     -->
-    <div class="float-right mt-0.5 ml-0.5 flex items-center gap-0.5">
+    <!-- 1+3) Real weight + X pinned to top-right corner -->
+    <span
+      class="absolute right-1 bottom-0.5 z-20 inline-flex items-center gap-0.5 whitespace-nowrap"
+    >
       {#if displayParts.weight}
         <span class="font-semibold text-blue-600">{displayParts.weight}</span>
       {/if}
@@ -213,7 +222,7 @@
       >
         <XMark class="h-3 w-3" />
       </button>
-    </div>
+    </span>
   </div>
 
   <!-- Drop indicator after this tag (for last position) -->
