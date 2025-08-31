@@ -144,9 +144,6 @@ export function expandCustomTags(
     const overrideTag = testModeStore[tag]?.overrideTag
     if (overrideTag) {
       selected = overrideTag
-    } else if (existingRandomResolutions[tag]) {
-      // Reuse resolution chosen earlier in this generation (e.g., from ALL zone)
-      selected = existingRandomResolutions[tag]
     } else if (previousRunResults[tag]) {
       const previousResult = previousRunResults[tag]
       const previousTags = previousResult.split(', ')
