@@ -48,8 +48,7 @@ export async function POST({ request }) {
       selectedComposition: data.selectedComposition || 'left-horizontal',
       useUpscale: data.useUpscale,
       useFaceDetailer: data.useFaceDetailer,
-      selectedLoras: data.selectedLoras,
-      loraWeight: data.loraWeight
+      selectedLoras: data.selectedLoras
     }
 
     await fs.writeFile(filePath, JSON.stringify(cleanedData, null, 2))
@@ -118,8 +117,7 @@ export async function GET() {
         selectedComposition: 'left-horizontal',
         useUpscale: true,
         useFaceDetailer: true,
-        selectedLoras: [],
-        loraWeight: 0.8
+        selectedLoras: []
       }
       return json(defaultPrompts)
     }

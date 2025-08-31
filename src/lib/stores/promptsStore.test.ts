@@ -14,7 +14,6 @@ import {
   updateUpscale,
   updateFaceDetailer,
   updateSelectedLoras,
-  updateLoraWeight,
   updateTags,
   saveCustomTag,
   reorderCategories,
@@ -49,8 +48,7 @@ describe('promptsStore', () => {
       selectedComposition: 'left-horizontal',
       useUpscale: false,
       useFaceDetailer: false,
-      selectedLoras: [],
-      loraWeight: 0.8
+      selectedLoras: []
     })
   })
 
@@ -153,8 +151,7 @@ describe('promptsStore', () => {
         selectedComposition: 'left-horizontal',
         useUpscale: true,
         useFaceDetailer: false,
-        selectedLoras: ['lora1'],
-        loraWeight: 0.9
+        selectedLoras: [{ name: 'lora1', weight: 1.0 }]
       }
 
       promptsData.set(testData)
@@ -276,19 +273,13 @@ describe('promptsStore', () => {
     })
 
     it('should update selected loras', () => {
-      const loras = ['lora1', 'lora2']
+      const loras = [{ name: 'lora1', weight: 0.8 }, { name: 'lora2', weight: 1.2 }]
       updateSelectedLoras(loras)
 
       const storeData = get(promptsData)
       expect(storeData.selectedLoras).toEqual(loras)
     })
 
-    it('should update lora weight', () => {
-      updateLoraWeight(0.7)
-
-      const storeData = get(promptsData)
-      expect(storeData.loraWeight).toBe(0.7)
-    })
   })
 
   describe('tags management', () => {
