@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import LoraItem from './LoraItem.svelte'
+  import LoraSelectionModal from './LoraSelectionModal.svelte'
+  import { Plus } from 'svelte-heros-v2'
 
   interface Props {
     selectedLoras: string[]
@@ -13,6 +16,15 @@
   let availableLoras: string[] = $state([])
   let loading = $state(true)
   let error = $state('')
+  let isModalOpen = $state(false)
+
+  // Convert selectedLoras array to LoraData objects with weights
+  let loraDataList = $derived.by(() => {
+    return selectedLoras.map((name) => ({
+      name,
+      weight: loraWeight
+    }))
+  })
 
   async function fetchLoras() {
     try {
@@ -36,20 +48,28 @@
     }
   }
 
-  function handleLoraToggle(lora: string, checked: boolean) {
-    let newSelectedLoras: string[]
+  function handleLoraAdd(lora: string) {
+    const newSelectedLoras = [...selectedLoras, lora]
+    onLoraChange(newSelectedLoras)
+    isModalOpen = false
+  }
 
-    if (checked) {
-      newSelectedLoras = [...selectedLoras, lora]
-    } else {
-      newSelectedLoras = selectedLoras.filter((l) => l !== lora)
-    }
-
+  function handleLoraRemove(loraName: string) {
+    const newSelectedLoras = selectedLoras.filter((l) => l !== loraName)
     onLoraChange(newSelectedLoras)
   }
 
-  function handleWeightChange(weight: number) {
+  function handleLoraWeightChange(loraName: string, weight: number) {
+    // For now, all LoRAs share the same weight, so update the global weight
     onWeightChange(weight)
+  }
+
+  function openModal() {
+    isModalOpen = true
+  }
+
+  function closeModal() {
+    isModalOpen = false
   }
 
   onMount(() => {
@@ -67,65 +87,73 @@
     <button onclick={fetchLoras} class="mt-1 text-xs text-blue-600 hover:text-blue-800">
       Retry
     </button>
-  {:else if availableLoras.length === 0}
-    <div class="text-sm text-gray-500">No LoRA models found</div>
   {:else}
-    <div class="lora-list max-h-24 space-y-1 overflow-y-auto">
-      {#each availableLoras as lora (lora)}
-        <label class="flex items-center space-x-2 text-xs">
-          <input
-            type="checkbox"
-            checked={selectedLoras.includes(lora)}
-            onchange={(e) => handleLoraToggle(lora, (e.target as HTMLInputElement).checked)}
-            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-          />
-          <span class="truncate" title={lora}>{lora}</span>
-        </label>
-      {/each}
+    <!-- Selected LoRAs display area -->
+    <div
+      class="lora-display-area max-h-24 min-h-[6rem] w-full overflow-y-auto rounded-lg border border-gray-300 bg-white p-2"
+    >
+      {#if loraDataList.length > 0}
+        <div class="flex flex-wrap gap-1">
+          {#each loraDataList as loraData, index (loraData.name)}
+            <LoraItem
+              bind:lora={loraDataList[index]}
+              onRemove={handleLoraRemove}
+              onWeightChange={handleLoraWeightChange}
+            />
+          {/each}
+        </div>
+      {/if}
+    </div>
+
+    <!-- Add LoRA button -->
+    <div class="mt-2 flex items-center justify-between">
+      <button
+        type="button"
+        onclick={openModal}
+        class="flex items-center gap-1 rounded-lg border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-600 hover:bg-green-100 focus:ring-2 focus:ring-green-500 focus:outline-none"
+        disabled={availableLoras.length === 0}
+      >
+        <Plus class="h-3 w-3" />
+        Add LoRA
+      </button>
+
+      <div class="text-xs text-gray-600">
+        {selectedLoras.length} selected
+      </div>
     </div>
   {/if}
-
-  <div class="mt-2 flex items-center gap-3">
-    <div class="text-xs text-gray-600">
-      Selected: {selectedLoras.length} LoRA{selectedLoras.length !== 1 ? 's' : ''}
-    </div>
-    <div class="flex items-center gap-1">
-      <label for="lora-weight" class="text-xs text-gray-600">Weight:</label>
-      <input
-        id="lora-weight"
-        type="number"
-        min="0"
-        max="2"
-        step="0.1"
-        value={loraWeight}
-        onchange={(e) => handleWeightChange(parseFloat((e.target as HTMLInputElement).value))}
-        class="w-16 rounded border border-gray-300 bg-white px-1 py-0.5 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-      />
-    </div>
-  </div>
 </div>
 
+<!-- LoRA Selection Modal -->
+<LoraSelectionModal
+  isOpen={isModalOpen}
+  {availableLoras}
+  {selectedLoras}
+  onClose={closeModal}
+  onLoraSelect={handleLoraAdd}
+/>
+
 <style>
-  .lora-list {
+  .lora-display-area {
     scrollbar-width: thin;
     scrollbar-color: #cbd5e0 #f7fafc;
   }
 
-  .lora-list::-webkit-scrollbar {
+  .lora-display-area::-webkit-scrollbar {
     width: 6px;
   }
 
-  .lora-list::-webkit-scrollbar-track {
+  .lora-display-area::-webkit-scrollbar-track {
     background: #f7fafc;
     border-radius: 3px;
   }
 
-  .lora-list::-webkit-scrollbar-thumb {
+  .lora-display-area::-webkit-scrollbar-thumb {
     background: #cbd5e0;
     border-radius: 3px;
   }
 
-  .lora-list::-webkit-scrollbar-thumb:hover {
+  .lora-display-area::-webkit-scrollbar-thumb:hover {
     background: #a0aec0;
   }
 </style>
