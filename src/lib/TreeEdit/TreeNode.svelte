@@ -214,6 +214,82 @@
     const parentName = node.name
     return !!testModeStore[parentName]?.overrideTag
   }
+
+  function handleTabFromNameEditor() {
+    const n = model.nodes[id]
+    if (!n) return
+    
+    if (n.kind === 'leaf') {
+      // Move from name to value editor on leaves
+      valueEditorRef?.activate()
+    } else if (n.kind === 'array' && autoEditName) {
+      const children = (n as ArrayNode).children
+      if (children && children.length > 0) {
+        const firstChildId = children[0]
+        // Request auto-editing on first child and select it
+        setAutoEditChildId?.(firstChildId)
+        onSelect(firstChildId)
+      }
+    }
+  }
+
+  function handleRowKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      // Handle before children so InlineEditor doesn't start editing
+      e.preventDefault()
+      // Only act when not already editing
+      if (!isNameEditing && !isValueEditing) {
+        const n = model.nodes[id]
+        if (n && n.kind === 'leaf') {
+          addSiblingAfterCurrentLeaf()
+          return
+        }
+        onSelect(id)
+        return
+      }
+    } else if (e.key === ' ') {
+      e.preventDefault()
+      onSelect(id)
+    }
+  }
+
+  function handleRowFocusIn() {
+    // Only sync selection when focus is moved via Tab navigation,
+    // not when focusing due to mouse or programmatic focus.
+    if (tabbingActive) {
+      onSelect(id, shiftTabActive)
+    }
+  }
+
+  function handleRowClick(e: MouseEvent) {
+    e.stopPropagation()
+    onSelect(id, e.shiftKey)
+  }
+
+  function handleToggleClick(e: MouseEvent) {
+    e.stopPropagation()
+    onToggle()
+  }
+
+  function handleNameSave(newValue: string) {
+    renameNode(model, id, newValue)
+    onMutate()
+  }
+
+  function handleValueSave(newValue: string) {
+    setLeafValue(model, id, newValue)
+    onMutate()
+  }
+
+  function handleNameFinish() {
+    onSelect(id)
+    rowEl?.focus()
+  }
+
+  function handleValueFinish() {
+    onSelect(id)
+    rowEl?.focus()
+  }
 </script>
 
 {#if get(id)}
@@ -243,49 +319,19 @@
         aria-grabbed={isDragging}
         aria-selected="false"
         tabindex="0"
-        onfocusin={() => {
-          // Only sync selection when focus is moved via Tab navigation,
-          // not when focusing due to mouse or programmatic focus.
-          if (tabbingActive) {
-            onSelect(id, shiftTabActive)
-          }
-        }}
-        onclick={(e) => {
-          e.stopPropagation()
-          onSelect(id, e.shiftKey)
-        }}
-        onkeydown={(e) => {
-          if (e.key === 'Enter') {
-            // Handle before children so InlineEditor doesn't start editing
-            e.preventDefault()
-            // Only act when not already editing
-            if (!isNameEditing && !isValueEditing) {
-              const n = model.nodes[id]
-              if (n && n.kind === 'leaf') {
-                addSiblingAfterCurrentLeaf()
-                return
-              }
-              onSelect(id)
-              return
-            }
-          } else if (e.key === ' ') {
-            e.preventDefault()
-            onSelect(id)
-          }
-        }}
+        onfocusin={handleRowFocusIn}
+        onclick={handleRowClick}
+        onkeydown={handleRowKeydown}
       >
         {#if parentKind !== 'array'}
           <div
             class="node-header"
-            class:array-type={n.kind === 'array'}
+            class:array-type={n.kind === 'array' || n.kind === 'object'}
             class:consistent-array={n.kind === 'array' && isConsistentRandomNode()}
           >
             <button
               class="toggle"
-              onclick={(e) => {
-                e.stopPropagation()
-                onToggle()
-              }}
+              onclick={handleToggleClick}
             >
               {#if isContainer(n) && (n as ObjectNode | ArrayNode).children.length > 0}
                 {#if n.collapsed}
@@ -297,32 +343,13 @@
             </button>
             <InlineEditor
               value={n.name}
-              onSave={(newValue) => {
-                renameNode(model, id, newValue)
-                onMutate()
-              }}
-              onTab={() => {
-                if (n.kind === 'leaf') {
-                  // Move from name to value editor on leaves
-                  valueEditorRef?.activate()
-                } else if (n.kind === 'array' && autoEditName) {
-                  const children = (n as ArrayNode).children
-                  if (children && children.length > 0) {
-                    const firstChildId = children[0]
-                    // Request auto-editing on first child and select it
-                    setAutoEditChildId?.(firstChildId)
-                    onSelect(firstChildId)
-                  }
-                }
-              }}
+              onSave={handleNameSave}
+              onTab={handleTabFromNameEditor}
               className="name-editor"
               {model}
               bind:this={nameEditorRef}
               onEditingChange={(editing) => (isNameEditing = editing)}
-              onFinish={() => {
-                onSelect(id)
-                rowEl?.focus()
-              }}
+              onFinish={handleNameFinish}
               expandOnEdit={true}
               enterStartsEditing={n.kind !== 'leaf'}
             />
@@ -340,20 +367,14 @@
           <div class="value-wrapper" class:editing={isValueEditing}>
             <InlineEditor
               value={String((n as LeafNode).value ?? '')}
-              onSave={(newValue) => {
-                setLeafValue(model, id, newValue)
-                onMutate()
-              }}
+              onSave={handleValueSave}
               enableAutocomplete={true}
               className="value-editor"
               placeholder="Enter value"
               onEditingChange={(editing) => (isValueEditing = editing)}
               {model}
               bind:this={valueEditorRef}
-              onFinish={() => {
-                onSelect(id)
-                rowEl?.focus()
-              }}
+              onFinish={handleValueFinish}
               enterStartsEditing={false}
               {onChipDoubleClick}
             />
