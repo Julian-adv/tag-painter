@@ -15,7 +15,7 @@
   }
 
   let {
-    lora = $bindable(),
+    lora,
     disabled = false,
     onRemove,
     onWeightChange
@@ -38,9 +38,6 @@
 
     // Round to 1 decimal place
     const roundedWeight = Math.round(newWeight * 10) / 10
-
-    // Update the lora weight
-    lora.weight = roundedWeight
 
     // Notify parent of weight change
     onWeightChange(lora.name, roundedWeight)

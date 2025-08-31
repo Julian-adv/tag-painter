@@ -17,7 +17,6 @@ import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow } from '$lib/
 export interface GenerationOptions {
   promptsData: PromptsData
   settings: Settings
-  selectedLoras: string[]
   seed: number | null
   maskFilePath: string | null
   currentImagePath: string | null
@@ -49,7 +48,6 @@ export async function generateImage(options: GenerationOptions): Promise<{
   const {
     promptsData,
     settings,
-    selectedLoras,
     seed,
     maskFilePath,
     currentImagePath,
@@ -187,8 +185,8 @@ export async function generateImage(options: GenerationOptions): Promise<{
       workflow['86'].inputs.image = maskImagePath
     }
 
-    // Configure LoRA chain
-    generateLoraChain(selectedLoras, workflow, promptsData.loraWeight)
+    // Configure LoRA chain with individual weights
+    generateLoraChain(promptsData.selectedLoras, workflow)
 
     // Configure workflow based on settings
     configureWorkflow(workflow, promptsData, settings, isInpainting, inpaintDenoiseStrength)

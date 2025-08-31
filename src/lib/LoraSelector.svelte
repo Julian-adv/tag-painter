@@ -4,27 +4,24 @@
   import LoraSelectionModal from './LoraSelectionModal.svelte'
   import { Plus } from 'svelte-heros-v2'
 
-  interface Props {
-    selectedLoras: string[]
-    onLoraChange: (loras: string[]) => void
-    loraWeight: number
-    onWeightChange: (weight: number) => void
+  interface LoraWithWeight {
+    name: string
+    weight: number
   }
 
-  let { selectedLoras, onLoraChange, loraWeight, onWeightChange }: Props = $props()
+  interface Props {
+    selectedLoras: LoraWithWeight[]
+    onLoraChange: (loras: LoraWithWeight[]) => void
+  }
+
+  let { selectedLoras, onLoraChange }: Props = $props()
 
   let availableLoras: string[] = $state([])
   let loading = $state(true)
   let error = $state('')
   let isModalOpen = $state(false)
 
-  // Convert selectedLoras array to LoraData objects with weights
-  let loraDataList = $derived.by(() => {
-    return selectedLoras.map((name) => ({
-      name,
-      weight: loraWeight
-    }))
-  })
+  // selectedLoras already contains LoraWithWeight objects
 
   async function fetchLoras() {
     try {
@@ -49,19 +46,21 @@
   }
 
   function handleLoraAdd(lora: string) {
-    const newSelectedLoras = [...selectedLoras, lora]
+    const newSelectedLoras = [...selectedLoras, { name: lora, weight: 1.0 }]
     onLoraChange(newSelectedLoras)
     isModalOpen = false
   }
 
   function handleLoraRemove(loraName: string) {
-    const newSelectedLoras = selectedLoras.filter((l) => l !== loraName)
+    const newSelectedLoras = selectedLoras.filter((l) => l.name !== loraName)
     onLoraChange(newSelectedLoras)
   }
 
   function handleLoraWeightChange(loraName: string, weight: number) {
-    // For now, all LoRAs share the same weight, so update the global weight
-    onWeightChange(weight)
+    const newSelectedLoras = selectedLoras.map((l) => 
+      l.name === loraName ? { ...l, weight } : l
+    )
+    onLoraChange(newSelectedLoras)
   }
 
   function openModal() {
@@ -92,11 +91,11 @@
     <div
       class="lora-display-area max-h-24 min-h-[6rem] w-full overflow-y-auto rounded-lg border border-gray-300 bg-white p-2"
     >
-      {#if loraDataList.length > 0}
+      {#if selectedLoras.length > 0}
         <div class="flex flex-wrap gap-1">
-          {#each loraDataList as loraData, index (loraData.name)}
+          {#each selectedLoras as lora (lora.name)}
             <LoraItem
-              bind:lora={loraDataList[index]}
+              lora={lora}
               onRemove={handleLoraRemove}
               onWeightChange={handleLoraWeightChange}
             />
@@ -128,7 +127,7 @@
 <LoraSelectionModal
   isOpen={isModalOpen}
   {availableLoras}
-  {selectedLoras}
+  selectedLoras={selectedLoras.map(l => l.name)}
   onClose={closeModal}
   onLoraSelect={handleLoraAdd}
 />

@@ -19,8 +19,7 @@
     updateCheckpoint,
     updateUpscale,
     updateFaceDetailer,
-    updateSelectedLoras,
-    updateLoraWeight
+    updateSelectedLoras
   } from './stores/promptsStore'
 
   // Component state
@@ -126,7 +125,6 @@
     const result = await generateImage({
       promptsData: currentPromptsData!,
       settings,
-      selectedLoras: currentPromptsData!.selectedLoras,
       seed: seedToUse,
       maskFilePath,
       currentImagePath: currentImageFileName,
@@ -223,7 +221,6 @@
     const result = await generateImage({
       promptsData: currentPromptsData!,
       settings,
-      selectedLoras: currentPromptsData!.selectedLoras,
       seed: null,
       maskFilePath,
       currentImagePath: currentImageFileName,
@@ -318,12 +315,8 @@
   }
 
   // PromptForm functions
-  function handleLoraChange(loras: string[]) {
+  function handleLoraChange(loras: { name: string; weight: number }[]) {
     updateSelectedLoras(loras)
-  }
-
-  function handleLoraWeightChange(weight: number) {
-    updateLoraWeight(weight)
   }
 
   // Cleanup
@@ -366,8 +359,6 @@
           <LoraSelector
             selectedLoras={$promptsData.selectedLoras}
             onLoraChange={handleLoraChange}
-            loraWeight={$promptsData.loraWeight}
-            onWeightChange={handleLoraWeightChange}
           />
         </div>
 

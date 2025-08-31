@@ -63,8 +63,7 @@ export interface PromptsData {
   selectedComposition: string
   useUpscale: boolean
   useFaceDetailer: boolean
-  selectedLoras: string[]
-  loraWeight: number
+  selectedLoras: { name: string; weight: number }[]
 }
 
 export interface ProgressData {

@@ -13,8 +13,7 @@ const defaultPromptsData: PromptsData = {
   selectedComposition: 'left-horizontal',
   useUpscale: false,
   useFaceDetailer: false,
-  selectedLoras: [],
-  loraWeight: 0.8
+  selectedLoras: []
 }
 
 // Create reactive store
@@ -114,12 +113,8 @@ export function updateFaceDetailer(enabled: boolean) {
   promptsData.update((data) => ({ ...data, useFaceDetailer: enabled }))
 }
 
-export function updateSelectedLoras(loras: string[]) {
+export function updateSelectedLoras(loras: { name: string; weight: number }[]) {
   promptsData.update((data) => ({ ...data, selectedLoras: loras }))
-}
-
-export function updateLoraWeight(weight: number) {
-  promptsData.update((data) => ({ ...data, loraWeight: weight }))
 }
 
 export function updateTags(
