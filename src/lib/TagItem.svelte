@@ -130,16 +130,15 @@
     role="button"
     tabindex="-1"
     aria-label="Drag to reorder tag: {tag.name}. Ctrl+Scroll to adjust weight. Right-click for options."
-    class="inline-flex items-center gap-1 {getTagClasses({
+    class="inline-block {getTagClasses({
       tag,
       dragged: draggedIndex === index,
       testSelected: isTestSelected,
       additionalClasses: 'py-0.5 pr-0.5 pl-1.5'
     })}"
   >
-    <button
-      type="button"
-      class="font-inherit flex cursor-pointer items-center border-none bg-transparent p-0 text-left text-inherit focus:outline-none"
+    <span
+      class="font-inherit inline cursor-pointer border-none bg-transparent p-0 text-left text-inherit focus:outline-none"
       tabindex="-1"
       ondblclick={handleTagDoubleClick}
       onkeydown={handleTagKeydown}
@@ -150,31 +149,27 @@
       aria-label={tag.type === 'regular'
         ? `Create custom tag from ${tag.name}`
         : `Edit custom tag ${tag.name}. Right-click for options.`}
+      role="button"
     >
-      <span class="font-medium">{displayParts.name}</span>
-      {#if isTestSelected}
-        <LockClosed class="ml-1 h-3 w-3 flex-shrink-0 text-white" />
-      {:else if isForceOverridden}
-        <LockClosed class="ml-1 h-3 w-3 flex-shrink-0 text-orange-500" />
-      {/if}
-      {#if displayParts.content}
-        <span class="mx-1 self-stretch border-l border-dashed border-gray-400"></span>
-        <span class="text-gray-600">{displayParts.content}</span>
-      {/if}
-      {#if displayParts.weight}
-        <span class="mx-1 self-stretch border-l border-dashed border-gray-400"></span>
-        <span class="font-semibold text-blue-600">{displayParts.weight}</span>
-      {/if}
-    </button>
-    <button
-      type="button"
-      class={getTagRemoveButtonClasses(tag, isTestSelected)}
-      tabindex="-1"
-      onclick={() => onRemove(tag.name)}
-      aria-label="Remove {tag.name}"
-    >
-      <XMark class="h-3 w-3" />
-    </button>
+      <span class="font-medium px-1 -ml-1.5 -mt-0.5 rounded {tag.type === 'random' || tag.type === 'sequential' 
+        ? 'bg-purple-200' 
+        : tag.type === 'consistent-random' 
+          ? 'bg-orange-200' 
+          : 'bg-sky-200'}">{displayParts.name}</span>{#if isTestSelected}<LockClosed class="ml-1 h-3 w-3 inline-block text-white" />{:else if isForceOverridden}<LockClosed class="ml-1 h-3 w-3 inline-block text-orange-500" />{/if}<!--
+    --></span><!--
+    --><span class="float-right"><!--
+      -->{#if displayParts.content}<span class="text-gray-600">{displayParts.content}</span>{/if}<!--
+      -->{#if displayParts.weight}<span class="ml-1 font-semibold text-blue-600">{displayParts.weight}</span>{/if}<!--
+      --><button
+        type="button"
+        class="{getTagRemoveButtonClasses(tag, isTestSelected)} ml-1"
+        tabindex="-1"
+        onclick={() => onRemove(tag.name)}
+        aria-label="Remove {tag.name}"
+      >
+        <XMark class="h-3 w-3" />
+      </button><!--
+    --></span>
   </div>
 
   <!-- Drop indicator after this tag (for last position) -->
