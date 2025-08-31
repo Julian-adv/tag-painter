@@ -384,7 +384,7 @@
             {onSelect}
             {setAutoEditChildId}
             {onChipDoubleClick}
-            tabbingActive={tabbingActive}
+            {tabbingActive}
             {shiftTabActive}
           />
         {/each}

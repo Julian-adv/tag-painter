@@ -5,6 +5,8 @@
   import ActionButton from '../ActionButton.svelte'
   import { Plus, Trash, ChevronDown, ChevronRight, LockClosed } from 'svelte-heros-v2'
   import { addChild, isContainer, uid, removeNode, convertLeafToArray } from './model'
+  import { groupSelectedNodes, canGroupSelected } from './operations'
+  import { getParentOf } from './utils'
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
   import { isConsistentRandomArray, isLeafPinned } from './utils'
@@ -61,7 +63,7 @@
       // Range selection: find nodes between lastSelectedId and id with same parent
       const lastNode = model.nodes[lastSelectedId]
       const currentNode = model.nodes[id]
-      
+
       if (lastNode && currentNode && lastNode.parentId === currentNode.parentId) {
         const parentId = lastNode.parentId
         if (parentId) {
@@ -70,12 +72,12 @@
             const children = (parent as ObjectNode | ArrayNode).children
             const lastIndex = children.indexOf(lastSelectedId)
             const currentIndex = children.indexOf(id)
-            
+
             if (lastIndex !== -1 && currentIndex !== -1) {
               const start = Math.min(lastIndex, currentIndex)
               const end = Math.max(lastIndex, currentIndex)
               const rangeIds = children.slice(start, end + 1)
-              
+
               // Add range to selection (union with existing selection)
               const newSelection = [...new Set([...selectedIds, ...rangeIds])]
               selectedIds = newSelection
@@ -85,7 +87,7 @@
         }
       }
     }
-    
+
     // Regular single selection
     selectedIds = [id]
     lastSelectedId = id
@@ -210,7 +212,7 @@
   function deleteBySelection() {
     if (selectedIds.length === 0 || selectedIds.includes(model.rootId)) return
     // Delete all selected nodes (filter out root if somehow included)
-    const validIds = selectedIds.filter(id => id !== model.rootId)
+    const validIds = selectedIds.filter((id) => id !== model.rootId)
     for (const id of validIds) {
       removeNode(model, id)
     }
@@ -224,7 +226,7 @@
     const selectedId = selectedIds[0]
     const n = model.nodes[selectedId]
     if (!n || n.kind !== 'leaf') return false
-    const pid = getParentOf(selectedId)
+    const pid = getParentOf(model, selectedId)
     if (!pid) return false
     const p = model.nodes[pid]
     return !!p && p.kind === 'array'
@@ -235,7 +237,7 @@
     const selectedId = selectedIds[0]
     const n = model.nodes[selectedId]
     if (!n || n.kind !== 'leaf') return
-    const pid = getParentOf(selectedId)
+    const pid = getParentOf(model, selectedId)
     if (!pid) return
     const p = model.nodes[pid]
     if (!p || p.kind !== 'array') return
@@ -303,10 +305,6 @@
     }
   }
 
-  function getParentOf(nodeId: string): string | null {
-    return model.nodes[nodeId]?.parentId ?? null
-  }
-
   function isAddDisabled(): boolean {
     if (selectedIds.length === 0) return false
     if (selectedIds.length > 1) return true // Disable add for multiple selection
@@ -314,107 +312,26 @@
     const sel = model.nodes[selectedId]
     if (!sel) return false
     if (sel.kind === 'ref') return true
-    const pid = getParentOf(selectedId)
+    const pid = getParentOf(model, selectedId)
     if (!pid) return false
     const p = model.nodes[pid]
     return !!p && p.kind === 'array'
   }
 
-  function canGroupSelected(): boolean {
-    if (selectedIds.length === 0) return false
-    // All selected must be leaves with the same array parent
-    let parentId: string | null = null
-    for (const id of selectedIds) {
-      const n = model.nodes[id]
-      if (!n || n.kind !== 'leaf') return false
-      const pid = getParentOf(id)
-      if (!pid) return false
-      const p = model.nodes[pid]
-      if (!p || p.kind !== 'array') return false
-      if (parentId === null) parentId = pid
-      else if (parentId !== pid) return false
-    }
-    return true
-  }
-
   function groupSelected() {
-    if (!canGroupSelected()) return
-    const anyId = selectedIds[0]
-    const parentId = getParentOf(anyId)!
-    const parent = model.nodes[parentId] as ArrayNode
-
-    const selectedSet = new Set(selectedIds)
-    const picked: string[] = []
-    const tempParents: ArrayNode[] = []
-
-    // Walk original order, create a temp_parent per unselected child
-    let tempCounter = 0
-    for (const cid of parent.children) {
-      if (selectedSet.has(cid)) {
-        picked.push(cid)
-      } else {
-        const tempArrId = uid()
-        const tempArr: ArrayNode = {
-          id: tempArrId,
-          name: `temp_parent${++tempCounter}`,
-          kind: 'array',
-          parentId: parentId,
-          children: [],
-          collapsed: false
-        }
-        // Reparent this single child into its own temp array
-        const child = model.nodes[cid]
-        if (child) {
-          child.parentId = tempArrId
-          child.name = '0'
-          tempArr.children.push(cid)
-        }
-        tempParents.push(tempArr)
-      }
+    const result = groupSelectedNodes(model, selectedIds)
+    if (!result.success) {
+      console.warn('Group operation failed:', result.error)
+      return
     }
-
-    // Create the new group array for all picked children
-    const newArrId = uid()
-    const newArr: ArrayNode = {
-      id: newArrId,
-      name: 'new_parent',
-      kind: 'array',
-      parentId: parentId,
-      children: [],
-      collapsed: false
-    }
-    picked.forEach((cid, idx) => {
-      const c = model.nodes[cid]
-      if (!c) return
-      c.parentId = newArrId
-      c.name = String(idx)
-      newArr.children.push(cid)
-    })
-
-    // Replace the original array with an object node under the same id
-    const objectChildren: string[] = []
-    for (const t of tempParents) {
-      objectChildren.push(t.id)
-      model.nodes[t.id] = t
-    }
-    objectChildren.push(newArrId)
-
-    const newObject: ObjectNode = {
-      id: parent.id,
-      name: parent.name,
-      kind: 'object',
-      parentId: parent.parentId,
-      children: objectChildren,
-      collapsed: false
-    }
-    model.nodes[newArrId] = newArr
-    model.nodes[parent.id] = newObject
 
     hasUnsavedChanges = true
-    selectedIds = [newArrId]
-    lastSelectedId = newArrId
+    selectedIds = result.newGroupId ? [result.newGroupId] : []
+    lastSelectedId = result.newGroupId || null
     // Trigger inline name editing for the new group
-    autoEditChildId = newArrId
+    if (result.newGroupId) {
+      autoEditChildId = result.newGroupId
+    }
   }
 </script>
 
@@ -465,11 +382,11 @@
           isRootChild={true}
           autoEditChildId={autoEditChildId ?? newlyAddedRootChildId}
           onMutate={() => (hasUnsavedChanges = true)}
-          selectedIds={selectedIds}
+          {selectedIds}
           onSelect={selectNode}
           {setAutoEditChildId}
           onChipDoubleClick={selectByName}
-          tabbingActive={tabbingActive}
+          {tabbingActive}
           shiftTabActive={lastTabWasWithShift}
         />
       </div>
@@ -515,7 +432,11 @@
             : 'Pin this option'}
           disabled={!canPinSelected()}
         >
-          {selectedIds.length === 1 ? (isLeafPinned(model, selectedIds[0]) ? 'Unpin' : 'Pin') : 'Pin'}
+          {selectedIds.length === 1
+            ? isLeafPinned(model, selectedIds[0])
+              ? 'Unpin'
+              : 'Pin'
+            : 'Pin'}
         </ActionButton>
         <ActionButton
           onclick={expandAll}
@@ -540,7 +461,7 @@
           variant="blue"
           size="md"
           title="Group selected leaves"
-          disabled={!canGroupSelected()}
+          disabled={!canGroupSelected(model, selectedIds)}
         >
           Group
         </ActionButton>

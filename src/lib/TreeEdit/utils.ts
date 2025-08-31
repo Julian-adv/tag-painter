@@ -35,3 +35,7 @@ export function findNodeByName(model: TreeModel, name: string): AnyNode | undefi
   }
   return undefined
 }
+
+export function getParentOf(model: TreeModel, nodeId: string): string | null {
+  return model.nodes[nodeId]?.parentId ?? null
+}

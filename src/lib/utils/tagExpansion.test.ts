@@ -27,9 +27,27 @@ describe('tagExpansion utilities', () => {
         children: ['hair-1', 'hair-2', 'hair-3'],
         collapsed: false
       },
-      'hair-1': { id: 'hair-1', name: '0', kind: 'leaf', parentId: 'hair-color', value: 'blonde hair' },
-      'hair-2': { id: 'hair-2', name: '1', kind: 'leaf', parentId: 'hair-color', value: 'brown hair' },
-      'hair-3': { id: 'hair-3', name: '2', kind: 'leaf', parentId: 'hair-color', value: 'black hair' },
+      'hair-1': {
+        id: 'hair-1',
+        name: '0',
+        kind: 'leaf',
+        parentId: 'hair-color',
+        value: 'blonde hair'
+      },
+      'hair-2': {
+        id: 'hair-2',
+        name: '1',
+        kind: 'leaf',
+        parentId: 'hair-color',
+        value: 'brown hair'
+      },
+      'hair-3': {
+        id: 'hair-3',
+        name: '2',
+        kind: 'leaf',
+        parentId: 'hair-color',
+        value: 'black hair'
+      },
       'eye-color': {
         id: 'eye-color',
         name: 'eye-color',
@@ -38,7 +56,13 @@ describe('tagExpansion utilities', () => {
         children: ['eye-marker', 'eye-1', 'eye-2', 'eye-3'],
         collapsed: false
       },
-      'eye-marker': { id: 'eye-marker', name: '0', kind: 'leaf', parentId: 'eye-color', value: '__CONSISTENT_RANDOM_MARKER__' },
+      'eye-marker': {
+        id: 'eye-marker',
+        name: '0',
+        kind: 'leaf',
+        parentId: 'eye-color',
+        value: '__CONSISTENT_RANDOM_MARKER__'
+      },
       'eye-1': { id: 'eye-1', name: '1', kind: 'leaf', parentId: 'eye-color', value: 'blue eyes' },
       'eye-2': { id: 'eye-2', name: '2', kind: 'leaf', parentId: 'eye-color', value: 'green eyes' },
       'eye-3': { id: 'eye-3', name: '3', kind: 'leaf', parentId: 'eye-color', value: 'brown eyes' },
@@ -50,9 +74,27 @@ describe('tagExpansion utilities', () => {
         children: ['char-1', 'char-2', 'char-3'],
         collapsed: false
       },
-      'char-1': { id: 'char-1', name: '0', kind: 'leaf', parentId: 'character-base', value: '1girl' },
-      'char-2': { id: 'char-2', name: '1', kind: 'leaf', parentId: 'character-base', value: 'solo' },
-      'char-3': { id: 'char-3', name: '2', kind: 'leaf', parentId: 'character-base', value: 'looking at viewer' }
+      'char-1': {
+        id: 'char-1',
+        name: '0',
+        kind: 'leaf',
+        parentId: 'character-base',
+        value: '1girl'
+      },
+      'char-2': {
+        id: 'char-2',
+        name: '1',
+        kind: 'leaf',
+        parentId: 'character-base',
+        value: 'solo'
+      },
+      'char-3': {
+        id: 'char-3',
+        name: '2',
+        kind: 'leaf',
+        parentId: 'character-base',
+        value: 'looking at viewer'
+      }
     },
     symbols: {
       'hair-color': 'hair-color',
@@ -133,13 +175,7 @@ describe('tagExpansion utilities', () => {
 
     it('should use previous zone random results during regen', () => {
       const previousResults = { 'hair-color': 'brown hair' }
-      const result = expandCustomTags(
-        ['hair-color'],
-        mockTreeModel,
-        new Set(),
-        {},
-        previousResults
-      )
+      const result = expandCustomTags(['hair-color'], mockTreeModel, new Set(), {}, previousResults)
 
       expect(result.expandedTags).toEqual(['brown hair'])
       expect(result.randomTagResolutions['hair-color']).toBe('brown hair')

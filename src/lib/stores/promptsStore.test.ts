@@ -273,13 +273,15 @@ describe('promptsStore', () => {
     })
 
     it('should update selected loras', () => {
-      const loras = [{ name: 'lora1', weight: 0.8 }, { name: 'lora2', weight: 1.2 }]
+      const loras = [
+        { name: 'lora1', weight: 0.8 },
+        { name: 'lora2', weight: 1.2 }
+      ]
       updateSelectedLoras(loras)
 
       const storeData = get(promptsData)
       expect(storeData.selectedLoras).toEqual(loras)
     })
-
   })
 
   describe('tags management', () => {
