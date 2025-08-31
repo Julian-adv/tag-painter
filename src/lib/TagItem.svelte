@@ -86,6 +86,34 @@
     onRightClick(event, index)
   }
 
+  function getNameBackgroundClass(tag: CustomTag): string {
+    if (isTestSelected) {
+      // Test mode - darker versions of main colors
+      switch (tag.type) {
+        case 'random':
+        case 'sequential':
+          return 'bg-purple-700'
+        case 'consistent-random':
+          return 'bg-orange-700'
+        case 'regular':
+        default:
+          return 'bg-sky-700'
+      }
+    }
+
+    // Normal mode - slightly darker than tag background
+    switch (tag.type) {
+      case 'random':
+      case 'sequential':
+        return 'bg-purple-200'
+      case 'consistent-random':
+        return 'bg-orange-200'
+      case 'regular':
+      default:
+        return 'bg-sky-200'
+    }
+  }
+
   let displayParts = $derived.by(() => {
     const weight = tag.weight ?? 1.0
 
@@ -130,13 +158,20 @@
     role="button"
     tabindex="-1"
     aria-label="Drag to reorder tag: {tag.name}. Ctrl+Scroll to adjust weight. Right-click for options."
-    class="inline-block {getTagClasses({
+    class="relative inline-block max-w-full {getTagClasses({
       tag,
       dragged: draggedIndex === index,
       testSelected: isTestSelected,
-      additionalClasses: 'py-0.5 pr-0.5 pl-1.5'
+      additionalClasses: 'py-0.5 pr-1 pl-1.5'
     })}"
   >
+    <!-- Label pinned to top-left corner of the chip -->
+    <span
+      class="pointer-events-none font-medium {getNameBackgroundClass(
+        tag
+      )} absolute top-0 left-0 z-10 rounded-none rounded-tl rounded-bl px-1 pt-0 pb-1"
+      >{displayParts.name}</span
+    >
     <span
       class="font-inherit inline cursor-pointer border-none bg-transparent p-0 text-left text-inherit focus:outline-none"
       tabindex="-1"
@@ -151,25 +186,34 @@
         : `Edit custom tag ${tag.name}. Right-click for options.`}
       role="button"
     >
-      <span class="font-medium px-1 -ml-1.5 -mt-0.5 rounded {tag.type === 'random' || tag.type === 'sequential' 
-        ? 'bg-purple-200' 
-        : tag.type === 'consistent-random' 
-          ? 'bg-orange-200' 
-          : 'bg-sky-200'}">{displayParts.name}</span>{#if isTestSelected}<LockClosed class="ml-1 h-3 w-3 inline-block text-white" />{:else if isForceOverridden}<LockClosed class="ml-1 h-3 w-3 inline-block text-orange-500" />{/if}<!--
-    --></span><!--
-    --><span class="float-right"><!--
-      -->{#if displayParts.content}<span class="text-gray-600">{displayParts.content}</span>{/if}<!--
-      -->{#if displayParts.weight}<span class="ml-1 font-semibold text-blue-600">{displayParts.weight}</span>{/if}<!--
-      --><button
+      <div class="inline-block">
+        <span class="invisible px-1 font-medium">{displayParts.name}</span
+        >{#if isTestSelected}<LockClosed
+            class="ml-1 inline-block h-3 w-3 text-white"
+          />{:else if isForceOverridden}<LockClosed
+            class="ml-1 inline-block h-3 w-3 text-orange-500"
+          />{/if}<!--
+        -->{#if displayParts.content}
+          <span class="text-gray-600">{displayParts.content}</span>{/if}
+      </div>
+      <!--
+    --></span
+    ><!--
+    -->
+    <div class="float-right mt-0.5 ml-0.5 flex items-center gap-0.5">
+      {#if displayParts.weight}
+        <span class="font-semibold text-blue-600">{displayParts.weight}</span>
+      {/if}
+      <button
         type="button"
-        class="{getTagRemoveButtonClasses(tag, isTestSelected)} ml-1"
+        class={getTagRemoveButtonClasses(tag, isTestSelected)}
         tabindex="-1"
         onclick={() => onRemove(tag.name)}
         aria-label="Remove {tag.name}"
       >
         <XMark class="h-3 w-3" />
-      </button><!--
-    --></span>
+      </button>
+    </div>
   </div>
 
   <!-- Drop indicator after this tag (for last position) -->
