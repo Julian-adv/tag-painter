@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { TreeModel } from './model'
   import ActionButton from '../ActionButton.svelte'
-  import { Plus, Trash, ChevronDown, ChevronRight, LockClosed } from 'svelte-heros-v2'
+  import { Plus, Trash, ChevronDown, ChevronRight, LockClosed, PencilSquare } from 'svelte-heros-v2'
   import { isLeafPinned } from './utils'
   import { canGroupSelected, expandAll, collapseAll } from './operations'
   import { getParentOf, isConsistentRandomArray } from './utils'
+  import { renameNode } from './model'
 
   let {
     model,
@@ -13,7 +14,10 @@
     togglePinSelected,
     groupSelected,
     addBySelection,
-    deleteBySelection
+    deleteBySelection,
+    onModelChanged,
+    setAutoEditChildId,
+    setRenameCallback
   }: {
     model: TreeModel
     selectedIds: string[]
@@ -22,7 +26,13 @@
     groupSelected: () => void
     addBySelection: () => void
     deleteBySelection: () => void
+    onModelChanged?: () => void
+    setAutoEditChildId?: (id: string | null) => void
+    setRenameCallback?: (nodeId: string | null, callback: ((newName: string) => void) | null) => void
   } = $props()
+
+  let editingNodeId: string | null = $state(null)
+  let originalName: string = $state('')
 
   function getSelectedNode() {
     return selectedIds.length === 1 ? model.nodes[selectedIds[0]] : null
@@ -60,6 +70,72 @@
     if (!pid) return false
     const p = model.nodes[pid]
     return !!p && p.kind === 'array'
+  }
+
+  function canRenameSelected(): boolean {
+    if (selectedIds.length !== 1) return false
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    return !!node && (node.kind === 'object' || node.kind === 'array')
+  }
+
+  function startRenaming() {
+    if (selectedIds.length !== 1) return
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    if (!node || (node.kind !== 'object' && node.kind !== 'array')) return
+    
+    originalName = node.name
+    editingNodeId = selectedId
+    setAutoEditChildId?.(selectedId)
+    setRenameCallback?.(selectedId, finishRenaming)
+  }
+
+  function finishRenaming(newName: string) {
+    if (!editingNodeId || !originalName || newName === originalName) {
+      editingNodeId = null
+      originalName = ''
+      setAutoEditChildId?.(null)
+      setRenameCallback?.(null, null)
+      return
+    }
+
+    // Rename the node itself
+    renameNode(model, editingNodeId, newName)
+
+    // Find all leaf nodes that reference the old name with __oldName__ pattern
+    // and replace with __newName__
+    replaceNameReferencesInLeaves(originalName, newName)
+
+    editingNodeId = null
+    originalName = ''
+    setAutoEditChildId?.(null)
+    setRenameCallback?.(null, null)
+    onModelChanged?.()
+  }
+
+  function cancelRenaming() {
+    editingNodeId = null
+    originalName = ''
+    setAutoEditChildId?.(null)
+    setRenameCallback?.(null, null)
+  }
+
+  function replaceNameReferencesInLeaves(oldName: string, newName: string) {
+    const oldPattern = `__${oldName}__`
+    const newPattern = `__${newName}__`
+    
+    for (const node of Object.values(model.nodes)) {
+      if (node.kind === 'leaf' && typeof node.value === 'string') {
+        if (node.value.includes(oldPattern)) {
+          node.value = node.value.replace(new RegExp(`__${escapeRegex(oldName)}__`, 'g'), newPattern)
+        }
+      }
+    }
+  }
+
+  function escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
 </script>
 
@@ -108,6 +184,16 @@
           ? 'Unpin'
           : 'Pin'
         : 'Pin'}
+    </ActionButton>
+    <ActionButton
+      onclick={startRenaming}
+      variant="gray"
+      size="md"
+      icon={PencilSquare}
+      title="Rename selected node"
+      disabled={!canRenameSelected()}
+    >
+      Rename
     </ActionButton>
     <ActionButton
       onclick={() => expandAll(model)}

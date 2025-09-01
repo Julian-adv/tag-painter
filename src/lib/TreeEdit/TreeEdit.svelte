@@ -30,6 +30,8 @@
   let tabbingActive: boolean = $state(false)
   // Track whether the last Tab press included Shift to enable range selection
   let lastTabWasWithShift: boolean = $state(false)
+  // Rename callback state
+  let renameCallbacks: Record<string, (newName: string) => void> = $state({})
 
   function loadYaml(text: string) {
     model = fromYAML(text)
@@ -288,6 +290,14 @@
       autoEditChildId = result.newGroupId
     }
   }
+
+  function setRenameCallback(nodeId: string | null, callback: ((newName: string) => void) | null) {
+    if (nodeId && callback) {
+      renameCallbacks[nodeId] = callback
+    } else if (nodeId) {
+      delete renameCallbacks[nodeId]
+    }
+  }
 </script>
 
 <div class="tree-root">
@@ -343,6 +353,7 @@
           onChipDoubleClick={selectByName}
           {tabbingActive}
           shiftTabActive={lastTabWasWithShift}
+          {renameCallbacks}
         />
       </div>
     </section>
@@ -355,6 +366,9 @@
       {groupSelected}
       {addBySelection}
       {deleteBySelection}
+      onModelChanged={() => (hasUnsavedChanges = true)}
+      {setAutoEditChildId}
+      {setRenameCallback}
     />
   </div>
 </div>

@@ -20,7 +20,8 @@
     setAutoEditChildId,
     onChipDoubleClick,
     tabbingActive = false,
-    shiftTabActive = false
+    shiftTabActive = false,
+    renameCallbacks = {}
   }: {
     model: TreeModel
     id: string
@@ -35,6 +36,7 @@
     onChipDoubleClick?: (tagName: string) => void
     tabbingActive?: boolean
     shiftTabActive?: boolean
+    renameCallbacks?: Record<string, (newName: string) => void>
   } = $props()
 
   const get = (id: string) => model.nodes[id]
@@ -272,8 +274,14 @@
   }
 
   function handleNameSave(newValue: string) {
-    renameNode(model, id, newValue)
-    onMutate()
+    // Check if there's a rename callback for this node (from Rename button)
+    if (renameCallbacks[id]) {
+      renameCallbacks[id](newValue)
+    } else {
+      // Normal rename behavior
+      renameNode(model, id, newValue)
+      onMutate()
+    }
   }
 
   function handleValueSave(newValue: string) {
@@ -406,6 +414,7 @@
             {onChipDoubleClick}
             {tabbingActive}
             {shiftTabActive}
+            {renameCallbacks}
           />
         {/each}
       </div>
