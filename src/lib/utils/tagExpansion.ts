@@ -5,7 +5,7 @@
 import type { AnyNode, TreeModel } from '$lib/TreeEdit/model'
 import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
-import { findNodeByName } from '$lib/TreeEdit/utils'
+import { findNodeByName, getTopLevelAncestorName } from '$lib/TreeEdit/utils'
 
 /**
  * Generate a cryptographically secure random number for better randomness
@@ -135,16 +135,62 @@ export function expandCustomTags(
     return [node.name]
   }
 
+  // Returns true if targetId is within the subtree of ancestorId
+  function isDescendantOf(m: TreeModel, ancestorId: string, targetId: string): boolean {
+    // Walk up from target to root and see if we hit ancestorId
+    let cur = m.nodes[targetId]
+    while (cur && cur.parentId) {
+      if (cur.parentId === ancestorId) return true
+      cur = m.nodes[cur.parentId]
+    }
+    return false
+  }
+
+  // Return the string value of a leaf by id; empty string if not a leaf or missing
+  function getLeafValueById(m: TreeModel, leafId: string): string {
+    const n = m.nodes[leafId]
+    if (n && n.kind === 'leaf') {
+      return String(n.value)
+    }
+    return ''
+  }
+
   function expandRandomArrayTag(
     tag: string,
     m: TreeModel
   ): { expandedTags: string[]; resolution: string } {
     // Check overrides or previous results
     let selected: string | null = null
-    const overrideTag = testModeStore[tag]?.overrideTag
-    if (overrideTag) {
-      selected = overrideTag
-    } else if (previousRunResults[tag]) {
+
+    // Try override by exact tag name first
+    const byExact = testModeStore[tag]
+    if (byExact && byExact.overrideTag) {
+      selected = byExact.overrideTag
+    }
+
+    // Try override/pin by top-level ancestor name used by TreeEdit pinning
+    if (!selected) {
+      const node = findNodeByName(m, tag)
+      if (node) {
+        const topName = getTopLevelAncestorName(m, node.id)
+        if (topName) {
+          const topStore = testModeStore[topName]
+          if (topStore) {
+            if (topStore.overrideTag) {
+              selected = topStore.overrideTag
+            } else if (topStore.pinnedLeafId && node.kind === 'array') {
+              // If pinned leaf belongs to this array's subtree, force-select it
+              const pinnedId = topStore.pinnedLeafId
+              if (isDescendantOf(m, node.id, pinnedId)) {
+                selected = getLeafValueById(m, pinnedId)
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (!selected && previousRunResults[tag]) {
       const previousResult = previousRunResults[tag]
       const previousTags = previousResult.split(', ')
       return { expandedTags: previousTags, resolution: previousResult }
@@ -162,7 +208,9 @@ export function expandCustomTags(
     if (children.length > 0) {
       const first = m.nodes[children[0]]
       if (first && first.kind === 'leaf' && typeof first.value === 'string') {
-        if (first.value === CONSISTENT_RANDOM_MARKER) {
+        // Back-compat: accept legacy marker value as well as the constant
+        const v = String(first.value)
+        if (v === CONSISTENT_RANDOM_MARKER || v === '__CONSISTENT_RANDOM_MARKER__') {
           isConsistent = true
           startIndex = 1
         }
@@ -204,6 +252,24 @@ export function expandCustomTags(
     tag: string,
     m: TreeModel
   ): { expandedTags: string[]; resolution: string } {
+    // Honor explicit override/pin from test mode first
+    const s = testModeStore[tag]
+    if (s && s.overrideTag) {
+      return { expandedTags: [s.overrideTag], resolution: s.overrideTag }
+    }
+
+    // If a pinned leaf id exists for this top-level object, and it is within this object's subtree,
+    // resolve directly to that leaf value.
+    if (s && s.pinnedLeafId) {
+      const objNode = findNodeByName(m, tag)
+      if (objNode && objNode.kind === 'object') {
+        if (isDescendantOf(m, objNode.id, s.pinnedLeafId)) {
+          const val = getLeafValueById(m, s.pinnedLeafId)
+          if (val) return { expandedTags: [val], resolution: val }
+        }
+      }
+    }
+
     // Try previous run resolution for this object tag
     if (previousRunResults[tag]) {
       const previousResult = previousRunResults[tag]
