@@ -12,6 +12,8 @@
     readonly?: boolean
     onValueChange?: (value: string) => void
     onkeydown?: (event: KeyboardEvent) => void
+    specialSuggestions?: string[]
+    specialTriggerPrefix?: string
   }
 
   let {
@@ -21,7 +23,9 @@
     class: className = '',
     readonly = false,
     onValueChange,
-    onkeydown
+    onkeydown,
+    specialSuggestions = [],
+    specialTriggerPrefix = '__'
   }: Props = $props()
 
   let textareaElement: HTMLTextAreaElement
@@ -31,6 +35,7 @@
   let suggestionPosition = $state({ top: 0, left: 0 })
   let mirrorDiv: HTMLDivElement | null = null
   let lastSelectedSuggestions: Map<string, string> = new Map()
+  let usingSpecialSuggestions = $state(false)
 
   onMount(async () => {
     await initTags()
@@ -77,6 +82,27 @@
     }
 
     const { word } = getCurrentWord()
+
+    // Special mode: when current token starts with the trigger (e.g., "__"),
+    // suggest from provided specialSuggestions using the token after the prefix.
+    if (specialTriggerPrefix && word.startsWith(specialTriggerPrefix)) {
+      usingSpecialSuggestions = true
+      const base = word.slice(specialTriggerPrefix.length)
+
+      const pool = Array.isArray(specialSuggestions) ? specialSuggestions : []
+      const lowered = base.toLowerCase()
+      const filtered = pool
+        .filter((name) => name && name.toLowerCase().includes(lowered))
+        .slice(0, 100)
+
+      suggestions = filtered
+      showSuggestions = suggestions.length > 0
+      selectedSuggestionIndex = -1
+      if (showSuggestions) updateSuggestionPosition()
+      return
+    } else {
+      usingSpecialSuggestions = false
+    }
 
     if (word.length < 2) {
       suggestions = []
@@ -173,13 +199,25 @@
       lastSelectedSuggestions.set(word.toLowerCase(), suggestion)
     }
 
-    value = beforeWord + suggestion + afterWord
+    // In special mode, keep the typed prefix and replace the rest with the suggestion,
+    // and also append a closing prefix (e.g., "__") if not already present.
+    const isSpecial = usingSpecialSuggestions && !!specialTriggerPrefix && word.startsWith(specialTriggerPrefix)
+    const hasClosing = isSpecial ? word.endsWith(specialTriggerPrefix) : false
+
+    if (isSpecial) {
+      const closing = hasClosing ? '' : specialTriggerPrefix
+      value = beforeWord + specialTriggerPrefix + suggestion + closing + afterWord
+    } else {
+      value = beforeWord + suggestion + afterWord
+    }
     showSuggestions = false
     onValueChange?.(value)
 
     // Set cursor position after the inserted suggestion
     setTimeout(() => {
-      const newCursorPosition = startIndex + suggestion.length
+      const addedPrefixLen = isSpecial ? specialTriggerPrefix.length : 0
+      const addedSuffixLen = isSpecial ? (hasClosing ? 0 : specialTriggerPrefix.length) : 0
+      const newCursorPosition = startIndex + addedPrefixLen + suggestion.length + addedSuffixLen
       textareaElement.setSelectionRange(newCursorPosition, newCursorPosition)
       textareaElement.focus()
     }, 0)

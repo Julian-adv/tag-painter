@@ -1,7 +1,7 @@
 <script lang="ts">
   import TreeNode from './TreeNode.svelte'
   import TreeEditControlPanel from './TreeEditControlPanel.svelte'
-  import type { TreeModel, LeafNode, ArrayNode, ObjectNode } from './model'
+  import type { TreeModel, LeafNode, ArrayNode, ObjectNode, AnyNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
   import { addChild, isContainer, uid, removeNode, convertLeafToArray } from './model'
   import { groupSelectedNodes } from './operations'
@@ -32,6 +32,24 @@
   let lastTabWasWithShift: boolean = $state(false)
   // Rename callback state
   let renameCallbacks: Record<string, (newName: string) => void> = $state({})
+  // Cached suggestions for "__" autocomplete: names of container nodes with children
+  let parentNameSuggestions: string[] = $state([])
+
+  function recomputeParentNameSuggestionsFromValues(values: AnyNode[]) {
+    const names = new Set<string>()
+    for (const n of values) {
+      if (isContainer(n) && n.children.length > 0) {
+        names.add(n.name)
+      }
+    }
+    parentNameSuggestions = Array.from(names)
+  }
+
+  // Derive suggestions whenever model structure changes
+  $effect(() => {
+    const values = Object.values(model.nodes)
+    recomputeParentNameSuggestionsFromValues(values)
+  })
 
   function loadYaml(text: string) {
     model = fromYAML(text)
@@ -354,6 +372,7 @@
           {tabbingActive}
           shiftTabActive={lastTabWasWithShift}
           {renameCallbacks}
+          parentNameSuggestions={parentNameSuggestions}
         />
       </div>
     </section>

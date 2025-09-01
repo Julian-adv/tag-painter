@@ -17,6 +17,8 @@
     onFinish?: (completed: boolean) => void
     model: TreeModel | null
     onChipDoubleClick?: (tagName: string) => void
+    specialSuggestions?: string[]
+    specialTrigger?: string
   }
 
   let {
@@ -31,7 +33,9 @@
     enterStartsEditing = true,
     onFinish,
     model = null,
-    onChipDoubleClick
+    onChipDoubleClick,
+    specialSuggestions = [],
+    specialTrigger = '__'
   }: Props = $props()
 
   let isEditing = $state(false)
@@ -130,6 +134,8 @@
         {placeholder}
         class={'inline-editor-input ' + className}
         onValueChange={(v) => (editingValue = v)}
+        specialSuggestions={specialSuggestions}
+        specialTriggerPrefix={specialTrigger}
         onkeydown={(event: KeyboardEvent) => {
           event.stopPropagation()
           if (event.key === 'Enter') {

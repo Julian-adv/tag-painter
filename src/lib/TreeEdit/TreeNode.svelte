@@ -21,7 +21,8 @@
     onChipDoubleClick,
     tabbingActive = false,
     shiftTabActive = false,
-    renameCallbacks = {}
+    renameCallbacks = {},
+    parentNameSuggestions = []
   }: {
     model: TreeModel
     id: string
@@ -37,6 +38,7 @@
     tabbingActive?: boolean
     shiftTabActive?: boolean
     renameCallbacks?: Record<string, (newName: string) => void>
+    parentNameSuggestions?: string[]
   } = $props()
 
   const get = (id: string) => model.nodes[id]
@@ -382,6 +384,7 @@
               value={String((n as LeafNode).value ?? '')}
               onSave={handleValueSave}
               enableAutocomplete={true}
+              specialSuggestions={parentNameSuggestions}
               className="value-editor"
               onEditingChange={(editing) => (isValueEditing = editing)}
               {model}
@@ -420,6 +423,7 @@
             {tabbingActive}
             {shiftTabActive}
             {renameCallbacks}
+            {parentNameSuggestions}
           />
         {/each}
       </div>
