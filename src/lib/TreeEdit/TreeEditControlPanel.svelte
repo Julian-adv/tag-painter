@@ -64,10 +64,15 @@
     const selectedId = selectedIds[0]
     const n = model.nodes[selectedId]
     if (!n || n.kind !== 'leaf') return false
-    const pid = getParentOf(model, selectedId)
-    if (!pid) return false
-    const p = model.nodes[pid]
-    return !!p && p.kind === 'array'
+    // Check if there exists any array ancestor
+    let pid = getParentOf(model, selectedId)
+    while (pid) {
+      const p = model.nodes[pid]
+      if (!p) break
+      if (p.kind === 'array') return true
+      pid = p.parentId
+    }
+    return false
   }
 
   function isAddDisabled(): boolean {

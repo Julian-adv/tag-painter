@@ -170,8 +170,8 @@
       class="pointer-events-none font-medium {getNameBackgroundClass(
         tag
       )} absolute top-0 left-0 z-10 rounded-tl rounded-bl px-1 pt-0.5 pb-0.5"
-      >{displayParts.name}</span
-    >
+      >{displayParts.name}
+    </span>
     <span
       class="font-inherit inline cursor-pointer border-none bg-transparent p-0 text-left text-inherit focus:outline-none"
       tabindex="-1"
@@ -189,9 +189,9 @@
       <div class="inline-block">
         <span class="invisible px-1 font-medium">{displayParts.name}</span>
         {#if isTestSelected}
-          <LockClosed class="ml-1 inline-block h-3 w-3 text-white" />
+          <LockClosed class="mb-1 -ml-2 inline-block h-3 w-3 text-white" />
         {:else if isForceOverridden}
-          <LockClosed class="ml-1 inline-block h-3 w-3 text-orange-500" />
+          <LockClosed class="mb-1 -ml-2 inline-block h-3 w-3 text-orange-500" />
         {/if}
         {#if displayParts.content}
           <span class="text-gray-600">{displayParts.content}</span>

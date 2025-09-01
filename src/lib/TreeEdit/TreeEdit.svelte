@@ -5,7 +5,7 @@
   import { fromYAML, toYAML } from './yaml-io'
   import { addChild, isContainer, uid, removeNode, convertLeafToArray, moveChild } from './model'
   import { groupSelectedNodes } from './operations'
-  import { getParentOf } from './utils'
+  import { getTopLevelAncestorName } from './utils'
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
   import { isConsistentRandomArray } from './utils'
@@ -240,22 +240,18 @@
     hasUnsavedChanges = true
   }
 
-
   function togglePinSelected() {
     if (selectedIds.length !== 1) return
     const selectedId = selectedIds[0]
     const n = model.nodes[selectedId]
     if (!n || n.kind !== 'leaf') return
-    const pid = getParentOf(model, selectedId)
-    if (!pid) return
-    const p = model.nodes[pid]
-    if (!p || p.kind !== 'array') return
-    const parentName = p.name
+    const parentName = getTopLevelAncestorName(model, selectedId)
+    if (!parentName) return
     const val = String(n.value ?? '')
-    if (testModeStore[parentName]?.overrideTag === val) {
+    if (testModeStore[parentName]?.pinnedLeafId === selectedId) {
       removeTestModeOverride(parentName)
     } else {
-      setTestModeOverride(parentName, val)
+      setTestModeOverride(parentName, val, selectedId)
     }
   }
 
@@ -291,7 +287,6 @@
       hasUnsavedChanges = true
     }
   }
-
 
   function groupSelected() {
     const result = groupSelectedNodes(model, selectedIds)
@@ -466,7 +461,7 @@
           {tabbingActive}
           shiftTabActive={lastTabWasWithShift}
           {renameCallbacks}
-          parentNameSuggestions={parentNameSuggestions}
+          {parentNameSuggestions}
         />
       </div>
     </section>

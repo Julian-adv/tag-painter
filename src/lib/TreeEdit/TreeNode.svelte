@@ -215,11 +215,12 @@
     onSelect(newId)
   }
 
-  function isArrayPinned(): boolean {
+  function isTopLevelPinned(): boolean {
     const node = model.nodes[id]
-    if (!node || node.kind !== 'array') return false
-    const parentName = node.name
-    return !!testModeStore[parentName]?.overrideTag
+    if (!node || (node.kind !== 'array' && node.kind !== 'object')) return false
+    if (node.parentId !== model.rootId) return false
+    const s = testModeStore[node.name]
+    return !!(s && s.enabled && s.overrideTag)
   }
 
   function handleTabFromNameEditor() {
@@ -371,7 +372,7 @@
               expandOnEdit={true}
               enterStartsEditing={n.kind !== 'leaf'}
             />
-            {#if n.kind === 'array' && isArrayPinned()}
+            {#if (n.kind === 'array' || n.kind === 'object') && isTopLevelPinned()}
               <span class="lock-icon"><LockClosed size="12" /></span>
             {/if}
           </div>

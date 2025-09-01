@@ -17,13 +17,31 @@ export function isConsistentRandomArray(model: TreeModel, id: NodeId): boolean {
 export function isLeafPinned(model: TreeModel, id: NodeId): boolean {
   const node = model.nodes[id]
   if (!node || node.kind !== 'leaf') return false
-  const pid = node.parentId
-  if (!pid) return false
-  const parent = model.nodes[pid]
-  if (!parent || parent.kind !== 'array') return false
-  const parentName = parent.name
+  const parentName = getTopLevelAncestorName(model, id)
+  if (!parentName) return false
+  const store = testModeStore[parentName]
+  if (!store || !store.enabled) return false
+  if (store.pinnedLeafId) {
+    return store.pinnedLeafId === id
+  }
   const val = String(node.value ?? '')
-  return testModeStore[parentName]?.overrideTag === val
+  return store.overrideTag === val
+}
+
+// Return the highest ancestor on the path that is a direct child of the root,
+// and return its name. If the starting node itself is a direct child of root,
+// returns that node's name. Otherwise null if no such ancestor is found.
+export function getTopLevelAncestorName(model: TreeModel, nodeId: string): string | null {
+  let current = model.nodes[nodeId]
+  while (current && current.parentId) {
+    const parent = model.nodes[current.parentId]
+    if (!parent) break
+    if (parent.id === model.rootId) {
+      return current.name
+    }
+    current = parent
+  }
+  return null
 }
 
 export function findNodeByName(model: TreeModel, name: string): AnyNode | undefined {
