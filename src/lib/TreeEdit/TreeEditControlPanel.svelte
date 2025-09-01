@@ -1,7 +1,16 @@
 <script lang="ts">
   import type { TreeModel } from './model'
   import ActionButton from '../ActionButton.svelte'
-  import { Plus, Trash, ChevronDown, ChevronRight, LockClosed, PencilSquare } from 'svelte-heros-v2'
+  import {
+    Plus,
+    Trash,
+    ChevronDown,
+    ChevronRight,
+    LockClosed,
+    PencilSquare,
+    DocumentDuplicate,
+    RectangleGroup
+  } from 'svelte-heros-v2'
   import { isLeafPinned } from './utils'
   import { canGroupSelected, expandAll, collapseAll } from './operations'
   import { getParentOf, isConsistentRandomArray } from './utils'
@@ -211,6 +220,7 @@
       onclick={duplicateBySelection}
       variant="gray"
       size="md"
+      icon={DocumentDuplicate}
       title="Duplicate selected node"
       disabled={!canDuplicateSelected()}
     >
@@ -238,6 +248,7 @@
       onclick={groupSelected}
       variant="blue"
       size="md"
+      icon={RectangleGroup}
       title="Group selected leaves"
       disabled={!canGroupSelected(model, selectedIds)}
     >
