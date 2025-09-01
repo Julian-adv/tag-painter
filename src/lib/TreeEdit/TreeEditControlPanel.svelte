@@ -92,6 +92,12 @@
   }
 
   function finishRenaming(newName: string) {
+    // Check if this is a cancellation signal
+    if (newName === '__CANCEL__') {
+      cancelRenaming()
+      return
+    }
+
     if (!editingNodeId || !originalName || newName === originalName) {
       editingNodeId = null
       originalName = ''

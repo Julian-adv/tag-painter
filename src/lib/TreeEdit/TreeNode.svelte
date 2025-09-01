@@ -289,12 +289,17 @@
     onMutate()
   }
 
-  function handleNameFinish() {
+  function handleNameFinish(completed: boolean = true) {
+    // Check if there's a rename callback for this node (from Rename button)
+    if (renameCallbacks[id] && !completed) {
+      // Signal cancellation by calling the callback with __CANCEL__
+      renameCallbacks[id]('__CANCEL__')
+    }
     onSelect(id)
     rowEl?.focus()
   }
 
-  function handleValueFinish() {
+  function handleValueFinish(_completed: boolean = true) {
     onSelect(id)
     rowEl?.focus()
   }

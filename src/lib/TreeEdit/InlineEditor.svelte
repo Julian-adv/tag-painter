@@ -14,7 +14,7 @@
     onEditingChange?: (editing: boolean) => void
     expandOnEdit?: boolean
     enterStartsEditing?: boolean
-    onFinish?: () => void
+    onFinish?: (completed: boolean) => void
     model: TreeModel | null
     onChipDoubleClick?: (tagName: string) => void
   }
@@ -73,14 +73,14 @@
     }
     isEditing = false
     onEditingChange?.(false)
-    onFinish?.()
+    onFinish?.(true) // completed = true
   }
 
   function cancelEditing() {
     isEditing = false
     editingValue = ''
     onEditingChange?.(false)
-    onFinish?.()
+    onFinish?.(false) // completed = false (cancelled)
   }
 
   function handleKeydown(event: KeyboardEvent) {
