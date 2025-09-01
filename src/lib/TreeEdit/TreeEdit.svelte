@@ -427,6 +427,10 @@
             e.preventDefault()
             selectedIds = []
             lastSelectedId = null
+          } else if (e.key === 'Delete') {
+            // Delete selected node(s) via keyboard
+            e.preventDefault()
+            deleteBySelection()
           }
           // Record Shift+Tab to enable range selection on focus movement
           if (e.key === 'Tab') {
