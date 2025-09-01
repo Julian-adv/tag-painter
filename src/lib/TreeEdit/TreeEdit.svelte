@@ -3,7 +3,7 @@
   import TreeEditControlPanel from './TreeEditControlPanel.svelte'
   import type { TreeModel, LeafNode, ArrayNode, ObjectNode, AnyNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
-  import { addChild, isContainer, uid, removeNode, convertLeafToArray } from './model'
+  import { addChild, isContainer, uid, removeNode, convertLeafToArray, moveChild } from './model'
   import { groupSelectedNodes } from './operations'
   import { getParentOf } from './utils'
   import { tick } from 'svelte'
@@ -316,6 +316,96 @@
       delete renameCallbacks[nodeId]
     }
   }
+
+  function duplicateBySelection() {
+    if (selectedIds.length !== 1) return
+    const sourceId = selectedIds[0]
+    if (sourceId === model.rootId) return
+    const source = model.nodes[sourceId]
+    if (!source) return
+
+    const parentId = source.parentId
+    if (!parentId) return
+    const parent = model.nodes[parentId]
+    if (!parent || !isContainer(parent)) return
+
+    const siblings = parent.children
+    const srcIndex = siblings.indexOf(sourceId)
+    if (srcIndex === -1) return
+    const insertIndex = srcIndex + 1
+
+    // Helper: clone subtree under a given parent and return new root id
+    function cloneUnderParent(srcId: string, tgtParentId: string, newName: string): string {
+      const src = model.nodes[srcId]
+      if (!src) return ''
+
+      if (src.kind === 'leaf') {
+        const newId = uid()
+        const cloned = {
+          id: newId,
+          name: newName,
+          kind: 'leaf' as const,
+          parentId: tgtParentId,
+          value: (src as LeafNode).value
+        }
+        addChild(model, tgtParentId, cloned)
+        return newId
+      }
+
+      if (src.kind === 'ref') {
+        const newId = uid()
+        const cloned = {
+          id: newId,
+          name: src.name,
+          kind: 'ref' as const,
+          parentId: tgtParentId,
+          refName: src.refName
+        }
+        addChild(model, tgtParentId, cloned)
+        return newId
+      }
+
+      // containers
+      const newId = uid()
+      const container = {
+        id: newId,
+        name: newName,
+        kind: src.kind,
+        parentId: tgtParentId,
+        children: [] as string[],
+        collapsed: !!src.collapsed
+      } as ObjectNode | ArrayNode
+      addChild(model, tgtParentId, container)
+
+      for (const childId of src.children) {
+        const child = model.nodes[childId]
+        if (!child) continue
+        const childName = child.name
+        cloneUnderParent(childId, newId, childName)
+      }
+      return newId
+    }
+
+    // Determine new name based on parent type
+    const newName = parent.kind === 'array' ? String(siblings.length) : source.name
+    const newRootId = cloneUnderParent(sourceId, parentId, newName)
+    if (!newRootId) return
+
+    // Move to appear just after the source
+    const appendedIndex = siblings.length - 1
+    let targetIndex = insertIndex
+    if (appendedIndex < insertIndex) {
+      // after appending, list grew by 1; if appending at end it may already be at/after target
+      targetIndex = Math.min(insertIndex, siblings.length - 1)
+    }
+    moveChild(model, parentId, appendedIndex, targetIndex)
+
+    // Focus/edit the new node
+    autoEditChildId = newRootId
+    selectedIds = [newRootId]
+    lastSelectedId = newRootId
+    hasUnsavedChanges = true
+  }
 </script>
 
 <div class="tree-root">
@@ -383,6 +473,7 @@
       {setSelectedArrayMode}
       {togglePinSelected}
       {groupSelected}
+      {duplicateBySelection}
       {addBySelection}
       {deleteBySelection}
       onModelChanged={() => (hasUnsavedChanges = true)}

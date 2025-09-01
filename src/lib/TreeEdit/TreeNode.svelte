@@ -59,9 +59,12 @@
 
   $effect(() => {
     if (autoEditName && !autoEditApplied) {
-      // Prefer name editor when available (non-array parents), otherwise use value editor.
-      if (nameEditorRef && parentKind !== 'array') {
-        nameEditorRef.activate()
+      const node = model.nodes[id]
+      // Prefer name editor for non-leaf nodes even under array parents;
+      // for leaves under array parents, prefer value editor.
+      const canUseNameEditor = !!nameEditorRef && node && node.kind !== 'leaf'
+      if (canUseNameEditor) {
+        nameEditorRef!.activate()
       } else if (valueEditorRef) {
         valueEditorRef.activate()
       }

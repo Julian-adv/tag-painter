@@ -13,6 +13,7 @@
     setSelectedArrayMode,
     togglePinSelected,
     groupSelected,
+    duplicateBySelection,
     addBySelection,
     deleteBySelection,
     onModelChanged,
@@ -24,6 +25,7 @@
     setSelectedArrayMode: (mode: 'random' | 'consistent-random') => void
     togglePinSelected: () => void
     groupSelected: () => void
+    duplicateBySelection: () => void
     addBySelection: () => void
     deleteBySelection: () => void
     onModelChanged?: () => void
@@ -77,6 +79,10 @@
     const selectedId = selectedIds[0]
     const node = model.nodes[selectedId]
     return !!node && (node.kind === 'object' || node.kind === 'array')
+  }
+
+  function canDuplicateSelected(): boolean {
+    return selectedIds.length === 1 && !selectedIds.includes(model.rootId)
   }
 
   function startRenaming() {
@@ -200,6 +206,15 @@
       disabled={!canRenameSelected()}
     >
       Rename
+    </ActionButton>
+    <ActionButton
+      onclick={duplicateBySelection}
+      variant="gray"
+      size="md"
+      title="Duplicate selected node"
+      disabled={!canDuplicateSelected()}
+    >
+      Duplicate
     </ActionButton>
     <ActionButton
       onclick={() => expandAll(model)}
