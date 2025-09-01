@@ -21,8 +21,12 @@
   function getTagType(tagName: string): 'random' | 'consistent-random' | 'unknown' {
     if (!model) return 'unknown'
     const node = findNodeByName(model, tagName)
-    if (!node || node.kind !== 'array') return 'unknown'
-    return isConsistentRandomArray(model, node.id) ? 'consistent-random' : 'random'
+    if (!node) return 'unknown'
+    if (node.kind === 'array') {
+      return isConsistentRandomArray(model, node.id) ? 'consistent-random' : 'random'
+    }
+    if (node.kind === 'object') return 'random'
+    return 'unknown'
   }
 
   let displaySegments = $derived.by<Seg[]>(() => {
