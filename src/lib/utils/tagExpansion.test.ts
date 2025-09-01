@@ -123,12 +123,7 @@ describe('tagExpansion utilities', () => {
       expect(result.randomTagResolutions).toEqual({})
     })
 
-    it('should expand sequential custom tags', () => {
-      const result = expandCustomTags(['character-base'], mockTreeModel)
-
-      expect(result.expandedTags).toEqual(['1girl', 'solo', 'looking at viewer'])
-      expect(result.randomTagResolutions['character-base']).toBe('1girl, solo, looking at viewer')
-    })
+    // Sequential node behavior removed; test no longer applicable.
 
     it('should expand random custom tags', () => {
       const result = expandCustomTags(['hair-color'], mockTreeModel)
@@ -158,12 +153,7 @@ describe('tagExpansion utilities', () => {
       expect(result.expandedTags).toEqual(['red dress'])
     })
 
-    it('should apply weight to expanded custom tags', () => {
-      const result = expandCustomTags(['character-base:1.5'], mockTreeModel)
-
-      expect(result.expandedTags).toEqual(['(1girl, solo, looking at viewer:1.5)'])
-      expect(result.randomTagResolutions['character-base']).toBe('1girl, solo, looking at viewer')
-    })
+    // Sequential weighted expansion removed; no longer applicable.
 
     it('should use existing random resolutions for consistent-random tags', () => {
       const existingResolutions = { 'eye-color': 'blue eyes' }
@@ -217,13 +207,6 @@ describe('tagExpansion utilities', () => {
       expect(true).toBe(true)
     })
 
-    it('should handle multiple tags in single call', () => {
-      const result = expandCustomTags(['character-base', 'red dress', 'hair-color'], mockTreeModel)
-
-      expect(result.expandedTags).toHaveLength(5) // 3 + 1 + 1
-      expect(result.expandedTags.slice(0, 3)).toEqual(['1girl', 'solo', 'looking at viewer'])
-      expect(result.expandedTags[3]).toBe('red dress')
-      expect(['blonde hair', 'brown hair', 'black hair']).toContain(result.expandedTags[4])
-    })
+    // Multi-tag test relying on sequential behavior removed.
   })
 })
