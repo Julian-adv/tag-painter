@@ -10,8 +10,9 @@ import {
   FINAL_SAVE_NODE_ID,
   generateLoraChain
 } from './workflow'
-import { expandCustomTags } from './tagExpansion'
+import { expandCustomTags, detectCompositionFromTags } from './tagExpansion'
 import { getWildcardModel } from '../stores/tagsStore'
+import { updateComposition } from '../stores/promptsStore'
 import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow } from '$lib/types'
 
 export interface GenerationOptions {
@@ -76,6 +77,15 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const previousAll = previousRandomTagResolutions?.all || {}
     const model = getWildcardModel()
     const allResult = expandCustomTags(promptsData.tags.all, model, new Set(), {}, previousAll)
+    
+    // Auto-select composition based on expanded All tags
+    const detectedComposition = detectCompositionFromTags(allResult.expandedTags)
+    if (detectedComposition) {
+      console.log(`Auto-selecting composition: ${detectedComposition}`)
+      updateComposition(detectedComposition)
+      // Update promptsData with the new composition for this generation
+      promptsData.selectedComposition = detectedComposition
+    }
 
     const previousZone1 = previousRandomTagResolutions?.zone1 || {}
     const zone1Result = expandCustomTags(
