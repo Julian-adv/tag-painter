@@ -57,3 +57,51 @@ export function findNodeByName(model: TreeModel, name: string): AnyNode | undefi
 export function getParentOf(model: TreeModel, nodeId: string): string | null {
   return model.nodes[nodeId]?.parentId ?? null
 }
+
+/**
+ * Extract composition directive from leaf node content
+ * @param leafValue The string value of a leaf node
+ * @returns The composition value (e.g., 'all', '2h', '2v') or null if none found
+ */
+export function extractCompositionDirective(leafValue: string): string | null {
+  if (typeof leafValue !== 'string') return null
+
+  // Match composition=xxx pattern (case-insensitive)
+  const match = leafValue.toLowerCase().match(/composition=([a-z0-9_-]+)/)
+  return match ? match[1] : null
+}
+
+/**
+ * Update composition directive in leaf node content
+ * @param leafValue The current string value of a leaf node
+ * @param newComposition The new composition value (e.g., 'all', '2h', '2v') or empty string to remove
+ * @returns Updated string with new composition directive
+ */
+export function updateCompositionDirective(leafValue: string, newComposition: string): string {
+  if (typeof leafValue !== 'string') leafValue = ''
+
+  const compositionPattern = /composition=[a-z0-9_-]+/gi
+
+  if (!newComposition) {
+    // Remove composition directive
+    let result = leafValue.replace(compositionPattern, '')
+    // Clean up extra commas and whitespace
+    result = result
+      .replace(/,\s*,/g, ',')
+      .replace(/^,\s*|,\s*$/g, '')
+      .replace(/\s+,/g, ',')
+      .replace(/,\s+/g, ', ')
+    return result.trim()
+  }
+
+  const newDirective = `composition=${newComposition}`
+
+  if (compositionPattern.test(leafValue)) {
+    // Replace existing composition directive
+    return leafValue.replace(compositionPattern, newDirective)
+  } else {
+    // Add new composition directive
+    const trimmed = leafValue.trim()
+    return trimmed ? `${trimmed}, ${newDirective}` : newDirective
+  }
+}

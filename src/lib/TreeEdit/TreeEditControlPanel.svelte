@@ -11,7 +11,7 @@
     DocumentDuplicate,
     RectangleGroup
   } from 'svelte-heros-v2'
-  import { isLeafPinned } from './utils'
+  import { isLeafPinned, extractCompositionDirective, updateCompositionDirective } from './utils'
   import { canGroupSelected, expandAll, collapseAll } from './operations'
   import { getParentOf, isConsistentRandomArray } from './utils'
   import { renameNode } from './model'
@@ -39,7 +39,10 @@
     deleteBySelection: () => void
     onModelChanged?: () => void
     setAutoEditChildId?: (id: string | null) => void
-    setRenameCallback?: (nodeId: string | null, callback: ((newName: string) => void) | null) => void
+    setRenameCallback?: (
+      nodeId: string | null,
+      callback: ((newName: string) => void) | null
+    ) => void
   } = $props()
 
   let editingNodeId: string | null = $state(null)
@@ -99,12 +102,39 @@
     return selectedIds.length === 1 && !selectedIds.includes(model.rootId)
   }
 
+  function getSelectedLeafComposition(): string | null {
+    if (selectedIds.length !== 1) return null
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    if (!node || node.kind !== 'leaf') return null
+    return extractCompositionDirective(String(node.value || ''))
+  }
+
+  function isSelectedLeafNode(): boolean {
+    if (selectedIds.length !== 1) return false
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    return !!node && node.kind === 'leaf'
+  }
+
+  function updateSelectedComposition(newComposition: string) {
+    if (selectedIds.length !== 1) return
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    if (!node || node.kind !== 'leaf') return
+
+    const currentValue = String(node.value || '')
+    const updatedValue = updateCompositionDirective(currentValue, newComposition)
+    node.value = updatedValue
+    onModelChanged?.()
+  }
+
   function startRenaming() {
     if (selectedIds.length !== 1) return
     const selectedId = selectedIds[0]
     const node = model.nodes[selectedId]
     if (!node || (node.kind !== 'object' && node.kind !== 'array')) return
-    
+
     originalName = node.name
     editingNodeId = selectedId
     setAutoEditChildId?.(selectedId)
@@ -150,11 +180,14 @@
   function replaceNameReferencesInLeaves(oldName: string, newName: string) {
     const oldPattern = `__${oldName}__`
     const newPattern = `__${newName}__`
-    
+
     for (const node of Object.values(model.nodes)) {
       if (node.kind === 'leaf' && typeof node.value === 'string') {
         if (node.value.includes(oldPattern)) {
-          node.value = node.value.replace(new RegExp(`__${escapeRegex(oldName)}__`, 'g'), newPattern)
+          node.value = node.value.replace(
+            new RegExp(`__${escapeRegex(oldName)}__`, 'g'),
+            newPattern
+          )
         }
       }
     }
@@ -192,6 +225,29 @@
     </fieldset>
   </div>
 
+  <!-- Directives section -->
+  {#if isSelectedLeafNode()}
+    <div class="directives" aria-label="Content directives">
+      <fieldset>
+        <legend class="section-label">Directives</legend>
+        <div class="directive-row">
+          <label for="composition-select" class="directive-label">Composition</label>
+          <select
+            id="composition-select"
+            class="directive-select"
+            value={getSelectedLeafComposition() || ''}
+            onchange={(e) => updateSelectedComposition(e.currentTarget.value)}
+          >
+            <option value="">None</option>
+            <option value="all">all</option>
+            <option value="2h">2h (horizontal split)</option>
+            <option value="2v">2v (vertical split)</option>
+          </select>
+        </div>
+      </fieldset>
+    </div>
+  {/if}
+
   <div class="btns">
     <ActionButton
       onclick={togglePinSelected}
@@ -205,11 +261,7 @@
         : 'Pin this option'}
       disabled={!canPinSelected()}
     >
-      {selectedIds.length === 1
-        ? isLeafPinned(model, selectedIds[0])
-          ? 'Unpin'
-          : 'Pin'
-        : 'Pin'}
+      {selectedIds.length === 1 ? (isLeafPinned(model, selectedIds[0]) ? 'Unpin' : 'Pin') : 'Pin'}
     </ActionButton>
     <ActionButton
       onclick={startRenaming}
@@ -290,6 +342,38 @@
     padding: 0.5rem;
     align-items: flex-start; /* left-align controls */
   }
+  .directives fieldset {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+  }
+  .directive-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .directive-label {
+    font-size: 0.875rem;
+    color: #374151;
+    font-weight: 500;
+  }
+  .directive-select {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background-color: white;
+    color: #374151;
+    min-width: 80px;
+  }
+  .directive-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px #3b82f6;
+  }
+
   .array-mode fieldset {
     display: inline-flex;
     justify-content: flex-start;
