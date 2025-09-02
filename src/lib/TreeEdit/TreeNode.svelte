@@ -4,7 +4,7 @@
   import TreeNode from './TreeNode.svelte'
   import InlineEditor from './InlineEditor.svelte'
   import { ChevronDown, ChevronRight, LockClosed } from 'svelte-heros-v2'
-  import { isConsistentRandomArray, isLeafPinned } from './utils'
+  import { isConsistentRandomArray, isLeafPinned, shouldNodeBeVisible } from './utils'
   import { testModeStore } from '../stores/testModeStore.svelte'
 
   let {
@@ -22,7 +22,8 @@
     tabbingActive = false,
     shiftTabActive = false,
     renameCallbacks = {},
-    parentNameSuggestions = []
+    parentNameSuggestions = [],
+    filterText = ''
   }: {
     model: TreeModel
     id: string
@@ -39,9 +40,13 @@
     shiftTabActive?: boolean
     renameCallbacks?: Record<string, (newName: string) => void>
     parentNameSuggestions?: string[]
+    filterText?: string
   } = $props()
 
   const get = (id: string) => model.nodes[id]
+
+  // Check if this node should be visible based on filter
+  const isVisible = $derived(() => shouldNodeBeVisible(model, id, filterText))
 
   let isDragging = $state(false)
   let dragOverPosition = $state<'before' | 'after' | null>(null)
@@ -311,7 +316,7 @@
   }
 </script>
 
-{#if get(id)}
+{#if get(id) && isVisible()}
   {@const n = get(id)}
   <div
     class="node"
@@ -425,6 +430,7 @@
             {shiftTabActive}
             {renameCallbacks}
             {parentNameSuggestions}
+            {filterText}
           />
         {/each}
       </div>
