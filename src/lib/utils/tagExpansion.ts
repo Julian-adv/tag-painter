@@ -5,7 +5,12 @@
 import type { AnyNode, TreeModel } from '$lib/TreeEdit/model'
 import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
-import { findNodeByName, getTopLevelAncestorName } from '$lib/TreeEdit/utils'
+import {
+  findNodeByName,
+  getTopLevelAncestorName,
+  extractDisablesDirective,
+  updateDisablesDirective
+} from '$lib/TreeEdit/utils'
 
 /**
  * Generate a cryptographically secure random number for better randomness
@@ -87,7 +92,8 @@ export function expandCustomTags(
   model: TreeModel,
   visitedTags: Set<string> = new Set(),
   existingRandomResolutions: Record<string, string> = {},
-  previousRunResults: Record<string, string> = {}
+  previousRunResults: Record<string, string> = {},
+  disabledContext: { names: Set<string>; patterns: string[] } | undefined
 ): {
   expandedTags: string[]
   randomTagResolutions: Record<string, string>
@@ -95,6 +101,9 @@ export function expandCustomTags(
   let expandedTags: string[] = []
   const randomTagResolutions: Record<string, string> = {}
   // Model is the sole source of truth
+
+  // Track disables collected from encountered leaf values with disables=[...]
+  const disables = disabledContext || { names: new Set<string>(), patterns: [] }
 
   // Recursively expand placeholders like __Name__ in a set of strings until stable.
   function expandPlaceholdersDeep(
@@ -117,13 +126,14 @@ export function expandCustomTags(
           let merged = t
           placeholderAny.lastIndex = 0
           merged = merged.replace(placeholderAny, (_full, name: string) => {
-            const nested = expandCustomTags(
-              [name],
-              m,
-              visited,
-              { ...existing, ...resolutionsAcc },
-              previousRun
-            )
+          const nested = expandCustomTags(
+            [name],
+            m,
+            visited,
+            { ...existing, ...resolutionsAcc },
+            previousRun,
+            disables
+          )
             for (const [k, v] of Object.entries(nested.randomTagResolutions)) {
               resolutionsAcc[k] = v
             }
@@ -143,8 +153,22 @@ export function expandCustomTags(
 
   function expandNodeOnce(m: TreeModel, node: AnyNode): string[] {
     if (node.kind === 'leaf') {
-      const val = node.value
-      return [String(val)]
+      let val = String(node.value)
+      // Extract disables from leaf content and remove directive from output
+      const items = extractDisablesDirective(val)
+      if (items.length) {
+        for (const it of items) {
+          // Interpret as node name if model has such a symbol; otherwise treat as pattern
+          const maybeNode = findNodeByName(m, it)
+          if (maybeNode) {
+            disables.names.add(it)
+          } else {
+            disables.patterns.push(it)
+          }
+        }
+        val = updateDisablesDirective(val, [])
+      }
+      return [val]
     }
     if (node.kind === 'ref') {
       const refName = node.refName
@@ -244,7 +268,14 @@ export function expandCustomTags(
       if (!childNode) continue
       const tokens = expandNodeOnce(m, childNode)
       // Join tokens for a single option (keeps comma-containing strings intact as single unit)
-      options.push(tokens.join(', '))
+      const candidate = tokens.join(', ')
+      // If any non-name pattern is disabled, avoid options containing it
+      if (disables.patterns.length) {
+        const lower = candidate.toLowerCase()
+        const blocked = disables.patterns.some((p) => lower.includes(p.toLowerCase()))
+        if (blocked) continue
+      }
+      options.push(candidate)
     }
     if (options.length === 0) return { expandedTags: [], resolution: '' }
 
@@ -328,6 +359,12 @@ export function expandCustomTags(
 
   for (const tagString of tags) {
     const { name: tag, weight: tagWeight } = parseTagWithWeight(tagString)
+
+    // If tag name itself is disabled by node-name disables, output empty string
+    if (disables.names.has(tag)) {
+      expandedTags.push('')
+      continue
+    }
 
     // Prevent infinite recursion by tracking visited tags
     if (visitedTags.has(tag)) {

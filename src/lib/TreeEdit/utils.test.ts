@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { extractCompositionDirective, updateCompositionDirective } from './utils'
+import {
+  extractCompositionDirective,
+  updateCompositionDirective,
+  extractDisablesDirective,
+  updateDisablesDirective
+} from './utils'
 
 describe('TreeEdit composition directive utilities', () => {
   describe('extractCompositionDirective', () => {
@@ -74,6 +79,43 @@ describe('TreeEdit composition directive utilities', () => {
     it('should handle non-string values', () => {
       expect(updateCompositionDirective(null as unknown as string, 'all')).toBe('composition=all')
       expect(updateCompositionDirective(undefined as unknown as string, '2h')).toBe('composition=2h')
+    })
+  })
+})
+
+describe('TreeEdit disables directive utilities', () => {
+  describe('extractDisablesDirective', () => {
+    it('should extract disables list from string', () => {
+      expect(extractDisablesDirective('foo, disables=[a, b, c], bar')).toEqual(['a', 'b', 'c'])
+      expect(extractDisablesDirective('disables=[x]')).toEqual(['x'])
+    })
+
+    it('should be case insensitive on directive keyword', () => {
+      expect(extractDisablesDirective('DISABLES=[A, B]')).toEqual(['A', 'B'])
+    })
+
+    it('should return empty array if none', () => {
+      expect(extractDisablesDirective('foo, bar')).toEqual([])
+      expect(extractDisablesDirective('')).toEqual([])
+    })
+  })
+
+  describe('updateDisablesDirective', () => {
+    it('should add disables directive to empty string', () => {
+      expect(updateDisablesDirective('', ['a', 'b'])).toBe('disables=[a, b]')
+    })
+
+    it('should append disables directive to existing content', () => {
+      expect(updateDisablesDirective('foo, bar', ['a'])).toBe('foo, bar, disables=[a]')
+    })
+
+    it('should replace existing disables directive', () => {
+      expect(updateDisablesDirective('x, disables=[a, b], y', ['c'])).toBe('x, y, disables=[c]')
+    })
+
+    it('should remove disables directive when list empty', () => {
+      expect(updateDisablesDirective('foo, disables=[a, b], bar', [])).toBe('foo, bar')
+      expect(updateDisablesDirective('disables=[a]', [])).toBe('')
     })
   })
 })

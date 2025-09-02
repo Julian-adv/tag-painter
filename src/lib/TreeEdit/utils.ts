@@ -108,6 +108,52 @@ export function updateCompositionDirective(leafValue: string, newComposition: st
 }
 
 /**
+ * Extract disables directive from leaf node content
+ * Format: disables=[a, b, c]
+ * Returns an array of items (trimmed), or empty array if none
+ */
+export function extractDisablesDirective(leafValue: string): string[] {
+  if (typeof leafValue !== 'string') return []
+  const m = leafValue.match(/disables=\[([^\]]*)\]/i)
+  if (!m) return []
+  const inner = m[1]
+  return inner
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+}
+
+/**
+ * Update disables directive list in leaf node content
+ * When items is empty, removes the directive and cleans commas/spaces
+ */
+export function updateDisablesDirective(leafValue: string, items: string[]): string {
+  if (typeof leafValue !== 'string') leafValue = ''
+  const directiveRe = /\s*disables=\[[^\]]*\]\s*/gi
+  let result = leafValue.replace(directiveRe, ' ')
+  result = result.replace(/\s{2,}/g, ' ').trim()
+
+  if (!items || items.length === 0) {
+    // Clean up stray commas similar to composition removal
+    result = result
+      .replace(/,\s*,/g, ',')
+      .replace(/^,\s*|,\s*$/g, '')
+      .replace(/\s+,/g, ',')
+      .replace(/,\s+/g, ', ')
+      .trim()
+    return result
+  }
+
+  const list = items.join(', ')
+  // Append or place with proper comma separation
+  if (!result) return `disables=[${list}]`
+  // Ensure single comma separation
+  result = result.replace(/\s*,\s*/g, ', ').replace(/\s{2,}/g, ' ').trim()
+  if (result.endsWith(',')) return `${result} disables=[${list}]`
+  return `${result}, disables=[${list}]`
+}
+
+/**
  * Check if a node matches the filter criteria
  * @param model TreeModel containing all nodes
  * @param nodeId ID of the node to check

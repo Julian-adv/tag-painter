@@ -532,6 +532,7 @@
       onModelChanged={() => (hasUnsavedChanges = true)}
       {setAutoEditChildId}
       {setRenameCallback}
+      {parentNameSuggestions}
     />
   </div>
 </div>

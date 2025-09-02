@@ -83,11 +83,15 @@
 
     const { word } = getCurrentWord()
 
-    // Special mode: when current token starts with the trigger (e.g., "__"),
-    // suggest from provided specialSuggestions using the token after the prefix.
-    if (specialTriggerPrefix && word.startsWith(specialTriggerPrefix)) {
+    // Special mode: if specialTriggerPrefix is an empty string, always use special suggestions.
+    // Otherwise, when current token starts with the trigger (e.g., "__"), use special suggestions.
+    const inSpecialMode =
+      specialTriggerPrefix !== undefined &&
+      (specialTriggerPrefix === '' || word.startsWith(specialTriggerPrefix))
+
+    if (inSpecialMode) {
       usingSpecialSuggestions = true
-      const base = word.slice(specialTriggerPrefix.length)
+      const base = specialTriggerPrefix === '' ? word : word.slice(specialTriggerPrefix.length)
 
       const pool = Array.isArray(specialSuggestions) ? specialSuggestions : []
       const lowered = base.toLowerCase()
