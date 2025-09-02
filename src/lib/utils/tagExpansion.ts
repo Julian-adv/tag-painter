@@ -82,9 +82,13 @@ export function detectCompositionFromTags(expandedTags: string[]): string | null
  *   target array is marked consistent (CONSISTENT_RANDOM_MARKER).
  * - previousRunResults: Decisions from a previous generation pass (regen). Used to keep the
  *   same zone stable across regenerations; takes precedence after explicit overrides.
+ * - disabledContext: Accumulator for the disables directive discovered during expansion.
+ *   - names: exact node names to blank when those tags are expanded.
+ *   - patterns: case-insensitive substrings to avoid when choosing random array options.
+ *   If undefined, a fresh context is created and shared with nested expansions.
  *
  * Returns:
- * - expandedTags: Final list of tags after full placeholder expansion.
+ * - expandedTags: Final list of tags after full placeholder expansion (directives removed).
  * - randomTagResolutions: Map of array tag name → fully-expanded chosen value (no placeholders).
  */
 export function expandCustomTags(
@@ -93,7 +97,7 @@ export function expandCustomTags(
   visitedTags: Set<string> = new Set(),
   existingRandomResolutions: Record<string, string> = {},
   previousRunResults: Record<string, string> = {},
-  disabledContext: { names: Set<string>; patterns: string[] } | undefined
+  disabledContext: { names: Set<string>; patterns: string[] } | undefined = undefined
 ): {
   expandedTags: string[]
   randomTagResolutions: Record<string, string>

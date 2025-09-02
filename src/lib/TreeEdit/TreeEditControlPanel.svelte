@@ -21,8 +21,8 @@
   import { canGroupSelected, expandAll, collapseAll } from './operations'
   import { getParentOf, isConsistentRandomArray } from './utils'
   import { renameNode } from './model'
-  import { XMark } from 'svelte-heros-v2'
-  import AutoCompleteTextarea from '../AutoCompleteTextarea.svelte'
+  
+  import DisablesEditor from './DisablesEditor.svelte'
 
   let {
     model,
@@ -159,22 +159,6 @@
     onModelChanged?.()
   }
 
-  let newDisableItem: string = $state('')
-  function addDisableItem() {
-    const item = newDisableItem.trim()
-    if (!item) return
-    const items = getSelectedLeafDisables()
-    if (!items.includes(item)) {
-      updateSelectedDisables([...items, item])
-    }
-    newDisableItem = ''
-  }
-
-  function removeDisableItem(item: string) {
-    const items = getSelectedLeafDisables().filter((x) => x !== item)
-    updateSelectedDisables(items)
-  }
-
   function startRenaming() {
     if (selectedIds.length !== 1) return
     const selectedId = selectedIds[0]
@@ -292,40 +276,19 @@
         </div>
         <div class="directive-row">
           <label class="directive-label" for="disables-input">Disables</label>
-          <div class="directive-multiedit">
-            <div class="chips">
-              {#each getSelectedLeafDisables() as item (item)}
-                <span class="chip" aria-label={`Disable ${item}`}>
-                  <span class="chip-label">{item}</span>
-                  <button class="chip-remove" title={`Remove ${item}`} onclick={() => removeDisableItem(item)}>
-                    <XMark class="h-3 w-3" />
-                  </button>
-                </span>
-              {/each}
-            </div>
-            <div class="adder">
-              <div class="w-full min-w-[220px] max-w-[360px]">
-                <AutoCompleteTextarea
-                  id="disables-input"
-                  value={newDisableItem}
-                  placeholder="Add disable (name or pattern)"
-                  class="directive-input"
-                  onValueChange={(v) => (newDisableItem = v)}
-                  onkeydown={(e: KeyboardEvent) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      addDisableItem()
-                    }
-                  }}
-                  specialSuggestions={parentNameSuggestions}
-                  specialTriggerPrefix=""
-                />
-              </div>
-              <button class="add-btn" type="button" onclick={addDisableItem} title="Add disable">
-                Add
-              </button>
-            </div>
-          </div>
+          <DisablesEditor
+            items={getSelectedLeafDisables()}
+            suggestions={parentNameSuggestions}
+            inputId="disables-input"
+            onAdd={(value: string) => {
+              const items = getSelectedLeafDisables()
+              if (!items.includes(value)) updateSelectedDisables([...items, value])
+            }}
+            onRemove={(value: string) => {
+              const items = getSelectedLeafDisables().filter((x) => x !== value)
+              updateSelectedDisables(items)
+            }}
+          />
         </div>
       </fieldset>
     </div>
@@ -425,74 +388,7 @@
     padding: 0.5rem;
     align-items: flex-start; /* left-align controls */
   }
-  .directive-multiedit {
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-    align-items: flex-start;
-    flex: 1;
-  }
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-  }
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.125rem 0.375rem 0.125rem 0.5rem;
-    border-radius: 9999px;
-    background: #eef2ff;
-    color: #4338ca;
-    border: 1px solid #c7d2fe;
-  }
-  .chip-label {
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-weight: 500;
-  }
-  .chip-remove {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1rem;
-    height: 1rem;
-    border-radius: 9999px;
-    background: transparent;
-    color: #4f46e5;
-    border: none;
-    cursor: pointer;
-  }
-  .chip-remove:hover { background: #e0e7ff; }
-  .adder {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-  }
-  .directive-input {
-    font-size: 0.875rem;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.375rem;
-    background-color: white;
-    color: #374151;
-  }
-  .directive-input:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 1px #3b82f6;
-  }
-  .add-btn {
-    font-size: 0.875rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.375rem;
-    background: #d1fae5;
-    color: #065f46;
-    border: 1px solid #a7f3d0;
-    cursor: pointer;
-  }
-  .add-btn:hover { background: #a7f3d0; }
+  /* Disables editor styles moved to DisablesEditor.svelte */
   .directives fieldset {
     display: flex;
     flex-direction: column;
