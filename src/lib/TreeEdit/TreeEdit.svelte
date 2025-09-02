@@ -207,24 +207,50 @@
     const freshParent = model.nodes[targetId]
     if (!freshParent || !isContainer(freshParent)) return
 
-    // Determine child name depending on container type
-    let childName = 'newKey'
-    if (freshParent.kind === 'array') {
-      const nextIndex = String(freshParent.children?.length ?? 0)
-      childName = nextIndex
-    }
+    // Determine what type of child to create based on container type
+    if (freshParent.kind === 'object') {
+      // For object nodes, create an array child with one empty item
+      const arrayNode: ArrayNode = {
+        id: uid(),
+        name: 'new_parent',
+        kind: 'array',
+        parentId: targetId,
+        children: [],
+        collapsed: false
+      }
+      addChild(model, targetId, arrayNode)
 
-    const child: LeafNode = {
-      id: uid(),
-      name: childName,
-      kind: 'leaf',
-      parentId: targetId,
-      value: ''
+      // Add a default child to the new array
+      const firstItem: LeafNode = {
+        id: uid(),
+        name: '0',
+        kind: 'leaf',
+        parentId: arrayNode.id,
+        value: 'new_child'
+      }
+      addChild(model, arrayNode.id, firstItem)
+
+      // Select the new array and set it for editing
+      newlyAddedRootChildId = arrayNode.id
+      selectedIds = [arrayNode.id]
+      lastSelectedId = arrayNode.id
+      setAutoEditChildId(arrayNode.id)
+    } else {
+      // For array nodes, create a leaf child as before
+      const nextIndex = String(freshParent.children?.length ?? 0)
+      const child: LeafNode = {
+        id: uid(),
+        name: nextIndex,
+        kind: 'leaf',
+        parentId: targetId,
+        value: ''
+      }
+      addChild(model, targetId, child)
+      newlyAddedRootChildId = child.id
+      selectedIds = [child.id]
+      lastSelectedId = child.id
     }
-    addChild(model, targetId, child)
-    newlyAddedRootChildId = child.id
-    selectedIds = [child.id]
-    lastSelectedId = child.id
+    
     hasUnsavedChanges = true
   }
 
