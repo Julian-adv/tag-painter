@@ -66,6 +66,10 @@ export async function generateImage(options: GenerationOptions): Promise<{
     JSON.stringify(isInpainting ? inpaintingWorkflowPrompt : defaultWorkflowPrompt)
   )
 
+  // Auto-select composition based on expanded All tags (before try block for scope)
+  let originalComposition: string | null = null
+  let detectedComposition: string | null = null
+
   try {
     onLoadingChange(true)
     onProgressUpdate({ value: 0, max: 100, currentNode: '' })
@@ -78,8 +82,9 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const model = getWildcardModel()
     const allResult = expandCustomTags(promptsData.tags.all, model, new Set(), {}, previousAll)
     
-    // Auto-select composition based on expanded All tags
-    const detectedComposition = detectCompositionFromTags(allResult.expandedTags)
+    // Check for composition detection and backup original
+    originalComposition = promptsData.selectedComposition
+    detectedComposition = detectCompositionFromTags(allResult.expandedTags)
     if (detectedComposition) {
       console.log(`Auto-selecting composition: ${detectedComposition}`)
       updateComposition(detectedComposition)
@@ -238,9 +243,22 @@ export async function generateImage(options: GenerationOptions): Promise<{
       }
     )
 
+    // Restore original composition after successful generation
+    if (detectedComposition && originalComposition && detectedComposition !== originalComposition) {
+      console.log(`Restoring original composition: ${originalComposition}`)
+      updateComposition(originalComposition)
+    }
+
     return { seed: appliedSeed, randomTagResolutions: allRandomResolutions }
   } catch (error) {
     console.error('Failed to generate image:', error)
+    
+    // Restore original composition after failed generation
+    if (detectedComposition && originalComposition && detectedComposition !== originalComposition) {
+      console.log(`Restoring original composition after error: ${originalComposition}`)
+      updateComposition(originalComposition)
+    }
+    
     onError(error instanceof Error ? error.message : 'Failed to generate image')
     onLoadingChange(false)
     throw error
