@@ -197,7 +197,7 @@
           <span class="text-gray-600">{displayParts.content}</span>
         {/if}
         <!-- 2) Invisible dummy to reserve right-edge space for weight + X -->
-        <span class="invisible align-top whitespace-nowrap" aria-hidden="true">
+        <span class="invisible ml-1 align-top whitespace-nowrap" aria-hidden="true">
           {#if displayParts.weight}
             <span class="font-semibold text-blue-600">{displayParts.weight}</span>
           {/if}xx</span

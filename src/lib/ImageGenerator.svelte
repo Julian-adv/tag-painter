@@ -9,6 +9,7 @@
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import { loadSettings, saveSettings as saveSettingsToFile, saveMaskData } from './utils/fileIO'
   import { fetchCheckpoints } from './utils/comfyui'
+  import { ArrowPath } from 'svelte-heros-v2'
   import { generateImage } from './utils/imageGeneration'
   import { DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
   import {
@@ -41,6 +42,7 @@
       }
     | undefined
   let compositionSelector: { selectTempMask: () => void } | undefined
+  let loraSelectorRef: { refresh: () => void } | undefined
   let isGeneratingForever = $state(false)
   let shouldStopGeneration = $state(false)
   let lastSeed: number | null = $state(null)
@@ -57,6 +59,37 @@
     negative: {},
     inpainting: {}
   })
+
+  // Reload model/LoRA lists from ComfyUI and refresh UI options
+  async function refreshModels(event: MouseEvent) {
+    // Prevent click from bubbling and default focus/selection behaviors
+    event.stopPropagation()
+    event.preventDefault()
+    try {
+      // Re-fetch checkpoints (ComfyUI updates lists on demand)
+      const checkpoints = await fetchCheckpoints()
+      if (checkpoints && checkpoints.length > 0) {
+        // Preserve selected checkpoint if still present; otherwise pick first
+        let prevSelected: string | null = null
+        promptsData.subscribe((d) => (prevSelected = d.selectedCheckpoint || null))()
+        availableCheckpoints = checkpoints
+        if (!prevSelected || !checkpoints.includes(prevSelected)) {
+          promptsData.update((data) => ({ ...data, selectedCheckpoint: checkpoints[0] }))
+        }
+      } else {
+        availableCheckpoints = []
+      }
+    } catch (e) {
+      console.error('Failed to reload checkpoint list', e)
+    }
+
+    // Refresh LoRA list in the selector
+    try {
+      loraSelectorRef?.refresh()
+    } catch (e) {
+      console.error('Failed to refresh LoRA list', e)
+    }
+  }
 
   // Settings state
   let settings: Settings = $state({
@@ -340,7 +373,18 @@
 
       <div class="flex flex-shrink-0 flex-col gap-1">
         <div class="flex flex-col gap-2">
-          <label for="checkpoint" class="text-left text-sm font-bold text-black">Checkpoint</label>
+          <div class="flex items-center justify-between gap-2">
+            <label for="checkpoint" class="text-left text-sm font-bold text-black">Checkpoint</label
+            >
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-1 py-0.5 text-xs text-gray-700 hover:bg-gray-50"
+              title="Reload lists from ComfyUI"
+              onclick={refreshModels}
+            >
+              <ArrowPath class="h-3 w-3" />
+            </button>
+          </div>
           <select
             id="checkpoint"
             value={$promptsData.selectedCheckpoint || ''}
@@ -357,6 +401,7 @@
         <!-- LoRA Selector -->
         <div class="flex flex-col gap-2">
           <LoraSelector
+            bind:this={loraSelectorRef}
             selectedLoras={$promptsData.selectedLoras}
             onLoraChange={handleLoraChange}
           />

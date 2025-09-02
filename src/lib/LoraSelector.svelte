@@ -72,23 +72,28 @@
   onMount(() => {
     fetchLoras()
   })
+
+  // Expose a refresh method to parent components
+  export function refresh() {
+    fetchLoras()
+  }
 </script>
 
 <div class="lora-selector">
   <h3 class="mb-2 pt-1 text-left text-sm font-bold text-gray-700">LoRA Models</h3>
 
-  {#if loading}
-    <div class="text-sm text-gray-500">Loading LoRA models...</div>
-  {:else if error}
-    <div class="text-sm text-red-600">{error}</div>
-    <button onclick={fetchLoras} class="mt-1 text-xs text-blue-600 hover:text-blue-800">
-      Retry
-    </button>
-  {:else}
-    <!-- Selected LoRAs display area -->
-    <div
-      class="lora-display-area max-h-24 min-h-[6rem] w-full overflow-y-auto rounded-lg border border-gray-300 bg-white p-2"
-    >
+  <!-- Stable-height container prevents layout jump during refresh -->
+  <div
+    class="lora-display-area max-h-24 min-h-[6rem] w-full overflow-y-auto rounded-lg border border-gray-300 bg-white p-2"
+  >
+    {#if loading}
+      <div class="text-sm text-gray-500" aria-live="polite">Loading LoRA models...</div>
+    {:else if error}
+      <div class="text-sm text-red-600">{error}</div>
+      <button onclick={fetchLoras} class="mt-1 text-xs text-blue-600 hover:text-blue-800">
+        Retry
+      </button>
+    {:else}
       {#if selectedLoras.length > 0}
         <div class="flex flex-wrap gap-1">
           {#each selectedLoras as lora (lora.name)}
@@ -96,25 +101,25 @@
           {/each}
         </div>
       {/if}
-    </div>
+    {/if}
+  </div>
 
-    <!-- Add LoRA button -->
-    <div class="mt-2 flex items-center justify-between">
-      <button
-        type="button"
-        onclick={openModal}
-        class="flex items-center gap-1 rounded-lg border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-600 hover:bg-green-100 focus:ring-2 focus:ring-green-500 focus:outline-none"
-        disabled={availableLoras.length === 0}
-      >
-        <Plus class="h-3 w-3" />
-        Add LoRA
-      </button>
+  <!-- Always render controls to keep layout stable; disable when unavailable/loading -->
+  <div class="mt-2 flex items-center justify-between">
+    <button
+      type="button"
+      onclick={openModal}
+      class="flex items-center gap-1 rounded-lg border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-600 hover:bg-green-100 focus:ring-2 focus:ring-green-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+      disabled={loading || availableLoras.length === 0}
+    >
+      <Plus class="h-3 w-3" />
+      Add LoRA
+    </button>
 
-      <div class="text-xs text-gray-600">
-        {selectedLoras.length} selected
-      </div>
+    <div class="text-xs text-gray-600">
+      {selectedLoras.length} selected
     </div>
-  {/if}
+  </div>
 </div>
 
 <!-- LoRA Selection Modal -->
