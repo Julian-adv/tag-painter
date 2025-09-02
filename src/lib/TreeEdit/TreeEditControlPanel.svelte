@@ -21,7 +21,6 @@
   import { canGroupSelected, expandAll, collapseAll } from './operations'
   import { getParentOf, isConsistentRandomArray } from './utils'
   import { renameNode } from './model'
-  
   import DisablesEditor from './DisablesEditor.svelte'
 
   let {
@@ -274,12 +273,13 @@
             <option value="2v">2v (vertical split)</option>
           </select>
         </div>
-        <div class="directive-row">
+        <div class="directive-row stacked">
           <label class="directive-label" for="disables-input">Disables</label>
           <DisablesEditor
             items={getSelectedLeafDisables()}
             suggestions={parentNameSuggestions}
             inputId="disables-input"
+            {model}
             onAdd={(value: string) => {
               const items = getSelectedLeafDisables()
               if (!items.includes(value)) updateSelectedDisables([...items, value])
@@ -295,6 +295,24 @@
   {/if}
 
   <div class="btns">
+    <ActionButton
+      onclick={() => expandAll(model)}
+      variant="gray"
+      size="md"
+      icon={ChevronDown}
+      title="Expand all nodes"
+    >
+      Expand all
+    </ActionButton>
+    <ActionButton
+      onclick={() => collapseAll(model)}
+      variant="gray"
+      size="md"
+      icon={ChevronRight}
+      title="Collapse all nodes"
+    >
+      Collapse all
+    </ActionButton>
     <ActionButton
       onclick={togglePinSelected}
       variant="gray"
@@ -328,24 +346,6 @@
       disabled={!canDuplicateSelected()}
     >
       Duplicate
-    </ActionButton>
-    <ActionButton
-      onclick={() => expandAll(model)}
-      variant="gray"
-      size="md"
-      icon={ChevronDown}
-      title="Expand all nodes"
-    >
-      Expand all
-    </ActionButton>
-    <ActionButton
-      onclick={() => collapseAll(model)}
-      variant="gray"
-      size="md"
-      icon={ChevronRight}
-      title="Collapse all nodes"
-    >
-      Collapse all
     </ActionButton>
     <ActionButton
       onclick={groupSelected}
@@ -401,6 +401,10 @@
     align-items: center;
     gap: 0.5rem;
   }
+  .directive-row.stacked {
+    flex-direction: column;
+    align-items: flex-start;
+  }
   .directive-label {
     font-size: 0.875rem;
     color: #374151;
@@ -420,7 +424,6 @@
     border-color: #3b82f6;
     box-shadow: 0 0 0 1px #3b82f6;
   }
-
   .array-mode fieldset {
     display: inline-flex;
     justify-content: flex-start;
@@ -446,10 +449,15 @@
     margin-bottom: 0.25rem;
   }
   .btns {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.375rem 0.5rem;
     margin: 0.25rem 0;
     padding: 0.5rem;
+    width: 100%;
+  }
+  .btns :global(button) {
+    width: 100%;
+    justify-content: center;
   }
 </style>

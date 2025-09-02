@@ -1,5 +1,8 @@
 <script lang="ts">
   import AutoCompleteTextarea from '../AutoCompleteTextarea.svelte'
+  import type { TreeModel } from './model'
+  import { isContainer } from './model'
+  import { findNodeByName } from './utils'
 
   interface Props {
     items: string[]
@@ -7,15 +10,10 @@
     onAdd: (item: string) => void
     onRemove: (item: string) => void
     inputId?: string
+    model: TreeModel
   }
 
-  let {
-    items,
-    suggestions,
-    onAdd,
-    onRemove,
-    inputId = 'disables-input'
-  }: Props = $props()
+  let { items, suggestions, onAdd, onRemove, inputId = 'disables-input', model }: Props = $props()
 
   let newItem: string = $state('')
 
@@ -27,12 +25,22 @@
     }
     newItem = ''
   }
+
+  function isContainerName(name: string): boolean {
+    const node = findNodeByName(model, name)
+    return !!node && isContainer(node)
+  }
 </script>
 
 <div class="directive-multiedit">
   <div class="chips">
     {#each items as item (item)}
-      <span class="chip" aria-label={`Disable ${item}`}>
+      <span
+        class="chip"
+        class:purple={isContainerName(item)}
+        class:blue={!isContainerName(item)}
+        aria-label={`Disable ${item}`}
+      >
         <span class="chip-label">{item}</span>
         <button class="chip-remove" title={`Remove ${item}`} onclick={() => onRemove(item)}>
           ×
@@ -41,7 +49,7 @@
     {/each}
   </div>
   <div class="adder">
-    <div class="w-full min-w-[220px] max-w-[360px]">
+    <div class="input-wrapper w-full max-w-[360px] min-w-[220px]">
       <AutoCompleteTextarea
         id={inputId}
         value={newItem}
@@ -57,11 +65,8 @@
         specialTriggerPrefix=""
       />
     </div>
-    <button class="add-btn" type="button" onclick={addItem} title="Add disable">
-      Add
-    </button>
+    <button class="add-btn" type="button" onclick={addItem} title="Add disable"> Add </button>
   </div>
-  
 </div>
 
 <style>
@@ -82,14 +87,23 @@
     align-items: center;
     gap: 0.25rem;
     padding: 0.125rem 0.375rem 0.125rem 0.5rem;
-    border-radius: 9999px;
-    background: #eef2ff;
-    color: #4338ca;
-    border: 1px solid #c7d2fe;
+    border-radius: 0.375rem;
+    border: 1px solid transparent;
+  }
+  /* Match TreeEdit colors: container header (purple) and value wrapper (sky) */
+  .chip.purple {
+    background: #f3e8ff;
+    color: #6b21a8;
+    border-color: #c084fc;
+  }
+  .chip.blue {
+    background: #e0f2fe;
+    color: #075985;
+    border-color: #bae6fd;
   }
   .chip-label {
-    font-size: 0.75rem;
-    line-height: 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
     font-weight: 500;
   }
   .chip-remove {
@@ -104,13 +118,20 @@
     border: none;
     cursor: pointer;
   }
-  .chip-remove:hover { background: #e0e7ff; }
+  .chip-remove:hover {
+    background: #e0e7ff;
+  }
   .adder {
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
   }
-  
+  .input-wrapper {
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    padding: 0.125rem;
+    background: #ffffff;
+  }
   .add-btn {
     font-size: 0.875rem;
     padding: 0.25rem 0.5rem;
@@ -120,5 +141,7 @@
     border: 1px solid #a7f3d0;
     cursor: pointer;
   }
-  .add-btn:hover { background: #a7f3d0; }
+  .add-btn:hover {
+    background: #a7f3d0;
+  }
 </style>

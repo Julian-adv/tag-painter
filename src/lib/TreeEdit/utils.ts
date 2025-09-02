@@ -132,6 +132,8 @@ export function updateDisablesDirective(leafValue: string, items: string[]): str
   const directiveRe = /\s*disables=\[[^\]]*\]\s*/gi
   let result = leafValue.replace(directiveRe, ' ')
   result = result.replace(/\s{2,}/g, ' ').trim()
+  // Collapse any duplicate commas introduced by removal (e.g., "x, , y" -> "x, y")
+  result = result.replace(/,\s*,/g, ', ')
 
   if (!items || items.length === 0) {
     // Clean up stray commas similar to composition removal
@@ -148,7 +150,11 @@ export function updateDisablesDirective(leafValue: string, items: string[]): str
   // Append or place with proper comma separation
   if (!result) return `disables=[${list}]`
   // Ensure single comma separation
-  result = result.replace(/\s*,\s*/g, ', ').replace(/\s{2,}/g, ' ').trim()
+  result = result
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/,\s*,/g, ', ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
   if (result.endsWith(',')) return `${result} disables=[${list}]`
   return `${result}, disables=[${list}]`
 }
@@ -234,7 +240,8 @@ function computeHasMatchingAncestor(
     return false
   }
   const parentId = node.parentId
-  const result = matchesSelf(model, parentId, cache) || computeHasMatchingAncestor(model, parentId, cache)
+  const result =
+    matchesSelf(model, parentId, cache) || computeHasMatchingAncestor(model, parentId, cache)
   cache.hasMatchingAncestor.set(nodeId, result)
   return result
 }
@@ -274,13 +281,13 @@ function nodeMatches(node: AnyNode, filterLower: string): boolean {
   if (node.name.toLowerCase().includes(filterLower)) {
     return true
   }
-  
+
   // For leaf nodes, also check the value
   if (node.kind === 'leaf' && typeof node.value === 'string') {
     if (node.value.toLowerCase().includes(filterLower)) {
       return true
     }
   }
-  
+
   return false
 }

@@ -130,14 +130,14 @@ export function expandCustomTags(
           let merged = t
           placeholderAny.lastIndex = 0
           merged = merged.replace(placeholderAny, (_full, name: string) => {
-          const nested = expandCustomTags(
-            [name],
-            m,
-            visited,
-            { ...existing, ...resolutionsAcc },
-            previousRun,
-            disables
-          )
+            const nested = expandCustomTags(
+              [name],
+              m,
+              visited,
+              { ...existing, ...resolutionsAcc },
+              previousRun,
+              disables
+            )
             for (const [k, v] of Object.entries(nested.randomTagResolutions)) {
               resolutionsAcc[k] = v
             }

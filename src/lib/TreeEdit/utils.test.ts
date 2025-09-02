@@ -78,7 +78,9 @@ describe('TreeEdit composition directive utilities', () => {
 
     it('should handle non-string values', () => {
       expect(updateCompositionDirective(null as unknown as string, 'all')).toBe('composition=all')
-      expect(updateCompositionDirective(undefined as unknown as string, '2h')).toBe('composition=2h')
+      expect(updateCompositionDirective(undefined as unknown as string, '2h')).toBe(
+        'composition=2h'
+      )
     })
   })
 })

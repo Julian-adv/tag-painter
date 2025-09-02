@@ -448,7 +448,7 @@
           onkeydown={(e) => e.stopPropagation()}
         />
         {#if filterText}
-          <button 
+          <button
             type="button"
             class="filter-clear"
             onclick={clearFilter}
@@ -458,7 +458,7 @@
           </button>
         {/if}
       </div>
-      
+
       <div
         class="tree"
         role="button"
