@@ -134,7 +134,7 @@
         {placeholder}
         class={'inline-editor-input ' + className}
         onValueChange={(v) => (editingValue = v)}
-        specialSuggestions={specialSuggestions}
+        {specialSuggestions}
         specialTriggerPrefix={specialTrigger}
         onkeydown={(event: KeyboardEvent) => {
           event.stopPropagation()

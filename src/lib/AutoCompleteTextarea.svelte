@@ -201,7 +201,8 @@
 
     // In special mode, keep the typed prefix and replace the rest with the suggestion,
     // and also append a closing prefix (e.g., "__") if not already present.
-    const isSpecial = usingSpecialSuggestions && !!specialTriggerPrefix && word.startsWith(specialTriggerPrefix)
+    const isSpecial =
+      usingSpecialSuggestions && !!specialTriggerPrefix && word.startsWith(specialTriggerPrefix)
     const hasClosing = isSpecial ? word.endsWith(specialTriggerPrefix) : false
 
     if (isSpecial) {

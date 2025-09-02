@@ -81,7 +81,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const previousAll = previousRandomTagResolutions?.all || {}
     const model = getWildcardModel()
     const allResult = expandCustomTags(promptsData.tags.all, model, new Set(), {}, previousAll)
-    
+
     // Check for composition detection and backup original
     originalComposition = promptsData.selectedComposition
     detectedComposition = detectCompositionFromTags(allResult.expandedTags)
@@ -252,13 +252,13 @@ export async function generateImage(options: GenerationOptions): Promise<{
     return { seed: appliedSeed, randomTagResolutions: allRandomResolutions }
   } catch (error) {
     console.error('Failed to generate image:', error)
-    
+
     // Restore original composition after failed generation
     if (detectedComposition && originalComposition && detectedComposition !== originalComposition) {
       console.log(`Restoring original composition after error: ${originalComposition}`)
       updateComposition(originalComposition)
     }
-    
+
     onError(error instanceof Error ? error.message : 'Failed to generate image')
     onLoadingChange(false)
     throw error

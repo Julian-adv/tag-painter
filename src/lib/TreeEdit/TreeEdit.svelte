@@ -250,7 +250,7 @@
       selectedIds = [child.id]
       lastSelectedId = child.id
     }
-    
+
     hasUnsavedChanges = true
   }
 

@@ -19,7 +19,11 @@ export function setTagTestMode(customTagName: string, enabled: boolean) {
   }
 }
 
-export function setTestModeOverride(customTagName: string, overrideTag: string, pinnedLeafId?: string) {
+export function setTestModeOverride(
+  customTagName: string,
+  overrideTag: string,
+  pinnedLeafId?: string
+) {
   if (!testModeStore[customTagName]) {
     testModeStore[customTagName] = { enabled: true, overrideTag, pinnedLeafId }
   } else {

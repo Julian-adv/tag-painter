@@ -226,7 +226,7 @@
   function handleTabFromNameEditor() {
     const n = model.nodes[id]
     if (!n) return
-    
+
     if (n.kind === 'leaf') {
       // Move from name to value editor on leaves
       valueEditorRef?.activate()
@@ -348,10 +348,7 @@
             class:array-type={n.kind === 'array' || n.kind === 'object'}
             class:consistent-array={n.kind === 'array' && isConsistentRandomNode()}
           >
-            <button
-              class="toggle"
-              onclick={handleToggleClick}
-            >
+            <button class="toggle" onclick={handleToggleClick}>
               {#if isContainer(n) && (n as ObjectNode | ArrayNode).children.length > 0}
                 {#if n.collapsed}
                   <ChevronRight class="h-3 w-3" />

@@ -50,18 +50,18 @@ function applyWeight(tagName: string, weight?: number): string {
 export function detectCompositionFromTags(expandedTags: string[]): string | null {
   // Join all tags into a single string for pattern matching
   const allTagsText = expandedTags.join(', ').toLowerCase()
-  
+
   // Check for composition patterns in the expanded tags
   if (allTagsText.includes('composition=all')) {
     return 'all'
   }
   if (allTagsText.includes('composition=2h')) {
-    return 'left-horizontal'  
+    return 'left-horizontal'
   }
   if (allTagsText.includes('composition=2v')) {
     return 'top-vertical'
   }
-  
+
   return null
 }
 

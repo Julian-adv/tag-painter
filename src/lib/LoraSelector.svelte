@@ -93,14 +93,12 @@
       <button onclick={fetchLoras} class="mt-1 text-xs text-blue-600 hover:text-blue-800">
         Retry
       </button>
-    {:else}
-      {#if selectedLoras.length > 0}
-        <div class="flex flex-wrap gap-1">
-          {#each selectedLoras as lora (lora.name)}
-            <LoraItem {lora} onRemove={handleLoraRemove} onWeightChange={handleLoraWeightChange} />
-          {/each}
-        </div>
-      {/if}
+    {:else if selectedLoras.length > 0}
+      <div class="flex flex-wrap gap-1">
+        {#each selectedLoras as lora (lora.name)}
+          <LoraItem {lora} onRemove={handleLoraRemove} onWeightChange={handleLoraWeightChange} />
+        {/each}
+      </div>
     {/if}
   </div>
 
@@ -109,7 +107,7 @@
     <button
       type="button"
       onclick={openModal}
-      class="flex items-center gap-1 rounded-lg border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-600 hover:bg-green-100 focus:ring-2 focus:ring-green-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+      class="flex items-center gap-1 rounded-lg border border-green-300 bg-green-50 px-2 py-1 text-xs text-green-600 hover:bg-green-100 focus:ring-2 focus:ring-green-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
       disabled={loading || availableLoras.length === 0}
     >
       <Plus class="h-3 w-3" />
