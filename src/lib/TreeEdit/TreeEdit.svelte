@@ -12,7 +12,7 @@
     moveChild,
     rebuildPathSymbols
   } from './model'
-  import { groupSelectedNodes } from './operations'
+  import { groupSelectedNodes, expandAll, collapseAll } from './operations'
   import { getTopLevelAncestorName } from './utils'
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
@@ -143,6 +143,45 @@
       // Move keyboard focus to the selected row so keyboard nav (Tab/Enter) applies to it
       el.focus()
     }
+  }
+
+  function findNearestVisibleAncestorId(id: string): string {
+    const start = model.nodes[id]
+    if (!start) return model.rootId
+    let current = start
+    while (current.parentId) {
+      const parent = model.nodes[current.parentId]
+      if (!parent) break
+      // If parent is collapsed, current is hidden; move up to parent
+      if (parent.collapsed) {
+        current = parent
+        continue
+      }
+      break
+    }
+    return current.id
+  }
+
+  function handleExpandAll() {
+    expandAll(model)
+    // Keep current selection centered if any
+    tick().then(() => scrollSelectedIntoView())
+  }
+
+  function handleCollapseAll() {
+    // Collapse containers
+    collapseAll(model)
+    // If current selection becomes hidden, select nearest visible ancestor
+    if (selectedIds.length === 1) {
+      const selId = selectedIds[0]
+      const newId = findNearestVisibleAncestorId(selId)
+      if (newId !== selId) {
+        selectedIds = [newId]
+        lastSelectedId = newId
+      }
+    }
+    // Scroll to show the new selection (typically a top-level node)
+    tick().then(() => scrollSelectedIntoView())
   }
 
   // Allow parent to programmatically select a node by name
@@ -546,6 +585,8 @@
     <TreeEditControlPanel
       {model}
       {selectedIds}
+      onExpandAll={handleExpandAll}
+      onCollapseAll={handleCollapseAll}
       {setSelectedArrayMode}
       {togglePinSelected}
       {groupSelected}

@@ -18,7 +18,7 @@
     extractDisablesDirective,
     updateDisablesDirective
   } from './utils'
-  import { canGroupSelected, expandAll, collapseAll } from './operations'
+  import { canGroupSelected } from './operations'
   import { getParentOf, isConsistentRandomArray } from './utils'
   import { renameNode } from './model'
   import DisablesEditor from './DisablesEditor.svelte'
@@ -26,6 +26,8 @@
   let {
     model,
     selectedIds,
+    onExpandAll,
+    onCollapseAll,
     setSelectedArrayMode,
     togglePinSelected,
     groupSelected,
@@ -39,6 +41,8 @@
   }: {
     model: TreeModel
     selectedIds: string[]
+    onExpandAll?: () => void
+    onCollapseAll?: () => void
     setSelectedArrayMode: (mode: 'random' | 'consistent-random') => void
     togglePinSelected: () => void
     groupSelected: () => void
@@ -296,7 +300,7 @@
 
   <div class="btns">
     <ActionButton
-      onclick={() => expandAll(model)}
+      onclick={() => onExpandAll?.()}
       variant="gray"
       size="md"
       icon={ChevronDown}
@@ -305,7 +309,7 @@
       Expand all
     </ActionButton>
     <ActionButton
-      onclick={() => collapseAll(model)}
+      onclick={() => onCollapseAll?.()}
       variant="gray"
       size="md"
       icon={ChevronRight}
