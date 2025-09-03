@@ -96,6 +96,7 @@ export function isCustomTag(tag: string): boolean {
 function computeWildcardNames(model: TreeModel): Set<string> {
   const names = new Set<string>()
   const nodes = model.nodes
+  // 1) Include container names and leaf names under objects (legacy behavior)
   for (const node of Object.values(nodes)) {
     if (node.name === 'root') continue
     if (node.kind === 'ref') continue
@@ -106,6 +107,14 @@ function computeWildcardNames(model: TreeModel): Set<string> {
     if (node.kind === 'leaf' && node.parentId) {
       const parent = nodes[node.parentId]
       if (parent && parent.kind === 'object') names.add(node.name)
+    }
+  }
+  // 2) Include full path keys for containers from pathSymbols (e.g., parent/sub)
+  for (const [path, id] of Object.entries(model.pathSymbols)) {
+    const n = nodes[id]
+    if (!n) continue
+    if ((n.kind === 'object' || n.kind === 'array') && n.children && n.children.length > 0) {
+      if (path) names.add(path)
     }
   }
   return names
@@ -144,7 +153,7 @@ export function getWildcardModel(): TreeModel {
 
 // Public helper to check if a wildcard name corresponds to an array node
 export function isWildcardArray(tag: string): boolean {
-  const symId = wildcardModel.symbols[tag]
+  const symId = wildcardModel.symbols[tag] || wildcardModel.pathSymbols[tag]
   const node = symId ? wildcardModel.nodes[symId] : undefined
   return !!node && node.kind === 'array'
 }
@@ -152,7 +161,7 @@ export function isWildcardArray(tag: string): boolean {
 // Determine tag type using wildcards.yaml structure
 export function wildcardTagType(name: string): TagType {
   // Resolve node by name
-  const symId = wildcardModel.symbols[name]
+  const symId = wildcardModel.symbols[name] || wildcardModel.pathSymbols[name]
   let node: AnyNode | undefined = symId ? wildcardModel.nodes[symId] : undefined
   if (!node) {
     for (const n of Object.values(wildcardModel.nodes)) {

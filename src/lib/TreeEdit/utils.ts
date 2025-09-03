@@ -49,9 +49,7 @@ export function findNodeByName(model: TreeModel, name: string): AnyNode | undefi
   const q = String(name).trim()
   const bySym = model.symbols[q] || model.pathSymbols[q]
   if (bySym) return model.nodes[bySym]
-  for (const n of Object.values(model.nodes)) {
-    if (n.name === q) return n
-  }
+  // Path-based lookup covered by model.pathSymbols; no manual walk needed
   return undefined
 }
 

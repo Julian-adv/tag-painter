@@ -16,7 +16,7 @@
     | { kind: 'text'; text: string }
     | { kind: 'chip'; name: string; type: 'random' | 'consistent-random' | 'unknown' }
 
-  const placeholderRe = /__([\p{L}\p{N}_\- ]+)__/gu
+  const placeholderRe = /__([\p{L}\p{N}_\- /]+)__/gu
 
   function getTagType(tagName: string): 'random' | 'consistent-random' | 'unknown' {
     if (!model) return 'unknown'

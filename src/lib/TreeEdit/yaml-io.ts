@@ -35,7 +35,10 @@ export function fromYAML(text: string): TreeModel {
       }
       // Treat as a symbol definition (assumes a single definition per name)
       symbols[name] = id
-      if (name !== 'root') pathSymbols[currentPath] = id
+      if (name !== 'root') {
+        const displayPath = currentPath.startsWith('root/') ? currentPath.slice(5) : currentPath
+        pathSymbols[displayPath] = id
+      }
       return n
     }
     if (Array.isArray(value)) {
@@ -48,7 +51,10 @@ export function fromYAML(text: string): TreeModel {
       })
       // Treat array containers as symbol definitions too (by key name)
       symbols[name] = id
-      if (name !== 'root') pathSymbols[currentPath] = id
+      if (name !== 'root') {
+        const displayPath = currentPath.startsWith('root/') ? currentPath.slice(5) : currentPath
+        pathSymbols[displayPath] = id
+      }
       return n
     }
     // Distinguish between object key (name: value) and array item context
@@ -93,7 +99,10 @@ export function fromYAML(text: string): TreeModel {
 
     // Register as symbols and pathSymbols like other containers
     symbols[name] = arrId
-    if (name !== 'root') pathSymbols[currentPath] = arrId
+    if (name !== 'root') {
+      const displayPath = currentPath.startsWith('root/') ? currentPath.slice(5) : currentPath
+      pathSymbols[displayPath] = arrId
+    }
     return arr
   }
 

@@ -118,7 +118,7 @@ export function expandCustomTags(
     previousRun: Record<string, string>,
     resolutionsAcc: Record<string, string>
   ): string[] {
-    const placeholderAny = /__([\p{L}\p{N}_\- ]+)__/gu
+    const placeholderAny = /__([\p{L}\p{N}_\- /]+)__/gu
     let out = inputs.slice()
     let safetyCounter = 0
     while (safetyCounter < 100) {
@@ -361,6 +361,7 @@ export function expandCustomTags(
     return { expandedTags: result.expandedTags, resolution: result.resolution }
   }
 
+  console.log(`Expanding tags: ${tags.join(', ')}`)
   for (const tagString of tags) {
     const { name: tag, weight: tagWeight } = parseTagWithWeight(tagString)
 
@@ -444,6 +445,7 @@ export function expandCustomTags(
     previousRunResults,
     randomTagResolutions
   )
+  console.log(`Final expanded tags: ${expandedTags.join(', ')}`)
 
   return { expandedTags, randomTagResolutions }
 }

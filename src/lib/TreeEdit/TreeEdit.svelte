@@ -39,9 +39,17 @@
 
   function recomputeParentNameSuggestionsFromValues(values: AnyNode[]) {
     const names = new Set<string>()
+    // Container names
     for (const n of values) {
       if (isContainer(n) && n.children.length > 0) {
         names.add(n.name)
+      }
+    }
+    // Full container paths from model.pathSymbols (e.g., parent/sub)
+    for (const [path, id] of Object.entries(model.pathSymbols)) {
+      const node = model.nodes[id]
+      if (node && isContainer(node) && node.children.length > 0) {
+        if (path) names.add(path)
       }
     }
     parentNameSuggestions = Array.from(names)
