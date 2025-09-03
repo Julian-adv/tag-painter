@@ -346,7 +346,7 @@
       variant="gray"
       size="md"
       icon={DocumentDuplicate}
-      title="Duplicate selected node"
+      title="Duplicate selected node (Ctrl+D / Cmd+D)"
       disabled={!canDuplicateSelected()}
     >
       Duplicate
@@ -376,7 +376,7 @@
       variant="red"
       size="md"
       icon={Trash}
-      title="Delete selected node"
+      title="Delete selected node (Delete)"
       disabled={selectedIds.length === 0 || selectedIds.includes(model.rootId)}
     >
       Delete

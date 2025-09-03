@@ -33,6 +33,7 @@
   let selectedIds: string[] = $state([])
   let lastSelectedId: string | null = $state(null) // For shift-click range selection
   let autoEditChildId: string | null = $state(null)
+  let autoEditBehavior: 'selectAll' | 'caretEnd' = $state('selectAll')
   let treeContainer: HTMLDivElement | null = $state(null)
   // Track Tab navigation state to sync selection with keyboard focus only
   let tabbingActive: boolean = $state(false)
@@ -133,6 +134,8 @@
   // Allow descendants to request auto-editing of a specific child id
   function setAutoEditChildId(id: string | null) {
     autoEditChildId = id
+    // Default behavior: select all when entering edit programmatically
+    autoEditBehavior = 'selectAll'
   }
 
   function scrollSelectedIntoView() {
@@ -242,6 +245,7 @@
 
       // Auto-edit the new array node's name
       newlyAddedRootChildId = arrayNode.id
+      autoEditBehavior = 'selectAll'
       selectedIds = [arrayNode.id]
       lastSelectedId = arrayNode.id
       hasUnsavedChanges = true
@@ -304,6 +308,7 @@
       }
       addChild(model, targetId, child)
       newlyAddedRootChildId = child.id
+      autoEditBehavior = 'selectAll'
       selectedIds = [child.id]
       lastSelectedId = child.id
     }
@@ -407,9 +412,7 @@
     selectedIds = result.newGroupId ? [result.newGroupId] : []
     lastSelectedId = result.newGroupId || null
     // Trigger inline name editing for the new group
-    if (result.newGroupId) {
-      autoEditChildId = result.newGroupId
-    }
+    if (result.newGroupId) setAutoEditChildId(result.newGroupId)
   }
 
   function setRenameCallback(nodeId: string | null, callback: ((newName: string) => void) | null) {
@@ -503,7 +506,8 @@
     }
     moveChild(model, parentId, appendedIndex, targetIndex)
 
-    // Focus/edit the new node
+    // Focus/edit the new node (caret at end, not select-all)
+    autoEditBehavior = 'caretEnd'
     autoEditChildId = newRootId
     selectedIds = [newRootId]
     lastSelectedId = newRootId
@@ -560,6 +564,10 @@
             // Delete selected node(s) via keyboard
             e.preventDefault()
             deleteBySelection()
+          } else if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+            // Duplicate selected node via Ctrl+D / Cmd+D
+            e.preventDefault()
+            duplicateBySelection()
           }
           // Record Shift+Tab to enable range selection on focus movement
           if (e.key === 'Tab') {
@@ -587,6 +595,7 @@
           id={model.rootId}
           isRootChild={true}
           autoEditChildId={autoEditChildId ?? newlyAddedRootChildId}
+          autoEditBehavior={autoEditBehavior}
           onMutate={(structural: boolean) => {
             if (structural) rebuildPathSymbols(model)
             hasUnsavedChanges = true

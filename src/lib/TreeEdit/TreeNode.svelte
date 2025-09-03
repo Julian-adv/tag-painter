@@ -23,7 +23,8 @@
     shiftTabActive = false,
     renameCallbacks = {},
     parentNameSuggestions = [],
-    filterText = ''
+    filterText = '',
+    autoEditBehavior = 'selectAll'
   }: {
     model: TreeModel
     id: string
@@ -41,6 +42,7 @@
     renameCallbacks?: Record<string, (newName: string) => void>
     parentNameSuggestions?: string[]
     filterText?: string
+    autoEditBehavior: 'selectAll' | 'caretEnd'
   } = $props()
 
   const get = (id: string) => model.nodes[id]
@@ -56,8 +58,8 @@
   let rowEl: HTMLDivElement | null = $state(null)
 
   // Refs to inline editors for programmatic activation
-  let nameEditorRef: { activate: () => void } | null = $state(null)
-  let valueEditorRef: { activate: () => void } | null = $state(null)
+  let nameEditorRef: { activate: (behavior: 'selectAll' | 'caretEnd') => void } | null = $state(null)
+  let valueEditorRef: { activate: (behavior: 'selectAll' | 'caretEnd') => void } | null = $state(null)
 
   // One-shot auto edit trigger per node instance
   let autoEditApplied = $state(false)
@@ -69,9 +71,9 @@
       // for leaves under array parents, prefer value editor.
       const canUseNameEditor = !!nameEditorRef && node && node.kind !== 'leaf'
       if (canUseNameEditor) {
-        nameEditorRef!.activate()
+        nameEditorRef!.activate(autoEditBehavior)
       } else if (valueEditorRef) {
-        valueEditorRef.activate()
+        valueEditorRef.activate(autoEditBehavior)
       }
       autoEditApplied = true
     }
@@ -556,7 +558,7 @@
 
     if (n.kind === 'leaf') {
       // Move from name to value editor on leaves
-      valueEditorRef?.activate()
+      valueEditorRef?.activate('selectAll')
     } else if (n.kind === 'array' && autoEditName) {
       const children = (n as ArrayNode).children
       if (children && children.length > 0) {
@@ -744,6 +746,7 @@
             isRootChild={id === model.rootId}
             autoEditName={cid === newlyAddedChildId || cid === autoEditChildId}
             {autoEditChildId}
+            {autoEditBehavior}
             {onMutate}
             {selectedIds}
             {onSelect}

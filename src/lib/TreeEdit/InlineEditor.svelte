@@ -108,20 +108,31 @@
     }
   }
 
-  export async function activate() {
-    // Programmatically start editing and focus/select input
-    startEditing()
+  export async function activate(behavior: 'selectAll' | 'caretEnd' = 'selectAll') {
+    // Programmatically start editing and focus/select input with desired caret behavior
+    startEditing(behavior)
     await tick()
     if (enableAutocomplete) {
       // Focus the inner textarea of AutoCompleteTextarea
       const ta = acWrapper?.querySelector('textarea') as HTMLTextAreaElement | null
       if (ta) {
         ta.focus()
-        ta.select()
+        if (behavior === 'selectAll') {
+          ta.select()
+        } else {
+          const end = ta.value?.length ?? 0
+          ta.selectionStart = end
+          ta.selectionEnd = end
+        }
       }
     } else if (inputElement) {
       inputElement.focus()
-      inputElement.select()
+      if (behavior === 'selectAll') {
+        inputElement.select()
+      } else {
+        const end = inputElement.value?.length ?? 0
+        inputElement.setSelectionRange?.(end, end)
+      }
     }
   }
 </script>
