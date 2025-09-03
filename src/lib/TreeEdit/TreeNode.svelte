@@ -132,6 +132,62 @@
       return false
     }
 
+    // If dropping between nodes adjacent to a collapsed container, insert as a sibling
+    // under that container (do not make it a child of the target node).
+    let siblingParentId: string | null = null
+    if (targetNode && isContainer(targetNode) && targetNode.collapsed) {
+      siblingParentId = targetNode.parentId
+    } else {
+      const targetParentId0 = model.nodes[id]?.parentId ?? null
+      if (targetParentId0) {
+        const targetParent0 = model.nodes[targetParentId0]
+        if (targetParent0 && isContainer(targetParent0) && targetParent0.collapsed) {
+          siblingParentId = targetParentId0
+        }
+      }
+    }
+    if (siblingParentId) {
+      // Prevent cycles: dragged cannot be moved under its descendant
+      if (isAncestor(draggedId, siblingParentId)) {
+        dragOverPosition = null
+        return
+      }
+      const siblings = (model.nodes[siblingParentId] as ObjectNode | ArrayNode).children
+      const targetIndex = siblings.indexOf(id)
+      if (targetIndex !== -1) {
+        let newIndex = targetIndex
+        if (dragOverPosition === 'after') newIndex = targetIndex + 1
+
+        const currentParentId = model.nodes[draggedId]?.parentId ?? null
+        if (currentParentId === siblingParentId) {
+          const fromIndex = siblings.indexOf(draggedId)
+          if (fromIndex !== -1) {
+            if (fromIndex < newIndex) newIndex -= 1
+            moveChild(model, siblingParentId, fromIndex, newIndex)
+            onMutate(true)
+          }
+        } else {
+          // Detach from old parent
+          if (currentParentId) {
+            const oldParent = model.nodes[currentParentId]
+            if (oldParent && isContainer(oldParent)) {
+              const oc = (oldParent as ObjectNode | ArrayNode).children
+              const oi = oc.indexOf(draggedId)
+              if (oi !== -1) oc.splice(oi, 1)
+            }
+          }
+          // Clamp index and insert
+          if (newIndex < 0) newIndex = 0
+          if (newIndex > siblings.length) newIndex = siblings.length
+          siblings.splice(newIndex, 0, draggedId)
+          if (draggedNode) draggedNode.parentId = siblingParentId
+          onMutate(true)
+        }
+        dragOverPosition = null
+        return
+      }
+    }
+
     // If dropping a container onto a child within an array, and the drop
     // is between children (middle), split the array around the drop index
     // into two arrays with the dragged container placed between them.

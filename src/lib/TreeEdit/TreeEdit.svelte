@@ -314,14 +314,36 @@
 
   function deleteBySelection() {
     if (selectedIds.length === 0 || selectedIds.includes(model.rootId)) return
-    // Delete all selected nodes (filter out root if somehow included)
     const validIds = selectedIds.filter((id) => id !== model.rootId)
+    const toDelete = new Set(validIds)
+
+    // Compute nearest surviving ancestors to select after deletion
+    const parentCandidates: string[] = []
     for (const id of validIds) {
-      removeNode(model, id)
+      let pid = model.nodes[id]?.parentId ?? null
+      while (pid) {
+        // pick the first ancestor that isn't being deleted and isn't the hidden root
+        if (!toDelete.has(pid) && pid !== model.rootId) {
+          parentCandidates.push(pid)
+          break
+        }
+        pid = model.nodes[pid]?.parentId ?? null
+      }
     }
+    const uniqueParents = Array.from(new Set(parentCandidates))
+
+    // Perform deletion
+    for (const id of validIds) removeNode(model, id)
     rebuildPathSymbols(model)
-    selectedIds = []
-    lastSelectedId = null
+
+    if (uniqueParents.length > 0) {
+      selectedIds = uniqueParents
+      lastSelectedId = uniqueParents[0]
+      tick().then(() => scrollSelectedIntoView())
+    } else {
+      selectedIds = []
+      lastSelectedId = null
+    }
     hasUnsavedChanges = true
   }
 
