@@ -9,6 +9,8 @@
   }
 
   let { isOpen = $bindable(), initialSelectedName = '' }: Props = $props()
+  let loading = $state(false)
+  let pendingText: string | null = $state(null)
 
   function handleBackdropClick(event: MouseEvent) {
     if (event.target === event.currentTarget) {
@@ -32,17 +34,33 @@
   // When dialog opens, load YAML from server and populate child
   $effect(() => {
     if (isOpen) {
+      loading = true
       fetchWildcardsText()
         .then((text) => {
-          if (tree) {
-            tree.load(text)
-            if (initialSelectedName) {
-              // Slightly defer to allow render
-              setTimeout(() => tree?.selectByName(initialSelectedName!), 0)
-            }
-          }
+          // Yield a frame so the dialog paints before heavy parse
+          requestAnimationFrame(() => {
+            pendingText = text
+            loading = false
+          })
         })
-        .catch((err) => console.error('Failed to load wildcards.yaml:', err))
+        .catch((err) => {
+          console.error('Failed to load wildcards.yaml:', err)
+          loading = false
+        })
+    } else {
+      pendingText = null
+    }
+  })
+
+  // Once TreeEdit is mounted (!loading) and we have pending text, load it
+  $effect(() => {
+    if (isOpen && !loading && tree && pendingText) {
+      const text = pendingText
+      pendingText = null
+      tree.load(text)
+      if (initialSelectedName) {
+        setTimeout(() => tree?.selectByName(initialSelectedName!), 0)
+      }
     }
   })
 
@@ -92,7 +110,13 @@
 
       <!-- Content -->
       <div class="min-h-0 flex-1 overflow-hidden">
-        <TreeEdit bind:this={tree} bind:hasUnsavedChanges />
+        {#if !loading}
+          <TreeEdit bind:this={tree} bind:hasUnsavedChanges />
+        {:else}
+          <div class="flex h-full items-center justify-center text-gray-500">
+            Loading wildcards...
+          </div>
+        {/if}
       </div>
 
       <!-- Footer -->
