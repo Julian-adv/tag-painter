@@ -157,14 +157,6 @@
       const sym = model.symbols[name]
       if (sym) {
         targetId = sym
-      } else {
-        // Fallback: scan simple names
-        for (const n of Object.values(model.nodes)) {
-          if (n.name === name) {
-            targetId = n.id
-            break
-          }
-        }
       }
     }
     if (targetId) {
