@@ -192,7 +192,10 @@ export function rebuildPathSymbols(model: TreeModel): void {
     const currentPath = parentPath ? `${parentPath}/${n.name}` : n.name
     if (n.kind === 'object' || n.kind === 'array') {
       if (n.name !== 'root') {
-        map[currentPath] = id
+        const displayPath = currentPath.startsWith('root/')
+          ? currentPath.slice(5)
+          : currentPath
+        map[displayPath] = id
       }
       for (const cid of (n.children || [])) dfs(cid, currentPath)
     }

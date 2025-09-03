@@ -527,8 +527,8 @@
           id={model.rootId}
           isRootChild={true}
           autoEditChildId={autoEditChildId ?? newlyAddedRootChildId}
-          onMutate={() => {
-            rebuildPathSymbols(model)
+          onMutate={(structural: boolean) => {
+            if (structural) rebuildPathSymbols(model)
             hasUnsavedChanges = true
           }}
           {selectedIds}

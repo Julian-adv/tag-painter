@@ -31,7 +31,7 @@
     isRootChild?: boolean
     autoEditName?: boolean
     autoEditChildId?: string | null
-    onMutate: () => void
+    onMutate: (structural: boolean) => void
     selectedIds?: string[]
     onSelect: (id: string, shiftKey?: boolean) => void
     setAutoEditChildId?: (id: string | null) => void
@@ -223,7 +223,7 @@
             // Write new b
             model.nodes[bId] = newB
 
-            onMutate()
+            onMutate(true)
             dragOverPosition = null
             return
           } else {
@@ -287,7 +287,7 @@
             }
 
             model.nodes[bId] = newB
-            onMutate()
+            onMutate(true)
             dragOverPosition = null
             return
           }
@@ -317,7 +317,7 @@
         }
         // Attach to target object
         addChild(model, targetNode.id, draggedNode)
-        onMutate()
+        onMutate(true)
         dragOverPosition = null
         return
       }
@@ -379,7 +379,7 @@
         // Attach dragged under new b
         addChild(model, bId, draggedNode)
 
-        onMutate()
+        onMutate(true)
         dragOverPosition = null
         return
       }
@@ -414,7 +414,7 @@
         }
         if (draggedIndex < newIndex) newIndex -= 1
         moveChild(model, targetParentId, draggedIndex, newIndex)
-        onMutate()
+        onMutate(true)
       } else {
         // Cross-parent move
         const draggedNode = model.nodes[draggedId]
@@ -435,7 +435,7 @@
         children.splice(newIndex, 0, draggedId)
         // Update parent link
         draggedNode.parentId = targetParentId
-        onMutate()
+        onMutate(true)
       }
     }
 
@@ -480,7 +480,7 @@
       Math.min(insertIndex, (parent as ObjectNode | ArrayNode).children.length - 1)
     )
 
-    onMutate()
+    onMutate(true)
     // Request auto-edit for the newly created leaf
     setAutoEditChildId?.(newId)
     onSelect(newId)
@@ -557,13 +557,14 @@
     } else {
       // Normal rename behavior
       renameNode(model, id, newValue)
-      onMutate()
+      const n = model.nodes[id]
+      onMutate(!!n && (n.kind === 'array' || n.kind === 'object'))
     }
   }
 
   function handleValueSave(newValue: string) {
     setLeafValue(model, id, newValue)
-    onMutate()
+    onMutate(false)
   }
 
   function handleNameFinish(completed: boolean = true) {
