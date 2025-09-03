@@ -3,7 +3,15 @@
   import TreeEditControlPanel from './TreeEditControlPanel.svelte'
   import type { TreeModel, LeafNode, ArrayNode, ObjectNode, AnyNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
-  import { addChild, isContainer, uid, removeNode, convertLeafToArray, moveChild } from './model'
+  import {
+    addChild,
+    isContainer,
+    uid,
+    removeNode,
+    convertLeafToArray,
+    moveChild,
+    rebuildPathSymbols
+  } from './model'
   import { groupSelectedNodes } from './operations'
   import { getTopLevelAncestorName } from './utils'
   import { tick } from 'svelte'
@@ -192,6 +200,7 @@
         value: ''
       }
       addChild(model, arrayNode.id, firstItem)
+      rebuildPathSymbols(model)
 
       // Auto-edit the new array node's name
       newlyAddedRootChildId = arrayNode.id
@@ -261,6 +270,7 @@
       lastSelectedId = child.id
     }
 
+    rebuildPathSymbols(model)
     hasUnsavedChanges = true
   }
 
@@ -271,6 +281,7 @@
     for (const id of validIds) {
       removeNode(model, id)
     }
+    rebuildPathSymbols(model)
     selectedIds = []
     lastSelectedId = null
     hasUnsavedChanges = true
@@ -331,6 +342,7 @@
       return
     }
 
+    rebuildPathSymbols(model)
     hasUnsavedChanges = true
     selectedIds = result.newGroupId ? [result.newGroupId] : []
     lastSelectedId = result.newGroupId || null
@@ -435,6 +447,7 @@
     autoEditChildId = newRootId
     selectedIds = [newRootId]
     lastSelectedId = newRootId
+    rebuildPathSymbols(model)
     hasUnsavedChanges = true
   }
 
@@ -514,7 +527,10 @@
           id={model.rootId}
           isRootChild={true}
           autoEditChildId={autoEditChildId ?? newlyAddedRootChildId}
-          onMutate={() => (hasUnsavedChanges = true)}
+          onMutate={() => {
+            rebuildPathSymbols(model)
+            hasUnsavedChanges = true
+          }}
           {selectedIds}
           onSelect={selectNode}
           {setAutoEditChildId}

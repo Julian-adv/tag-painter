@@ -178,3 +178,25 @@ export function moveChild(model: TreeModel, parentId: NodeId, fromIndex: number,
   const [moved] = children.splice(fromIndex, 1)
   children.splice(toIndex, 0, moved)
 }
+
+/**
+ * Rebuild the pathSymbols map from the current tree structure.
+ * Stores container paths without the implicit 'root/' prefix.
+ */
+export function rebuildPathSymbols(model: TreeModel): void {
+  // Build map: path -> id
+  const map: Record<string, NodeId> = {}
+  function dfs(id: NodeId, parentPath: string) {
+    const n = model.nodes[id]
+    if (!n) return
+    const currentPath = parentPath ? `${parentPath}/${n.name}` : n.name
+    if (n.kind === 'object' || n.kind === 'array') {
+      if (n.name !== 'root') {
+        map[currentPath] = id
+      }
+      for (const cid of (n.children || [])) dfs(cid, currentPath)
+    }
+  }
+  dfs(model.rootId, '')
+  model.pathSymbols = map
+}
