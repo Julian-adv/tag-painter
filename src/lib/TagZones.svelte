@@ -102,7 +102,10 @@
     showTreeEditDialog = true
   }
 
-  function handleCustomTagDoubleClickForZone(zoneId: 'all' | 'zone1' | 'zone2' | 'negative' | 'inpainting', tagName: string) {
+  function handleCustomTagDoubleClickForZone(
+    zoneId: 'all' | 'zone1' | 'zone2' | 'negative' | 'inpainting',
+    tagName: string
+  ) {
     preselectTagName = tagName
     preselectTargetText = ''
 

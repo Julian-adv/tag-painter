@@ -58,8 +58,10 @@
   let rowEl: HTMLDivElement | null = $state(null)
 
   // Refs to inline editors for programmatic activation
-  let nameEditorRef: { activate: (behavior: 'selectAll' | 'caretEnd') => void } | null = $state(null)
-  let valueEditorRef: { activate: (behavior: 'selectAll' | 'caretEnd') => void } | null = $state(null)
+  let nameEditorRef: { activate: (behavior: 'selectAll' | 'caretEnd') => void } | null =
+    $state(null)
+  let valueEditorRef: { activate: (behavior: 'selectAll' | 'caretEnd') => void } | null =
+    $state(null)
 
   // One-shot auto edit trigger per node instance
   let autoEditApplied = $state(false)
