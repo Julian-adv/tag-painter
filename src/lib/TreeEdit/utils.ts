@@ -18,13 +18,23 @@ export function isConsistentRandomArray(model: TreeModel, id: NodeId): boolean {
 export function isLeafPinned(model: TreeModel, id: NodeId): boolean {
   const node = model.nodes[id]
   if (!node || node.kind !== 'leaf') return false
-  const parentName = getTopLevelAncestorName(model, id)
-  if (!parentName) return false
-  const store = testModeStore[parentName]
-  if (!store || !store.enabled) return false
-  if (store.pinnedLeafId) {
-    return store.pinnedLeafId === id
+  // Find nearest array ancestor and use its path as the pin key
+  let parentId: string | null = node.parentId
+  let arrayAncestorId: string | null = null
+  while (parentId) {
+    const p = model.nodes[parentId]
+    if (!p) break
+    if (p.kind === 'array') {
+      arrayAncestorId = p.id
+      break
+    }
+    parentId = p.parentId ?? null
   }
+  if (!arrayAncestorId) return false
+  const pinKey = getNodePath(model, arrayAncestorId)
+  const store = testModeStore[pinKey]
+  if (!store || !store.enabled) return false
+  if (store.pinnedLeafId) return store.pinnedLeafId === id
   const val = String(node.value ?? '')
   return store.overrideTag === val
 }
@@ -56,6 +66,19 @@ export function findNodeByName(model: TreeModel, name: string): AnyNode | undefi
   }
   // Path-based lookup covered by model.pathSymbols; no manual walk needed
   return undefined
+}
+
+// Build full path (without leading 'root') for a node id
+export function getNodePath(model: TreeModel, nodeId: string): string {
+  const parts: string[] = []
+  let cur = model.nodes[nodeId]
+  while (cur && cur.parentId) {
+    parts.push(cur.name)
+    cur = model.nodes[cur.parentId]
+  }
+  parts.reverse()
+  if (parts[0] === 'root') parts.shift()
+  return parts.join('/')
 }
 
 export function getParentOf(model: TreeModel, nodeId: string): string | null {

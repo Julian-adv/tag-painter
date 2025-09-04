@@ -5,12 +5,11 @@
   import { fromYAML, toYAML } from './yaml-io'
   import { addChild, isContainer, uid, removeNode, moveChild, rebuildPathSymbols } from './model'
   import { groupSelectedNodes, expandAll, collapseAll } from './operations'
-  import { getTopLevelAncestorName } from './utils'
   import { computeNextSelectionAfterDelete } from './selection'
   import { findBestMatchingLeafId } from '$lib/utils/treeSearch'
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
-  import { isConsistentRandomArray } from './utils'
+  import { isConsistentRandomArray, getNodePath } from './utils'
   import { addBySelectionAction } from './addBySelection'
   import {
     testModeStore,
@@ -276,13 +275,26 @@
     const selectedId = selectedIds[0]
     const n = model.nodes[selectedId]
     if (!n || n.kind !== 'leaf') return
-    const parentName = getTopLevelAncestorName(model, selectedId)
-    if (!parentName) return
+    // Find nearest array ancestor to scope the pin to that array only
+    let parentId = n.parentId
+    let arrayAncestorId: string | null = null
+    while (parentId) {
+      const p = model.nodes[parentId]
+      if (!p) break
+      if (p.kind === 'array') {
+        arrayAncestorId = p.id
+        break
+      }
+      parentId = p.parentId || null
+    }
+    if (!arrayAncestorId) return
+    // Build path key for the array ancestor
+    const pinKey = getNodePath(model, arrayAncestorId)
     const val = String(n.value ?? '')
-    if (testModeStore[parentName]?.pinnedLeafId === selectedId) {
-      removeTestModeOverride(parentName)
+    if (testModeStore[pinKey]?.pinnedLeafId === selectedId) {
+      removeTestModeOverride(pinKey)
     } else {
-      setTestModeOverride(parentName, val, selectedId)
+      setTestModeOverride(pinKey, val, selectedId)
     }
   }
 
