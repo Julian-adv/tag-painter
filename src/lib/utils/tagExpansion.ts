@@ -7,7 +7,6 @@ import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
 import {
   findNodeByName,
-  getTopLevelAncestorName,
   extractDisablesDirective,
   updateDisablesDirective
 } from '$lib/TreeEdit/utils'
@@ -21,6 +20,7 @@ type TagExpansionCtx = {
   previousRunResults: Record<string, string>
   randomTagResolutions: Record<string, string>
   disables: DisabledContext
+  overrideMap: Record<string, string>
 }
 
 function isDescendantOf(model: TreeModel, ancestorId: string, nodeId: string): boolean {
@@ -36,6 +36,29 @@ function getLeafValueById(model: TreeModel, leafId: string): string {
   const n = model.nodes[leafId]
   if (n && n.kind === 'leaf') return String(n.value)
   return ''
+}
+
+// Build a unified override map from testModeStore pins/overrides and previous run results
+function buildOverrideMap(
+  model: TreeModel,
+  previousRunResults: Record<string, string>
+): Record<string, string> {
+  const map: Record<string, string> = {}
+  // 1) Path-scoped pins/overrides from test mode
+  for (const key of Object.keys(testModeStore)) {
+    const s = testModeStore[key]
+    if (!s || !s.enabled) continue
+    let v: string | undefined = undefined
+    if (s.overrideTag && String(s.overrideTag).trim()) v = String(s.overrideTag)
+    else if (s.pinnedLeafId) v = getLeafValueById(model, s.pinnedLeafId)
+    if (v && String(v).trim()) map[key] = String(v)
+  }
+  // 2) Previous run results (do not override explicit pins)
+  for (const [k, v] of Object.entries(previousRunResults || {})) {
+    if (map[k]) continue
+    if (v && String(v).trim()) map[k] = String(v)
+  }
+  return map
 }
 
 function collectDisablesFromStrings(ctx: TagExpansionCtx, values: string[]): string[] {
@@ -127,17 +150,8 @@ function expandRandomArrayTagWithCtx(
   tag: string
 ): { expandedTags: string[]; resolution: string } {
   let selected: string | null = null
-  const exact = testModeStore[tag]
-  if (exact && exact.overrideTag) selected = exact.overrideTag
-  if (!selected && exact && exact.pinnedLeafId) {
-    const node = findNodeByName(ctx.model, tag)
-    if (node && node.kind === 'array') {
-      const pinnedId = exact.pinnedLeafId
-      if (isDescendantOf(ctx.model, node.id, pinnedId)) {
-        selected = getLeafValueById(ctx.model, pinnedId)
-      }
-    }
-  }
+  // Exact path/name override from unified map
+  if (ctx.overrideMap[tag]) selected = ctx.overrideMap[tag]
   if (!selected && ctx.previousRunResults[tag]) {
     const previousResult = ctx.previousRunResults[tag]
     const previousTags = previousResult.split(', ')
@@ -174,8 +188,10 @@ function expandRandomArrayTagWithCtx(
   }
   if (options.length === 0) return { expandedTags: [], resolution: '' }
   if (!selected) {
-    if (isConsistent && ctx.existingRandomResolutions[tag]) selected = ctx.existingRandomResolutions[tag]
-    if (!selected && isConsistent && ctx.randomTagResolutions[tag]) selected = ctx.randomTagResolutions[tag]
+    if (isConsistent && ctx.existingRandomResolutions[tag])
+      selected = ctx.existingRandomResolutions[tag]
+    if (!selected && isConsistent && ctx.randomTagResolutions[tag])
+      selected = ctx.randomTagResolutions[tag]
   }
   if (!selected) {
     const idx = getSecureRandomIndex(options.length)
@@ -188,17 +204,7 @@ function expandRandomObjectOfArraysTagWithCtx(
   ctx: TagExpansionCtx,
   tag: string
 ): { expandedTags: string[]; resolution: string } {
-  const s = testModeStore[tag]
-  if (s && s.overrideTag) return { expandedTags: [s.overrideTag], resolution: s.overrideTag }
-  if (s && s.pinnedLeafId) {
-    const objNode = findNodeByName(ctx.model, tag)
-    if (objNode && objNode.kind === 'object') {
-      if (isDescendantOf(ctx.model, objNode.id, s.pinnedLeafId)) {
-        const val = getLeafValueById(ctx.model, s.pinnedLeafId)
-        if (val) return { expandedTags: [val], resolution: val }
-      }
-    }
-  }
+  if (ctx.overrideMap[tag]) return { expandedTags: [ctx.overrideMap[tag]], resolution: ctx.overrideMap[tag] }
   if (ctx.previousRunResults[tag]) {
     const previousResult = ctx.previousRunResults[tag]
     const previousTags = previousResult.split(', ')
@@ -368,7 +374,8 @@ export function expandCustomTags(
     existingRandomResolutions,
     previousRunResults,
     randomTagResolutions: {},
-    disables: disabledContext || { names: new Set<string>(), patterns: [] }
+    disables: disabledContext || { names: new Set<string>(), patterns: [] },
+    overrideMap: buildOverrideMap(model, previousRunResults)
   }
 
   let out: string[] = []
@@ -388,11 +395,10 @@ export function expandCustomTags(
     if (node && node.kind === 'array') {
       ctx.visitedTags.add(tag)
       const result = expandRandomArrayTagWithCtx(ctx, tag)
-      const finalized = expandPlaceholdersDeepWithCtx(
-        ctx,
-        result.expandedTags,
-        { ...ctx.existingRandomResolutions, ...ctx.randomTagResolutions }
-      )
+      const finalized = expandPlaceholdersDeepWithCtx(ctx, result.expandedTags, {
+        ...ctx.existingRandomResolutions,
+        ...ctx.randomTagResolutions
+      })
       const cleaned = collectDisablesFromStrings(ctx, finalized)
       const cleanedText = cleaned.join(', ')
       if (tagWeight) out.push(applyWeight(cleanedText, tagWeight))
@@ -405,11 +411,10 @@ export function expandCustomTags(
     if (node && node.kind === 'object') {
       ctx.visitedTags.add(tag)
       const result = expandRandomObjectOfArraysTagWithCtx(ctx, tag)
-      const finalized = expandPlaceholdersDeepWithCtx(
-        ctx,
-        result.expandedTags,
-        { ...ctx.existingRandomResolutions, ...ctx.randomTagResolutions }
-      )
+      const finalized = expandPlaceholdersDeepWithCtx(ctx, result.expandedTags, {
+        ...ctx.existingRandomResolutions,
+        ...ctx.randomTagResolutions
+      })
       const cleaned = collectDisablesFromStrings(ctx, finalized)
       const cleanedText = cleaned.join(', ')
       if (tagWeight) out.push(applyWeight(cleanedText, tagWeight))
@@ -423,11 +428,10 @@ export function expandCustomTags(
     else out.push(tag)
   }
 
-  out = expandPlaceholdersDeepWithCtx(
-    ctx,
-    out,
-    { ...ctx.existingRandomResolutions, ...ctx.randomTagResolutions }
-  )
+  out = expandPlaceholdersDeepWithCtx(ctx, out, {
+    ...ctx.existingRandomResolutions,
+    ...ctx.randomTagResolutions
+  })
   out = collectDisablesFromStrings(ctx, out)
   if (ctx.disables.names.size > 0) {
     const disabledOutputs = new Set<string>()
