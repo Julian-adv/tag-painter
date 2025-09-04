@@ -120,7 +120,7 @@ export function addBySelectionAction(
   }
 
   // freshParent.kind === 'array': add a leaf child
-  const nextIndex = String((freshParent.children?.length ?? 0))
+  const nextIndex = String(freshParent.children?.length ?? 0)
   const child: LeafNode = {
     id: uid(),
     name: nextIndex,

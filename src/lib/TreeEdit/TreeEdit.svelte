@@ -3,14 +3,7 @@
   import TreeEditControlPanel from './TreeEditControlPanel.svelte'
   import type { TreeModel, LeafNode, ArrayNode, ObjectNode, AnyNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
-  import {
-    addChild,
-    isContainer,
-    uid,
-    removeNode,
-    moveChild,
-    rebuildPathSymbols
-  } from './model'
+  import { addChild, isContainer, uid, removeNode, moveChild, rebuildPathSymbols } from './model'
   import { groupSelectedNodes, expandAll, collapseAll } from './operations'
   import { getTopLevelAncestorName } from './utils'
   import { computeNextSelectionAfterDelete } from './selection'
