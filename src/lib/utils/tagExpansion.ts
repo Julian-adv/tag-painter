@@ -184,6 +184,30 @@ export function expandCustomTags(
     return [node.name]
   }
 
+  // Collect disables directives appearing in arbitrary strings (e.g., after placeholder expansion)
+  // Returns a cleaned copy of the input with disables directives removed and context updated.
+  function collectDisablesFromStrings(values: string[], m: TreeModel): string[] {
+    const out: string[] = []
+    for (let val of values) {
+      const items = extractDisablesDirective(String(val))
+      if (items.length) {
+        for (const it of items) {
+          const maybeNode = findNodeByName(m, it)
+          if (maybeNode) {
+            disables.names.add(it)
+          } else {
+            // Treat as name/path anyway so top-level tag matching works; also keep as pattern for option filtering
+            disables.names.add(it)
+            disables.patterns.push(it)
+          }
+        }
+        val = updateDisablesDirective(String(val), [])
+      }
+      out.push(val)
+    }
+    return out
+  }
+
   // Returns true if targetId is within the subtree of ancestorId
   function isDescendantOf(m: TreeModel, ancestorId: string, targetId: string): boolean {
     // Walk up from target to root and see if we hit ancestorId
@@ -281,7 +305,9 @@ export function expandCustomTags(
       }
       options.push(candidate)
     }
-    if (options.length === 0) return { expandedTags: [], resolution: '' }
+    if (options.length === 0) {
+      return { expandedTags: [], resolution: '' }
+    }
 
     // Select option if not fixed by override/previous
     if (!selected) {
@@ -321,7 +347,9 @@ export function expandCustomTags(
       if (objNode && objNode.kind === 'object') {
         if (isDescendantOf(m, objNode.id, s.pinnedLeafId)) {
           const val = getLeafValueById(m, s.pinnedLeafId)
-          if (val) return { expandedTags: [val], resolution: val }
+          if (val) {
+            return { expandedTags: [val], resolution: val }
+          }
         }
       }
     }
@@ -419,15 +447,16 @@ export function expandCustomTags(
         previousRunResults,
         randomTagResolutions
       )
+      // Apply and remove any disables that appeared inside the finalized text
+      const cleaned = collectDisablesFromStrings(finalized, model)
+      const cleanedText = cleaned.join(', ')
       if (tagWeight) {
-        const weightedExpansion = applyWeight(finalized.join(', '), tagWeight)
+        const weightedExpansion = applyWeight(cleanedText, tagWeight)
         expandedTags.push(weightedExpansion)
-        // 3. Remember fully expanded text for this tag
-        randomTagResolutions[tag] = finalized.join(', ')
+        randomTagResolutions[tag] = cleanedText
       } else {
-        expandedTags.push(...finalized)
-        // 3. Remember fully expanded text for this tag
-        randomTagResolutions[tag] = finalized.join(', ')
+        expandedTags.push(...cleaned)
+        randomTagResolutions[tag] = cleanedText
       }
       visitedTags.delete(tag)
       continue
@@ -444,13 +473,16 @@ export function expandCustomTags(
         previousRunResults,
         randomTagResolutions
       )
+      // Apply and remove any disables that appeared inside the finalized text
+      const cleaned = collectDisablesFromStrings(finalized, model)
+      const cleanedText = cleaned.join(', ')
       if (tagWeight) {
-        const weightedExpansion = applyWeight(finalized.join(', '), tagWeight)
+        const weightedExpansion = applyWeight(cleanedText, tagWeight)
         expandedTags.push(weightedExpansion)
-        randomTagResolutions[tag] = finalized.join(', ')
+        randomTagResolutions[tag] = cleanedText
       } else {
-        expandedTags.push(...finalized)
-        randomTagResolutions[tag] = finalized.join(', ')
+        expandedTags.push(...cleaned)
+        randomTagResolutions[tag] = cleanedText
       }
       visitedTags.delete(tag)
       continue

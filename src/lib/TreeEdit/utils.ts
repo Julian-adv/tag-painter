@@ -47,8 +47,13 @@ export function getTopLevelAncestorName(model: TreeModel, nodeId: string): strin
 
 export function findNodeByName(model: TreeModel, name: string): AnyNode | undefined {
   const q = String(name).trim()
-  const bySym = model.symbols[q] || model.pathSymbols[q]
-  if (bySym) return model.nodes[bySym]
+  const bySym = model.symbols[q]
+  const byPath = model.pathSymbols[q]
+  if (bySym || byPath) {
+    const id = bySym || byPath
+    const n = id ? model.nodes[id] : undefined
+    return n
+  }
   // Path-based lookup covered by model.pathSymbols; no manual walk needed
   return undefined
 }
