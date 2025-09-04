@@ -6,9 +6,10 @@
   interface Props {
     isOpen: boolean
     initialSelectedName?: string
+    initialTargetText?: string
   }
 
-  let { isOpen = $bindable(), initialSelectedName = '' }: Props = $props()
+  let { isOpen = $bindable(), initialSelectedName = '', initialTargetText = '' }: Props = $props()
   let loading = $state(false)
   let pendingText: string | null = $state(null)
 
@@ -28,6 +29,7 @@
     getYaml: () => string
     markSaved: () => void
     selectByName: (n: string) => void
+    selectBestChildByValue: (parentName: string, targetText: string) => boolean
   } | null = $state(null)
   let hasUnsavedChanges = $state(false)
 
@@ -115,7 +117,14 @@
       pendingText = null
       tree.load(text)
       if (initialSelectedName) {
-        setTimeout(() => tree?.selectByName(initialSelectedName!), 0)
+        setTimeout(() => {
+          if (initialTargetText) {
+            const ok = tree?.selectBestChildByValue(initialSelectedName!, initialTargetText!)
+            if (!ok) tree?.selectByName(initialSelectedName!)
+          } else {
+            tree?.selectByName(initialSelectedName!)
+          }
+        }, 0)
       }
     }
   })

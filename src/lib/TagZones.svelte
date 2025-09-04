@@ -30,6 +30,7 @@
   let inpaintingTags = $state<CustomTag[]>([])
   let showTreeEditDialog = $state(false)
   let preselectTagName = $state('')
+  let preselectTargetText = $state('')
 
   // Parse weight from tag string
   function parseTagWithWeight(tagString: string): { name: string; weight?: number } {
@@ -101,8 +102,29 @@
     showTreeEditDialog = true
   }
 
-  function handleCustomTagDoubleClick(tagName: string) {
+  function handleCustomTagDoubleClickForZone(zoneId: 'all' | 'zone1' | 'zone2' | 'negative' | 'inpainting', tagName: string) {
     preselectTagName = tagName
+    preselectTargetText = ''
+
+    // Determine tag object from the respective zone to check type
+    let src: CustomTag[] = []
+    if (zoneId === 'all') src = allTags
+    else if (zoneId === 'zone1') src = firstZoneTags
+    else if (zoneId === 'zone2') src = secondZoneTags
+    else if (zoneId === 'negative') src = negativeTags
+    else if (zoneId === 'inpainting') src = inpaintingTags
+
+    const tagObj = src.find((t) => t.name === tagName)
+    const tagType = tagObj ? tagObj.type : wildcardTagType(tagName)
+
+    if (tagType === 'random' || tagType === 'consistent-random' || tagType === 'sequential') {
+      const zoneMap = currentRandomTagResolutions[zoneId] || {}
+      const resolved = zoneMap[tagName]
+      if (resolved) {
+        preselectTargetText = String(resolved)
+      }
+    }
+
     showTreeEditDialog = true
   }
 </script>
@@ -127,7 +149,7 @@
       label="All"
       bind:tags={allTags}
       onTagsChange={saveTags}
-      onCustomTagDoubleClick={handleCustomTagDoubleClick}
+      onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('all', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.all}
     />
 
@@ -136,7 +158,7 @@
       label="First Zone"
       bind:tags={firstZoneTags}
       onTagsChange={saveTags}
-      onCustomTagDoubleClick={handleCustomTagDoubleClick}
+      onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone1}
     />
 
@@ -145,7 +167,7 @@
       label="Second Zone"
       bind:tags={secondZoneTags}
       onTagsChange={saveTags}
-      onCustomTagDoubleClick={handleCustomTagDoubleClick}
+      onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone2}
       disabled={$promptsData.selectedComposition === 'all'}
     />
@@ -155,7 +177,7 @@
       label="Negative Tags"
       bind:tags={negativeTags}
       onTagsChange={saveTags}
-      onCustomTagDoubleClick={handleCustomTagDoubleClick}
+      onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('negative', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.negative}
     />
 
@@ -164,13 +186,17 @@
       label="Inpainting Prompt"
       bind:tags={inpaintingTags}
       onTagsChange={saveTags}
-      onCustomTagDoubleClick={handleCustomTagDoubleClick}
+      onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('inpainting', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.inpainting}
     />
   </div>
 
   <!-- Wildcards editor dialog (single instance, opened from button or double-click) -->
-  <WildcardsEditorDialog bind:isOpen={showTreeEditDialog} initialSelectedName={preselectTagName} />
+  <WildcardsEditorDialog
+    bind:isOpen={showTreeEditDialog}
+    initialSelectedName={preselectTagName}
+    initialTargetText={preselectTargetText}
+  />
 </div>
 
 <style>

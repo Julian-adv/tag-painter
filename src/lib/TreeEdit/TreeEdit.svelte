@@ -13,7 +13,7 @@
     rebuildPathSymbols
   } from './model'
   import { groupSelectedNodes, expandAll, collapseAll } from './operations'
-  import { getTopLevelAncestorName } from './utils'
+  import { getTopLevelAncestorName, updateDisablesDirective } from './utils'
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
   import { isConsistentRandomArray } from './utils'
@@ -214,6 +214,135 @@
       // Wait for DOM update then scroll to the selected row
       tick().then(() => scrollSelectedIntoView())
     }
+  }
+
+  // Select the most similar leaf under a given parent container name based on target text
+  export function selectBestChildByValue(parentName: string, targetText: string): boolean {
+    if (!parentName || !targetText) return false
+    const baseId = model.symbols[parentName] || model.pathSymbols[parentName]
+    if (!baseId) return false
+
+    // If a nested path is provided (e.g., "pose/d"), widen the search to the
+    // parent container ("pose") so siblings like gaze/expression are included.
+    let searchRootId = baseId
+    if (parentName.includes('/')) {
+      const baseNode = model.nodes[baseId]
+      if (baseNode && baseNode.parentId) {
+        searchRootId = baseNode.parentId
+      }
+    }
+
+    // Collect descendant leaf nodes under the chosen root
+    const leaves: string[] = []
+    const stack: string[] = [searchRootId]
+    const seen = new Set<string>()
+    while (stack.length) {
+      const cid = stack.pop() as string
+      if (seen.has(cid)) continue
+      seen.add(cid)
+      const n = model.nodes[cid]
+      if (!n) continue
+      if (n.kind === 'leaf') {
+        leaves.push(cid)
+      } else if (n.kind === 'object' || n.kind === 'array') {
+        const kids = (n as ObjectNode | ArrayNode).children
+        if (kids && kids.length) stack.push(...kids)
+      }
+    }
+    if (leaves.length === 0) return false
+
+    function normalize(s: string): string {
+      const cleaned = s
+        .replace(/disables=\[[^\]]*\]/gi, ' ')
+        .replace(/composition=[a-z0-9_-]+/gi, ' ')
+        .toLowerCase()
+      return cleaned.replace(/[^a-z0-9]+/g, ' ').replace(/\s{2,}/g, ' ').trim()
+    }
+    function tokens(s: string): Set<string> {
+      const arr = normalize(s).split(' ').filter((t) => t.length > 0)
+      return new Set(arr)
+    }
+    function jaccard(a: Set<string>, b: Set<string>): number {
+      if (a.size === 0 && b.size === 0) return 0
+      let inter = 0
+      for (const t of a) if (b.has(t)) inter++
+      const union = a.size + b.size - inter
+      if (union === 0) return 0
+      return inter / union
+    }
+    // Plain Levenshtein distance (edit distance)
+    function levenshtein(a: string, b: string): number {
+      const m = a.length
+      const n = b.length
+      if (m === 0) return n
+      if (n === 0) return m
+      const prev: number[] = new Array(n + 1)
+      const curr: number[] = new Array(n + 1)
+      for (let j = 0; j <= n; j++) prev[j] = j
+      for (let i = 1; i <= m; i++) {
+        curr[0] = i
+        const ai = a.charCodeAt(i - 1)
+        for (let j = 1; j <= n; j++) {
+          const cost = ai === b.charCodeAt(j - 1) ? 0 : 1
+          curr[j] = Math.min(
+            prev[j] + 1, // deletion
+            curr[j - 1] + 1, // insertion
+            prev[j - 1] + cost // substitution
+          )
+        }
+        // swap rows
+        for (let j = 0; j <= n; j++) prev[j] = curr[j]
+      }
+      return prev[n]
+    }
+    function editSimilarity(a: string, b: string): number {
+      const maxLen = Math.max(a.length, b.length)
+      if (maxLen === 0) return 1
+      const dist = levenshtein(a, b)
+      return 1 - dist / maxLen
+    }
+    const targetTokens = tokens(targetText)
+
+    let bestId: string | null = null
+    let bestScore = -1
+    for (const leafId of leaves) {
+      const leaf = model.nodes[leafId]
+      if (!leaf || leaf.kind !== 'leaf') continue
+      let val = String((leaf as LeafNode).value ?? '')
+      // Remove disables directive cleanly
+      val = updateDisablesDirective(val, [])
+      const candTokens = tokens(val)
+      const j = jaccard(targetTokens, candTokens)
+      const nt = normalize(targetText)
+      const nv = normalize(val)
+      const e = editSimilarity(nt, nv)
+      // Combine token overlap and order-sensitive edit similarity
+      let score = 0.5 * j + 0.5 * e
+      if (score > bestScore) {
+        bestScore = score
+        bestId = leafId
+      }
+    }
+
+    if (!bestId || bestScore <= 0) {
+      // Fallback: select the parent container by name
+      selectByName(parentName)
+      return false
+    }
+
+    // Expand ancestors to ensure visibility
+    let cur = model.nodes[bestId]
+    while (cur && cur.parentId) {
+      const p = model.nodes[cur.parentId]
+      if (!p) break
+      if (p.kind === 'object' || p.kind === 'array') p.collapsed = false
+      cur = p
+    }
+
+    selectedIds = [bestId]
+    lastSelectedId = bestId
+    tick().then(() => scrollSelectedIntoView())
+    return true
   }
 
   function addBySelection() {
