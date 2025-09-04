@@ -13,7 +13,7 @@
     rebuildPathSymbols
   } from './model'
   import { groupSelectedNodes, expandAll, collapseAll } from './operations'
-  import { getTopLevelAncestorName, updateDisablesDirective } from './utils'
+  import { getTopLevelAncestorName } from './utils'
   import { findBestMatchingLeafId } from '$lib/utils/treeSearch'
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'

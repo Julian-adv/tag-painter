@@ -145,7 +145,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
 
     const allTagsText = allResult.expandedTags.join(', ')
     const zone1TagsText = zone1Result.expandedTags.join(', ')
-    const zone2TagsText = zone2Result.expandedTags.join(', ')
+    let zone2TagsText = zone2Result.expandedTags.join(', ')
     const negativeTagsText = negativeResult.expandedTags.join(', ')
     const inpaintingTagsText = inpaintingResult.expandedTags.join(', ')
 
@@ -167,9 +167,15 @@ export async function generateImage(options: GenerationOptions): Promise<{
       }
     } else {
       // Configure regular workflow
-      // Set face detailer wildcard with combined first zone and second zone prompts
-      const combinedZonePrompt =
-        zone1TagsText && zone2TagsText
+      // If composition is 'all', ignore zone2 so it doesn't affect generation
+      const isAll = promptsData.selectedComposition === 'all'
+      if (isAll) {
+        zone2TagsText = ''
+      }
+      // Set face detailer wildcard with appropriate prompts
+      const combinedZonePrompt = isAll
+        ? zone1TagsText
+        : zone1TagsText && zone2TagsText
           ? `[ASC] ${zone1TagsText} [SEP] ${zone2TagsText}`
           : zone1TagsText || zone2TagsText
       workflow['56'].inputs.wildcard = combinedZonePrompt
