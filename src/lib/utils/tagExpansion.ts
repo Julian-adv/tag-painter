@@ -103,7 +103,7 @@ function expandNodeOnce(ctx: TagExpansionCtx, node: AnyNode): string[] {
   return [node.name]
 }
 
-function expandPlaceholdersDeepWithCtx(
+function expandPlaceholders(
   ctx: TagExpansionCtx,
   inputs: string[],
   resolutionsAcc: Record<string, string>
@@ -145,7 +145,7 @@ function expandPlaceholdersDeepWithCtx(
   return out
 }
 
-function expandRandomArrayTagWithCtx(
+function expandArrayNode(
   ctx: TagExpansionCtx,
   tag: string
 ): { expandedTags: string[]; resolution: string } {
@@ -200,7 +200,7 @@ function expandRandomArrayTagWithCtx(
   return { expandedTags: [selected!], resolution: selected! }
 }
 
-function expandRandomObjectOfArraysTagWithCtx(
+function expandObjectNode(
   ctx: TagExpansionCtx,
   tag: string
 ): { expandedTags: string[]; resolution: string } {
@@ -238,9 +238,8 @@ function expandRandomObjectOfArraysTagWithCtx(
       if (parts[0] === 'root') parts.shift()
       return parts.join('/')
     })(ctx.model, arr.id)
-    const sDesc = testModeStore[preferredPath]
-    if (sDesc && (sDesc.overrideTag || sDesc.pinnedLeafId)) {
-      const preferred = expandRandomArrayTagWithCtx(ctx, preferredPath)
+    if (ctx.overrideMap[preferredPath]) {
+      const preferred = expandArrayNode(ctx, preferredPath)
       return { expandedTags: preferred.expandedTags, resolution: preferred.resolution }
     }
   }
@@ -277,7 +276,7 @@ function expandRandomObjectOfArraysTagWithCtx(
     if (parts[0] === 'root') parts.shift()
     return parts.join('/')
   })(ctx.model, chosenArray.id)
-  const result = expandRandomArrayTagWithCtx(ctx, chosenPath)
+  const result = expandArrayNode(ctx, chosenPath)
   return { expandedTags: result.expandedTags, resolution: result.resolution }
 }
 
@@ -394,8 +393,8 @@ export function expandCustomTags(
     const node = findNodeByName(model, tag)
     if (node && node.kind === 'array') {
       ctx.visitedTags.add(tag)
-      const result = expandRandomArrayTagWithCtx(ctx, tag)
-      const finalized = expandPlaceholdersDeepWithCtx(ctx, result.expandedTags, {
+      const result = expandArrayNode(ctx, tag)
+      const finalized = expandPlaceholders(ctx, result.expandedTags, {
         ...ctx.existingRandomResolutions,
         ...ctx.randomTagResolutions
       })
@@ -410,8 +409,8 @@ export function expandCustomTags(
 
     if (node && node.kind === 'object') {
       ctx.visitedTags.add(tag)
-      const result = expandRandomObjectOfArraysTagWithCtx(ctx, tag)
-      const finalized = expandPlaceholdersDeepWithCtx(ctx, result.expandedTags, {
+      const result = expandObjectNode(ctx, tag)
+      const finalized = expandPlaceholders(ctx, result.expandedTags, {
         ...ctx.existingRandomResolutions,
         ...ctx.randomTagResolutions
       })
@@ -428,7 +427,7 @@ export function expandCustomTags(
     else out.push(tag)
   }
 
-  out = expandPlaceholdersDeepWithCtx(ctx, out, {
+  out = expandPlaceholders(ctx, out, {
     ...ctx.existingRandomResolutions,
     ...ctx.randomTagResolutions
   })
