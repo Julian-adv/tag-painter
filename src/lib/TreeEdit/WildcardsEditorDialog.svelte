@@ -31,6 +31,58 @@
   } | null = $state(null)
   let hasUnsavedChanges = $state(false)
 
+  // Draggable dialog state
+  let dialogEl: HTMLDivElement | null = $state(null)
+  let posLeft = $state(0)
+  let posTop = $state(0)
+  let hasCustomPosition = $state(false)
+  let isDragging = $state(false)
+  let dragOffsetX = $state(0)
+  let dragOffsetY = $state(0)
+
+  function centerDialog() {
+    if (!dialogEl) return
+    const rect = dialogEl.getBoundingClientRect()
+    const left = Math.max(0, Math.round((window.innerWidth - rect.width) / 2))
+    const top = Math.max(0, Math.round((window.innerHeight - rect.height) / 2))
+    posLeft = left
+    posTop = top
+  }
+
+  function startDrag(e: PointerEvent) {
+    if (!dialogEl) return
+    isDragging = true
+    const rect = dialogEl.getBoundingClientRect()
+    dragOffsetX = e.clientX - rect.left
+    dragOffsetY = e.clientY - rect.top
+    hasCustomPosition = true
+    e.preventDefault()
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', stopDrag)
+  }
+
+  function onPointerMove(e: PointerEvent) {
+    if (!isDragging || !dialogEl) return
+    const w = dialogEl.offsetWidth
+    const h = dialogEl.offsetHeight
+    let left = e.clientX - dragOffsetX
+    let top = e.clientY - dragOffsetY
+    const maxLeft = Math.max(0, window.innerWidth - w)
+    const maxTop = Math.max(0, window.innerHeight - h)
+    if (left < 0) left = 0
+    if (top < 0) top = 0
+    if (left > maxLeft) left = maxLeft
+    if (top > maxTop) top = maxTop
+    posLeft = left
+    posTop = top
+  }
+
+  function stopDrag() {
+    isDragging = false
+    window.removeEventListener('pointermove', onPointerMove)
+    window.removeEventListener('pointerup', stopDrag)
+  }
+
   // When dialog opens, load YAML from server and populate child
   $effect(() => {
     if (isOpen) {
@@ -41,6 +93,10 @@
           requestAnimationFrame(() => {
             pendingText = text
             loading = false
+            // Center dialog on first open or when no custom position yet
+            if (!hasCustomPosition) {
+              requestAnimationFrame(() => centerDialog())
+            }
           })
         })
         .catch((err) => {
@@ -79,7 +135,7 @@
 {#if isOpen}
   <!-- Modal backdrop -->
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    class="fixed inset-0 z-50 bg-black/50"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
@@ -87,14 +143,22 @@
     onkeydown={(e) => e.key === 'Escape' && handleClose()}
   >
     <!-- Modal content -->
-    <div class="flex h-[700px] w-full max-w-5xl flex-col rounded-lg bg-white shadow-xl">
+    <div
+      bind:this={dialogEl}
+      class="fixed flex h-[700px] w-full max-w-5xl flex-col rounded-lg bg-white shadow-xl"
+      style={`left: ${posLeft}px; top: ${posTop}px;`}
+    >
       <!-- Header -->
-      <div class="flex items-center justify-between border-b border-gray-300 p-6">
+      <div
+        class="flex cursor-move items-center justify-between border-b border-gray-300 p-6 select-none"
+        onpointerdown={startDrag}
+      >
         <h2 class="text-lg font-semibold text-gray-900">Wildcards Editor</h2>
         <button
           type="button"
           class="text-gray-400 transition-colors hover:text-gray-600"
           onclick={handleClose}
+          onpointerdown={(e) => e.stopPropagation()}
           aria-label="Close dialog"
         >
           <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
