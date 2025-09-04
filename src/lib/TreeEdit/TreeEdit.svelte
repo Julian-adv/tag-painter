@@ -8,7 +8,6 @@
     isContainer,
     uid,
     removeNode,
-    convertLeafToArray,
     moveChild,
     rebuildPathSymbols
   } from './model'
@@ -19,6 +18,7 @@
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
   import { isConsistentRandomArray } from './utils'
+  import { addBySelectionAction } from './addBySelection'
   import {
     testModeStore,
     setTestModeOverride,
@@ -242,104 +242,20 @@
   }
 
   function addBySelection() {
-    // Special case: no selection -> add an Array node at root with one empty item
-    if (selectedIds.length === 0) {
-      const rootId = model.rootId
-      const root = model.nodes[rootId]
-      if (!root || !isContainer(root)) return
+    const result = addBySelectionAction(model, selectedIds)
+    if (!result.changed) return
 
-      const arrayNode: ArrayNode = {
-        id: uid(),
-        name: 'newKey',
-        kind: 'array',
-        parentId: rootId,
-        children: [],
-        collapsed: false
-      }
-      addChild(model, rootId, arrayNode)
+    autoEditBehavior = result.autoEditBehavior
+    if (result.autoEditChildId) setAutoEditChildId(result.autoEditChildId)
+    newlyAddedRootChildId = result.newlyAddedRootChildId
 
-      const firstItem: LeafNode = {
-        id: uid(),
-        name: '0',
-        kind: 'leaf',
-        parentId: arrayNode.id,
-        value: ''
-      }
-      addChild(model, arrayNode.id, firstItem)
-      rebuildPathSymbols(model)
-
-      // Auto-edit the new array node's name
-      newlyAddedRootChildId = arrayNode.id
-      autoEditBehavior = 'selectAll'
-      selectedIds = [arrayNode.id]
-      lastSelectedId = arrayNode.id
-      hasUnsavedChanges = true
-      return
+    if (result.selectedId) {
+      selectedIds = [result.selectedId]
+      lastSelectedId = result.selectedId
     }
 
-    const targetId = selectedIds.length === 1 ? selectedIds[0] : null
-    if (!targetId) return
-    const parent = model.nodes[targetId]
-    if (!parent) return
-    // Disallow adding under ref nodes
-    if (parent.kind === 'ref') return
-
-    // If leaf, convert to array and then add an empty child at the end
-    if (parent.kind === 'leaf') {
-      const firstChildId = convertLeafToArray(model, targetId)
-      if (!firstChildId) return
-    }
-
-    const freshParent = model.nodes[targetId]
-    if (!freshParent || !isContainer(freshParent)) return
-
-    // Determine what type of child to create based on container type
-    if (freshParent.kind === 'object') {
-      // For object nodes, create an array child with one empty item
-      const arrayNode: ArrayNode = {
-        id: uid(),
-        name: 'new_parent',
-        kind: 'array',
-        parentId: targetId,
-        children: [],
-        collapsed: false
-      }
-      addChild(model, targetId, arrayNode)
-
-      // Add a default child to the new array
-      const firstItem: LeafNode = {
-        id: uid(),
-        name: '0',
-        kind: 'leaf',
-        parentId: arrayNode.id,
-        value: 'new_child'
-      }
-      addChild(model, arrayNode.id, firstItem)
-
-      // Select the new array and set it for editing
-      newlyAddedRootChildId = arrayNode.id
-      selectedIds = [arrayNode.id]
-      lastSelectedId = arrayNode.id
-      setAutoEditChildId(arrayNode.id)
-    } else {
-      // For array nodes, create a leaf child as before
-      const nextIndex = String(freshParent.children?.length ?? 0)
-      const child: LeafNode = {
-        id: uid(),
-        name: nextIndex,
-        kind: 'leaf',
-        parentId: targetId,
-        value: ''
-      }
-      addChild(model, targetId, child)
-      newlyAddedRootChildId = child.id
-      autoEditBehavior = 'selectAll'
-      selectedIds = [child.id]
-      lastSelectedId = child.id
-    }
-
-    rebuildPathSymbols(model)
     hasUnsavedChanges = true
+    tick().then(() => scrollSelectedIntoView())
   }
 
   function deleteBySelection() {
