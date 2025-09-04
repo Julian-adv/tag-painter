@@ -354,6 +354,34 @@ export function expandCustomTags(
     }
     if (arrays.length === 0) return { expandedTags: [tag], resolution: tag }
 
+    // Helper: compute path like "outfit/d" for a node id
+    function getNodePath(m: TreeModel, id: string): string {
+      const parts: string[] = []
+      let cur = m.nodes[id]
+      while (cur && cur.parentId) {
+        parts.push(cur.name)
+        cur = m.nodes[cur.parentId]
+      }
+      parts.reverse()
+      // Drop leading root if present
+      if (parts[0] === 'root') parts.shift()
+      return parts.join('/')
+    }
+
+    // Respect disables by exact node name/path when choosing descendant arrays
+    if (disables.names.size > 0) {
+      const disabledLower = new Set(Array.from(disables.names, (s) => s.toLowerCase()))
+      for (let i = arrays.length - 1; i >= 0; i--) {
+        const arr = arrays[i]
+        const p = getNodePath(m, arr.id).toLowerCase()
+        if (disabledLower.has(p)) {
+          arrays.splice(i, 1)
+        }
+      }
+    }
+
+    if (arrays.length === 0) return { expandedTags: [tag], resolution: tag }
+
     // Choose one descendant array at random and expand it using the array logic
     const idx = getSecureRandomIndex(arrays.length)
     const chosenArray = arrays[idx]
@@ -445,6 +473,24 @@ export function expandCustomTags(
     previousRunResults,
     randomTagResolutions
   )
+  // 5. Apply disables discovered during expansion even to items expanded earlier.
+  //    If a tag name was disabled (e.g., outfit/d), and it already expanded before
+  //    the directive was discovered, remove its expansion from the final list.
+  if (disables.names.size > 0) {
+    const disabledOutputs = new Set<string>()
+    for (const name of disables.names) {
+      const resolved = randomTagResolutions[name]
+      if (resolved && typeof resolved === 'string' && resolved.trim().length > 0) {
+        disabledOutputs.add(resolved.toLowerCase())
+      }
+    }
+    if (disabledOutputs.size > 0) {
+      expandedTags = expandedTags.filter((item) => {
+        const v = String(item || '').toLowerCase()
+        return !disabledOutputs.has(v)
+      })
+    }
+  }
   console.log(`Final expanded tags: ${expandedTags.join(', ')}`)
 
   return { expandedTags, randomTagResolutions }
