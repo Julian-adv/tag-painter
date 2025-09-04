@@ -14,6 +14,7 @@
   } from './model'
   import { groupSelectedNodes, expandAll, collapseAll } from './operations'
   import { getTopLevelAncestorName } from './utils'
+  import { computeNextSelectionAfterDelete } from './selection'
   import { findBestMatchingLeafId } from '$lib/utils/treeSearch'
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
@@ -344,30 +345,15 @@
   function deleteBySelection() {
     if (selectedIds.length === 0 || selectedIds.includes(model.rootId)) return
     const validIds = selectedIds.filter((id) => id !== model.rootId)
-    const toDelete = new Set(validIds)
-
-    // Compute nearest surviving ancestors to select after deletion
-    const parentCandidates: string[] = []
-    for (const id of validIds) {
-      let pid = model.nodes[id]?.parentId ?? null
-      while (pid) {
-        // pick the first ancestor that isn't being deleted and isn't the hidden root
-        if (!toDelete.has(pid) && pid !== model.rootId) {
-          parentCandidates.push(pid)
-          break
-        }
-        pid = model.nodes[pid]?.parentId ?? null
-      }
-    }
-    const uniqueParents = Array.from(new Set(parentCandidates))
+    const uniqueNext = computeNextSelectionAfterDelete(model, validIds)
 
     // Perform deletion
     for (const id of validIds) removeNode(model, id)
     rebuildPathSymbols(model)
 
-    if (uniqueParents.length > 0) {
-      selectedIds = uniqueParents
-      lastSelectedId = uniqueParents[0]
+    if (uniqueNext.length > 0) {
+      selectedIds = uniqueNext
+      lastSelectedId = uniqueNext[0]
       tick().then(() => scrollSelectedIntoView())
     } else {
       selectedIds = []

@@ -7,11 +7,16 @@ function normalize(s: string): string {
     .replace(/disables=\[[^\]]*\]/gi, ' ')
     .replace(/composition=[a-z0-9_-]+/gi, ' ')
     .toLowerCase()
-  return cleaned.replace(/[^a-z0-9]+/g, ' ').replace(/\s{2,}/g, ' ').trim()
+  return cleaned
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
 }
 
 function tokens(s: string): Set<string> {
-  const arr = normalize(s).split(' ').filter((t) => t.length > 0)
+  const arr = normalize(s)
+    .split(' ')
+    .filter((t) => t.length > 0)
   return new Set(arr)
 }
 
@@ -88,4 +93,3 @@ export function findBestMatchingLeafId(
   if (!bestId || bestScore <= 0) return null
   return bestId
 }
-
