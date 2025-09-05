@@ -5,11 +5,7 @@
 import type { AnyNode, TreeModel } from '$lib/TreeEdit/model'
 import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
-import {
-  findNodeByName,
-  extractDisablesDirective,
-  updateDisablesDirective
-} from '$lib/TreeEdit/utils'
+import { findNodeByName, extractDisablesDirective } from '$lib/TreeEdit/utils'
 
 // Core context and helpers extracted for clarity
 type DisabledContext = { names: Set<string>; patterns: string[] }
@@ -38,11 +34,15 @@ function buildOverrideMap(
   // 1) Path-scoped pins/overrides from test mode
   for (const key of Object.keys(testModeStore)) {
     const s = testModeStore[key]
-    if (!s || !s.enabled) continue
+    if (!s || !s.enabled) {
+      continue
+    }
     let v: string | undefined = undefined
     if (s.overrideTag && String(s.overrideTag).trim()) v = String(s.overrideTag)
     else if (s.pinnedLeafId) v = getLeafValueById(model, s.pinnedLeafId)
-    if (v && String(v).trim()) map[key] = String(v)
+    if (v && String(v).trim()) {
+      map[key] = String(v)
+    }
   }
   // 2) Previous run results (do not override explicit pins)
   for (const [k, v] of Object.entries(previousRunResults || {})) {
@@ -52,39 +52,49 @@ function buildOverrideMap(
   return map
 }
 
-function collectDisablesFromStrings(ctx: TagExpansionCtx, values: string[]): string[] {
-  const out: string[] = []
-  for (let val of values) {
+function extractDisablesInfo(ctx: TagExpansionCtx, values: string[]): void {
+  // Only extract disables information without removing directives
+  for (const val of values) {
     const items = extractDisablesDirective(String(val))
     if (items.length) {
       for (const it of items) {
         const maybeNode = findNodeByName(ctx.model, it)
-        if (maybeNode) ctx.disables.names.add(it)
-        else {
+        if (maybeNode) {
+          ctx.disables.names.add(it)
+        } else {
           ctx.disables.names.add(it)
           ctx.disables.patterns.push(it)
         }
       }
-      val = updateDisablesDirective(String(val), [])
     }
-    out.push(val)
   }
-  return out
+}
+
+/**
+ * Clean all directives (disables, composition, etc.) from expanded tag strings before sending to ComfyUI
+ */
+export function cleanDirectivesFromTags(tagsText: string): string {
+  if (!tagsText) return tagsText
+
+  // Remove disables directives
+  let cleaned = tagsText.replace(/,?\s*disables=\[[^\]]*\]/g, '')
+
+  // Remove composition directives
+  cleaned = cleaned.replace(/,?\s*composition=\w+/g, '')
+
+  // Clean up any double commas or extra spaces
+  cleaned = cleaned.replace(/,\s*,/g, ',')
+  cleaned = cleaned.replace(/^\s*,\s*|\s*,\s*$/g, '')
+  cleaned = cleaned.replace(/\s+/g, ' ')
+
+  return cleaned.trim()
 }
 
 function expandNodeOnce(ctx: TagExpansionCtx, node: AnyNode): string[] {
   if (node.kind === 'leaf') {
-    let val = String(node.value)
-    const items = extractDisablesDirective(val)
-    if (items.length) {
-      for (const it of items) {
-        const maybeNode = findNodeByName(ctx.model, it)
-        if (maybeNode) ctx.disables.names.add(it)
-        else ctx.disables.patterns.push(it)
-      }
-      val = updateDisablesDirective(val, [])
-    }
-    return [val]
+    // Return raw value including any directives; selected paths
+    // will be cleaned and recorded via collectDisablesFromStrings later.
+    return [String(node.value)]
   }
   if (node.kind === 'ref') {
     const target = findNodeByName(ctx.model, node.refName)
@@ -143,6 +153,12 @@ function expandArrayNode(
   let selected: string | null = null
   // Exact path/name override from unified map
   if (ctx.overrideMap[tag]) selected = ctx.overrideMap[tag]
+  if (!selected && ctx.existingRandomResolutions[tag]) {
+    // Use existing resolution from consistent-random, which may contain disables
+    const existingResult = ctx.existingRandomResolutions[tag]
+    const existingTags = existingResult.split(', ')
+    return { expandedTags: existingTags, resolution: existingResult }
+  }
   if (!selected && ctx.previousRunResults[tag]) {
     const previousResult = ctx.previousRunResults[tag]
     const previousTags = previousResult.split(', ')
@@ -195,7 +211,8 @@ function expandObjectNode(
   ctx: TagExpansionCtx,
   tag: string
 ): { expandedTags: string[]; resolution: string } {
-  if (ctx.overrideMap[tag]) return { expandedTags: [ctx.overrideMap[tag]], resolution: ctx.overrideMap[tag] }
+  if (ctx.overrideMap[tag])
+    return { expandedTags: [ctx.overrideMap[tag]], resolution: ctx.overrideMap[tag] }
   if (ctx.previousRunResults[tag]) {
     const previousResult = ctx.previousRunResults[tag]
     const previousTags = previousResult.split(', ')
@@ -250,7 +267,17 @@ function expandObjectNode(
     for (let i = arrays.length - 1; i >= 0; i--) {
       const arr = arrays[i]
       const p = getNodePath(ctx.model, arr.id).toLowerCase()
-      if (disabledLower.has(p)) arrays.splice(i, 1)
+      // Remove if the exact array path is disabled or any ancestor container is disabled
+      let disabled = disabledLower.has(p)
+      if (!disabled) {
+        for (const d of disabledLower) {
+          if (d && p.startsWith(d + '/')) {
+            disabled = true
+            break
+          }
+        }
+      }
+      if (disabled) arrays.splice(i, 1)
     }
   }
   if (arrays.length === 0) return { expandedTags: [tag], resolution: tag }
@@ -368,11 +395,30 @@ export function expandCustomTags(
     overrideMap: buildOverrideMap(model, previousRunResults)
   }
 
+  // Extract disables from existingRandomResolutions to handle cross-zone disabling
+  if (existingRandomResolutions) {
+    Object.values(existingRandomResolutions).forEach((resolution) => {
+      extractDisablesInfo(ctx, [resolution])
+    })
+  }
+
   let out: string[] = []
   for (const tagString of tags) {
     const { name: tag, weight: tagWeight } = parseTagWithWeight(tagString)
 
-    if (ctx.disables.names.has(tag)) {
+    // Early skip: if this tag name or any of its descendant paths are disabled
+    const disablesLower = new Set(Array.from(ctx.disables.names, (s) => s.toLowerCase()))
+    const tagLower = tag.toLowerCase()
+    let tagDisabled = disablesLower.has(tagLower)
+    if (!tagDisabled) {
+      for (const d of disablesLower) {
+        if (d && tagLower.startsWith(d + '/')) {
+          tagDisabled = true
+          break
+        }
+      }
+    }
+    if (tagDisabled) {
       out.push('')
       continue
     }
@@ -385,15 +431,17 @@ export function expandCustomTags(
     if (node && node.kind === 'array') {
       ctx.visitedTags.add(tag)
       const result = expandArrayNode(ctx, tag)
-      const finalized = expandPlaceholders(ctx, result.expandedTags, {
-        ...ctx.existingRandomResolutions,
-        ...ctx.randomTagResolutions
-      })
-      const cleaned = collectDisablesFromStrings(ctx, finalized)
-      const cleanedText = cleaned.join(', ')
-      if (tagWeight) out.push(applyWeight(cleanedText, tagWeight))
-      else out.push(...cleaned)
-      ctx.randomTagResolutions[tag] = cleanedText
+      // Pass ctx.randomTagResolutions by reference so nested placeholder
+      // expansions contribute their resolutions to the shared map.
+      const finalized = expandPlaceholders(ctx, result.expandedTags, ctx.randomTagResolutions)
+      // Extract disables info without removing directives
+      extractDisablesInfo(ctx, finalized)
+      // Store the placeholder-expanded resolution WITH disables directive
+      ctx.randomTagResolutions[tag] = finalized.join(', ')
+      // Add to output WITHOUT removing disables directive
+      const finalizedText = finalized.join(', ')
+      if (tagWeight) out.push(applyWeight(finalizedText, tagWeight))
+      else out.push(finalizedText)
       ctx.visitedTags.delete(tag)
       continue
     }
@@ -401,15 +449,17 @@ export function expandCustomTags(
     if (node && node.kind === 'object') {
       ctx.visitedTags.add(tag)
       const result = expandObjectNode(ctx, tag)
-      const finalized = expandPlaceholders(ctx, result.expandedTags, {
-        ...ctx.existingRandomResolutions,
-        ...ctx.randomTagResolutions
-      })
-      const cleaned = collectDisablesFromStrings(ctx, finalized)
-      const cleanedText = cleaned.join(', ')
-      if (tagWeight) out.push(applyWeight(cleanedText, tagWeight))
-      else out.push(...cleaned)
-      ctx.randomTagResolutions[tag] = cleanedText
+      // Pass ctx.randomTagResolutions by reference so nested placeholder
+      // expansions contribute their resolutions to the shared map.
+      const finalized = expandPlaceholders(ctx, result.expandedTags, ctx.randomTagResolutions)
+      // Extract disables info without removing directives
+      extractDisablesInfo(ctx, finalized)
+      // Store the placeholder-expanded resolution WITH disables directive
+      ctx.randomTagResolutions[tag] = finalized.join(', ')
+      // Add to output WITHOUT removing disables directive
+      const finalizedText = finalized.join(', ')
+      if (tagWeight) out.push(applyWeight(finalizedText, tagWeight))
+      else out.push(finalizedText)
       ctx.visitedTags.delete(tag)
       continue
     }
@@ -418,23 +468,40 @@ export function expandCustomTags(
     else out.push(tag)
   }
 
-  out = expandPlaceholders(ctx, out, {
-    ...ctx.existingRandomResolutions,
-    ...ctx.randomTagResolutions
-  })
-  out = collectDisablesFromStrings(ctx, out)
+  // Expand any remaining placeholders; allow nested resolutions to accumulate
+  // directly into ctx.randomTagResolutions for later disable filtering.
+  out = expandPlaceholders(ctx, out, ctx.randomTagResolutions)
+  // Extract disables info without removing directives
+  extractDisablesInfo(ctx, out)
   if (ctx.disables.names.size > 0) {
     const disabledOutputs = new Set<string>()
-    for (const name of ctx.disables.names) {
-      const resolved = ctx.randomTagResolutions[name]
-      if (resolved && typeof resolved === 'string' && resolved.trim().length > 0) {
-        disabledOutputs.add(resolved.toLowerCase())
+    const disablesLower = new Set(Array.from(ctx.disables.names, (s) => s.toLowerCase()))
+    // Collect resolutions for any disabled key or its descendants
+    for (const [key, val] of Object.entries(ctx.randomTagResolutions)) {
+      const keyLower = key.toLowerCase()
+      let affected = disablesLower.has(keyLower)
+      if (!affected) {
+        for (const d of disablesLower) {
+          if (d && keyLower.startsWith(d + '/')) {
+            affected = true
+            break
+          }
+        }
+      }
+      if (affected) {
+        const resolved = String(val || '')
+        if (resolved.trim().length > 0) disabledOutputs.add(resolved.toLowerCase())
       }
     }
     if (disabledOutputs.size > 0) {
+      const weightWrap = /^\((.*?):(\d+(?:\.\d+)?)\)$/
       out = out.filter((item) => {
-        const v = String(item || '').toLowerCase()
-        return !disabledOutputs.has(v)
+        const raw = String(item || '')
+        const v = raw.toLowerCase().trim()
+        // If item is weight-wrapped like "(content:1.2)", compare inner content
+        const m = v.match(weightWrap)
+        const normalized = m ? m[1] : v
+        return !disabledOutputs.has(normalized)
       })
     }
   }

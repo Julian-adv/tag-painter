@@ -10,7 +10,11 @@ import {
   FINAL_SAVE_NODE_ID,
   generateLoraChain
 } from './workflow'
-import { expandCustomTags, detectCompositionFromTags } from './tagExpansion'
+import {
+  expandCustomTags,
+  detectCompositionFromTags,
+  cleanDirectivesFromTags
+} from './tagExpansion'
 import { getWildcardModel } from '../stores/tagsStore'
 import { updateComposition } from '../stores/promptsStore'
 import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow } from '$lib/types'
@@ -143,11 +147,12 @@ export async function generateImage(options: GenerationOptions): Promise<{
       inpainting: inpaintingResult.randomTagResolutions
     }
 
-    const allTagsText = allResult.expandedTags.join(', ')
-    const zone1TagsText = zone1Result.expandedTags.join(', ')
-    let zone2TagsText = zone2Result.expandedTags.join(', ')
-    const negativeTagsText = negativeResult.expandedTags.join(', ')
-    const inpaintingTagsText = inpaintingResult.expandedTags.join(', ')
+    // Clean directives before sending to ComfyUI
+    const allTagsText = cleanDirectivesFromTags(allResult.expandedTags.join(', '))
+    const zone1TagsText = cleanDirectivesFromTags(zone1Result.expandedTags.join(', '))
+    let zone2TagsText = cleanDirectivesFromTags(zone2Result.expandedTags.join(', '))
+    const negativeTagsText = cleanDirectivesFromTags(negativeResult.expandedTags.join(', '))
+    const inpaintingTagsText = cleanDirectivesFromTags(inpaintingResult.expandedTags.join(', '))
 
     if (isInpainting) {
       // Configure inpainting workflow
