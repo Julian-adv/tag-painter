@@ -449,14 +449,11 @@ export function expandCustomTags(
     else out.push(tag)
   }
 
-  // Expand any remaining placeholders; allow nested resolutions to accumulate
-  // directly into ctx.randomTagResolutions for later disable filtering.
-  out = expandPlaceholders(ctx, out, ctx.randomTagResolutions)
   // Extract disables info without removing directives
   extractDisablesInfo(ctx, out)
   if (ctx.disables.names.size > 0) {
     const disabledOutputs = new Set<string>()
-    // Update disabled names set after potential new disables from final placeholder expansion
+    // Create lowercase set for efficient disable checking
     const finalDisablesLower = new Set(Array.from(ctx.disables.names, (s) => s.toLowerCase()))
     // Collect resolutions for any disabled key or its descendants
     for (const [key, val] of Object.entries(ctx.randomTagResolutions)) {
