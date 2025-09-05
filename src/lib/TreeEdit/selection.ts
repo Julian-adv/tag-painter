@@ -63,7 +63,7 @@ export function computeNextSelectionAfterDelete(model: TreeModel, selectedIds: s
         nextCandidates.push(apid)
         break
       }
-      const p = model.nodes[apid]
+      const p: { parentId: string | null } | undefined = model.nodes[apid]
       apid = p ? p.parentId : null
     }
   }
