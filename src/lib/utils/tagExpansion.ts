@@ -417,16 +417,14 @@ export function expandCustomTags(
     })
   }
 
-  // Pre-compute disabled names for performance
-  const disablesLower = new Set(Array.from(ctx.disables.names, (s) => s.toLowerCase()))
-
   let out: string[] = []
   for (const tagString of tags) {
     const { name: tag, weight: tagWeight } = parseTagWithWeight(tagString)
 
     // Early skip: if this tag name or any of its descendant paths are disabled
-    if (isTagDisabled(disablesLower, tag)) {
-      out.push('')
+    // Recompute disablesLower each time since ctx.disables.names can be updated by nested calls
+    const currentDisablesLower = new Set(Array.from(ctx.disables.names, (s) => s.toLowerCase()))
+    if (isTagDisabled(currentDisablesLower, tag)) {
       continue
     }
     if (ctx.visitedTags.has(tag)) {
@@ -449,31 +447,6 @@ export function expandCustomTags(
     else out.push(tag)
   }
 
-  // Extract disables info without removing directives
-  extractDisablesInfo(ctx, out)
-  if (ctx.disables.names.size > 0) {
-    const disabledOutputs = new Set<string>()
-    // Create lowercase set for efficient disable checking
-    const finalDisablesLower = new Set(Array.from(ctx.disables.names, (s) => s.toLowerCase()))
-    // Collect resolutions for any disabled key or its descendants
-    for (const [key, val] of Object.entries(ctx.randomTagResolutions)) {
-      if (isTagDisabled(finalDisablesLower, key)) {
-        const resolved = String(val || '')
-        if (resolved.trim().length > 0) disabledOutputs.add(resolved.toLowerCase())
-      }
-    }
-    if (disabledOutputs.size > 0) {
-      const weightWrap = /^\((.*?):(\d+(?:\.\d+)?)\)$/
-      out = out.filter((item) => {
-        const raw = String(item || '')
-        const v = raw.toLowerCase().trim()
-        // If item is weight-wrapped like "(content:1.2)", compare inner content
-        const m = v.match(weightWrap)
-        const normalized = m ? m[1] : v
-        return !disabledOutputs.has(normalized)
-      })
-    }
-  }
   out = out.filter((t) => String(t ?? '').trim().length > 0)
 
   return { expandedTags: out, randomTagResolutions: ctx.randomTagResolutions }
