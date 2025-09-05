@@ -23,15 +23,6 @@ type TagExpansionCtx = {
   overrideMap: Record<string, string>
 }
 
-function isDescendantOf(model: TreeModel, ancestorId: string, nodeId: string): boolean {
-  let cur = model.nodes[nodeId]
-  while (cur && cur.parentId) {
-    if (cur.parentId === ancestorId) return true
-    cur = model.nodes[cur.parentId]
-  }
-  return false
-}
-
 function getLeafValueById(model: TreeModel, leafId: string): string {
   const n = model.nodes[leafId]
   if (n && n.kind === 'leaf') return String(n.value)

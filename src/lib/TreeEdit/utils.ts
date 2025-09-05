@@ -34,7 +34,9 @@ export function isLeafPinned(model: TreeModel, id: NodeId): boolean {
   const pinKey = getNodePath(model, arrayAncestorId)
   const store = testModeStore[pinKey]
   if (!store || !store.enabled) return false
-  if (store.pinnedLeafId) return store.pinnedLeafId === id
+  // If we have an exact pinned leaf id and it matches, it's pinned.
+  // If it doesn't match (e.g., model reloaded and ids changed), fall back to value match.
+  if (store.pinnedLeafId === id) return true
   const val = String(node.value ?? '')
   return store.overrideTag === val
 }

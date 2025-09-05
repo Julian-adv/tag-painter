@@ -8,6 +8,47 @@
   } from './stores/testModeStore.svelte'
   import { LockClosed } from 'svelte-heros-v2'
   import type { CustomTag } from './types'
+  import { getWildcardModel } from './stores/tagsStore'
+
+  // Cache referenced placeholder containers per model+tag to avoid rescanning on every render
+  const refCacheByModel: WeakMap<object, Map<string, string[]>> = new WeakMap()
+
+  function getReferencedContainers(tagName: string): string[] {
+    const model = getWildcardModel()
+    let map = refCacheByModel.get(model)
+    if (!map) {
+      map = new Map<string, string[]>()
+      refCacheByModel.set(model, map)
+    }
+    const cached = map.get(tagName)
+    if (cached) return cached
+
+    const id = model.pathSymbols[tagName] || model.symbols[tagName]
+    const out: string[] = []
+    const seen = new Set<string>()
+    if (id) {
+      const node = model.nodes[id]
+      if (node && node.kind === 'array') {
+        const placeholderAny = /__([\p{L}\p{N}_\- /]+)__/gu
+        for (const cid of node.children) {
+          const c = model.nodes[cid]
+          if (!c || c.kind !== 'leaf') continue
+          const val = String(c.value ?? '')
+          placeholderAny.lastIndex = 0
+          let m: RegExpExecArray | null
+          while ((m = placeholderAny.exec(val)) !== null) {
+            const refName = m[1]
+            if (!seen.has(refName)) {
+              seen.add(refName)
+              out.push(refName)
+            }
+          }
+        }
+      }
+    }
+    map.set(tagName, out)
+    return out
+  }
 
   interface Props {
     id: string
@@ -103,6 +144,30 @@
       document.addEventListener('click', handleClickOutside)
       document.addEventListener('contextmenu', handleClickOutside)
     }, 0)
+  }
+
+  // Determine if a tag's displayed content is currently forced by a pin.
+  // This is true if there's an override for the tag itself (by name),
+  // or for any descendant path under that tag (e.g., "parent/child").
+  function isOverriddenForTag(tagName: string): boolean {
+    const st = testModeStore[tagName]
+    if (st && st.enabled && !!st.overrideTag) return true
+    for (const [k, v] of Object.entries(testModeStore)) {
+      if (!k || k === tagName) continue
+      if (k.startsWith(tagName + '/') && v && v.enabled && !!v.overrideTag) return true
+    }
+
+    // Also handle alias/placeholder expansions (e.g., pose/d → pose/action)
+    const refs = getReferencedContainers(tagName)
+    if (refs.length > 0) {
+      for (const [k, v] of Object.entries(testModeStore)) {
+        if (!v || !v.enabled || !v.overrideTag) continue
+        for (const refName of refs) {
+          if (k === refName || k.startsWith(refName + '/')) return true
+        }
+      }
+    }
+    return false
   }
 
   function handlePinToggle() {
@@ -225,7 +290,7 @@
           {dropPosition}
           {currentRandomTagResolutions}
           isTestSelected={testOverrideTag === tag.name}
-          isForceOverridden={!!testModeStore[tag.name]?.overrideTag}
+          isForceOverridden={isOverriddenForTag(tag.name)}
           {disabled}
           onRemove={removeTag}
           {onCustomTagDoubleClick}

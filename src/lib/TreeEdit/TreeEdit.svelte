@@ -290,10 +290,24 @@
     if (!arrayAncestorId) return
     // Build path key for the array ancestor
     const pinKey = getNodePath(model, arrayAncestorId)
+    // Compute a group path (nearest object ancestor) to enforce exclusive pinning within that group
+    let groupPath: string | null = null
+    const arrayParentId = model.nodes[arrayAncestorId]?.parentId || null
+    if (arrayParentId) {
+      groupPath = getNodePath(model, arrayParentId)
+    }
     const val = String(n.value ?? '')
     if (testModeStore[pinKey]?.pinnedLeafId === selectedId) {
       removeTestModeOverride(pinKey)
     } else {
+      // Remove existing pins within the same group (e.g., pose/action/*), except the one we are setting
+      if (groupPath && groupPath.length > 0) {
+        for (const k of Object.keys(testModeStore)) {
+          if (k !== pinKey && (k === groupPath || k.startsWith(groupPath + '/'))) {
+            removeTestModeOverride(k)
+          }
+        }
+      }
       setTestModeOverride(pinKey, val, selectedId)
     }
   }
