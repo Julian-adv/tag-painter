@@ -18,6 +18,8 @@
     extractDisablesDirective,
     updateDisablesDirective
   } from './utils'
+  import { DEFAULT_ARRAY_WEIGHT } from '$lib/constants'
+  import { parseWeightDirective } from '$lib/utils/tagExpansion'
   import { canGroupSelected } from './operations'
   import { getParentOf, isConsistentRandomArray } from './utils'
   import { renameNode } from './model'
@@ -162,6 +164,61 @@
     onModelChanged?.()
   }
 
+  function getSelectedLeafWeight(): number | null {
+    if (selectedIds.length !== 1) return null
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    if (!node || node.kind !== 'leaf') return null
+    
+    return parseWeightDirective(String(node.value || ''))
+  }
+
+  function getSelectedLeafProbability(): string | null {
+    if (selectedIds.length !== 1) return null
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    if (!node || node.kind !== 'leaf') return null
+    
+    // Find the parent array node
+    let parentId = node.parentId
+    let parentNode = parentId ? model.nodes[parentId] : null
+    
+    // If parent is not an array, look for the nearest array ancestor
+    while (parentNode && parentNode.kind !== 'array') {
+      parentId = parentNode.parentId
+      parentNode = parentId ? model.nodes[parentId] : null
+    }
+    
+    if (!parentNode || parentNode.kind !== 'array') {
+      return null // Not inside an array, no probability to calculate
+    }
+    
+    // Calculate weights for all siblings in the array
+    const siblings = parentNode.children || []
+    let totalWeight = 0
+    let currentWeight = 0
+    
+    for (const siblingId of siblings) {
+      const siblingNode = model.nodes[siblingId]
+      if (!siblingNode) continue
+      
+      let weight = DEFAULT_ARRAY_WEIGHT
+      if (siblingNode.kind === 'leaf') {
+        weight = parseWeightDirective(String(siblingNode.value || ''))
+      }
+      
+      totalWeight += weight
+      if (siblingId === selectedId) {
+        currentWeight = weight
+      }
+    }
+    
+    if (totalWeight === 0) return '0%'
+    
+    const probability = (currentWeight / totalWeight) * 100
+    return `${probability.toFixed(1)}%`
+  }
+
   function startRenaming() {
     if (selectedIds.length !== 1) return
     const selectedId = selectedIds[0]
@@ -276,6 +333,19 @@
             <option value="2h">2h (horizontal split)</option>
             <option value="2v">2v (vertical split)</option>
           </select>
+        </div>
+        <div class="directive-row">
+          <span class="directive-label">Weight</span>
+          <div class="weight-info">
+            <span class="weight-display">
+              {getSelectedLeafWeight() ?? DEFAULT_ARRAY_WEIGHT}
+            </span>
+            {#if getSelectedLeafProbability()}
+              <span class="probability-display">
+                ({getSelectedLeafProbability()})
+              </span>
+            {/if}
+          </div>
         </div>
         <div class="directive-row stacked">
           <label class="directive-label" for="disables-input">Disables</label>
@@ -427,6 +497,31 @@
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 1px #3b82f6;
+  }
+  .weight-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .weight-display {
+    font-size: 0.875rem;
+    color: #374151;
+    font-weight: 500;
+    font-family: monospace;
+    padding: 0.25rem 0.5rem;
+    background-color: #f3f4f6;
+    border-radius: 0.375rem;
+    min-width: 60px;
+    text-align: center;
+  }
+  .probability-display {
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-weight: 500;
+    font-family: monospace;
+    padding: 0.125rem 0.375rem;
+    background-color: #e5e7eb;
+    border-radius: 0.25rem;
   }
   .array-mode fieldset {
     display: inline-flex;

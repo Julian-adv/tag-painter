@@ -3,7 +3,7 @@
  */
 
 import type { AnyNode, TreeModel } from '$lib/TreeEdit/model'
-import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
+import { CONSISTENT_RANDOM_MARKER, DEFAULT_ARRAY_WEIGHT } from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
 import { findNodeByName, extractDisablesDirective } from '$lib/TreeEdit/utils'
 
@@ -135,6 +135,9 @@ export function cleanDirectivesFromTags(tagsText: string): string {
   // Remove composition directives
   cleaned = cleaned.replace(/,?\s*composition=\w+/g, '')
 
+  // Remove weight directives
+  cleaned = cleaned.replace(/,?\s*weight=\d+(?:\.\d+)?/gi, '')
+
   // Clean up any double commas or extra spaces
   cleaned = cleaned.replace(/,\s*,/g, ',')
   cleaned = cleaned.replace(/^\s*,\s*|\s*,\s*$/g, '')
@@ -145,8 +148,7 @@ export function cleanDirectivesFromTags(tagsText: string): string {
 
 function expandNodeOnce(ctx: TagExpansionCtx, node: AnyNode): string[] {
   if (node.kind === 'leaf') {
-    // Return raw value including any directives; selected paths
-    // will be cleaned and recorded via collectDisablesFromStrings later.
+    // Return raw value including weight directives; they will be cleaned later before ComfyUI
     return [String(node.value)]
   }
   if (node.kind === 'ref') {
@@ -232,7 +234,7 @@ function expandArrayNode(
       }
     }
   }
-  const options: string[] = []
+  const options: { content: string; weight: number }[] = []
   for (let i = startIndex; i < children.length; i++) {
     const cid = children[i]
     const childNode = ctx.model.nodes[cid]
@@ -244,7 +246,8 @@ function expandArrayNode(
       const blocked = ctx.disables.patterns.some((p) => lower.includes(p.toLowerCase()))
       if (blocked) continue
     }
-    options.push(candidate)
+    const weight = getOptionWeight(ctx, childNode)
+    options.push({ content: candidate, weight })
   }
   if (options.length === 0) return { expandedTags: [], resolution: '' }
   if (!selected) {
@@ -254,8 +257,8 @@ function expandArrayNode(
       selected = ctx.randomTagResolutions[tag]
   }
   if (!selected) {
-    const idx = getSecureRandomIndex(options.length)
-    selected = options[idx]
+    const idx = getWeightedRandomIndex(options)
+    selected = options[idx].content
   }
   return { expandedTags: [selected!], resolution: selected! }
 }
@@ -311,6 +314,65 @@ function expandObjectNode(
   const chosenPath = getNodePath(ctx.model, chosenArray.id)
   const result = expandArrayNode(ctx, chosenPath)
   return { expandedTags: result.expandedTags, resolution: result.resolution }
+}
+
+/**
+ * Parse weight directive from text content
+ */
+export function parseWeightDirective(content: string): number {
+  const trimmed = String(content || '').trim()
+  if (!trimmed) return DEFAULT_ARRAY_WEIGHT
+
+  // Look for weight=xx directive
+  const weightMatch = trimmed.match(/weight=(\d+(?:\.\d+)?)/i)
+
+  if (weightMatch) {
+    return parseFloat(weightMatch[1])
+  }
+
+  return DEFAULT_ARRAY_WEIGHT
+}
+
+/**
+ * Get the weight for an array option
+ */
+function getOptionWeight(ctx: TagExpansionCtx, childNode: AnyNode): number {
+  if (childNode.kind === 'leaf') {
+    return parseWeightDirective(String(childNode.value))
+  }
+  return DEFAULT_ARRAY_WEIGHT
+}
+
+/**
+ * Perform weighted random selection from array options
+ */
+function getWeightedRandomIndex(options: { content: string; weight: number }[]): number {
+  if (options.length === 0) return 0
+  if (options.length === 1) return 0
+
+  // Calculate total weight
+  const totalWeight = options.reduce((sum, option) => sum + option.weight, 0)
+  if (totalWeight <= 0) {
+    // Fallback to uniform random if all weights are zero
+    return getSecureRandomIndex(options.length)
+  }
+
+  // Generate random number between 0 and totalWeight
+  const array = new Uint32Array(1)
+  crypto.getRandomValues(array)
+  const random = (array[0] / 0xffffffff) * totalWeight
+
+  // Find the selected option
+  let accumulator = 0
+  for (let i = 0; i < options.length; i++) {
+    accumulator += options[i].weight
+    if (random <= accumulator) {
+      return i
+    }
+  }
+
+  // Fallback (should not happen with proper weights)
+  return options.length - 1
 }
 
 /**
