@@ -297,7 +297,11 @@
       groupPath = getNodePath(model, arrayParentId)
     }
     const val = String(n.value ?? '')
-    if (testModeStore[pinKey]?.pinnedLeafId === selectedId) {
+    const store = testModeStore[pinKey]
+    const isPinned = store && store.enabled && 
+                     (store.pinnedLeafId === selectedId || store.overrideTag === val)
+    
+    if (isPinned) {
       removeTestModeOverride(pinKey)
     } else {
       // Remove existing pins within the same group (e.g., pose/action/*), except the one we are setting
