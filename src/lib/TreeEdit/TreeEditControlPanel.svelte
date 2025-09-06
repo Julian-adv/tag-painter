@@ -204,8 +204,8 @@
     const node = model.nodes[selectedId]
     if (!node || node.kind !== 'leaf') return
 
-    // Clamp weight between 0.1 and 999
-    const clampedWeight = Math.max(0.1, Math.min(999, newWeight))
+    // Clamp weight between 0.1 and 10000
+    const clampedWeight = Math.max(0.1, Math.min(10000, newWeight))
     
     const currentValue = String(node.value || '').trim()
     
@@ -285,8 +285,8 @@
     const node = model.nodes[selectedId]
     if (!node || node.kind !== 'array') return
 
-    // Clamp weight between 0.1 and 999
-    const clampedWeight = Math.max(0.1, Math.min(999, newWeight))
+    // Clamp weight between 0.1 and 10000
+    const clampedWeight = Math.max(0.1, Math.min(10000, newWeight))
     
     const currentName = node.name.trim()
     
@@ -471,7 +471,7 @@
             <WheelAdjustableInput
               value={getSelectedLeafWeight() ?? DEFAULT_ARRAY_WEIGHT}
               min={0.1}
-              max={999}
+              max={10000}
               step={0.1}
               wheelStep={10}
               ctrlWheelStep={1}
@@ -518,7 +518,7 @@
             <WheelAdjustableInput
               value={getSelectedArrayWeight() ?? DEFAULT_ARRAY_WEIGHT}
               min={0.1}
-              max={999}
+              max={10000}
               step={0.1}
               wheelStep={10}
               ctrlWheelStep={1}

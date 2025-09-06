@@ -41,6 +41,7 @@
   let isDragging = $state(false)
   let dragOffsetX = $state(0)
   let dragOffsetY = $state(0)
+  const OFFSCREEN_ALLOWANCE = 160 // px: allow dialog to go slightly off-screen while dragging
 
   function centerDialog() {
     if (!dialogEl) return
@@ -69,10 +70,13 @@
     const h = dialogEl.offsetHeight
     let left = e.clientX - dragOffsetX
     let top = e.clientY - dragOffsetY
-    const maxLeft = Math.max(0, window.innerWidth - w)
-    const maxTop = Math.max(0, window.innerHeight - h)
-    if (left < 0) left = 0
-    if (top < 0) top = 0
+    // Allow the dialog to move slightly beyond the viewport bounds
+    const minLeft = -OFFSCREEN_ALLOWANCE
+    const minTop = -OFFSCREEN_ALLOWANCE
+    const maxLeft = Math.max(0, window.innerWidth - w) + OFFSCREEN_ALLOWANCE
+    const maxTop = Math.max(0, window.innerHeight - h) + OFFSCREEN_ALLOWANCE
+    if (left < minLeft) left = minLeft
+    if (top < minTop) top = minTop
     if (left > maxLeft) left = maxLeft
     if (top > maxTop) top = maxTop
     posLeft = left
