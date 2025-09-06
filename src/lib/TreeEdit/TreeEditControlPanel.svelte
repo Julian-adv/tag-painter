@@ -31,6 +31,7 @@
     selectedIds,
     onExpandAll,
     onCollapseAll,
+    collapseSiblings,
     setSelectedArrayMode,
     togglePinSelected,
     groupSelected,
@@ -46,6 +47,7 @@
     selectedIds: string[]
     onExpandAll?: () => void
     onCollapseAll?: () => void
+    collapseSiblings?: () => void
     setSelectedArrayMode: (mode: 'random' | 'consistent-random') => void
     togglePinSelected: () => void
     groupSelected: () => void
@@ -84,6 +86,15 @@
     
     const parent = model.nodes[parentId]
     return !!parent && parent.kind === 'object'
+  }
+
+  function canCollapseSiblings(): boolean {
+    if (selectedIds.length !== 1) return false
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    if (!node) return false
+    // Only enable for container nodes (array or object)
+    return node.kind === 'array' || node.kind === 'object'
   }
 
   function isSelectedConsistentRandom(): boolean {
@@ -544,6 +555,16 @@
       title="Collapse all nodes"
     >
       Collapse all
+    </ActionButton>
+    <ActionButton
+      onclick={() => collapseSiblings?.()}
+      variant="gray"
+      size="md"
+      icon={ChevronRight}
+      title="Collapse selected node and its siblings"
+      disabled={!canCollapseSiblings()}
+    >
+      Collapse siblings
     </ActionButton>
     <ActionButton
       onclick={togglePinSelected}

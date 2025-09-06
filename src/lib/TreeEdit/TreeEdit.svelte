@@ -181,6 +181,31 @@
     tick().then(() => scrollSelectedIntoView())
   }
 
+  function handleCollapseSiblings() {
+    if (selectedIds.length !== 1) return
+    const selectedId = selectedIds[0]
+    const selectedNode = model.nodes[selectedId]
+    if (!selectedNode || (selectedNode.kind !== 'array' && selectedNode.kind !== 'object')) return
+
+    // Find parent node
+    const parentId = selectedNode.parentId
+    if (!parentId) return
+    
+    const parentNode = model.nodes[parentId]
+    if (!parentNode || (parentNode.kind !== 'array' && parentNode.kind !== 'object')) return
+    if (!parentNode.children) return
+
+    // Collapse all sibling container nodes (including selected node)
+    for (const childId of parentNode.children) {
+      const childNode = model.nodes[childId]
+      if (childNode && (childNode.kind === 'array' || childNode.kind === 'object')) {
+        childNode.collapsed = true
+      }
+    }
+
+    tick().then(() => scrollSelectedIntoView())
+  }
+
   // Allow parent to programmatically select a node by name
   export function selectByName(name: string) {
     if (!name) return
@@ -567,6 +592,7 @@
       {selectedIds}
       onExpandAll={handleExpandAll}
       onCollapseAll={handleCollapseAll}
+      collapseSiblings={handleCollapseSiblings}
       {setSelectedArrayMode}
       {togglePinSelected}
       {groupSelected}
