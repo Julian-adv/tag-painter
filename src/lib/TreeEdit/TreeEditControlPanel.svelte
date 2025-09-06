@@ -73,6 +73,19 @@
     return !!n && n.kind === 'array'
   }
 
+
+  function isSelectedArrayInObject(): boolean {
+    const n = getSelectedNode()
+    if (!n || n.kind !== 'array') return false
+    
+    // Check if parent is object
+    const parentId = n.parentId
+    if (!parentId) return false
+    
+    const parent = model.nodes[parentId]
+    return !!parent && parent.kind === 'object'
+  }
+
   function isSelectedConsistentRandom(): boolean {
     if (selectedIds.length !== 1) return false
     return isConsistentRandomArray(model, selectedIds[0])
@@ -247,6 +260,85 @@
     return `${probability.toFixed(1)}%`
   }
 
+  function getSelectedArrayWeight(): number | null {
+    if (!isSelectedArrayInObject()) return null
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    if (!node || node.kind !== 'array') return null
+    return parseWeightDirective(node.name)
+  }
+
+  function updateSelectedArrayWeight(newWeight: number) {
+    if (!isSelectedArrayInObject()) return
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    if (!node || node.kind !== 'array') return
+
+    // Clamp weight between 0.1 and 999
+    const clampedWeight = Math.max(0.1, Math.min(999, newWeight))
+    
+    const currentName = node.name.trim()
+    
+    // Remove existing weight directive if any
+    let cleaned = currentName.replace(/,?\s*weight=\d+(?:\.\d+)?/gi, '')
+    cleaned = cleaned.replace(/^\s*,\s*|\s*,\s*$/g, '').trim()
+    
+    // Add new weight directive if not default
+    if (clampedWeight !== DEFAULT_ARRAY_WEIGHT) {
+      const newName = cleaned ? `${cleaned}, weight=${clampedWeight}` : `weight=${clampedWeight}`
+      node.name = newName
+    } else {
+      node.name = cleaned || ''
+    }
+    
+    onModelChanged?.()
+  }
+
+  function getSelectedArrayProbability(): string {
+    if (!isSelectedArrayInObject()) return ''
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    if (!node || node.kind !== 'array') return ''
+
+    const parentId = node.parentId
+    if (!parentId) return ''
+
+    const parent = model.nodes[parentId]
+    if (!parent || parent.kind !== 'object') return ''
+
+    // Get all sibling arrays in the object
+    const arrayChildren = []
+    const stack = [...(parent.children || [])]
+    const seen = new Set<string>()
+
+    while (stack.length) {
+      const childId = stack.pop()!
+      if (seen.has(childId)) continue
+      seen.add(childId)
+
+      const child = model.nodes[childId]
+      if (!child) continue
+
+      if (child.kind === 'array') {
+        const weight = parseWeightDirective(child.name)
+        arrayChildren.push({ id: childId, weight })
+      } else if (child.kind === 'object') {
+        stack.push(...(child.children || []))
+      }
+    }
+
+    if (arrayChildren.length === 0) return '0%'
+
+    const totalWeight = arrayChildren.reduce((sum, child) => sum + child.weight, 0)
+    const currentArray = arrayChildren.find(child => child.id === selectedId)
+    
+    if (!currentArray || totalWeight === 0) return '0%'
+    
+    const probability = (currentArray.weight / totalWeight) * 100
+    return `${probability.toFixed(1)}%`
+  }
+
+
   function startRenaming() {
     if (selectedIds.length !== 1) return
     const selectedId = selectedIds[0]
@@ -399,6 +491,36 @@
               updateSelectedDisables(items)
             }}
           />
+        </div>
+      </fieldset>
+    </div>
+  {/if}
+
+  <!-- Array node weight section (when array is child of object) -->
+  {#if isSelectedArrayInObject()}
+    <div class="directives" aria-label="Array weight in object">
+      <fieldset>
+        <legend class="section-label">Array Weight</legend>
+        <div class="directive-row">
+          <label for="array-weight-input" class="directive-label">Weight</label>
+          <div class="weight-info">
+            <WheelAdjustableInput
+              value={getSelectedArrayWeight() ?? DEFAULT_ARRAY_WEIGHT}
+              min={0.1}
+              max={999}
+              step={0.1}
+              wheelStep={10}
+              ctrlWheelStep={1}
+              arrowStep={0.1}
+              class=""
+              onchange={updateSelectedArrayWeight}
+            />
+            {#if getSelectedArrayProbability()}
+              <span class="probability-display">
+                ({getSelectedArrayProbability()})
+              </span>
+            {/if}
+          </div>
         </div>
       </fieldset>
     </div>

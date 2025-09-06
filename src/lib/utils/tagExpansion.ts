@@ -309,10 +309,18 @@ function expandObjectNode(
     }
   }
   if (arrays.length === 0) return { expandedTags: [tag], resolution: tag }
-  const idx = getSecureRandomIndex(arrays.length)
-  const chosenArray = arrays[idx]
-  const chosenPath = getNodePath(ctx.model, chosenArray.id)
-  const result = expandArrayNode(ctx, chosenPath)
+  
+  // Use weighted selection for object children
+  const options: { array: AnyNode; path: string; weight: number }[] = []
+  for (const arr of arrays) {
+    const path = getNodePath(ctx.model, arr.id)
+    const weight = parseWeightDirective(arr.name)
+    options.push({ array: arr, path, weight })
+  }
+  
+  const idx = getWeightedRandomIndex(options)
+  const chosenOption = options[idx]
+  const result = expandArrayNode(ctx, chosenOption.path)
   return { expandedTags: result.expandedTags, resolution: result.resolution }
 }
 
@@ -346,7 +354,7 @@ function getOptionWeight(ctx: TagExpansionCtx, childNode: AnyNode): number {
 /**
  * Perform weighted random selection from array options
  */
-function getWeightedRandomIndex(options: { content: string; weight: number }[]): number {
+function getWeightedRandomIndex<T extends { weight: number }>(options: T[]): number {
   if (options.length === 0) return 0
   if (options.length === 1) return 0
 
