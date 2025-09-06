@@ -21,6 +21,7 @@
   import { DEFAULT_ARRAY_WEIGHT } from '$lib/constants'
   import { parseWeightDirective } from '$lib/utils/tagExpansion'
   import { canGroupSelected } from './operations'
+  import WheelAdjustableInput from '../WheelAdjustableInput.svelte'
   import { getParentOf, isConsistentRandomArray } from './utils'
   import { renameNode } from './model'
   import DisablesEditor from './DisablesEditor.svelte'
@@ -172,6 +173,33 @@
     
     return parseWeightDirective(String(node.value || ''))
   }
+
+  function updateSelectedWeight(newWeight: number) {
+    if (selectedIds.length !== 1) return
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    if (!node || node.kind !== 'leaf') return
+
+    // Clamp weight between 0.1 and 999
+    const clampedWeight = Math.max(0.1, Math.min(999, newWeight))
+    
+    const currentValue = String(node.value || '').trim()
+    
+    // Remove existing weight directive if any
+    let cleaned = currentValue.replace(/,?\s*weight=\d+(?:\.\d+)?/gi, '')
+    cleaned = cleaned.replace(/^\s*,\s*|\s*,\s*$/g, '').trim()
+    
+    // Add new weight directive if not default
+    if (clampedWeight !== DEFAULT_ARRAY_WEIGHT) {
+      const newValue = cleaned ? `${cleaned}, weight=${clampedWeight}` : `weight=${clampedWeight}`
+      node.value = newValue
+    } else {
+      node.value = cleaned || ''
+    }
+    
+    onModelChanged?.()
+  }
+
 
   function getSelectedLeafProbability(): string | null {
     if (selectedIds.length !== 1) return null
@@ -335,11 +363,19 @@
           </select>
         </div>
         <div class="directive-row">
-          <span class="directive-label">Weight</span>
+          <label for="weight-input" class="directive-label">Weight</label>
           <div class="weight-info">
-            <span class="weight-display">
-              {getSelectedLeafWeight() ?? DEFAULT_ARRAY_WEIGHT}
-            </span>
+            <WheelAdjustableInput
+              value={getSelectedLeafWeight() ?? DEFAULT_ARRAY_WEIGHT}
+              min={0.1}
+              max={999}
+              step={0.1}
+              wheelStep={10}
+              ctrlWheelStep={1}
+              arrowStep={0.1}
+              class=""
+              onchange={updateSelectedWeight}
+            />
             {#if getSelectedLeafProbability()}
               <span class="probability-display">
                 ({getSelectedLeafProbability()})
@@ -502,17 +538,6 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-  }
-  .weight-display {
-    font-size: 0.875rem;
-    color: #374151;
-    font-weight: 500;
-    font-family: monospace;
-    padding: 0.25rem 0.5rem;
-    background-color: #f3f4f6;
-    border-radius: 0.375rem;
-    min-width: 60px;
-    text-align: center;
   }
   .probability-display {
     font-size: 0.75rem;
