@@ -163,6 +163,15 @@ describe('tagExpansion utilities', () => {
       expect(result.randomTagResolutions['eye-color']).toBe('blue eyes')
     })
 
+    it('should NOT reuse existing resolutions for random tags across zones', () => {
+      const existingResolutions = { 'hair-color': 'brown hair' }
+      const result = expandCustomTags(['hair-color'], mockTreeModel, new Set(), existingResolutions)
+
+      // With mocked crypto returning 0, the first option is chosen deterministically
+      expect(result.expandedTags).toEqual(['blonde hair'])
+      expect(result.randomTagResolutions['hair-color']).toBe('blonde hair')
+    })
+
     it('should use previous zone random results during regen', () => {
       const previousResults = { 'hair-color': 'brown hair' }
       const result = expandCustomTags(['hair-color'], mockTreeModel, new Set(), {}, previousResults)

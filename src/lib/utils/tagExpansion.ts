@@ -208,12 +208,6 @@ function expandArrayNode(
   let selected: string | null = null
   // Exact path/name override from unified map
   if (ctx.overrideMap[tag]) selected = ctx.overrideMap[tag]
-  if (!selected && ctx.existingRandomResolutions[tag]) {
-    // Use existing resolution from consistent-random, which may contain disables
-    const existingResult = ctx.existingRandomResolutions[tag]
-    const existingTags = existingResult.split(', ')
-    return { expandedTags: existingTags, resolution: existingResult }
-  }
   if (!selected && ctx.previousRunResults[tag]) {
     const previousResult = ctx.previousRunResults[tag]
     const previousTags = previousResult.split(', ')
@@ -250,11 +244,9 @@ function expandArrayNode(
     options.push({ content: candidate, weight })
   }
   if (options.length === 0) return { expandedTags: [], resolution: '' }
-  if (!selected) {
-    if (isConsistent && ctx.existingRandomResolutions[tag])
-      selected = ctx.existingRandomResolutions[tag]
-    if (!selected && isConsistent && ctx.randomTagResolutions[tag])
-      selected = ctx.randomTagResolutions[tag]
+  if (!selected && isConsistent) {
+    if (ctx.existingRandomResolutions[tag]) selected = ctx.existingRandomResolutions[tag]
+    if (!selected && ctx.randomTagResolutions[tag]) selected = ctx.randomTagResolutions[tag]
   }
   if (!selected) {
     const idx = getWeightedRandomIndex(options)
