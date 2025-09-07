@@ -9,6 +9,7 @@
   import { LockClosed } from 'svelte-heros-v2'
   import type { CustomTag } from './types'
   import { getWildcardModel } from './stores/tagsStore'
+  import { createPlaceholderRegex } from '$lib/constants'
 
   // Cache referenced placeholder containers per model+tag to avoid rescanning on every render
   const refCacheByModel: WeakMap<object, Map<string, string[]>> = new WeakMap()
@@ -29,7 +30,7 @@
     if (id) {
       const node = model.nodes[id]
       if (node && node.kind === 'array') {
-        const placeholderAny = /__([\p{L}\p{N}_\- /]+)__/gu
+        const placeholderAny = createPlaceholderRegex()
         for (const cid of node.children) {
           const c = model.nodes[cid]
           if (!c || c.kind !== 'leaf') continue

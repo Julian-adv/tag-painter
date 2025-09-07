@@ -3,7 +3,7 @@
  */
 
 import type { AnyNode, TreeModel } from '$lib/TreeEdit/model'
-import { CONSISTENT_RANDOM_MARKER, DEFAULT_ARRAY_WEIGHT } from '$lib/constants'
+import { CONSISTENT_RANDOM_MARKER, DEFAULT_ARRAY_WEIGHT, createPlaceholderRegex } from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
 import { findNodeByName, extractDisablesDirective } from '$lib/TreeEdit/utils'
 
@@ -196,7 +196,8 @@ function expandPlaceholders(
   inputs: string[],
   resolutionsAcc: Record<string, string>
 ): string[] {
-  const placeholderAny = /__([\p{L}\p{N}_\- /]+)__/gu
+  // Match placeholders like __name__ using shared factory (non-greedy)
+  const placeholderAny = createPlaceholderRegex()
   let out = inputs.slice()
   let safetyCounter = 0
   while (safetyCounter < 100) {

@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { TreeModel } from './model'
+  import type { TreeModel } from './model' 
   import { isConsistentRandomArray, findNodeByName } from './utils'
+  import { createPlaceholderRegex } from '$lib/constants'
 
   interface Props {
     value: string
@@ -16,7 +17,8 @@
     | { kind: 'text'; text: string }
     | { kind: 'chip'; name: string; type: 'random' | 'consistent-random' | 'unknown' }
 
-  const placeholderRe = /__([\p{L}\p{N}_\- /]+)__/gu
+  // Use shared regex factory to avoid state sharing across matches
+  const placeholderRe = createPlaceholderRegex()
 
   function getTagType(tagName: string): 'random' | 'consistent-random' | 'unknown' {
     if (!model) return 'unknown'
