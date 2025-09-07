@@ -203,22 +203,38 @@
     if (selectedIds.length !== 1) return
     const selectedId = selectedIds[0]
     const selectedNode = model.nodes[selectedId]
-    if (!selectedNode || (selectedNode.kind !== 'array' && selectedNode.kind !== 'object')) return
+    if (!selectedNode) return
 
-    // Find parent node
-    const parentId = selectedNode.parentId
+    // Determine the container whose siblings we want to collapse
+    let targetContainerId: string | null = null
+    if (selectedNode.kind === 'array' || selectedNode.kind === 'object') {
+      targetContainerId = selectedId
+    } else if (selectedNode.kind === 'leaf') {
+      targetContainerId = selectedNode.parentId ?? null
+    }
+    if (!targetContainerId) return
+
+    // Find the parent of that container
+    const targetContainer = model.nodes[targetContainerId]
+    if (!targetContainer || (targetContainer.kind !== 'array' && targetContainer.kind !== 'object')) return
+    const parentId = targetContainer.parentId
     if (!parentId) return
-    
     const parentNode = model.nodes[parentId]
     if (!parentNode || (parentNode.kind !== 'array' && parentNode.kind !== 'object')) return
     if (!parentNode.children) return
 
-    // Collapse all sibling container nodes (including selected node)
+    // Collapse all sibling container nodes (including the target container)
     for (const childId of parentNode.children) {
       const childNode = model.nodes[childId]
       if (childNode && (childNode.kind === 'array' || childNode.kind === 'object')) {
         childNode.collapsed = true
       }
+    }
+
+    // If a leaf was selected, move selection to its parent container for visibility
+    if (selectedNode.kind === 'leaf') {
+      selectedIds = [targetContainerId]
+      lastSelectedId = targetContainerId
     }
 
     tick().then(() => scrollSelectedIntoView())

@@ -93,8 +93,15 @@
     const selectedId = selectedIds[0]
     const node = model.nodes[selectedId]
     if (!node) return false
-    // Only enable for container nodes (array or object)
-    return node.kind === 'array' || node.kind === 'object'
+    // Enable for container nodes, and also for leaves that have a container parent
+    if (node.kind === 'array' || node.kind === 'object') return true
+    if (node.kind === 'leaf') {
+      const parentId = node.parentId
+      if (!parentId) return false
+      const parent = model.nodes[parentId]
+      return !!parent && (parent.kind === 'array' || parent.kind === 'object')
+    }
+    return false
   }
 
   function isSelectedConsistentRandom(): boolean {
