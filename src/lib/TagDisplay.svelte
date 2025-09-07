@@ -151,17 +151,17 @@
   // or for any descendant path under that tag (e.g., "parent/child").
   function isOverriddenForTag(tagName: string): boolean {
     const st = testModeStore[tagName]
-    if (st && st.enabled && !!st.overrideTag) return true
+    if (st && st.enabled && (!!st.overrideTag || !!st.pinnedLeafPath)) return true
     for (const [k, v] of Object.entries(testModeStore)) {
       if (!k || k === tagName) continue
-      if (k.startsWith(tagName + '/') && v && v.enabled && !!v.overrideTag) return true
+      if (k.startsWith(tagName + '/') && v && v.enabled && (!!v.overrideTag || !!v.pinnedLeafPath)) return true
     }
 
     // Also handle alias/placeholder expansions (e.g., pose/d → pose/action)
     const refs = getReferencedContainers(tagName)
     if (refs.length > 0) {
       for (const [k, v] of Object.entries(testModeStore)) {
-        if (!v || !v.enabled || !v.overrideTag) continue
+        if (!v || !v.enabled || (!v.overrideTag && !v.pinnedLeafPath)) continue
         for (const refName of refs) {
           if (k === refName || k.startsWith(refName + '/')) return true
         }
@@ -172,7 +172,8 @@
 
   function handlePinToggle() {
     const tag = tags[contextMenuState.tagIndex]
-    const isForceOverridden = !!testModeStore[tag.name]?.overrideTag
+    const store = testModeStore[tag.name]
+    const isForceOverridden = !!(store?.overrideTag || store?.pinnedLeafPath)
 
     // Use current resolution if available, otherwise use the tag name itself
     const targetTag = currentRandomTagResolutions[tag.name] || tag.name
@@ -320,7 +321,8 @@
     >
       {#if contextMenuState.tagIndex >= 0}
         {@const tag = tags[contextMenuState.tagIndex]}
-        {@const isForceOverridden = !!testModeStore[tag.name]?.overrideTag}
+        {@const store = testModeStore[tag.name]}
+        {@const isForceOverridden = !!(store?.overrideTag || store?.pinnedLeafPath)}
         <LockClosed class="h-4 w-4 {isForceOverridden ? 'text-orange-500' : 'text-gray-500'}" />
         <span>
           {isForceOverridden ? 'Unpin this option' : 'Pin this option'}
@@ -329,7 +331,8 @@
     </button>
     {#if contextMenuState.tagIndex >= 0}
       {@const tag = tags[contextMenuState.tagIndex]}
-      {@const isForceOverridden = !!testModeStore[tag.name]?.overrideTag}
+      {@const store = testModeStore[tag.name]}
+      {@const isForceOverridden = !!(store?.overrideTag || store?.pinnedLeafPath)}
       {@const displayContent = currentRandomTagResolutions[tag.name]}
 
       {#if displayContent && !isForceOverridden}
@@ -337,9 +340,9 @@
           Will pin: <span class="font-medium">{displayContent}</span>
         </div>
       {/if}
-      {#if isForceOverridden && testModeStore[tag.name]?.overrideTag}
+      {#if isForceOverridden}
         <div class="border-t border-gray-200 px-3 py-1 text-xs text-gray-500">
-          Pinned to: <span class="font-medium">{testModeStore[tag.name].overrideTag}</span>
+          Pinned to: <span class="font-medium">{store?.overrideTag || 'path-based pin'}</span>
         </div>
       {/if}
     {/if}
