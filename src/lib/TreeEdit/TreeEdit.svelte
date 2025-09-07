@@ -39,6 +39,8 @@
   let parentNameSuggestions: string[] = $state([])
   // Filter state
   let filterText: string = $state('')
+  // Track whether a filter was active previously to react when it is cleared
+  let hadFilter: boolean = $state(false)
 
   function recomputeParentNameSuggestionsFromValues(values: AnyNode[]) {
     const names = new Set<string>()
@@ -62,6 +64,15 @@
   $effect(() => {
     const values = Object.values(model.nodes)
     recomputeParentNameSuggestionsFromValues(values)
+  })
+
+  // When a previously active filter is cleared, keep selection and scroll it into view
+  $effect(() => {
+    const nowHasFilter = !!filterText && filterText.trim().length > 0
+    if (hadFilter && !nowHasFilter) {
+      tick().then(() => scrollSelectedIntoView())
+    }
+    hadFilter = nowHasFilter
   })
 
   function loadYaml(text: string) {
@@ -123,6 +134,13 @@
     // Regular single selection
     selectedIds = [id]
     lastSelectedId = id
+    // If the user explicitly selects a different node, stop auto-edit anchoring
+    if (autoEditChildId && autoEditChildId !== id) {
+      autoEditChildId = null
+    }
+    if (newlyAddedRootChildId && newlyAddedRootChildId !== id) {
+      newlyAddedRootChildId = null
+    }
   }
 
   // Allow descendants to request auto-editing of a specific child id
@@ -491,6 +509,8 @@
 
   function clearFilter() {
     filterText = ''
+    // After clearing via the button, ensure current selection is visible
+    tick().then(() => scrollSelectedIntoView())
   }
 </script>
 
