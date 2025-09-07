@@ -1,6 +1,7 @@
 <script lang="ts">
   import TreeNode from './TreeNode.svelte'
   import TreeEditControlPanel from './TreeEditControlPanel.svelte'
+  import TreeNodePath from './TreeNodePath.svelte'
   import type { TreeModel, LeafNode, ArrayNode, ObjectNode, AnyNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
   import { addChild, isContainer, uid, removeNode, moveChild, rebuildPathSymbols } from './model'
@@ -159,6 +160,7 @@
       el.focus()
     }
   }
+
 
   function findNearestVisibleAncestorId(id: string): string {
     const start = model.nodes[id]
@@ -553,6 +555,14 @@
           </button>
         {/if}
       </div>
+
+      <!-- Path breadcrumb -->
+      <TreeNodePath 
+        {model} 
+        {selectedIds} 
+        onSelectNode={selectNode}
+        onScrollToSelected={scrollSelectedIntoView}
+      />
 
       <div
         class="tree"
