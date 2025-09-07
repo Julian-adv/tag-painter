@@ -19,9 +19,41 @@ type TagExpansionCtx = {
   overrideMap: Record<string, string>
 }
 
-function getLeafValueById(model: TreeModel, leafId: string): string {
-  const n = model.nodes[leafId]
-  if (n && n.kind === 'leaf') return String(n.value)
+function getLeafValueByPath(model: TreeModel, leafPath: string): string {
+  // Split path into parts and traverse manually
+  const parts = leafPath.split('/')
+  let currentNode = model.nodes[model.rootId]
+  
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]
+    
+    if (!currentNode || (currentNode.kind !== 'array' && currentNode.kind !== 'object')) {
+      return ''
+    }
+    
+    const children = currentNode.children || []
+    
+    // Find child by name
+    let foundChildId: string | null = null
+    for (const childId of children) {
+      const childNode = model.nodes[childId]
+      if (childNode && childNode.name === part) {
+        foundChildId = childId
+        break
+      }
+    }
+    
+    if (!foundChildId) {
+      return ''
+    }
+    
+    currentNode = model.nodes[foundChildId]
+  }
+  
+  if (currentNode && currentNode.kind === 'leaf') {
+    return String(currentNode.value)
+  }
+  
   return ''
 }
 
@@ -87,11 +119,11 @@ function buildOverrideMap(
       continue
     }
     let v: string | undefined = undefined
-    if (s.overrideTag) {
+    if (s.overrideTag && s.overrideTag.trim()) {
       const overrideStr = String(s.overrideTag).trim()
-      if (overrideStr) v = overrideStr
-    } else if (s.pinnedLeafId) {
-      v = getLeafValueById(model, s.pinnedLeafId)
+      v = overrideStr
+    } else if (s.pinnedLeafPath) {
+      v = getLeafValueByPath(model, s.pinnedLeafPath)
     }
     if (v && v.trim()) {
       map[key] = v
@@ -207,7 +239,9 @@ function expandArrayNode(
 ): { expandedTags: string[]; resolution: string } {
   let selected: string | null = null
   // Exact path/name override from unified map
-  if (ctx.overrideMap[tag]) selected = ctx.overrideMap[tag]
+  if (ctx.overrideMap[tag]) {
+    selected = ctx.overrideMap[tag]
+  }
   if (!selected && ctx.previousRunResults[tag]) {
     const previousResult = ctx.previousRunResults[tag]
     const previousTags = previousResult.split(', ')

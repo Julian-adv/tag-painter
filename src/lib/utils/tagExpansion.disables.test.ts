@@ -34,7 +34,7 @@ outfit:
     testModeStore['pose/action/pull'] = {
       enabled: true,
       overrideTag: 'pulls, disables=[outfit/d]',
-      pinnedLeafId: undefined
+      pinnedLeafPath: undefined
     }
     const { expandedTags } = expandCustomTags(['pose/d', 'outfit/d'], model, new Set(), {}, {})
 
@@ -49,7 +49,7 @@ outfit:
     testModeStore['pose/action/pull'] = {
       enabled: true,
       overrideTag: 'alt',
-      pinnedLeafId: undefined
+      pinnedLeafPath: undefined
     }
     const { expandedTags } = expandCustomTags(['pose/d', 'outfit/d'], model, new Set(), {}, {})
 
@@ -62,7 +62,7 @@ outfit:
     testModeStore['pose/action/pull'] = {
       enabled: true,
       overrideTag: 'pulls, disables=[outfit/d]',
-      pinnedLeafId: undefined
+      pinnedLeafPath: undefined
     }
     // Expand outfit first with a weight, then pose which disables outfit
     const { expandedTags } = expandCustomTags(['outfit/d:1.3', 'pose/d'], model, new Set(), {}, {})
@@ -76,7 +76,7 @@ outfit:
     testModeStore['pose/action/pull'] = {
       enabled: true,
       overrideTag: 'pulls, disables=[outfit/d]',
-      pinnedLeafId: undefined
+      pinnedLeafPath: undefined
     }
     const sharedDisables = { names: new Set<string>(), patterns: [] as string[] }
 

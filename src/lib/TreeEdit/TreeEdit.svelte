@@ -359,8 +359,9 @@
     }
     const val = String(n.value ?? '')
     const store = testModeStore[pinKey]
+    const selectedNodePath = getNodePath(model, selectedId)
     const isPinned = store && store.enabled && 
-                     (store.pinnedLeafId === selectedId || store.overrideTag === val)
+                     (store.pinnedLeafPath === selectedNodePath || store.overrideTag === val)
     
     if (isPinned) {
       removeTestModeOverride(pinKey)
@@ -373,7 +374,9 @@
           }
         }
       }
-      setTestModeOverride(pinKey, val, selectedId)
+      const selectedNodePath = getNodePath(model, selectedId)
+      // Store only the pinnedLeafPath, not the overrideTag
+      setTestModeOverride(pinKey, '', selectedNodePath)
     }
   }
 
