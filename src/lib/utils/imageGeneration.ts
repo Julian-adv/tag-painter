@@ -214,6 +214,11 @@ export async function generateImage(options: GenerationOptions): Promise<{
     // Configure workflow based on settings
     configureWorkflow(workflow, promptsData, settings, isInpainting, inpaintDenoiseStrength)
 
+    // If a custom VAE is selected, inject VAELoader and rewire all VAE inputs
+    if (settings.selectedVae && settings.selectedVae !== '__embedded__') {
+      applyCustomVae(workflow, settings.selectedVae)
+    }
+
     // Apply seeds (either use provided seed or generate new one)
     const appliedSeed = applySeedsToWorkflow(workflow, seed, isInpainting)
 
@@ -305,6 +310,28 @@ function configureWorkflow(
     if (promptsData.useFaceDetailer) {
       // Face detailer nodes are already in the workflow (56, 69)
       // They are enabled by default in this workflow
+    }
+  }
+}
+
+function applyCustomVae(workflow: ComfyUIWorkflow, vaeName: string) {
+  const vaeNodeId = '901'
+  // Add VAELoader node
+  workflow[vaeNodeId] = {
+    inputs: {
+      vae_name: vaeName
+    },
+    class_type: 'VAELoader',
+    _meta: {
+      title: 'Load VAE'
+    }
+  }
+
+  // Rewire all inputs that reference a VAE to use the VAELoader output
+  for (const node of Object.values(workflow)) {
+    if (!node || !node.inputs) continue
+    if (Object.prototype.hasOwnProperty.call(node.inputs, 'vae')) {
+      node.inputs.vae = [vaeNodeId, 0]
     }
   }
 }

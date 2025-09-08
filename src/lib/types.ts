@@ -30,6 +30,8 @@ export interface Settings {
   seed: number
   sampler: string
   outputDirectory: string
+  // VAE selection: '__embedded__' means use checkpoint's embedded VAE
+  selectedVae: string
 }
 
 export interface PromptCategory {

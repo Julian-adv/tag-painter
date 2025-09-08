@@ -99,7 +99,8 @@
     steps: 28,
     seed: -1,
     sampler: 'euler_ancestral',
-    outputDirectory: DEFAULT_OUTPUT_DIRECTORY
+    outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
+    selectedVae: '__embedded__'
   })
 
   // Prompts state is now managed by the central store
@@ -112,7 +113,9 @@
     // Load settings
     const savedSettings = await loadSettings()
     if (savedSettings) {
-      settings = savedSettings
+      // Merge with defaults to ensure new fields like selectedVae exist
+      settings = { ...settings, ...savedSettings }
+      if (!settings.selectedVae) settings.selectedVae = '__embedded__'
     }
 
     // Load available checkpoints

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Settings } from '$lib/types'
+  import { fetchVaeModels } from './utils/comfyui'
 
   interface Props {
     show: boolean
@@ -18,7 +19,8 @@
     steps: settings.steps,
     seed: settings.seed,
     sampler: settings.sampler,
-    outputDirectory: settings.outputDirectory
+    outputDirectory: settings.outputDirectory,
+    selectedVae: settings.selectedVae
   })
 
   // Update local settings when props change
@@ -31,8 +33,23 @@
         steps: settings.steps,
         seed: settings.seed,
         sampler: settings.sampler,
-        outputDirectory: settings.outputDirectory
+        outputDirectory: settings.outputDirectory,
+        selectedVae: settings.selectedVae
       }
+    }
+  })
+
+  let availableVaes: string[] = $state([])
+
+  $effect(() => {
+    if (show) {
+      fetchVaeModels()
+        .then((vaes) => {
+          availableVaes = vaes || []
+        })
+        .catch(() => {
+          availableVaes = []
+        })
     }
   })
 
@@ -113,14 +130,22 @@
           class="two-col-input"
         />
 
-        <label for="sampler" class="two-col-label">Sampler:</label>
-        <select id="sampler" bind:value={localSettings.sampler} class="two-col-input">
-          <option value="euler_ancestral">Euler Ancestral</option>
-          <option value="euler">Euler</option>
-          <option value="dpmpp_2m">DPM++ 2M</option>
-          <option value="dpmpp_sde">DPM++ SDE</option>
-          <option value="ddim">DDIM</option>
-        </select>
+      <label for="sampler" class="two-col-label">Sampler:</label>
+      <select id="sampler" bind:value={localSettings.sampler} class="two-col-input">
+        <option value="euler_ancestral">Euler Ancestral</option>
+        <option value="euler">Euler</option>
+        <option value="dpmpp_2m">DPM++ 2M</option>
+        <option value="dpmpp_sde">DPM++ SDE</option>
+        <option value="ddim">DDIM</option>
+      </select>
+
+      <label for="vae" class="two-col-label">VAE:</label>
+      <select id="vae" bind:value={localSettings.selectedVae} class="two-col-input">
+        <option value="__embedded__">Use checkpoint's embedded VAE (default)</option>
+        {#each availableVaes as vae (vae)}
+          <option value={vae}>{vae}</option>
+        {/each}
+      </select>
 
         <label for="output-directory" class="output-dir-label">Output Directory:</label>
         <input

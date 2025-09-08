@@ -25,7 +25,8 @@ export async function GET() {
           steps: 28,
           seed: -1,
           sampler: 'euler_ancestral',
-          outputDirectory: DEFAULT_OUTPUT_DIRECTORY
+          outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
+          selectedVae: '__embedded__'
         }
       })
     }

@@ -34,6 +34,33 @@ export async function fetchCheckpoints(): Promise<string[]> {
   }
 }
 
+export async function fetchVaeModels(): Promise<string[]> {
+  try {
+    const response = await fetch('http://127.0.0.1:8188/object_info/VAELoader')
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    const data = await response.json()
+    // Structure mirrors CheckpointLoaderSimple: VAELoader.input.required.vae_name[0]
+    if (
+      data &&
+      data.VAELoader &&
+      data.VAELoader.input &&
+      data.VAELoader.input.required &&
+      data.VAELoader.input.required.vae_name
+    ) {
+      const vaes = data.VAELoader.input.required.vae_name[0]
+      return vaes
+    } else {
+      console.error('Could not find vae list in API response:', data)
+      return []
+    }
+  } catch (error) {
+    console.error('Error fetching VAE models:', error)
+    return []
+  }
+}
+
 export interface WebSocketCallbacks {
   onLoadingChange: (loading: boolean) => void
   onProgressUpdate: (progress: ProgressData) => void
