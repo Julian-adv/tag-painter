@@ -506,45 +506,7 @@
     return isConsistentRandomArray(model, id)
   }
 
-  function addSiblingAfterCurrentLeaf() {
-    const node = model.nodes[id]
-    if (!node || node.kind !== 'leaf') return
-    const parentId = node.parentId
-    if (!parentId) return
-    const parent = model.nodes[parentId]
-    if (!parent || !isContainer(parent)) return
-
-    // Ensure parent is expanded so the new item is visible
-    parent.collapsed = false
-
-    const children = (parent as ObjectNode | ArrayNode).children
-    const currentIndex = children.indexOf(id)
-    const insertIndex = currentIndex >= 0 ? currentIndex + 1 : children.length
-
-    const newId = uid()
-    const newLeaf: LeafNode = {
-      id: newId,
-      name: parent.kind === 'array' ? String(children.length) : 'newKey',
-      kind: 'leaf',
-      parentId,
-      value: ''
-    }
-
-    // Append first, then move to the desired position to keep indices valid
-    addChild(model, parentId, newLeaf)
-    const appendedIndex = (parent as ObjectNode | ArrayNode).children.length - 1
-    moveChild(
-      model,
-      parentId,
-      appendedIndex,
-      Math.min(insertIndex, (parent as ObjectNode | ArrayNode).children.length - 1)
-    )
-
-    onMutate(true)
-    // Request auto-edit for the newly created leaf
-    setAutoEditChildId?.(newId)
-    onSelect(newId)
-  }
+  
 
   function isTopLevelPinned(): boolean {
     const node = model.nodes[id]
@@ -573,20 +535,8 @@
   }
 
   function handleRowKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') {
-      // Handle before children so InlineEditor doesn't start editing
-      e.preventDefault()
-      // Only act when not already editing
-      if (!isNameEditing && !isValueEditing) {
-        const n = model.nodes[id]
-        if (n && n.kind === 'leaf') {
-          addSiblingAfterCurrentLeaf()
-          return
-        }
-        onSelect(id)
-        return
-      }
-    } else if (e.key === ' ') {
+    // Keep Space to toggle/select on the current row; let other keys bubble
+    if (e.key === ' ') {
       e.preventDefault()
       onSelect(id)
     }

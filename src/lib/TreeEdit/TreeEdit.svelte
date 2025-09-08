@@ -12,6 +12,7 @@
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
   import { isConsistentRandomArray, getNodePath } from './utils'
   import { addBySelectionAction } from './addBySelection'
+  import { shouldNodeBeVisible } from './utils'
   import {
     testModeStore,
     setTestModeOverride,
@@ -42,6 +43,186 @@
   let filterText: string = $state('')
   // Track whether a filter was active previously to react when it is cleared
   let hadFilter: boolean = $state(false)
+
+  // Build a flat list of currently visible node ids in render order
+  function flattenVisibleNodeIds(): string[] {
+    const result: string[] = []
+    function dfs(curId: string) {
+      const n = model.nodes[curId]
+      if (!n) return
+      // Only traverse subtrees that are visible under current filter
+      if (!shouldNodeBeVisible(model, curId, filterText)) return
+      if (curId !== model.rootId) result.push(curId)
+      if (isContainer(n) && !n.collapsed) {
+        for (const cid of (n.children || [])) dfs(cid)
+      }
+    }
+    dfs(model.rootId)
+    return result
+  }
+
+  function focusSelectedSoon() {
+    tick().then(() => scrollSelectedIntoView())
+  }
+
+  function moveSelectionBy(delta: number) {
+    const visible = flattenVisibleNodeIds()
+    if (visible.length === 0) return
+    // Prefer lastSelectedId when available
+    const currentId = lastSelectedId || selectedIds[0] || null
+    if (!currentId) {
+      selectedIds = [visible[0]]
+      lastSelectedId = visible[0]
+      focusSelectedSoon()
+      return
+    }
+    let idx = visible.indexOf(currentId)
+    if (idx === -1) {
+      // Fallback: select nearest visible ancestor
+      const newId = findNearestVisibleAncestorId(currentId)
+      idx = Math.max(0, visible.indexOf(newId))
+    }
+    const next = Math.min(visible.length - 1, Math.max(0, idx + delta))
+    if (visible[next]) {
+      selectedIds = [visible[next]]
+      lastSelectedId = visible[next]
+      focusSelectedSoon()
+    }
+  }
+
+  function collapseOrFocusParent() {
+    if (selectedIds.length !== 1) return
+    const sid = selectedIds[0]
+    const n = model.nodes[sid]
+    if (!n) return
+    if (isContainer(n) && !n.collapsed) {
+      n.collapsed = true
+      return
+    }
+    const pid = n.parentId
+    if (pid && pid !== model.rootId) {
+      selectedIds = [pid]
+      lastSelectedId = pid
+      focusSelectedSoon()
+    }
+  }
+
+  function expandOrFocusFirstChild() {
+    if (selectedIds.length !== 1) return
+    const sid = selectedIds[0]
+    const n = model.nodes[sid]
+    if (!n) return
+    if (isContainer(n)) {
+      if (n.collapsed) {
+        n.collapsed = false
+        return
+      }
+      const firstChild = n.children?.[0]
+      if (firstChild) {
+        selectedIds = [firstChild]
+        lastSelectedId = firstChild
+        focusSelectedSoon()
+      }
+    }
+  }
+
+  function startEditingSelection() {
+    if (selectedIds.length !== 1) return
+    const sid = selectedIds[0]
+    autoEditChildId = sid
+    autoEditBehavior = 'selectAll'
+    focusSelectedSoon()
+  }
+
+  function addSiblingAfterLeaf(leafId: string) {
+    const node = model.nodes[leafId]
+    if (!node || node.kind !== 'leaf') return
+    const parentId = node.parentId
+    if (!parentId) return
+    const parent = model.nodes[parentId]
+    if (!parent || !isContainer(parent)) return
+    parent.collapsed = false
+    const children = (parent as ObjectNode | ArrayNode).children
+    const currentIndex = children.indexOf(leafId)
+    const insertIndex = currentIndex >= 0 ? currentIndex + 1 : children.length
+    const newId = uid()
+    const newLeaf: LeafNode = {
+      id: newId,
+      name: parent.kind === 'array' ? String(children.length) : 'newKey',
+      kind: 'leaf',
+      parentId,
+      value: ''
+    }
+    addChild(model, parentId, newLeaf)
+    const appendedIndex = (parent as ObjectNode | ArrayNode).children.length - 1
+    moveChild(
+      model,
+      parentId,
+      appendedIndex,
+      Math.min(insertIndex, (parent as ObjectNode | ArrayNode).children.length - 1)
+    )
+    setAutoEditChildId(newId)
+    selectedIds = [newId]
+    lastSelectedId = newId
+    hasUnsavedChanges = true
+    focusSelectedSoon()
+  }
+
+  function addChildForSelection() {
+    if (selectedIds.length !== 1) return
+    const sid = selectedIds[0]
+    const n = model.nodes[sid]
+    if (!n) return
+    if (n.kind === 'leaf') {
+      addSiblingAfterLeaf(sid)
+      return
+    }
+
+    // Container: add a child
+    if (n.kind === 'array') {
+      const child: LeafNode = {
+        id: uid(),
+        name: String(n.children.length),
+        kind: 'leaf',
+        parentId: n.id,
+        value: ''
+      }
+      addChild(model, n.id, child)
+      setAutoEditChildId(child.id)
+      selectedIds = [child.id]
+      lastSelectedId = child.id
+      hasUnsavedChanges = true
+      focusSelectedSoon()
+      return
+    }
+
+    if (n.kind === 'object') {
+      const arrId = uid()
+      const arrayNode: ArrayNode = {
+        id: arrId,
+        name: 'new_parent',
+        kind: 'array',
+        parentId: n.id,
+        children: [],
+        collapsed: false
+      }
+      addChild(model, n.id, arrayNode)
+      const firstChild: LeafNode = {
+        id: uid(),
+        name: '0',
+        kind: 'leaf',
+        parentId: arrId,
+        value: ''
+      }
+      addChild(model, arrId, firstChild)
+      setAutoEditChildId(firstChild.id)
+      selectedIds = [firstChild.id]
+      lastSelectedId = firstChild.id
+      hasUnsavedChanges = true
+      focusSelectedSoon()
+      return
+    }
+  }
 
   function recomputeParentNameSuggestionsFromValues(values: AnyNode[]) {
     const names = new Set<string>()
@@ -579,11 +760,70 @@
         bind:this={treeContainer}
         data-tree-root
         onkeydown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+          // Tree-level keyboard handling (navigation and actions)
+          if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+            // Reorder within parent
+            if (selectedIds.length === 1) {
+              const sid = selectedIds[0]
+              const node = model.nodes[sid]
+              const pid = node?.parentId || null
+              if (pid) {
+                const parent = model.nodes[pid]
+                if (parent && isContainer(parent)) {
+                  const children = (parent as ObjectNode | ArrayNode).children
+                  const idx = children.indexOf(sid)
+                  if (idx !== -1) {
+                    const to = e.key === 'ArrowUp' ? idx - 1 : idx + 1
+                    if (to >= 0 && to < children.length) {
+                      moveChild(model, pid, idx, to)
+                      hasUnsavedChanges = true
+                      // Keep selection and ensure visibility
+                      tick().then(() => scrollSelectedIntoView())
+                    }
+                  }
+                }
+              }
+            }
             e.preventDefault()
-            selectedIds = []
-            lastSelectedId = null
-          } else if (e.key === 'Delete') {
+            return
+          }
+
+          if (!e.ctrlKey && (e.key === 'Enter' || e.key === 'F2')) {
+            // Start editing current selection
+            e.preventDefault()
+            startEditingSelection()
+            return
+          }
+
+          if (e.ctrlKey && e.key === 'Enter') {
+            // Ctrl+Enter: add child (or sibling if leaf)
+            e.preventDefault()
+            addChildForSelection()
+            return
+          }
+
+          if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            moveSelectionBy(-1)
+            return
+          }
+          if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            moveSelectionBy(1)
+            return
+          }
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault()
+            collapseOrFocusParent()
+            return
+          }
+          if (e.key === 'ArrowRight') {
+            e.preventDefault()
+            expandOrFocusFirstChild()
+            return
+          }
+
+          if (e.key === 'Delete') {
             // Delete selected node(s) via keyboard
             e.preventDefault()
             deleteBySelection()
