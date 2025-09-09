@@ -20,6 +20,7 @@
     id,
     value = $bindable(),
     placeholder = 'Enter text...',
+    rows = 1,
     class: className = '',
     readonly = false,
     onValueChange,
@@ -335,8 +336,8 @@
     bind:value
     {placeholder}
     {readonly}
-    rows={1}
-    class="box-border block w-full resize-y rounded border-gray-300 bg-white p-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200 focus:outline-none {readonly
+    rows={rows}
+    class="box-border block w-full resize-y rounded border border-gray-300 bg-white p-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200 focus:outline-none {readonly
       ? 'cursor-not-allowed bg-gray-100 text-gray-600'
       : ''} {className}"
     oninput={handleInput}

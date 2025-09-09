@@ -1,6 +1,8 @@
 <script lang="ts">
-  import type { Settings } from '$lib/types'
-  import { fetchVaeModels } from './utils/comfyui'
+  import type { Settings, LoraWithWeight } from '$lib/types'
+  import { fetchVaeModels, fetchCheckpoints } from './utils/comfyui'
+  import LoraSelector from './LoraSelector.svelte'
+  import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
 
   interface Props {
     show: boolean
@@ -20,7 +22,8 @@
     seed: settings.seed,
     sampler: settings.sampler,
     outputDirectory: settings.outputDirectory,
-    selectedVae: settings.selectedVae
+    selectedVae: settings.selectedVae,
+    perModel: settings.perModel || {}
   })
 
   // Update local settings when props change
@@ -34,12 +37,52 @@
         seed: settings.seed,
         sampler: settings.sampler,
         outputDirectory: settings.outputDirectory,
-        selectedVae: settings.selectedVae
+        selectedVae: settings.selectedVae,
+        perModel: settings.perModel || {}
+      }
+    }
+  })
+
+  // When dialog opens, ensure 'Default' per-model entry exists for initial render
+  $effect(() => {
+    if (show) {
+      const hasDefault = !!(localSettings.perModel && localSettings.perModel['Default'])
+      if (!hasDefault) {
+        localSettings.perModel = {
+          ...(localSettings.perModel || {}),
+          Default: {
+            qualityPrefix: '',
+            negativePrefix: '',
+            loras: [],
+            cfgScale: localSettings.cfgScale,
+            steps: localSettings.steps,
+            sampler: localSettings.sampler,
+            selectedVae: localSettings.selectedVae
+          }
+        }
       }
     }
   })
 
   let availableVaes: string[] = $state([])
+  let availableCheckpoints: string[] = $state([])
+  let selectedModelKey: string = $state('Default')
+
+  function ensureModelEntry(key: string) {
+    if (!localSettings.perModel[key]) {
+      localSettings.perModel[key] = {
+        qualityPrefix: '',
+        negativePrefix: '',
+        loras: [],
+        cfgScale: localSettings.cfgScale,
+        steps: localSettings.steps,
+        sampler: localSettings.sampler,
+        selectedVae: localSettings.selectedVae
+      }
+    }
+  }
+
+  // Create per-model entry only on demand (via dropdown onchange)
 
   $effect(() => {
     if (show) {
@@ -50,6 +93,15 @@
         .catch(() => {
           availableVaes = []
         })
+      fetchCheckpoints()
+        .then((cps) => {
+          availableCheckpoints = ['Default', ...(cps || [])]
+        })
+        .catch(() => {
+          availableCheckpoints = ['Default']
+        })
+      // Initialize selected model key
+      if (!selectedModelKey) selectedModelKey = 'Default'
     }
   })
 
@@ -75,6 +127,7 @@
       </div>
 
       <div class="dialog-body">
+        <!-- Global settings -->
         <label for="image-width" class="two-col-label">Image Width:</label>
         <input
           id="image-width"
@@ -97,28 +150,6 @@
           class="two-col-input"
         />
 
-        <label for="cfg-scale" class="two-col-label">CFG Scale:</label>
-        <input
-          id="cfg-scale"
-          type="number"
-          bind:value={localSettings.cfgScale}
-          min="1"
-          max="20"
-          step="0.5"
-          class="two-col-input"
-        />
-
-        <label for="steps" class="two-col-label">Steps:</label>
-        <input
-          id="steps"
-          type="number"
-          bind:value={localSettings.steps}
-          min="1"
-          max="100"
-          step="1"
-          class="two-col-input"
-        />
-
         <label for="seed" class="two-col-label">Seed (-1 for random):</label>
         <input
           id="seed"
@@ -129,24 +160,7 @@
           step="1"
           class="two-col-input"
         />
-
-      <label for="sampler" class="two-col-label">Sampler:</label>
-      <select id="sampler" bind:value={localSettings.sampler} class="two-col-input">
-        <option value="euler_ancestral">Euler Ancestral</option>
-        <option value="euler">Euler</option>
-        <option value="dpmpp_2m">DPM++ 2M</option>
-        <option value="dpmpp_sde">DPM++ SDE</option>
-        <option value="ddim">DDIM</option>
-      </select>
-
-      <label for="vae" class="two-col-label">VAE:</label>
-      <select id="vae" bind:value={localSettings.selectedVae} class="two-col-input">
-        <option value="__embedded__">Use checkpoint's embedded VAE (default)</option>
-        {#each availableVaes as vae (vae)}
-          <option value={vae}>{vae}</option>
-        {/each}
-      </select>
-
+        <!-- Output directory remains global -->
         <label for="output-directory" class="output-dir-label">Output Directory:</label>
         <input
           id="output-directory"
@@ -155,6 +169,106 @@
           placeholder="/path/to/output/directory"
           class="output-dir-input"
         />
+
+        <!-- Per-model overrides -->
+        <div class="section-spacer" style="grid-column: 1 / 4; height: 10px;"></div>
+        <div
+          class="section-title"
+          style="grid-column: 1 / 4; font-weight: 600; color: #333; text-align: left; justify-self: start;"
+        >
+          Per-Model Overrides
+        </div>
+
+        <label for="model-key" class="two-col-label">Model:</label>
+        <select
+          id="model-key"
+          class="two-col-input"
+          bind:value={selectedModelKey}
+          onchange={() => ensureModelEntry(selectedModelKey)}
+        >
+          {#each availableCheckpoints as cp (cp)}
+            <option value={cp}>{cp}</option>
+          {/each}
+        </select>
+
+        {#if localSettings.perModel[selectedModelKey]}
+          <label for="pm-cfg" class="two-col-label">CFG Scale:</label>
+          <input
+            id="pm-cfg"
+            type="number"
+            bind:value={localSettings.perModel[selectedModelKey].cfgScale}
+            min="1"
+            max="20"
+            step="0.5"
+            class="two-col-input"
+          />
+
+          <label for="pm-steps" class="two-col-label">Steps:</label>
+          <input
+            id="pm-steps"
+            type="number"
+            bind:value={localSettings.perModel[selectedModelKey].steps}
+            min="1"
+            max="100"
+            step="1"
+            class="two-col-input"
+          />
+
+          <label for="pm-sampler" class="two-col-label">Sampler:</label>
+          <select
+            id="pm-sampler"
+            bind:value={localSettings.perModel[selectedModelKey].sampler}
+            class="two-col-input"
+          >
+            <option value="euler_ancestral">Euler Ancestral</option>
+            <option value="euler">Euler</option>
+            <option value="dpmpp_2m">DPM++ 2M</option>
+            <option value="dpmpp_sde">DPM++ SDE</option>
+            <option value="ddim">DDIM</option>
+          </select>
+
+          <label for="pm-vae" class="two-col-label">VAE:</label>
+          <select
+            id="pm-vae"
+            bind:value={localSettings.perModel[selectedModelKey].selectedVae}
+            class="two-col-input-wide"
+          >
+            <option value="__embedded__">Use checkpoint's embedded VAE (default)</option>
+            {#each availableVaes as vae (vae)}
+              <option value={vae}>{vae}</option>
+            {/each}
+          </select>
+
+          <label for="pm-quality" class="two-col-label">Quality Prefix:</label>
+          <div class="two-col-input-wide">
+            <AutoCompleteTextarea
+              id="pm-quality"
+              value={localSettings.perModel[selectedModelKey].qualityPrefix}
+              onValueChange={(v) => (localSettings.perModel[selectedModelKey].qualityPrefix = v)}
+              placeholder="e.g., masterwork, high quality"
+              rows={3}
+            />
+          </div>
+
+          <label for="pm-negative" class="two-col-label">Negative Prefix:</label>
+          <div class="two-col-input-wide">
+            <AutoCompleteTextarea
+              id="pm-negative"
+              value={localSettings.perModel[selectedModelKey].negativePrefix}
+              onValueChange={(v) => (localSettings.perModel[selectedModelKey].negativePrefix = v)}
+              placeholder="e.g., lowres, bad anatomy"
+              rows={3}
+            />
+          </div>
+
+          <div class="two-col-label" style="text-align: right;">LoRA Models:</div>
+          <div class="two-col-input-wide lora-embed">
+            <LoraSelector
+              selectedLoras={localSettings.perModel[selectedModelKey].loras as LoraWithWeight[]}
+              onLoraChange={(loras) => (localSettings.perModel[selectedModelKey].loras = loras)}
+            />
+          </div>
+        {/if}
       </div>
 
       <div class="dialog-footer">
@@ -194,25 +308,25 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px 20px 10px 20px;
+    padding: 12px 16px 8px 16px;
     border-bottom: 1px solid #eee;
   }
 
   .dialog-header h3 {
     margin: 0;
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     color: #333;
   }
 
   .close-button {
     background: none;
     border: none;
-    font-size: 24px;
+    font-size: 20px;
     cursor: pointer;
     color: #666;
     padding: 0;
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -226,8 +340,8 @@
   .dialog-body {
     display: grid;
     grid-template-columns: auto 1fr 1fr;
-    gap: 15px 20px;
-    padding: 20px;
+    gap: 10px 16px;
+    padding: 12px 16px;
     max-height: 50vh;
     overflow-y: auto;
     align-items: center;
@@ -236,16 +350,16 @@
   .dialog-body label {
     font-weight: 500;
     color: #333;
-    font-size: 14px;
+    font-size: 13px;
     text-align: right;
   }
 
   .dialog-body input,
   .dialog-body select {
-    padding: 8px 12px;
+    padding: 6px 10px;
     border: 1px solid #ddd;
     border-radius: 4px;
-    font-size: 14px;
+    font-size: 13px;
     width: 100%;
   }
 
@@ -266,23 +380,27 @@
     grid-column: 2;
   }
 
+  .two-col-input-wide {
+    grid-column: 2 / 4;
+  }
+
   .output-dir-label {
     grid-column: 1;
     text-align: right;
     justify-self: end;
-    margin-top: 10px;
+    margin-top: 6px;
   }
 
   .output-dir-input {
     grid-column: 2 / 4;
-    margin-top: 10px;
+    margin-top: 6px;
   }
 
   .dialog-footer {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     justify-content: flex-end;
-    padding: 15px 20px 20px 20px;
+    padding: 12px 16px 14px 16px;
     border-top: 1px solid #eee;
   }
 
@@ -290,10 +408,10 @@
     background-color: #007bff;
     color: white;
     border: none;
-    padding: 8px 16px;
+    padding: 6px 12px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .primary-button:hover {
@@ -304,13 +422,18 @@
     background-color: #6c757d;
     color: white;
     border: none;
-    padding: 8px 16px;
+    padding: 6px 12px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .secondary-button:hover {
     background-color: #545b62;
+  }
+
+  /* Hide embedded LoRA header inside settings */
+  .lora-embed :global(.lora-selector h3) {
+    display: none;
   }
 </style>

@@ -100,7 +100,8 @@
     seed: -1,
     sampler: 'euler_ancestral',
     outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
-    selectedVae: '__embedded__'
+    selectedVae: '__embedded__',
+    perModel: {}
   })
 
   // Prompts state is now managed by the central store
@@ -116,6 +117,7 @@
       // Merge with defaults to ensure new fields like selectedVae exist
       settings = { ...settings, ...savedSettings }
       if (!settings.selectedVae) settings.selectedVae = '__embedded__'
+      if (!settings.perModel) settings.perModel = {}
     }
 
     // Load available checkpoints

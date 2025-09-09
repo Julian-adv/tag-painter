@@ -22,6 +22,21 @@ export interface OptionItem {
   value: string
 }
 
+export interface LoraWithWeight {
+  name: string
+  weight: number
+}
+
+export interface ModelSettings {
+  qualityPrefix: string
+  negativePrefix: string
+  loras: LoraWithWeight[]
+  cfgScale: number
+  steps: number
+  sampler: string
+  selectedVae: string
+}
+
 export interface Settings {
   imageWidth: number
   imageHeight: number
@@ -32,6 +47,8 @@ export interface Settings {
   outputDirectory: string
   // VAE selection: '__embedded__' means use checkpoint's embedded VAE
   selectedVae: string
+  // Per-model overrides including Default pseudo-model
+  perModel: Record<string, ModelSettings>
 }
 
 export interface PromptCategory {

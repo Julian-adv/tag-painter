@@ -17,7 +17,7 @@ import {
 } from './tagExpansion'
 import { getWildcardModel } from '../stores/tagsStore'
 import { updateComposition } from '../stores/promptsStore'
-import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow } from '$lib/types'
+import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow, ModelSettings } from '$lib/types'
 
 export interface GenerationOptions {
   promptsData: PromptsData
@@ -148,11 +148,24 @@ export async function generateImage(options: GenerationOptions): Promise<{
     }
 
     // Clean directives before sending to ComfyUI
-    const allTagsText = cleanDirectivesFromTags(allResult.expandedTags.join(', '))
+    let allTagsText = cleanDirectivesFromTags(allResult.expandedTags.join(', '))
     const zone1TagsText = cleanDirectivesFromTags(zone1Result.expandedTags.join(', '))
     let zone2TagsText = cleanDirectivesFromTags(zone2Result.expandedTags.join(', '))
-    const negativeTagsText = cleanDirectivesFromTags(negativeResult.expandedTags.join(', '))
+    let negativeTagsText = cleanDirectivesFromTags(negativeResult.expandedTags.join(', '))
     const inpaintingTagsText = cleanDirectivesFromTags(inpaintingResult.expandedTags.join(', '))
+
+    // Apply per-model quality/negative prefixes
+    const effectiveModel = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
+    const qualityPrefix = effectiveModel ? effectiveModel.qualityPrefix : ''
+    const negativePrefix = effectiveModel ? effectiveModel.negativePrefix : ''
+    if (qualityPrefix && qualityPrefix.trim().length > 0) {
+      allTagsText = [qualityPrefix.trim(), allTagsText].filter((p) => p && p.length > 0).join(', ')
+    }
+    if (negativePrefix && negativePrefix.trim().length > 0) {
+      negativeTagsText = [negativePrefix.trim(), negativeTagsText]
+        .filter((p) => p && p.length > 0)
+        .join(', ')
+    }
 
     if (isInpainting) {
       // Configure inpainting workflow
@@ -208,15 +221,17 @@ export async function generateImage(options: GenerationOptions): Promise<{
       workflow['86'].inputs.image = maskImagePath
     }
 
-    // Configure LoRA chain with individual weights
-    generateLoraChain(promptsData.selectedLoras, workflow)
+    // Configure LoRA chain with per-model overrides
+    const effectiveLoras = getEffectiveLoras(settings, promptsData.selectedCheckpoint, promptsData.selectedLoras)
+    generateLoraChain(effectiveLoras, workflow)
 
-    // Configure workflow based on settings
-    configureWorkflow(workflow, promptsData, settings, isInpainting, inpaintDenoiseStrength)
+    // Configure workflow based on settings merged with per-model overrides
+    const appliedSettings = applyPerModelOverrides(settings, promptsData.selectedCheckpoint)
+    configureWorkflow(workflow, promptsData, appliedSettings, isInpainting, inpaintDenoiseStrength)
 
     // If a custom VAE is selected, inject VAELoader and rewire all VAE inputs
-    if (settings.selectedVae && settings.selectedVae !== '__embedded__') {
-      applyCustomVae(workflow, settings.selectedVae)
+    if (appliedSettings.selectedVae && appliedSettings.selectedVae !== '__embedded__') {
+      applyCustomVae(workflow, appliedSettings.selectedVae)
     }
 
     // Apply seeds (either use provided seed or generate new one)
@@ -246,7 +261,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
         negative: negativeTagsText,
         inpainting: inpaintingTagsText
       },
-      settings,
+      appliedSettings,
       appliedSeed,
       {
         onLoadingChange,
@@ -484,4 +499,38 @@ async function submitToComfyUI(
   }
 
   await connectWebSocket(result.prompt_id, clientId, FINAL_SAVE_NODE_ID, workflow, wsCallbacks)
+}
+
+function getEffectiveModelSettings(settings: Settings, modelName: string | null): ModelSettings | null {
+  if (settings.perModel && modelName && settings.perModel[modelName]) {
+    return settings.perModel[modelName]
+  }
+  if (settings.perModel && settings.perModel['Default']) {
+    return settings.perModel['Default']
+  }
+  return null
+}
+
+function getEffectiveLoras(
+  settings: Settings,
+  modelName: string | null,
+  fallback: { name: string; weight: number }[]
+): { name: string; weight: number }[] {
+  const ms = getEffectiveModelSettings(settings, modelName)
+  if (ms && ms.loras && ms.loras.length > 0) {
+    return ms.loras
+  }
+  return fallback
+}
+
+function applyPerModelOverrides(settings: Settings, modelName: string | null): Settings {
+  const base: Settings = { ...settings, perModel: settings.perModel }
+  const ms = getEffectiveModelSettings(settings, modelName)
+  if (ms) {
+    base.cfgScale = ms.cfgScale
+    base.steps = ms.steps
+    base.sampler = ms.sampler
+    base.selectedVae = ms.selectedVae
+  }
+  return base
 }
