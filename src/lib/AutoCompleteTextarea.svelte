@@ -284,16 +284,19 @@
     if (showSuggestions && suggestions.length > 0) {
       if (event.key === 'ArrowDown') {
         event.preventDefault()
+        event.stopPropagation()
         selectedSuggestionIndex = Math.min(selectedSuggestionIndex + 1, suggestions.length - 1)
         scrollSelectedIntoView()
         return
       } else if (event.key === 'ArrowUp') {
         event.preventDefault()
+        event.stopPropagation()
         selectedSuggestionIndex = Math.max(selectedSuggestionIndex - 1, -1)
         scrollSelectedIntoView()
         return
       } else if (event.key === 'Tab') {
         event.preventDefault()
+        event.stopPropagation()
         // Use first suggestion if none selected, otherwise use selected one
         const indexToUse = selectedSuggestionIndex >= 0 ? selectedSuggestionIndex : 0
         if (indexToUse < suggestions.length) {
@@ -303,6 +306,7 @@
       } else if (event.key === 'Enter') {
         if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < suggestions.length) {
           event.preventDefault()
+          event.stopPropagation()
           insertSuggestion(suggestions[selectedSuggestionIndex])
           return
         } else if (showSuggestions) {
