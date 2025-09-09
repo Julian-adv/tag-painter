@@ -43,6 +43,134 @@
   let inputElement: HTMLInputElement | null = $state(null)
   let acWrapper: HTMLDivElement | null = $state(null)
 
+  // Adjust the weight of the comma-separated token at caret with Ctrl+Wheel
+  function handleWheel(event: WheelEvent) {
+    if (!event.ctrlKey) return
+    event.preventDefault()
+    event.stopPropagation()
+
+    // Determine the active editable element (textarea for autocomplete, input otherwise)
+    let el: HTMLTextAreaElement | HTMLInputElement | null = null
+    if (enableAutocomplete) {
+      el = (acWrapper?.querySelector('textarea') as HTMLTextAreaElement) ?? null
+    } else {
+      el = inputElement
+    }
+    if (!el) return
+
+    const caret = el.selectionStart ?? 0
+    const step = event.deltaY < 0 ? 0.1 : -0.1
+
+    const { text, caretPos } = adjustWeightAtCaret(editingValue, caret, step)
+    if (text !== editingValue) {
+      editingValue = text
+      // Update caret after DOM updates
+      setTimeout(() => {
+        try {
+          el?.setSelectionRange(caretPos, caretPos)
+        } catch (err) {
+          // Ignore errors when element is not focusable or is detached
+          void err
+        }
+      }, 0)
+    }
+  }
+
+  // Core logic: find token by comma around caret, wrap as (token:weight) and adjust
+  function adjustWeightAtCaret(text: string, caret: number, delta: number): { text: string; caretPos: number } {
+    // Find token boundaries (comma-separated)
+    const leftComma = text.lastIndexOf(',', Math.max(0, caret - 1))
+    const rightComma = text.indexOf(',', caret)
+    const left = leftComma === -1 ? 0 : leftComma + 1
+    const right = rightComma === -1 ? text.length : rightComma
+
+    // Preserve surrounding whitespace but operate on trimmed token
+    let tokenStart = left
+    while (tokenStart < right && /\s/.test(text[tokenStart])) tokenStart++
+    let tokenEnd = right
+    while (tokenEnd > tokenStart && /\s/.test(text[tokenEnd - 1])) tokenEnd--
+
+    if (tokenStart >= tokenEnd) {
+      return { text, caretPos: caret }
+    }
+
+    const token = text.slice(tokenStart, tokenEnd)
+
+    // Parse existing form: (label:weight) | (label) | label
+    let label = ''
+    let weight = 1.0
+    let hasParens = false
+    let hasExplicitWeight = false
+
+    if (token.startsWith('(') && token.endsWith(')')) {
+      hasParens = true
+      const inner = token.slice(1, -1)
+      const colonIdx = inner.lastIndexOf(':')
+      if (colonIdx !== -1) {
+        label = inner.slice(0, colonIdx)
+        const num = parseFloat(inner.slice(colonIdx + 1))
+        if (!Number.isNaN(num)) {
+          weight = num
+          hasExplicitWeight = true
+        } else {
+          label = inner // Treat as no weight if parse failed
+        }
+      } else {
+        label = inner
+      }
+    } else {
+      // No parentheses
+      const colonIdx = token.lastIndexOf(':')
+      if (colonIdx !== -1) {
+        // If someone typed label:1.2 without parens, support it
+        label = token.slice(0, colonIdx)
+        const num = parseFloat(token.slice(colonIdx + 1))
+        weight = Number.isNaN(num) ? 1.0 : num
+        hasExplicitWeight = !Number.isNaN(num)
+      } else {
+        label = token
+      }
+    }
+
+    // Determine caret position within label
+    let labelStartInText = tokenStart + (hasParens ? 1 : 0)
+    let labelEndInText = tokenEnd - (hasParens ? 1 : 0)
+    if (hasParens && hasExplicitWeight) {
+      // Exclude ":weight" from label range
+      const inner = token.slice(1, -1)
+      const colonIdx = inner.lastIndexOf(':')
+      if (colonIdx !== -1) {
+        labelEndInText = tokenStart + 1 + colonIdx
+      }
+    } else if (!hasParens && hasExplicitWeight) {
+      const colonIdx = token.lastIndexOf(':')
+      if (colonIdx !== -1) {
+        labelEndInText = tokenStart + colonIdx
+      }
+    }
+
+    const labelLen = Math.max(0, labelEndInText - labelStartInText)
+    const posInLabel = Math.max(0, Math.min(labelLen, caret - labelStartInText))
+
+    // Adjust weight and clamp
+    const newWeightRaw = Math.round((weight + delta) * 10) / 10
+    const newWeight = Math.max(0.1, Math.min(2.0, newWeightRaw))
+
+    const before = text.slice(0, tokenStart)
+    const after = text.slice(tokenEnd)
+
+    // If weight is exactly 1.0, unwrap to just the label (no parentheses)
+    const isOne = newWeight === 1.0
+    const newToken = isOne ? label : `(${label}:${newWeight.toFixed(1)})`
+    const newText = before + newToken + after
+
+    // New caret: keep position within label
+    const newLabelStart = isOne ? before.length : before.length + 1 // after "(" if wrapped
+    const newCaret = newLabelStart + Math.max(0, Math.min(label.length, posInLabel))
+
+    return { text: newText, caretPos: newCaret }
+  }
+
   async function startEditing(behavior: 'selectAll' | 'caretEnd' = 'selectAll') {
     editingValue = value
     isEditing = true
@@ -139,7 +267,7 @@
 
 {#if isEditing}
   {#if enableAutocomplete}
-    <div bind:this={acWrapper} onfocusout={finishEditing} class="w-full" style="width: 100%;">
+    <div bind:this={acWrapper} onfocusout={finishEditing} class="w-full" style="width: 100%;" onwheel={handleWheel}>
       <AutoCompleteTextarea
         value={editingValue}
         {placeholder}
@@ -171,6 +299,7 @@
       bind:value={editingValue}
       onblur={finishEditing}
       onkeydown={handleKeydown}
+      onwheel={handleWheel}
       {placeholder}
       bind:this={inputElement}
     />
