@@ -35,6 +35,11 @@
   let showSettingsDialog = $state(false)
   let inpaintDenoiseStrength = $state(0.55)
 
+  // Public API for parent to open the dialog
+  export function openSettingsDialogExternal() {
+    showSettingsDialog = true
+  }
+
   function openSettingsDialog() {
     showSettingsDialog = true
   }

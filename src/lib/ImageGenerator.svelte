@@ -134,6 +134,10 @@
   })
 
   // Event handlers
+  let generationControlsRef: { openSettingsDialogExternal: () => void } | undefined
+  function openSettingsFromTagZones() {
+    generationControlsRef?.openSettingsDialogExternal()
+  }
   async function handleGenerate(seedToUse: number | null = null) {
     // Add current values to options if they're not already there
     autoSaveCurrentValues()
@@ -373,7 +377,7 @@
       <CompositionSelector bind:this={compositionSelector} />
 
       <div class="flex min-h-0 flex-1 flex-shrink-1">
-        <TagZones {currentRandomTagResolutions} />
+        <TagZones {currentRandomTagResolutions} {settings} onOpenSettings={openSettingsFromTagZones} />
       </div>
 
       <div class="flex flex-shrink-0 flex-col gap-1">
@@ -438,6 +442,7 @@
       </div>
 
       <GenerationControls
+        bind:this={generationControlsRef}
         {isLoading}
         {progressData}
         {settings}

@@ -7,7 +7,8 @@
   import { onMount } from 'svelte'
   import { Tag } from 'svelte-heros-v2'
   import { get } from 'svelte/store'
-  import type { CustomTag } from './types'
+  import type { CustomTag, Settings } from './types'
+  // Use callback prop instead of deprecated createEventDispatcher
 
   interface Props {
     currentRandomTagResolutions?: {
@@ -17,10 +18,14 @@
       negative: Record<string, string>
       inpainting: Record<string, string>
     }
+    settings: Settings
+    onOpenSettings?: () => void
   }
 
   let {
-    currentRandomTagResolutions = { all: {}, zone1: {}, zone2: {}, negative: {}, inpainting: {} }
+    currentRandomTagResolutions = { all: {}, zone1: {}, zone2: {}, negative: {}, inpainting: {} },
+    settings,
+    onOpenSettings
   }: Props = $props()
 
   let allTags = $state<CustomTag[]>([])
@@ -31,6 +36,18 @@
   let showTreeEditDialog = $state(false)
   let preselectTagName = $state('')
   let preselectTargetText = $state('')
+
+  // Display-only prefixes from Settings per selected model
+  let qualityPrefixText = $state('')
+  let negativePrefixText = $state('')
+
+  $effect(() => {
+    const perModel = settings?.perModel || {}
+    const key = $promptsData.selectedCheckpoint || 'Default'
+    const ms = perModel[key] || perModel['Default']
+    qualityPrefixText = ms?.qualityPrefix || ''
+    negativePrefixText = ms?.negativePrefix || ''
+  })
 
   // Parse weight from tag string
   function parseTagWithWeight(tagString: string): { name: string; weight?: number } {
@@ -147,6 +164,36 @@
 
   <!-- Tag zones input sections -->
   <div class="tags-scroll flex-1 space-y-4 overflow-y-auto border-y-1 border-gray-300 p-2">
+    <!-- Settings-derived prefixes preview -->
+    <div>
+      <div class="mb-1 flex items-center justify-between">
+        <div class="text-xs font-medium text-gray-700 text-left">Quality Prefix (Settings)</div>
+      </div>
+      <div
+        id="quality-prefix-preview"
+        class="prefix-preview"
+        role="button"
+        tabindex="0"
+        ondblclick={() => onOpenSettings?.()}
+      >
+        {qualityPrefixText || ''}
+      </div>
+    </div>
+
+    <div>
+      <div class="mb-1 flex items-center justify-between">
+        <div class="text-xs font-medium text-gray-700 text-left">Negative Prefix (Settings)</div>
+      </div>
+      <div
+        id="negative-prefix-preview"
+        class="prefix-preview"
+        role="button"
+        tabindex="0"
+        ondblclick={() => onOpenSettings?.()}
+      >
+        {negativePrefixText || ''}
+      </div>
+    </div>
     <TagInput
       id="all-tags"
       label="All"
@@ -224,5 +271,19 @@
 
   .tags-scroll::-webkit-scrollbar-thumb:hover {
     background: #a0aec0;
+  }
+
+  .prefix-preview {
+    width: 100%;
+    border: 1px solid #e5e7eb; /* gray-200 */
+    border-radius: 0.25rem; /* rounded */
+    background-color: #f9fafb; /* gray-50 */
+    padding: 0.25rem; /* p-1 */
+    font-size: 0.875rem; /* text-sm */
+    white-space: pre-wrap;
+    min-height: 3.6em; /* approx 3 lines */
+    cursor: pointer;
+    user-select: none;
+    text-align: left;
   }
 </style>
