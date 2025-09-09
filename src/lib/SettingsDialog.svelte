@@ -27,6 +27,29 @@
     perModel: settings.perModel || {}
   })
 
+  // Track original state to enable/disable Save when changed
+  // Initialize with a neutral placeholder; set real baseline when dialog opens
+  let originalLocalSettings: Settings = $state({
+    imageWidth: 0,
+    imageHeight: 0,
+    cfgScale: 0,
+    steps: 0,
+    seed: 0,
+    sampler: '',
+    outputDirectory: '',
+    selectedVae: '',
+    perModel: {}
+  })
+  let hasUnsavedChanges: boolean = $state(false)
+  let sessionInitialized: boolean = $state(false)
+
+  function deepClone<T>(obj: T): T {
+    return JSON.parse(JSON.stringify(obj))
+  }
+  function deepEqual(a: unknown, b: unknown): boolean {
+    return JSON.stringify(a) === JSON.stringify(b)
+  }
+
   // Update local settings when props change
   $effect(() => {
     if (show) {
@@ -41,6 +64,8 @@
         selectedVae: settings.selectedVae,
         perModel: settings.perModel || {}
       }
+      // Reset session init so we can capture a fresh baseline below
+      sessionInitialized = false
     }
   })
 
@@ -62,6 +87,21 @@
           }
         }
       }
+    }
+  })
+
+  // Initialize baseline once per open session
+  $effect(() => {
+    if (show && !sessionInitialized) {
+      // Ensure we have the 'Default' entry before snapshot
+      ensureModelEntry('Default')
+      originalLocalSettings = deepClone(localSettings)
+      hasUnsavedChanges = false
+      sessionInitialized = true
+    }
+    if (!show && sessionInitialized) {
+      sessionInitialized = false
+      hasUnsavedChanges = false
     }
   })
 
@@ -115,8 +155,18 @@
     }
   })
 
+  // Detect changes to enable/disable Save
+  $effect(() => {
+    if (show && sessionInitialized) {
+      hasUnsavedChanges = !deepEqual(localSettings, originalLocalSettings)
+    }
+  })
+
   function handleSave() {
     onSave(localSettings)
+    // Update baseline immediately so button disables if dialog remains open
+    originalLocalSettings = deepClone(localSettings)
+    hasUnsavedChanges = false
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -282,8 +332,24 @@
       </div>
 
       <div class="dialog-footer">
-        <button onclick={onClose} class="secondary-button">Cancel</button>
-        <button onclick={handleSave} class="primary-button">Save</button>
+        <button
+          type="button"
+          class={(hasUnsavedChanges
+            ? 'bg-blue-500 text-white hover:bg-blue-600 focus:ring-blue-500 '
+            : 'bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-gray-500 disabled:cursor-default ') +
+            'rounded-md px-4 py-2 transition-colors focus:ring-2 focus:outline-none'}
+          onclick={handleSave}
+          disabled={!hasUnsavedChanges}
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          class="rounded-md bg-gray-200 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+          onclick={onClose}
+        >
+          Close
+        </button>
       </div>
     </div>
   </div>
