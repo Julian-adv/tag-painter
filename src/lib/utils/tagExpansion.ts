@@ -3,7 +3,11 @@
  */
 
 import type { AnyNode, TreeModel } from '$lib/TreeEdit/model'
-import { CONSISTENT_RANDOM_MARKER, DEFAULT_ARRAY_WEIGHT, createPlaceholderRegex } from '$lib/constants'
+import {
+  CONSISTENT_RANDOM_MARKER,
+  DEFAULT_ARRAY_WEIGHT,
+  createPlaceholderRegex
+} from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
 import { findNodeByName, extractDisablesDirective } from '$lib/TreeEdit/utils'
 
@@ -23,16 +27,16 @@ function getLeafValueByPath(model: TreeModel, leafPath: string): string {
   // Split path into parts and traverse manually
   const parts = leafPath.split('/')
   let currentNode = model.nodes[model.rootId]
-  
+
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i]
-    
+
     if (!currentNode || (currentNode.kind !== 'array' && currentNode.kind !== 'object')) {
       return ''
     }
-    
+
     const children = currentNode.children || []
-    
+
     // Find child by name
     let foundChildId: string | null = null
     for (const childId of children) {
@@ -42,18 +46,18 @@ function getLeafValueByPath(model: TreeModel, leafPath: string): string {
         break
       }
     }
-    
+
     if (!foundChildId) {
       return ''
     }
-    
+
     currentNode = model.nodes[foundChildId]
   }
-  
+
   if (currentNode && currentNode.kind === 'leaf') {
     return String(currentNode.value)
   }
-  
+
   return ''
 }
 
@@ -67,6 +71,30 @@ function getNodePath(model: TreeModel, id: string): string {
   parts.reverse()
   if (parts[0] === 'root') parts.shift()
   return parts.join('/')
+}
+
+// Check if a tag/container has any descendant array with an explicit override/pin
+function hasPinnedDescendant(ctx: TagExpansionCtx, tagOrPath: string): boolean {
+  const node = findNodeByName(ctx.model, tagOrPath)
+  if (!node) return false
+  // Only containers can have descendants
+  if (!(node.kind === 'array' || node.kind === 'object')) return false
+  const seen = new Set<string>()
+  const stack: string[] = [...(node.children || [])]
+  while (stack.length) {
+    const cid = stack.pop() as string
+    if (seen.has(cid)) continue
+    seen.add(cid)
+    const child = ctx.model.nodes[cid]
+    if (!child) continue
+    if (child.kind === 'array') {
+      const p = getNodePath(ctx.model, child.id)
+      if (ctx.overrideMap[p]) return true
+    } else if (child.kind === 'object') {
+      stack.push(...(child.children || []))
+    }
+  }
+  return false
 }
 
 // Check if a tag is disabled by name or path
@@ -97,6 +125,22 @@ function processNodeExpansion(
   const finalized = expandPlaceholders(ctx, result.expandedTags, ctx.randomTagResolutions)
   // Extract disables info without removing directives
   extractDisablesInfo(ctx, finalized)
+  // Retroactively remove any earlier outputs that match newly discovered disabled arrays
+  if (ctx.disables.names.size > 0 && out.length > 0) {
+    const disabledList = Array.from(ctx.disables.names, (s) => s.toLowerCase())
+    for (let i = out.length - 1; i >= 0; i--) {
+      const lowerText = out[i].toLowerCase()
+      let shouldRemove = false
+      for (const d of disabledList) {
+        const chosen = ctx.randomTagResolutions[d]
+        if (chosen && lowerText.includes(String(chosen).toLowerCase())) {
+          shouldRemove = true
+          break
+        }
+      }
+      if (shouldRemove) out.splice(i, 1)
+    }
+  }
   // Store the placeholder-expanded resolution WITH disables directive
   ctx.randomTagResolutions[tag] = finalized.join(', ')
   // Add to output WITHOUT removing disables directive
@@ -279,6 +323,40 @@ function expandArrayNode(
     options.push({ content: candidate, weight })
   }
   if (options.length === 0) return { expandedTags: [], resolution: '' }
+
+  // If no direct override selected, prefer options that lead to a pinned descendant
+  if (!selected) {
+    const placeholderAny = createPlaceholderRegex()
+
+    function optionLeadsToPinned(content: string): boolean {
+      // Check placeholders within the content
+      if (placeholderAny.test(content)) {
+        placeholderAny.lastIndex = 0
+        let leads = false
+        content.replace(placeholderAny, (full, name: string) => {
+          if (leads) return full
+          if (hasPinnedDescendant(ctx, name)) {
+            leads = true
+          }
+          return full
+        })
+        if (leads) return true
+      }
+      // If content itself is a tag/container name, check it as well
+      return hasPinnedDescendant(ctx, content)
+    }
+
+    const pinnedLeading = options
+      .map((opt, idx) => ({ ...opt, idx }))
+      .filter((opt) => optionLeadsToPinned(opt.content))
+
+    if (pinnedLeading.length > 0) {
+      // Choose among pinned-leading options using weights
+      const idx = getWeightedRandomIndex(pinnedLeading)
+      selected = pinnedLeading[idx].content
+      return { expandedTags: [selected], resolution: selected }
+    }
+  }
   if (!selected && isConsistent) {
     if (ctx.existingRandomResolutions[tag]) selected = ctx.existingRandomResolutions[tag]
     if (!selected && ctx.randomTagResolutions[tag]) selected = ctx.randomTagResolutions[tag]
@@ -316,13 +394,20 @@ function expandObjectNode(
     else if (child.kind === 'object') stack.push(...(child.children || []))
   }
   if (arrays.length === 0) return { expandedTags: [tag], resolution: tag }
-  // Prefer descendant array whose full path has an explicit override/pin
-  for (const arr of arrays) {
-    const preferredPath = getNodePath(ctx.model, arr.id)
-    if (ctx.overrideMap[preferredPath]) {
-      const preferred = expandArrayNode(ctx, preferredPath)
-      return { expandedTags: preferred.expandedTags, resolution: preferred.resolution }
-    }
+  // Prefer descendant arrays whose full path has an explicit override/pin.
+  // If multiple, choose among them using weights.
+  const pinnedArrays = arrays
+    .map((arr) => ({
+      arr,
+      path: getNodePath(ctx.model, arr.id),
+      weight: parseWeightDirective(arr.name)
+    }))
+    .filter(({ path }) => !!ctx.overrideMap[path])
+  if (pinnedArrays.length > 0) {
+    const idx = getWeightedRandomIndex(pinnedArrays)
+    const chosen = pinnedArrays[idx]
+    const preferred = expandArrayNode(ctx, chosen.path)
+    return { expandedTags: preferred.expandedTags, resolution: preferred.resolution }
   }
   if (ctx.disables.names.size > 0) {
     const disabledLower = new Set(Array.from(ctx.disables.names, (s) => s.toLowerCase()))
@@ -336,7 +421,7 @@ function expandObjectNode(
     }
   }
   if (arrays.length === 0) return { expandedTags: [tag], resolution: tag }
-  
+
   // Use weighted selection for object children
   const options: { array: AnyNode; path: string; weight: number }[] = []
   for (const arr of arrays) {
@@ -344,7 +429,7 @@ function expandObjectNode(
     const weight = parseWeightDirective(arr.name)
     options.push({ array: arr, path, weight })
   }
-  
+
   const idx = getWeightedRandomIndex(options)
   const chosenOption = options[idx]
   const result = expandArrayNode(ctx, chosenOption.path)
