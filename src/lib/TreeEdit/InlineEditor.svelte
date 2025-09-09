@@ -77,7 +77,11 @@
   }
 
   // Core logic: find token by comma around caret, wrap as (token:weight) and adjust
-  function adjustWeightAtCaret(text: string, caret: number, delta: number): { text: string; caretPos: number } {
+  function adjustWeightAtCaret(
+    text: string,
+    caret: number,
+    delta: number
+  ): { text: string; caretPos: number } {
     // Find token boundaries (comma-separated)
     const leftComma = text.lastIndexOf(',', Math.max(0, caret - 1))
     const rightComma = text.indexOf(',', caret)
@@ -267,7 +271,13 @@
 
 {#if isEditing}
   {#if enableAutocomplete}
-    <div bind:this={acWrapper} onfocusout={finishEditing} class="w-full" style="width: 100%;" onwheel={handleWheel}>
+    <div
+      bind:this={acWrapper}
+      onfocusout={finishEditing}
+      class="w-full"
+      style="width: 100%;"
+      onwheel={handleWheel}
+    >
       <AutoCompleteTextarea
         value={editingValue}
         {placeholder}

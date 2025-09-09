@@ -167,7 +167,7 @@
     <!-- Settings-derived prefixes preview -->
     <div>
       <div class="mb-1 flex items-center justify-between">
-        <div class="text-xs font-medium text-gray-700 text-left">Quality Prefix (Settings)</div>
+        <div class="text-left text-xs font-medium text-gray-700">Quality Prefix (Settings)</div>
       </div>
       <div
         id="quality-prefix-preview"
@@ -182,7 +182,7 @@
 
     <div>
       <div class="mb-1 flex items-center justify-between">
-        <div class="text-xs font-medium text-gray-700 text-left">Negative Prefix (Settings)</div>
+        <div class="text-left text-xs font-medium text-gray-700">Negative Prefix (Settings)</div>
       </div>
       <div
         id="negative-prefix-preview"

@@ -134,7 +134,9 @@
   })
 
   // Event handlers
-  let generationControlsRef: { openSettingsDialogExternal: (focusField: 'quality' | 'negative' | null) => void } | undefined
+  let generationControlsRef:
+    | { openSettingsDialogExternal: (focusField: 'quality' | 'negative' | null) => void }
+    | undefined
   function openSettingsFromTagZones(focusField: 'quality' | 'negative') {
     generationControlsRef?.openSettingsDialogExternal(focusField)
   }
@@ -377,7 +379,11 @@
       <CompositionSelector bind:this={compositionSelector} />
 
       <div class="flex min-h-0 flex-1 flex-shrink-1">
-        <TagZones {currentRandomTagResolutions} {settings} onOpenSettings={openSettingsFromTagZones} />
+        <TagZones
+          {currentRandomTagResolutions}
+          {settings}
+          onOpenSettings={openSettingsFromTagZones}
+        />
       </div>
 
       <div class="flex flex-shrink-0 flex-col gap-1">

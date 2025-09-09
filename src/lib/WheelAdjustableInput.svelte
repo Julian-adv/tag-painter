@@ -35,15 +35,15 @@
 
   function handleWheel(event: WheelEvent) {
     event.preventDefault()
-    
+
     let stepSize: number
-    
+
     if (event.ctrlKey) {
       stepSize = ctrlWheelStep
     } else {
       stepSize = wheelStep
     }
-    
+
     // Snap to next/previous multiple of stepSize
     let newValue: number
     if (event.deltaY > 0) {
@@ -61,13 +61,13 @@
         newValue = (Math.ceil(value / stepSize) + 1) * stepSize
       }
     }
-    
+
     updateValue(newValue)
   }
 
   function handleKeydown(event: KeyboardEvent) {
     let delta = 0
-    
+
     if (event.key === 'ArrowUp') {
       delta = arrowStep
       event.preventDefault()
@@ -75,7 +75,7 @@
       delta = -arrowStep
       event.preventDefault()
     }
-    
+
     if (delta !== 0) {
       // Round to avoid floating point precision issues
       const newValue = Math.round((value + delta) / arrowStep) * arrowStep
@@ -90,7 +90,10 @@
   }
 
   // Generate default title if not provided
-  let defaultTitle = $derived(title || `Wheel: snap to ${wheelStep}s, Ctrl+Wheel: snap to ${ctrlWheelStep}s, Arrow keys: ±${arrowStep}`)
+  let defaultTitle = $derived(
+    title ||
+      `Wheel: snap to ${wheelStep}s, Ctrl+Wheel: snap to ${ctrlWheelStep}s, Arrow keys: ±${arrowStep}`
+  )
 </script>
 
 <input
@@ -119,7 +122,7 @@
     min-width: 80px;
     text-align: center;
   }
-  
+
   .wheel-adjustable-input:focus {
     outline: none;
     border-color: #3b82f6;

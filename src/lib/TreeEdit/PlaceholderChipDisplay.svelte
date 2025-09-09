@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TreeModel } from './model' 
+  import type { TreeModel } from './model'
   import { isConsistentRandomArray, findNodeByName } from './utils'
   import { createPlaceholderRegex } from '$lib/constants'
 

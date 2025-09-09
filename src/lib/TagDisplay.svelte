@@ -155,7 +155,8 @@
     if (st && st.enabled && (!!st.overrideTag || !!st.pinnedLeafPath)) return true
     for (const [k, v] of Object.entries(testModeStore)) {
       if (!k || k === tagName) continue
-      if (k.startsWith(tagName + '/') && v && v.enabled && (!!v.overrideTag || !!v.pinnedLeafPath)) return true
+      if (k.startsWith(tagName + '/') && v && v.enabled && (!!v.overrideTag || !!v.pinnedLeafPath))
+        return true
     }
 
     // Also handle alias/placeholder expansions (e.g., pose/d → pose/action)

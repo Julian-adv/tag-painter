@@ -506,8 +506,6 @@
     return isConsistentRandomArray(model, id)
   }
 
-  
-
   function isTopLevelPinned(): boolean {
     const node = model.nodes[id]
     if (!node || (node.kind !== 'array' && node.kind !== 'object')) return false

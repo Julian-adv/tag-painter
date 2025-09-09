@@ -75,15 +75,14 @@
     return !!n && n.kind === 'array'
   }
 
-
   function isSelectedArrayInObject(): boolean {
     const n = getSelectedNode()
     if (!n || n.kind !== 'array') return false
-    
+
     // Check if parent is object
     const parentId = n.parentId
     if (!parentId) return false
-    
+
     const parent = model.nodes[parentId]
     return !!parent && parent.kind === 'object'
   }
@@ -201,7 +200,7 @@
     const selectedId = selectedIds[0]
     const node = model.nodes[selectedId]
     if (!node || node.kind !== 'leaf') return null
-    
+
     return parseWeightDirective(String(node.value || ''))
   }
 
@@ -213,13 +212,13 @@
 
     // Clamp weight between 0.1 and 10000
     const clampedWeight = Math.max(0.1, Math.min(10000, newWeight))
-    
+
     const currentValue = String(node.value || '').trim()
-    
+
     // Remove existing weight directive if any
     let cleaned = currentValue.replace(/,?\s*weight=\d+(?:\.\d+)?/gi, '')
     cleaned = cleaned.replace(/^\s*,\s*|\s*,\s*$/g, '').trim()
-    
+
     // Add new weight directive if not default
     if (clampedWeight !== DEFAULT_ARRAY_WEIGHT) {
       const newValue = cleaned ? `${cleaned}, weight=${clampedWeight}` : `weight=${clampedWeight}`
@@ -227,53 +226,52 @@
     } else {
       node.value = cleaned || ''
     }
-    
+
     onModelChanged?.()
   }
-
 
   function getSelectedLeafProbability(): string | null {
     if (selectedIds.length !== 1) return null
     const selectedId = selectedIds[0]
     const node = model.nodes[selectedId]
     if (!node || node.kind !== 'leaf') return null
-    
+
     // Find the parent array node
     let parentId = node.parentId
     let parentNode = parentId ? model.nodes[parentId] : null
-    
+
     // If parent is not an array, look for the nearest array ancestor
     while (parentNode && parentNode.kind !== 'array') {
       parentId = parentNode.parentId
       parentNode = parentId ? model.nodes[parentId] : null
     }
-    
+
     if (!parentNode || parentNode.kind !== 'array') {
       return null // Not inside an array, no probability to calculate
     }
-    
+
     // Calculate weights for all siblings in the array
     const siblings = parentNode.children || []
     let totalWeight = 0
     let currentWeight = 0
-    
+
     for (const siblingId of siblings) {
       const siblingNode = model.nodes[siblingId]
       if (!siblingNode) continue
-      
+
       let weight = DEFAULT_ARRAY_WEIGHT
       if (siblingNode.kind === 'leaf') {
         weight = parseWeightDirective(String(siblingNode.value || ''))
       }
-      
+
       totalWeight += weight
       if (siblingId === selectedId) {
         currentWeight = weight
       }
     }
-    
+
     if (totalWeight === 0) return '0%'
-    
+
     const probability = (currentWeight / totalWeight) * 100
     return `${probability.toFixed(1)}%`
   }
@@ -294,13 +292,13 @@
 
     // Clamp weight between 0.1 and 10000
     const clampedWeight = Math.max(0.1, Math.min(10000, newWeight))
-    
+
     const currentName = node.name.trim()
-    
+
     // Remove existing weight directive if any
     let cleaned = currentName.replace(/,?\s*weight=\d+(?:\.\d+)?/gi, '')
     cleaned = cleaned.replace(/^\s*,\s*|\s*,\s*$/g, '').trim()
-    
+
     // Add new weight directive if not default
     if (clampedWeight !== DEFAULT_ARRAY_WEIGHT) {
       const newName = cleaned ? `${cleaned}, weight=${clampedWeight}` : `weight=${clampedWeight}`
@@ -308,7 +306,7 @@
     } else {
       node.name = cleaned || ''
     }
-    
+
     onModelChanged?.()
   }
 
@@ -348,14 +346,13 @@
     if (arrayChildren.length === 0) return '0%'
 
     const totalWeight = arrayChildren.reduce((sum, child) => sum + child.weight, 0)
-    const currentArray = arrayChildren.find(child => child.id === selectedId)
-    
+    const currentArray = arrayChildren.find((child) => child.id === selectedId)
+
     if (!currentArray || totalWeight === 0) return '0%'
-    
+
     const probability = (currentArray.weight / totalWeight) * 100
     return `${probability.toFixed(1)}%`
   }
-
 
   function startRenaming() {
     if (selectedIds.length !== 1) return

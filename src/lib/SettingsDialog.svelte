@@ -168,7 +168,8 @@
   // Focus requested field when dialog opens or when initialFocus changes
   $effect(() => {
     if (show) {
-      const id = initialFocus === 'quality' ? 'pm-quality' : initialFocus === 'negative' ? 'pm-negative' : ''
+      const id =
+        initialFocus === 'quality' ? 'pm-quality' : initialFocus === 'negative' ? 'pm-negative' : ''
       if (id) {
         setTimeout(() => {
           const el = document.getElementById(id) as HTMLTextAreaElement | null

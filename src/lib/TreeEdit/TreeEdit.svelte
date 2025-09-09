@@ -54,7 +54,7 @@
       if (!shouldNodeBeVisible(model, curId, filterText)) return
       if (curId !== model.rootId) result.push(curId)
       if (isContainer(n) && !n.collapsed) {
-        for (const cid of (n.children || [])) dfs(cid)
+        for (const cid of n.children || []) dfs(cid)
       }
     }
     dfs(model.rootId)
@@ -342,7 +342,6 @@
     }
   }
 
-
   function findNearestVisibleAncestorId(id: string): string {
     const start = model.nodes[id]
     if (!start) return model.rootId
@@ -399,7 +398,8 @@
 
     // Find the parent of that container
     const targetContainer = model.nodes[targetContainerId]
-    if (!targetContainer || (targetContainer.kind !== 'array' && targetContainer.kind !== 'object')) return
+    if (!targetContainer || (targetContainer.kind !== 'array' && targetContainer.kind !== 'object'))
+      return
     const parentId = targetContainer.parentId
     if (!parentId) return
     const parentNode = model.nodes[parentId]
@@ -541,9 +541,11 @@
     const val = String(n.value ?? '')
     const store = testModeStore[pinKey]
     const selectedNodePath = getNodePath(model, selectedId)
-    const isPinned = store && store.enabled && 
-                     (store.pinnedLeafPath === selectedNodePath || store.overrideTag === val)
-    
+    const isPinned =
+      store &&
+      store.enabled &&
+      (store.pinnedLeafPath === selectedNodePath || store.overrideTag === val)
+
     if (isPinned) {
       removeTestModeOverride(pinKey)
     } else {
@@ -741,9 +743,9 @@
       </div>
 
       <!-- Path breadcrumb -->
-      <TreeNodePath 
-        {model} 
-        {selectedIds} 
+      <TreeNodePath
+        {model}
+        {selectedIds}
         onSelectNode={selectNode}
         onScrollToSelected={scrollSelectedIntoView}
       />

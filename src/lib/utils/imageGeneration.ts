@@ -17,7 +17,13 @@ import {
 } from './tagExpansion'
 import { getWildcardModel } from '../stores/tagsStore'
 import { updateComposition } from '../stores/promptsStore'
-import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow, ModelSettings } from '$lib/types'
+import type {
+  PromptsData,
+  Settings,
+  ProgressData,
+  ComfyUIWorkflow,
+  ModelSettings
+} from '$lib/types'
 
 export interface GenerationOptions {
   promptsData: PromptsData
@@ -222,7 +228,11 @@ export async function generateImage(options: GenerationOptions): Promise<{
     }
 
     // Configure LoRA chain with per-model overrides
-    const effectiveLoras = getEffectiveLoras(settings, promptsData.selectedCheckpoint, promptsData.selectedLoras)
+    const effectiveLoras = getEffectiveLoras(
+      settings,
+      promptsData.selectedCheckpoint,
+      promptsData.selectedLoras
+    )
     generateLoraChain(effectiveLoras, workflow)
 
     // Configure workflow based on settings merged with per-model overrides
@@ -501,7 +511,10 @@ async function submitToComfyUI(
   await connectWebSocket(result.prompt_id, clientId, FINAL_SAVE_NODE_ID, workflow, wsCallbacks)
 }
 
-function getEffectiveModelSettings(settings: Settings, modelName: string | null): ModelSettings | null {
+function getEffectiveModelSettings(
+  settings: Settings,
+  modelName: string | null
+): ModelSettings | null {
   if (settings.perModel && modelName && settings.perModel[modelName]) {
     return settings.perModel[modelName]
   }
