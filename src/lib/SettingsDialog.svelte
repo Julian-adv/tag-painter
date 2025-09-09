@@ -2,6 +2,7 @@
   import type { Settings, LoraWithWeight } from '$lib/types'
   import { fetchVaeModels, fetchCheckpoints } from './utils/comfyui'
   import LoraSelector from './LoraSelector.svelte'
+  import { promptsData } from './stores/promptsStore'
   import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
 
   interface Props {
@@ -102,6 +103,15 @@
         })
       // Initialize selected model key
       if (!selectedModelKey) selectedModelKey = 'Default'
+    }
+  })
+
+  // When dialog opens, select current checkpoint from prompts store
+  $effect(() => {
+    if (show) {
+      let currentSelected: string | null = null
+      promptsData.subscribe((d) => (currentSelected = d.selectedCheckpoint || null))()
+      selectedModelKey = currentSelected || 'Default'
     }
   })
 
