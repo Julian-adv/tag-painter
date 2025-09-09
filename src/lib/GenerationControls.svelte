@@ -33,24 +33,29 @@
   }: Props = $props()
 
   let showSettingsDialog = $state(false)
+  let initialSettingsFocus: 'quality' | 'negative' | null = $state(null)
   let inpaintDenoiseStrength = $state(0.55)
 
   // Public API for parent to open the dialog
-  export function openSettingsDialogExternal() {
+  export function openSettingsDialogExternal(focusField: 'quality' | 'negative' | null) {
+    initialSettingsFocus = focusField
     showSettingsDialog = true
   }
 
   function openSettingsDialog() {
+    initialSettingsFocus = null
     showSettingsDialog = true
   }
 
   function closeSettingsDialog() {
     showSettingsDialog = false
+    initialSettingsFocus = null
   }
 
   function handleSettingsChange(newSettings: Settings) {
     onSettingsChange(newSettings)
     showSettingsDialog = false
+    initialSettingsFocus = null
   }
 </script>
 
@@ -147,6 +152,7 @@
 <SettingsDialog
   show={showSettingsDialog}
   {settings}
+  initialFocus={initialSettingsFocus}
   onClose={closeSettingsDialog}
   onSave={handleSettingsChange}
 />

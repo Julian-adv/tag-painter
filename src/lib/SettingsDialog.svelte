@@ -10,9 +10,10 @@
     settings: Settings
     onClose: () => void
     onSave: (settings: Settings) => void
+    initialFocus: 'quality' | 'negative' | null
   }
 
-  let { show, settings, onClose, onSave }: Props = $props()
+  let { show, settings, onClose, onSave, initialFocus }: Props = $props()
 
   // Local copy of settings for editing
   let localSettings: Settings = $state({
@@ -95,6 +96,15 @@
     if (show && !sessionInitialized) {
       // Ensure we have the 'Default' entry before snapshot
       ensureModelEntry('Default')
+      // If dialog was opened with a target focus from TagZones,
+      // ensure the selected model entry exists as well so the field renders.
+      let currentSelected: string | null = null
+      promptsData.subscribe((d) => (currentSelected = d.selectedCheckpoint || null))()
+      const keyToEnsure = currentSelected || 'Default'
+      if (initialFocus) {
+        ensureModelEntry(keyToEnsure)
+        selectedModelKey = keyToEnsure
+      }
       originalLocalSettings = deepClone(localSettings)
       hasUnsavedChanges = false
       sessionInitialized = true
@@ -152,6 +162,19 @@
       let currentSelected: string | null = null
       promptsData.subscribe((d) => (currentSelected = d.selectedCheckpoint || null))()
       selectedModelKey = currentSelected || 'Default'
+    }
+  })
+
+  // Focus requested field when dialog opens or when initialFocus changes
+  $effect(() => {
+    if (show) {
+      const id = initialFocus === 'quality' ? 'pm-quality' : initialFocus === 'negative' ? 'pm-negative' : ''
+      if (id) {
+        setTimeout(() => {
+          const el = document.getElementById(id) as HTMLTextAreaElement | null
+          el?.focus()
+        }, 0)
+      }
     }
   })
 

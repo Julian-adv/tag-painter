@@ -134,9 +134,9 @@
   })
 
   // Event handlers
-  let generationControlsRef: { openSettingsDialogExternal: () => void } | undefined
-  function openSettingsFromTagZones() {
-    generationControlsRef?.openSettingsDialogExternal()
+  let generationControlsRef: { openSettingsDialogExternal: (focusField: 'quality' | 'negative' | null) => void } | undefined
+  function openSettingsFromTagZones(focusField: 'quality' | 'negative') {
+    generationControlsRef?.openSettingsDialogExternal(focusField)
   }
   async function handleGenerate(seedToUse: number | null = null) {
     // Add current values to options if they're not already there

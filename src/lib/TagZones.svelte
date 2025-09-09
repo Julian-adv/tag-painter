@@ -19,7 +19,7 @@
       inpainting: Record<string, string>
     }
     settings: Settings
-    onOpenSettings?: () => void
+    onOpenSettings?: (focusField: 'quality' | 'negative') => void
   }
 
   let {
@@ -174,7 +174,7 @@
         class="prefix-preview"
         role="button"
         tabindex="0"
-        ondblclick={() => onOpenSettings?.()}
+        ondblclick={() => onOpenSettings?.('quality')}
       >
         {qualityPrefixText || ''}
       </div>
@@ -189,7 +189,7 @@
         class="prefix-preview"
         role="button"
         tabindex="0"
-        ondblclick={() => onOpenSettings?.()}
+        ondblclick={() => onOpenSettings?.('negative')}
       >
         {negativePrefixText || ''}
       </div>
