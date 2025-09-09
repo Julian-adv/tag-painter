@@ -517,10 +517,18 @@ function getEffectiveLoras(
   fallback: { name: string; weight: number }[]
 ): { name: string; weight: number }[] {
   const ms = getEffectiveModelSettings(settings, modelName)
-  if (ms && ms.loras && ms.loras.length > 0) {
-    return ms.loras
+  const primary = ms && ms.loras ? ms.loras : []
+  const secondary = Array.isArray(fallback) ? fallback : []
+  // Merge while preserving order and avoiding duplicates by name.
+  const seen = new Set<string>()
+  const merged: { name: string; weight: number }[] = []
+  for (const l of [...primary, ...secondary]) {
+    if (!seen.has(l.name)) {
+      seen.add(l.name)
+      merged.push({ name: l.name, weight: l.weight })
+    }
   }
-  return fallback
+  return merged
 }
 
 function applyPerModelOverrides(settings: Settings, modelName: string | null): Settings {
