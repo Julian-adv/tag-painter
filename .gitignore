@@ -23,3 +23,8 @@ Thumbs.db
 data/
 .claude/
 static/temp_mask.png
+vendor/
+
+# Release artifacts
+tag-painter-release.zip
+release/_*/
