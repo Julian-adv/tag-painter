@@ -60,6 +60,114 @@ else:
   }
 }
 
+function Get-ModelIfMissing($url, $destPath) {
+  if (Test-Path $destPath) {
+    $fileSize = (Get-Item $destPath).Length
+    if ($fileSize -gt 1MB) {
+      # Check if it's actually a model file, not HTML by reading first few characters as text
+      try {
+        $fileStart = Get-Content $destPath -TotalCount 1 -Raw -ErrorAction SilentlyContinue
+        if ($fileStart -and -not $fileStart.StartsWith('<')) {
+          Write-Host "Model already exists: $(Split-Path $destPath -Leaf) ($([math]::Round($fileSize/1MB, 2)) MB)" -ForegroundColor Green
+          return
+        } else {
+          Write-Host "Existing file appears to be HTML/text, re-downloading: $(Split-Path $destPath -Leaf)" -ForegroundColor Yellow
+          Remove-Item $destPath -Force -ErrorAction SilentlyContinue
+        }
+      } catch {
+        # If we can't read as text, assume it's binary (good)
+        Write-Host "Model already exists: $(Split-Path $destPath -Leaf) ($([math]::Round($fileSize/1MB, 2)) MB)" -ForegroundColor Green
+        return
+      }
+    } else {
+      Write-Host "Model file too small, re-downloading: $(Split-Path $destPath -Leaf)" -ForegroundColor Yellow
+      Remove-Item $destPath -Force -ErrorAction SilentlyContinue
+    }
+  }
+  
+  $destDir = Split-Path $destPath -Parent
+  New-DirectoryIfMissing $destDir
+  
+  Write-Host "Downloading model: $(Split-Path $destPath -Leaf)" -ForegroundColor DarkCyan
+  try {
+    Invoke-WebRequest -Uri $url -OutFile $destPath -Headers @{ 'User-Agent' = 'Mozilla/5.0' } -MaximumRedirection 10
+    if (Test-Path $destPath) {
+      $fileSize = (Get-Item $destPath).Length
+      # Check if downloaded file is actually a model file, not HTML error page
+      $isValidModel = $false
+      try {
+        $fileStart = Get-Content $destPath -TotalCount 1 -Raw -ErrorAction SilentlyContinue
+        if ($fileSize -gt 1MB -and ($null -eq $fileStart -or -not $fileStart.StartsWith('<'))) {
+          $isValidModel = $true
+        }
+      } catch {
+        # If we can't read as text and file is large enough, assume it's binary (good)
+        if ($fileSize -gt 1MB) { $isValidModel = $true }
+      }
+      
+      if ($isValidModel) {
+        Write-Host "Model downloaded successfully: $(Split-Path $destPath -Leaf) ($([math]::Round($fileSize/1MB, 2)) MB)" -ForegroundColor Green
+        return
+      } else {
+        # File is too small or starts with '<' (HTML), likely an error page
+        Remove-Item $destPath -Force -ErrorAction SilentlyContinue
+        throw "Downloaded file appears to be HTML error page or too small"
+      }
+    }
+  } catch {
+    # Download failed, clean up any partial file
+    if (Test-Path $destPath) {
+      Remove-Item $destPath -Force -ErrorAction SilentlyContinue
+    }
+  }
+  
+  Write-Host "Failed to download model from $url" -ForegroundColor Red
+  Write-Host "Please download manually and place in: $destPath" -ForegroundColor Yellow
+}
+
+function Test-ComfyUIIntegrity($comfyDir) {
+  if (-not (Test-Path $comfyDir)) { return $false }
+  
+  # Check essential ComfyUI files
+  $essentialFiles = @(
+    "main.py",
+    "requirements.txt",
+    "nodes.py"
+  )
+  
+  foreach ($file in $essentialFiles) {
+    $fullPath = Join-Path $comfyDir $file
+    if (-not (Test-Path $fullPath)) {
+      Write-Host "Missing essential ComfyUI file: $file" -ForegroundColor Yellow
+      return $false
+    }
+  }
+  
+  # Check custom nodes
+  $customNodesDir = Join-Path $comfyDir "custom_nodes"
+  $expectedNodes = @(
+    "cgem156-ComfyUI",
+    "ComfyUI-Custom-Scripts", 
+    "ComfyUI-Impact-Pack",
+    "ComfyUI-Impact-Subpack"
+  )
+  
+  $missingNodes = @()
+  foreach ($node in $expectedNodes) {
+    $nodePath = Join-Path $customNodesDir $node
+    if (-not (Test-Path $nodePath)) {
+      $missingNodes += $node
+    }
+  }
+  
+  if ($missingNodes.Count -gt 0) {
+    Write-Host "Missing custom nodes: $($missingNodes -join ', ')" -ForegroundColor Yellow
+    return $false
+  }
+  
+  return $true
+}
+
 function Install-TorchCudaIfNeeded($venvPy) {
   # If NVIDIA GPU present but torch lacks CUDA, install CUDA-enabled torch
   $hasNvidia = $false
@@ -150,7 +258,7 @@ function Start-ComfyUI($dir, [switch]$Cpu) {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $venvPy
     $extra = if ($Cpu) { " --cpu" } else { "" }
-    $psi.Arguments = ("-s main.py --windows-standalone-build" + $extra)
+    $psi.Arguments = ("-s main.py --windows-standalone-build --listen 0.0.0.0 --enable-cors-header `"*`"" + $extra)
     $psi.WorkingDirectory = (Resolve-Path $dir)
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $false
@@ -201,6 +309,13 @@ try {
   Write-Header "Prerequisite check"
   New-DirectoryIfMissing "vendor"
 
+  # Check if this is a fresh release (has build/ but no node_modules)
+  if ((Test-Path "build\\index.js") -and -not (Test-Path "node_modules")) {
+    Write-Header "Setting up release dependencies"
+    Write-Host "Running bootstrap to install dependencies..." -ForegroundColor DarkCyan
+    & pwsh -File "scripts\\bootstrap.ps1" -SkipBuild | Write-Host
+  }
+
   # Determine if using a Portable ComfyUI (run_*.bat present)
   $runNvidiaBat = Join-Path $ComfyDir "run_nvidia_gpu.bat"
   $runCpuBat = Join-Path $ComfyDir "run_cpu.bat"
@@ -212,7 +327,17 @@ try {
   } else {
     # Ensure ComfyUI + venv exist; run bootstrap (without building app) if missing
     $venvPy = Join-Path (Resolve-Path "vendor") "comfy-venv\\Scripts\\python.exe"
+    $needsBootstrap = $false
+    
     if (-not (Test-Path $ComfyDir) -or -not (Test-Path $venvPy)) {
+      $needsBootstrap = $true
+      Write-Host "ComfyUI or Python venv missing. Running bootstrap..." -ForegroundColor DarkCyan
+    } elseif (-not (Test-ComfyUIIntegrity -comfyDir $ComfyDir)) {
+      $needsBootstrap = $true
+      Write-Host "ComfyUI installation incomplete or corrupted. Running bootstrap to repair..." -ForegroundColor DarkCyan
+    }
+    
+    if ($needsBootstrap) {
       Write-Header "Setting up ComfyUI (latest source)"
       & pwsh -File "scripts\\bootstrap.ps1" -SkipBuild | Write-Host
     }
@@ -232,10 +357,67 @@ try {
       Remove-Item Env:CUDA_VISIBLE_DEVICES -ErrorAction SilentlyContinue
     }
 
-    # Ensure common extras used by custom nodes (e.g., matplotlib for cgem156-ComfyUI)
+    # Ensure common extras used by custom nodes and check custom node dependencies
     if (Test-Path $venvPy) {
       Install-PythonPackages -venvPy $venvPy -packages @('matplotlib')
+      
+      # Check and install custom node dependencies if missing
+      $customNodesDir = Join-Path $ComfyDir "custom_nodes"
+      if (Test-Path $customNodesDir) {
+        $customNodes = Get-ChildItem -Path $customNodesDir -Directory
+        foreach ($node in $customNodes) {
+          $requirementsFile = Join-Path $node.FullName "requirements.txt"
+          if (Test-Path $requirementsFile) {
+            Write-Host "Checking dependencies for $($node.Name)..." -ForegroundColor DarkCyan
+            $uvExe = Join-Path (Resolve-Path "vendor") "uv.exe"
+            if (Test-Path $uvExe) {
+              & $uvExe pip install -p $venvPy -r $requirementsFile
+            } else {
+              & $venvPy -m pip install -r $requirementsFile
+            }
+          }
+        }
+      }
     }
+    
+    # Download essential models for Impact Subpack
+    if (Test-Path (Join-Path $ComfyDir "custom_nodes\\ComfyUI-Impact-Subpack")) {
+      Write-Host "Downloading essential models for Impact Subpack..." -ForegroundColor DarkCyan
+      $personYoloModel = Join-Path $ComfyDir "models\\ultralytics\\segm\\person_yolov8m-seg.pt"
+      Get-ModelIfMissing -url "https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt" -destPath $personYoloModel
+      
+      $faceYoloModel = Join-Path $ComfyDir "models\\ultralytics\\bbox\\face_yolov8m.pt"
+      Get-ModelIfMissing -url "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt" -destPath $faceYoloModel
+    }
+    
+    # Download essential VAE model
+    Write-Host "Downloading essential VAE model..." -ForegroundColor DarkCyan
+    $vaeModel = Join-Path $ComfyDir "models\\vae\\fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors"
+    Get-ModelIfMissing -url "https://huggingface.co/moonshotmillion/VAEfixFP16ErrorsSDXLLowerMemoryUse_v10/resolve/main/fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors" -destPath $vaeModel
+    
+    # Download checkpoint model
+    Write-Host "Downloading checkpoint model..." -ForegroundColor DarkCyan
+    $checkpointModel = Join-Path $ComfyDir "models\\checkpoints\\zenijiMixKIllust_v10.safetensors"
+    Get-ModelIfMissing -url "https://civitai.com/api/download/models/1869616" -destPath $checkpointModel
+    
+    # Download LoRA models
+    Write-Host "Downloading LoRA models..." -ForegroundColor DarkCyan
+    $loraModel1 = Join-Path $ComfyDir "models\\loras\\MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors"
+    Get-ModelIfMissing -url "https://civitai.com/api/download/models/1244133" -destPath $loraModel1
+    
+    $loraModel2 = Join-Path $ComfyDir "models\\loras\\spo_sdxl_10ep_4k-data_lora_webui.safetensors"
+    Get-ModelIfMissing -url "https://civitai.com/api/download/models/567119" -destPath $loraModel2
+    
+    $loraModel3 = Join-Path $ComfyDir "models\\loras\\Sinozick_Style_XL_Pony.safetensors"
+    Get-ModelIfMissing -url "https://civitai.com/api/download/models/481798" -destPath $loraModel3
+    
+    $loraModel4 = Join-Path $ComfyDir "models\\loras\\Fant5yP0ny.safetensors"
+    Get-ModelIfMissing -url "https://civitai.com/api/download/models/524632" -destPath $loraModel4
+    
+    # Download SAM model
+    Write-Host "Downloading SAM model..." -ForegroundColor DarkCyan
+    $samModel = Join-Path $ComfyDir "models\\sams\\sam_vit_b_01ec64.pth"
+    Get-ModelIfMissing -url "https://huggingface.co/datasets/Gourieff/ReActor/resolve/main/models/sams/sam_vit_b_01ec64.pth" -destPath $samModel
   }
 
   Write-Header "Start ComfyUI"
@@ -247,9 +429,7 @@ try {
   Write-Header "Start App Server"
   $app = Start-NodeServer -port $Port
 
-  if ($OpenBrowser) {
-    Start-Process "http://127.0.0.1:$Port"
-  }
+  Start-Process "http://127.0.0.1:$Port"
 
   if ($comfy) {
     Write-Host "ComfyUI PID: $($comfy.Id)" -ForegroundColor Green
