@@ -40,7 +40,6 @@ try {
     "danbooru_tags.txt",
     "src",
     "static",
-    "data",
     "docs",
     "scripts",
     "build"
@@ -49,6 +48,17 @@ try {
   foreach ($p in $paths) {
     if (Test-Path $p) {
       Copy-Item $p -Destination $payloadRoot -Recurse -Force
+    }
+  }
+
+  # Copy specific data files only
+  $dataDir = Join-Path $payloadRoot "data"
+  New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+  $dataFiles = @("prompts.json", "settings.json", "wildcards.yaml")
+  foreach ($file in $dataFiles) {
+    $srcPath = Join-Path "data" $file
+    if (Test-Path $srcPath) {
+      Copy-Item $srcPath -Destination $dataDir -Force
     }
   }
 

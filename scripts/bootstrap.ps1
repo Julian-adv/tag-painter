@@ -7,6 +7,10 @@ param(
   [string]$CustomNodeBranch = "main",
   [string]$CustomScriptsRepo = "https://github.com/pythongosssss/ComfyUI-Custom-Scripts",
   [string]$CustomScriptsBranch = "main",
+  [string]$ImpactPackRepo = "https://github.com/ltdrdata/ComfyUI-Impact-Pack",
+  [string]$ImpactPackBranch = "Main",
+  [string]$ImpactSubpackRepo = "https://github.com/ltdrdata/ComfyUI-Impact-Subpack",
+  [string]$ImpactSubpackBranch = "main",
   [string]$PythonVersion = "3.13",
   [switch]$SkipNode,
   [switch]$SkipComfy,
@@ -21,6 +25,8 @@ param(
   - (Optional) If -ComfyPortableUrl is provided, installs ComfyUI Portable instead
   - Creates Python venv via uv and installs ComfyUI requirements + Torch
   - Installs custom node cgem156-ComfyUI into ComfyUI/custom_nodes
+  - Installs ComfyUI-Impact-Pack into ComfyUI/custom_nodes
+  - Installs ComfyUI-Impact-Subpack into ComfyUI/custom_nodes
 
   Usage examples:
     pwsh -File scripts/bootstrap.ps1 -ComfyPortableUrl "<portable_zip_url>"
@@ -360,7 +366,7 @@ else:
   }
 }
 
-function Install-CustomNode($comfyDir, $repoUrl, $branch) {
+function Install-CustomNode($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
   $dest = Join-Path $comfyDir "custom_nodes\\cgem156-ComfyUI"
   if (-not (Test-Path $comfyDir)) {
     Write-Host "ComfyUI not found at $comfyDir; skipping custom node install." -ForegroundColor Yellow
@@ -368,6 +374,7 @@ function Install-CustomNode($comfyDir, $repoUrl, $branch) {
   }
   if (Test-Path $dest) {
     Write-Host "Custom node already present: $dest" -ForegroundColor Green
+    Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
     return
   }
 
@@ -394,9 +401,12 @@ function Install-CustomNode($comfyDir, $repoUrl, $branch) {
     Move-Item -Path $extracted.FullName -Destination $dest
     Remove-Item -Recurse -Force $tmp
   }
+  
+  # Install dependencies if requirements.txt exists
+  Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
 }
 
-function Install-CustomScripts($comfyDir, $repoUrl, $branch) {
+function Install-CustomScripts($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
   $dest = Join-Path $comfyDir "custom_nodes\\ComfyUI-Custom-Scripts"
   if (-not (Test-Path $comfyDir)) {
     Write-Host "ComfyUI not found at $comfyDir; skipping custom scripts install." -ForegroundColor Yellow
@@ -404,6 +414,7 @@ function Install-CustomScripts($comfyDir, $repoUrl, $branch) {
   }
   if (Test-Path $dest) {
     Write-Host "Custom scripts already present: $dest" -ForegroundColor Green
+    Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
     return
   }
 
@@ -430,6 +441,107 @@ function Install-CustomScripts($comfyDir, $repoUrl, $branch) {
     Move-Item -Path $extracted.FullName -Destination $dest
     Remove-Item -Recurse -Force $tmp
   }
+  
+  # Install dependencies if requirements.txt exists
+  Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
+}
+
+function Install-CustomNodeDependencies($nodePath, $venvPy, $uv) {
+  $requirementsFile = Join-Path $nodePath "requirements.txt"
+  if (Test-Path $requirementsFile) {
+    $nodeName = Split-Path $nodePath -Leaf
+    Write-Host "Installing dependencies for $nodeName..." -ForegroundColor DarkCyan
+    
+    try { & $venvPy -m ensurepip --upgrade } catch {}
+    $pipOk = $false
+    try { & $venvPy -m pip --version | Out-Null; if ($LASTEXITCODE -eq 0) { $pipOk = $true } } catch {}
+    
+    if ($pipOk) {
+      & $venvPy -m pip install -r $requirementsFile
+    } else {
+      & $uv pip install -p $venvPy -r $requirementsFile
+    }
+  }
+}
+
+function Install-ImpactPack($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
+  $dest = Join-Path $comfyDir "custom_nodes\\ComfyUI-Impact-Pack"
+  if (-not (Test-Path $comfyDir)) {
+    Write-Host "ComfyUI not found at $comfyDir; skipping Impact Pack install." -ForegroundColor Yellow
+    return
+  }
+  if (Test-Path $dest) {
+    Write-Host "Impact Pack already present: $dest" -ForegroundColor Green
+    Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
+    return
+  }
+
+  Write-Header "Install ComfyUI-Impact-Pack"
+
+  try {
+    git --version *> $null
+    $useGit = $true
+  } catch { $useGit = $false }
+
+  New-DirectoryIfMissing (Join-Path $comfyDir "custom_nodes")
+  if ($useGit) {
+    Write-Host "Cloning via git..." -ForegroundColor DarkCyan
+    git clone --depth 1 --branch $branch $repoUrl $dest
+  } else {
+    $zipUrl = "$repoUrl/archive/refs/heads/$branch.zip"
+    $tmp = Join-Path $comfyDir "custom_nodes\\.tmp_impact_pack"
+    New-DirectoryIfMissing $tmp
+    $zipPath = Join-Path $tmp "impact_pack.zip"
+    Save-UrlIfMissing $zipUrl $zipPath
+    Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
+    $extracted = Get-ChildItem -Path $tmp | Where-Object { $_.PSIsContainer -and $_.Name -like "ComfyUI-Impact-Pack*" } | Select-Object -First 1
+    if (-not $extracted) { throw "Failed to extract Impact Pack archive" }
+    Move-Item -Path $extracted.FullName -Destination $dest
+    Remove-Item -Recurse -Force $tmp
+  }
+  
+  # Install dependencies if requirements.txt exists
+  Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
+}
+
+function Install-ImpactSubpack($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
+  $dest = Join-Path $comfyDir "custom_nodes\\ComfyUI-Impact-Subpack"
+  if (-not (Test-Path $comfyDir)) {
+    Write-Host "ComfyUI not found at $comfyDir; skipping Impact Subpack install." -ForegroundColor Yellow
+    return
+  }
+  if (Test-Path $dest) {
+    Write-Host "Impact Subpack already present: $dest" -ForegroundColor Green
+    Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
+    return
+  }
+
+  Write-Header "Install ComfyUI-Impact-Subpack"
+
+  try {
+    git --version *> $null
+    $useGit = $true
+  } catch { $useGit = $false }
+
+  New-DirectoryIfMissing (Join-Path $comfyDir "custom_nodes")
+  if ($useGit) {
+    Write-Host "Cloning via git..." -ForegroundColor DarkCyan
+    git clone --depth 1 --branch $branch $repoUrl $dest
+  } else {
+    $zipUrl = "$repoUrl/archive/refs/heads/$branch.zip"
+    $tmp = Join-Path $comfyDir "custom_nodes\\.tmp_impact_subpack"
+    New-DirectoryIfMissing $tmp
+    $zipPath = Join-Path $tmp "impact_subpack.zip"
+    Save-UrlIfMissing $zipUrl $zipPath
+    Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
+    $extracted = Get-ChildItem -Path $tmp | Where-Object { $_.PSIsContainer -and $_.Name -like "ComfyUI-Impact-Subpack*" } | Select-Object -First 1
+    if (-not $extracted) { throw "Failed to extract Impact Subpack archive" }
+    Move-Item -Path $extracted.FullName -Destination $dest
+    Remove-Item -Recurse -Force $tmp
+  }
+  
+  # Install dependencies if requirements.txt exists
+  Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
 }
 
 # Main
@@ -444,11 +556,13 @@ try {
     Install-ComfyUISource -vendorDir (Resolve-Path "vendor") -comfyDir $ComfyDir
     Initialize-PythonVenv -vendorDir (Resolve-Path "vendor") -comfyDir $ComfyDir -pythonVersion $PythonVersion
   }
-  Install-CustomNode -comfyDir $ComfyDir -repoUrl $CustomNodeRepo -branch $CustomNodeBranch
-  Install-CustomScripts -comfyDir $ComfyDir -repoUrl $CustomScriptsRepo -branch $CustomScriptsBranch
-  # Common extras used by some custom nodes (e.g., matplotlib for cgem156-ComfyUI)
   $uv = Install-Uv (Resolve-Path "vendor")
   $venvPy = Join-Path (Resolve-Path "vendor") "comfy-venv\Scripts\python.exe"
+  Install-CustomNode -comfyDir $ComfyDir -repoUrl $CustomNodeRepo -branch $CustomNodeBranch -venvPy $venvPy -uv $uv
+  Install-CustomScripts -comfyDir $ComfyDir -repoUrl $CustomScriptsRepo -branch $CustomScriptsBranch -venvPy $venvPy -uv $uv
+  Install-ImpactPack -comfyDir $ComfyDir -repoUrl $ImpactPackRepo -branch $ImpactPackBranch -venvPy $venvPy -uv $uv
+  Install-ImpactSubpack -comfyDir $ComfyDir -repoUrl $ImpactSubpackRepo -branch $ImpactSubpackBranch -venvPy $venvPy -uv $uv
+  # Common extras used by some custom nodes (e.g., matplotlib for cgem156-ComfyUI)
   if (Test-Path $venvPy) {
     Install-PythonPackages -py $venvPy -uv $uv -packages @('matplotlib')
   }
