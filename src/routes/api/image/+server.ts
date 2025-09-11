@@ -174,7 +174,19 @@ export async function POST({ request }) {
       imageBuffer = Buffer.from(await imageBlob.arrayBuffer())
     }
 
-    const baseOutputDir = path.resolve(process.cwd(), outputDirectory)
+    // Compute effective output directory with fallbacks
+    function getEffectiveOutputDir(dir: string): string {
+      const trimmed = (dir || '').trim()
+      if (!trimmed) {
+        return DEFAULT_OUTPUT_DIRECTORY
+      }
+      return trimmed
+    }
+
+    const effectiveDir = getEffectiveOutputDir(outputDirectory)
+    const baseOutputDir = path.isAbsolute(effectiveDir)
+      ? effectiveDir
+      : path.resolve(process.cwd(), effectiveDir)
     const todayFolder = getTodayDate()
     const finalOutputDir = path.join(baseOutputDir, todayFolder)
     await fs.mkdir(finalOutputDir, { recursive: true })
@@ -228,33 +240,34 @@ ${zoneLines.join('\n')}
 Negative prompt: ${prompts.negative}
 Steps: ${steps}, Sampler: ${samplerName}, Schedule type: ${scheduleType}, CFG scale: ${cfg}, Seed: ${workflowSeed}, Size: ${width}x${height}, Model: ${modelName}`
 
-      // First process the image with Sharp
-      const processedBuffer = await sharp(imageBuffer)
-        .png({
-          compressionLevel: 6,
-          palette: false
-        })
-        .toBuffer()
+      try {
+        // First process the image with Sharp
+        const processedBuffer = await sharp(imageBuffer)
+          .png({ compressionLevel: 6, palette: false })
+          .toBuffer()
 
-      // Extract PNG chunks
-      const chunks = extractChunks(processedBuffer)
+        // Extract PNG chunks
+        const chunks = extractChunks(processedBuffer)
 
-      // Create a text chunk with parameters (WebUI style)
-      // PNG tEXt must be Latin-1; replace non-Latin-1 chars to avoid errors
-      const parametersChunk = textChunk.encode('parameters', toLatin1(parametersText))
+        // Create a text chunk with parameters (WebUI style)
+        // PNG tEXt must be Latin-1; replace non-Latin-1 chars to avoid errors
+        const parametersChunk = textChunk.encode('parameters', toLatin1(parametersText))
 
-      // Insert the text chunk before the IEND chunk
-      const iendIndex = chunks.findIndex((chunk: PngChunk) => chunk.name === 'IEND')
-      if (iendIndex > -1) {
-        chunks.splice(iendIndex, 0, parametersChunk)
-      } else {
-        chunks.push(parametersChunk)
+        // Insert the text chunk before the IEND chunk
+        const iendIndex = chunks.findIndex((chunk: PngChunk) => chunk.name === 'IEND')
+        if (iendIndex > -1) {
+          chunks.splice(iendIndex, 0, parametersChunk)
+        } else {
+          chunks.push(parametersChunk)
+        }
+
+        // Encode chunks back to PNG buffer
+        const finalBuffer = Buffer.from(encodeChunks(chunks))
+        await fs.writeFile(filePath, finalBuffer)
+      } catch (e) {
+        console.warn('Metadata embed failed; saving original buffer. Reason:', e)
+        await fs.writeFile(filePath, imageBuffer)
       }
-
-      // Encode chunks back to PNG buffer
-      const finalBuffer = Buffer.from(encodeChunks(chunks))
-
-      await fs.writeFile(filePath, finalBuffer)
     } else {
       // Save without metadata if no prompt provided
       await fs.writeFile(filePath, imageBuffer)

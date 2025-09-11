@@ -71,8 +71,14 @@ export async function saveImage(
     })
 
     if (!response.ok) {
-      const errorData = await response.json()
-      console.error('Failed to save image:', errorData.error)
+      // Response might be plain text (e.g., CSRF 403). Fallback to text parsing.
+      try {
+        const errorData: unknown = await response.json()
+        console.error('Failed to save image:', errorData)
+      } catch {
+        const txt = await response.text()
+        console.error('Failed to save image:', txt)
+      }
       return null
     } else {
       const result = await response.json()

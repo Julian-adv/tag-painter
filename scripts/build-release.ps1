@@ -62,6 +62,19 @@ try {
     }
   }
 
+  # For packaged settings.json, blank out outputDirectory
+  $settingsPath = Join-Path $dataDir "settings.json"
+  if (Test-Path $settingsPath) {
+    try {
+      $settingsObj = Get-Content $settingsPath -Raw | ConvertFrom-Json -Depth 100
+      $settingsObj.outputDirectory = ""
+      $settingsObj | ConvertTo-Json -Depth 100 | Set-Content -Path $settingsPath -Encoding UTF8
+      Write-Host "Release settings.json: outputDirectory blanked" -ForegroundColor DarkCyan
+    } catch {
+      Write-Host "Warning: failed to process settings.json for release: $_" -ForegroundColor Yellow
+    }
+  }
+
   # Place wrapper start scripts at archive root
   $wrapperPs1 = Join-Path "release" "start.ps1"
   $wrapperSh  = Join-Path "release" "start.sh"

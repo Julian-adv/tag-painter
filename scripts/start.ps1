@@ -283,6 +283,8 @@ function Wait-For-Port8188() {
 
 function Start-NodeServer($port) {
   $env:PORT = "$port"
+  # Increase SvelteKit request body size limit (bytes) to allow PNG uploads
+  if (-not $env:BODY_SIZE_LIMIT) { $env:BODY_SIZE_LIMIT = "10485760" } # 10 MB
 
   $node = "node"
   if (Test-Path "vendor\\node\\node.exe") { $node = (Resolve-Path "vendor\\node\\node.exe") }
@@ -312,8 +314,19 @@ try {
   # Check if this is a fresh release (has build/ but no node_modules)
   if ((Test-Path "build\\index.js") -and -not (Test-Path "node_modules")) {
     Write-Header "Setting up release dependencies"
-    Write-Host "Running bootstrap to install dependencies..." -ForegroundColor DarkCyan
+    Write-Host "Running bootstrap to prepare environment (Node, ComfyUI)..." -ForegroundColor DarkCyan
     & pwsh -File "scripts\\bootstrap.ps1" -SkipBuild | Write-Host
+
+    # Ensure Node deps are installed without rebuilding app
+    Write-Host "Installing Node dependencies (npm ci)..." -ForegroundColor DarkCyan
+    $npm = "npm"
+    $vendorNpm = Join-Path (Resolve-Path "vendor") "node\\npm.cmd"
+    if (Test-Path $vendorNpm) { $npm = $vendorNpm }
+    & $npm ci
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "npm ci failed. Falling back to 'npm install'." -ForegroundColor Yellow
+      & $npm install
+    }
   }
 
   # Determine if using a Portable ComfyUI (run_*.bat present)
@@ -397,13 +410,13 @@ try {
     
     # Download checkpoint model
     Write-Host "Downloading checkpoint model..." -ForegroundColor DarkCyan
-    $checkpointModel = Join-Path $ComfyDir "models\\checkpoints\\zenijiMixKIllust_v10.safetensors"
-    Get-ModelIfMissing -url "https://civitai.com/api/download/models/1869616" -destPath $checkpointModel
+    $checkpointModel = Join-Path $ComfyDir "models\\checkpoints\\ARAZmixNoob075.safetensors"
+    Get-ModelIfMissing -url "https://huggingface.co/ariaze/ARAZmixNOOB/resolve/main/ARAZmixNoob075.safetensors?download=true" -destPath $checkpointModel
     
     # Download LoRA models
     Write-Host "Downloading LoRA models..." -ForegroundColor DarkCyan
     $loraModel1 = Join-Path $ComfyDir "models\\loras\\MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors"
-    Get-ModelIfMissing -url "https://civitai.com/api/download/models/1244133" -destPath $loraModel1
+    Get-ModelIfMissing -url "https://huggingface.co/NeigeSnowflake/neigeworkflow/resolve/main/MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors" -destPath $loraModel1
     
     $loraModel2 = Join-Path $ComfyDir "models\\loras\\spo_sdxl_10ep_4k-data_lora_webui.safetensors"
     Get-ModelIfMissing -url "https://civitai.com/api/download/models/567119" -destPath $loraModel2
@@ -412,7 +425,7 @@ try {
     Get-ModelIfMissing -url "https://civitai.com/api/download/models/481798" -destPath $loraModel3
     
     $loraModel4 = Join-Path $ComfyDir "models\\loras\\Fant5yP0ny.safetensors"
-    Get-ModelIfMissing -url "https://civitai.com/api/download/models/524632" -destPath $loraModel4
+    Get-ModelIfMissing -url "https://huggingface.co/LyliaEngine/Fant5yP0ny/resolve/main/Fant5yP0ny.safetensors?download=true" -destPath $loraModel4
     
     # Download SAM model
     Write-Host "Downloading SAM model..." -ForegroundColor DarkCyan
