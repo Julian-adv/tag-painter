@@ -13,6 +13,17 @@ $ErrorActionPreference = 'Stop'
 
 Push-Location (Resolve-Path (Join-Path $PSScriptRoot ".."))
 try {
+  # If using default output name, append version from package.json
+  try {
+    $pkg = Get-Content "package.json" -Raw | ConvertFrom-Json
+    $ver = $pkg.version
+    if ($ver -and $OutFile -eq "tag-painter-release.zip") {
+      $OutFile = "tag-painter-release-v$ver.zip"
+    }
+  } catch {
+    Write-Host "Warning: could not read version from package.json; using default name." -ForegroundColor Yellow
+  }
+
   if (-not $NoBuild) {
     Write-Host "Building app..." -ForegroundColor Cyan
     & pwsh -File "scripts\build.ps1"
