@@ -48,13 +48,61 @@ function Get-LatestZipUrl {
     throw 'Could not determine a ZIP download URL from latest release.'
 }
 
+function Get-LatestReleaseInfo {
+    param(
+        [string]$Owner,
+        [string]$Repo,
+        [hashtable]$Headers
+    )
+    $releaseApi = "https://api.github.com/repos/$Owner/$Repo/releases/latest"
+    Write-Host "Fetching latest release info from $releaseApi"
+    return (Invoke-RestMethod -Uri $releaseApi -Headers $Headers)
+}
+
 try {
     # Ensure TLS 1.2 for older PowerShell environments.
     try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
+    
+    # Ensure tempRoot exists even if we early-return (for finally cleanup guard)
+    $tempRoot = ''
 
     Write-DebugLog ("Params: Owner={0} Repo={1} TokenSet={2}" -f $Owner, $Repo, ([bool]$Token))
     $headers = Get-Headers -Token $Token
     Write-DebugLog ("Headers set: Accept, User-Agent{0}" -f ($(if ($Token) { ', Authorization' } else { '' })))
+
+    # Determine local target dir (for reading current version) before network download
+    $cwd = (Get-Location).Path
+    $tpDir = Join-Path $cwd 'tag-painter'
+    if (Test-Path -LiteralPath $tpDir -PathType Container) {
+        $targetDir = $tpDir
+        Write-Host "Detected release layout. Target: $targetDir"
+    } else {
+        $targetDir = $cwd
+        Write-Host "Target directory: $targetDir"
+    }
+    Write-DebugLog ("cwd={0}; targetDir={1}" -f $cwd, $targetDir)
+
+    # Read current local version from package.json if available
+    $pkgPath = Join-Path $targetDir 'package.json'
+    $currentVersion = ''
+    if (Test-Path -LiteralPath $pkgPath -PathType Leaf) {
+        try {
+            $pkg = Get-Content -LiteralPath $pkgPath -Raw | ConvertFrom-Json -Depth 32
+            $currentVersion = '' + $pkg.version
+        } catch {
+            Write-DebugLog ("Failed to read local package.json: {0}" -f $_)
+        }
+    }
+
+    # Get latest release info and compare versions
+    $latest = Get-LatestReleaseInfo -Owner $Owner -Repo $Repo -Headers $headers
+    $latestVersion = '' + ($latest.tag_name -replace '^[vV]', '')
+    if ($currentVersion -and ($currentVersion -eq $latestVersion)) {
+        Write-Host ("Already up to date. Version {0}" -f $currentVersion) -ForegroundColor Green
+        return
+    }
+
+    # Proceed to download if upgrade is available or local version missing
     $downloadUrl = Get-LatestZipUrl -Owner $Owner -Repo $Repo -Headers $headers
     Write-DebugLog ("Download URL: {0}" -f $downloadUrl)
 
@@ -80,18 +128,12 @@ try {
     }
     Write-DebugLog ("Source root selected: {0}" -f $srcRoot)
 
-    # Decide destination: if current folder looks like a release layout (has tag-painter/),
-    # merge into that; otherwise merge into the current directory.
-    $cwd = (Get-Location).Path
-    $tpDir = Join-Path $cwd 'tag-painter'
-    if (Test-Path -LiteralPath $tpDir -PathType Container) {
-        $targetDir = $tpDir
+    # Decide destination (targetDir already computed above); re-emit message for clarity
+    if ($targetDir -eq $tpDir) {
         Write-Host "Detected release layout. Updating: $targetDir"
     } else {
-        $targetDir = $cwd
         Write-Host "Updating current directory: $targetDir"
     }
-    Write-DebugLog ("cwd={0}; targetDir={1}" -f $cwd, $targetDir)
 
     # Exclude updater and wrapper scripts and VCS metadata if copying from a repo/zipball root
     $exclude = @('update.ps1','update.sh','start.ps1','start.sh','.git')
@@ -210,7 +252,7 @@ catch {
     exit 1
 }
 finally {
-    if (Test-Path -LiteralPath $tempRoot) {
+    if ($null -ne $tempRoot -and $tempRoot -ne '' -and (Test-Path -LiteralPath $tempRoot)) {
         try { Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue } catch {}
     }
 }
