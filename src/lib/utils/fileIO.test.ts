@@ -283,7 +283,9 @@ describe('fileIO utilities', () => {
         steps: 20,
         seed: -1,
         sampler: 'euler',
-        outputDirectory: '/test/output'
+        outputDirectory: '/test/output',
+        selectedVae: '__embedded__',
+        perModel: {}
       }
 
       mockFetch.mockResolvedValueOnce({

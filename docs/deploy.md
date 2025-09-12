@@ -1,6 +1,7 @@
 Deployment Guide
 
 Overview
+
 - Targets Windows first; macOS/Linux supported with shell scripts.
 - Online install only. Downloads Node and ComfyUI (or clones) at first run.
 - Python 3.13 default (Windows) via uv; macOS/Linux prefers uv, falls back to system Python.
@@ -8,15 +9,18 @@ Overview
 - Models/LoRA are not bundled. Use ComfyUI UI (Manager included) to download on first run.
 
 Prerequisites
+
 - Internet connectivity
 - Windows PowerShell 5+ (Windows 10/11) or bash (macOS/Linux)
 - Optional: git (recommended on macOS/Linux)
 
 Build Adapter
+
 - Uses `@sveltejs/adapter-node` and runs on port `3000` by default.
 
 Windows (single entry)
-1) Start
+
+1. Start
    - pwsh -File scripts/start.ps1
 
    Behavior:
@@ -31,7 +35,8 @@ Windows (single entry)
    - Optional flags: `-Port 3000`, `-OpenBrowser` (both optional).
 
 macOS/Linux (single entry)
-1) Start
+
+1. Start
    - PORT=3000 bash scripts/start.sh
 
    Behavior:
@@ -41,6 +46,7 @@ macOS/Linux (single entry)
    - Installs custom node `cgem156-ComfyUI`.
 
 Building & Packaging (maintainers)
+
 - Build only:
   - Windows: `pwsh -File scripts/build.ps1` (installs Node 22.19 portable if needed)
   - macOS/Linux: `npm ci && npm run build`
@@ -49,12 +55,14 @@ Building & Packaging (maintainers)
   - Skip build: `pwsh -File scripts/build-release.ps1 -NoBuild`
 
 Release ZIP layout
+
 - After extracting `tag-painter-release.zip`, the top-level contains only the start scripts and a single folder:
   - `start.ps1` (Windows)
   - `start.sh` (macOS/Linux)
   - `tag-painter/` (all app files live here)
 
 Usage (from extracted ZIP)
+
 - Windows: `pwsh -File ./start.ps1 [-Port 3000]`
 - macOS/Linux: `bash ./start.sh`
 - Notes:
@@ -65,15 +73,18 @@ Usage (from extracted ZIP)
   - Existing ComfyUI Portable: pass `-ComfyDir "D:\ComfyUI_windows_portable"` to use your installed portable (uses its `run_*.bat` and skips our venv).
 
 Custom Nodes
+
 - `cgem156-ComfyUI` is installed automatically during bootstrap.
 - To add more, place them under `vendor/ComfyUI/custom_nodes`.
 
 Updating
+
 - App: pull changes, run `npm ci && npm run build`.
 - ComfyUI (Windows portable): replace the portable folder inside `vendor/ComfyUI`.
 - ComfyUI (macOS/Linux): `cd vendor/ComfyUI && git pull` then reinstall requirements if needed.
 
 Troubleshooting
+
 - Port 8188 Busy: Ensure no existing ComfyUI instance is running.
 - Node Mismatch: Scripts prefer system Node if it exactly matches v22.19.0; otherwise a portable Node is installed to `vendor/node`.
 - Missing Portable URL (Windows): Rerun bootstrap with `-ComfyPortableUrl` or manually place ComfyUI under `vendor/ComfyUI`.

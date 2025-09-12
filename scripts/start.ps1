@@ -1,9 +1,9 @@
 param(
   [int]$Port = 3000,
   [string]$ComfyDir = "vendor\\ComfyUI",
-  [string]$ComfyPortableUrl = $env:COMFY_PORTABLE_URL,
   [switch]$OpenBrowser,
-  [switch]$ForceCPU
+  [switch]$ForceCPU,
+  [switch]$ComfyOnly
 )
 
 <#
@@ -11,6 +11,7 @@ param(
   - Detects NVIDIA GPU and picks run_nvidia_gpu.bat or run_cpu.bat for ComfyUI Portable
   - Starts ComfyUI, waits for port 8188 to respond
   - Starts Node server (adapter-node build) on -Port (default 3000)
+  - Use -ComfyOnly flag to start only ComfyUI without the Node server
 #>
 
 Set-StrictMode -Version Latest
@@ -224,12 +225,6 @@ function Start-ComfyUI($dir, [switch]$Cpu) {
     return $null
   }
 
-  
-
-  
-
-  
-
   # Try source install path using venv Python
   $venvPy = Join-Path (Resolve-Path "vendor") "comfy-venv\\Scripts\\python.exe"
   if (Test-Path $venvPy) {
@@ -383,11 +378,6 @@ try {
   $vaeModel = Join-Path $ComfyDir "models\\vae\\fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors"
   Get-ModelIfMissing -url "https://huggingface.co/moonshotmillion/VAEfixFP16ErrorsSDXLLowerMemoryUse_v10/resolve/main/fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors" -destPath $vaeModel
 
-  # Download checkpoint model
-  Write-Host "Downloading checkpoint model..." -ForegroundColor DarkCyan
-  $checkpointModel = Join-Path $ComfyDir "models\\checkpoints\\ARAZmixNoob075.safetensors"
-  Get-ModelIfMissing -url "https://huggingface.co/ariaze/ARAZmixNOOB/resolve/main/ARAZmixNoob075.safetensors?download=true" -destPath $checkpointModel
-
   # Download LoRA models
   Write-Host "Downloading LoRA models..." -ForegroundColor DarkCyan
   $loraModel1 = Join-Path $ComfyDir "models\\loras\\MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors"
@@ -413,22 +403,34 @@ try {
     Write-Host "ComfyUI did not respond on 8188 in time. You may still continue if starting manually." -ForegroundColor Yellow
   }
 
-  Write-Header "Start App Server"
-  $app = Start-NodeServer -port $Port
-
-  Start-Process "http://127.0.0.1:$Port"
-
-  if ($comfy) {
-    Write-Host "ComfyUI PID: $($comfy.Id)" -ForegroundColor Green
+  if ($ComfyOnly) {
+    # ComfyUI-only mode
+    if ($comfy) {
+      Write-Host "ComfyUI PID: $($comfy.Id)" -ForegroundColor Green
+      Write-Host "ComfyUI is running at http://127.0.0.1:8188" -ForegroundColor Cyan
+    } else {
+      Write-Host "ComfyUI not started (portable scripts or venv python missing)" -ForegroundColor Yellow
+    }
+    Write-Host "Press Ctrl+C to stop ComfyUI (or close the console)." -ForegroundColor Yellow
   } else {
-    Write-Host "ComfyUI not started (portable scripts or venv python missing)" -ForegroundColor Yellow
+    # Full mode with app server
+    Write-Header "Start App Server"
+    $app = Start-NodeServer -port $Port
+
+    Start-Process "http://127.0.0.1:$Port"
+
+    if ($comfy) {
+      Write-Host "ComfyUI PID: $($comfy.Id)" -ForegroundColor Green
+    } else {
+      Write-Host "ComfyUI not started (portable scripts or venv python missing)" -ForegroundColor Yellow
+    }
+    if ($app) {
+      Write-Host "App server PID: $($app.Id)" -ForegroundColor Green
+    } else {
+      Write-Host "App server not started" -ForegroundColor Yellow
+    }
+    Write-Host "Press Ctrl+C to stop (or close the console)." -ForegroundColor Yellow
   }
-  if ($app) {
-    Write-Host "App server PID: $($app.Id)" -ForegroundColor Green
-  } else {
-    Write-Host "App server not started" -ForegroundColor Yellow
-  }
-  Write-Host "Press Ctrl+C to stop (or close the console)." -ForegroundColor Yellow
 
   # Keep foreground process alive while children run
   while ($true) { Start-Sleep -Seconds 3600 }

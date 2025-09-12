@@ -6,6 +6,7 @@
   import CompositionSelector from './CompositionSelector.svelte'
   import TagZones from './TagZones.svelte'
   import LoraSelector from './LoraSelector.svelte'
+  import NoCheckpointsDialog from './NoCheckpointsDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import { loadSettings, saveSettings as saveSettingsToFile, saveMaskData } from './utils/fileIO'
   import { fetchCheckpoints } from './utils/comfyui'
@@ -46,6 +47,7 @@
   let isGeneratingForever = $state(false)
   let shouldStopGeneration = $state(false)
   let lastSeed: number | null = $state(null)
+  let showNoCheckpointsDialog = $state(false)
   let currentRandomTagResolutions: {
     all: Record<string, string>
     zone1: Record<string, string>
@@ -59,6 +61,11 @@
     negative: {},
     inpainting: {}
   })
+
+  // Show dialog when no checkpoints are found
+  function openNoCheckpointsDialog() {
+    showNoCheckpointsDialog = true
+  }
 
   // Reload model/LoRA lists from ComfyUI and refresh UI options
   async function refreshModels(event: MouseEvent) {
@@ -78,6 +85,7 @@
         }
       } else {
         availableCheckpoints = []
+        openNoCheckpointsDialog()
       }
     } catch (e) {
       console.error('Failed to reload checkpoint list', e)
@@ -130,6 +138,9 @@
         }
         return data
       })
+    } else {
+      // Show dialog when no checkpoints are found
+      openNoCheckpointsDialog()
     }
   })
 
@@ -141,6 +152,12 @@
     generationControlsRef?.openSettingsDialogExternal(focusField)
   }
   async function handleGenerate(seedToUse: number | null = null) {
+    // Check if checkpoints are available before generating
+    if (!availableCheckpoints || availableCheckpoints.length === 0) {
+      openNoCheckpointsDialog()
+      return
+    }
+
     // Add current values to options if they're not already there
     autoSaveCurrentValues()
 
@@ -474,6 +491,9 @@
     </section>
   </div>
 </main>
+
+<!-- No Checkpoints Dialog -->
+<NoCheckpointsDialog bind:isOpen={showNoCheckpointsDialog} />
 
 <style>
   :global(html, body) {
