@@ -106,11 +106,55 @@ try {
     }
     Write-DebugLog ("Copy root: {0}" -f $copyRoot)
 
+    function Copy-DataDirWithPreserve {
+        param(
+            [string]$SrcDataDir,
+            [string]$DstDataDir
+        )
+        $preserveNames = @('wildcards.yaml','settings.json','prompts.json')
+        if (-not (Test-Path -LiteralPath $DstDataDir -PathType Container)) {
+            $null = New-Item -ItemType Directory -Path $DstDataDir -Force
+        }
+        $files = Get-ChildItem -LiteralPath $SrcDataDir -Recurse -File -Force
+        foreach ($f in $files) {
+            $rel = $f.FullName.Substring($SrcDataDir.Length).TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+            $dst = Join-Path $DstDataDir $rel
+            $dstDir = Split-Path -Parent $dst
+            if (-not (Test-Path -LiteralPath $dstDir -PathType Container)) {
+                $null = New-Item -ItemType Directory -Path $dstDir -Force
+            }
+
+            $isPreserve = $preserveNames -contains $f.Name
+            if ($isPreserve -and (Test-Path -LiteralPath $dst -PathType Leaf)) {
+                try {
+                    $srcHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $f.FullName).Hash
+                    $dstHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $dst).Hash
+                } catch {
+                    $srcHash = ''
+                    $dstHash = 'x'
+                }
+                if ($srcHash -ne $dstHash) {
+                    Write-Host ("Preserving user file (no overwrite): data/{0}" -f $f.Name)
+                    continue
+                }
+            }
+            if ($DebugLog) { Write-DebugLog ("Copy data file: {0} -> {1}" -f $f.FullName, $dst) }
+            Copy-Item -LiteralPath $f.FullName -Destination $dst -Force
+        }
+    }
+
     $items = Get-ChildItem -LiteralPath $copyRoot -Force
     Write-DebugLog ("Items to copy: {0}" -f ($items.Count))
     foreach ($item in $items) {
         if ($exclude -contains $item.Name) { continue }
         $dest = Join-Path -Path $targetDir -ChildPath $item.Name
+
+        if ($item.PSIsContainer -and $item.Name -ieq 'data') {
+            if ($DebugLog) { Write-DebugLog ("Copy (data with preserve): {0} -> {1}" -f $item.FullName, $dest) }
+            Copy-DataDirWithPreserve -SrcDataDir $item.FullName -DstDataDir $dest
+            continue
+        }
+
         if (Test-Path -LiteralPath $dest) {
             if ($DebugLog) { Write-DebugLog ("Copy (overlay): {0} -> {1}" -f $item.FullName, $dest) }
             Copy-Item -LiteralPath $item.FullName -Destination $dest -Recurse -Force
