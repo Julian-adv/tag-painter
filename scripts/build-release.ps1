@@ -92,6 +92,12 @@ try {
   if (Test-Path $wrapperPs1) { Copy-Item $wrapperPs1 -Destination (Join-Path $temp "start.ps1") -Force }
   if (Test-Path $wrapperSh)  { Copy-Item $wrapperSh  -Destination (Join-Path $temp "start.sh")  -Force }
 
+  # Include updater scripts at archive root
+  $updaterPs1 = Join-Path "scripts" "update.ps1"
+  $updaterSh  = Join-Path "scripts" "update.sh"
+  if (Test-Path $updaterPs1) { Copy-Item $updaterPs1 -Destination (Join-Path $temp "update.ps1") -Force }
+  if (Test-Path $updaterSh)  { Copy-Item $updaterSh  -Destination (Join-Path $temp "update.sh")  -Force }
+
   if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
   Compress-Archive -Path (Join-Path $temp '*') -DestinationPath $OutFile
   Write-Host "Release created: $OutFile" -ForegroundColor Green

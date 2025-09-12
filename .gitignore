@@ -26,5 +26,5 @@ static/temp_mask.png
 vendor/
 
 # Release artifacts
-tag-painter-release.zip
+tag-painter-*.zip
 release/_*/
