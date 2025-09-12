@@ -165,6 +165,13 @@
     }
   })
 
+  // Ensure model entry exists whenever selectedModelKey changes
+  $effect(() => {
+    if (show && selectedModelKey) {
+      ensureModelEntry(selectedModelKey)
+    }
+  })
+
   // Focus requested field when dialog opens or when initialFocus changes
   $effect(() => {
     if (show) {
