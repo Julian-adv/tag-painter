@@ -104,4 +104,3 @@ export function treeKeyboard(node: HTMLElement, options: Options) {
     }
   }
 }
-

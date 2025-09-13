@@ -5,7 +5,11 @@
 import type { TreeModel, ArrayNode, ObjectNode, LeafNode, RefNode } from './model'
 import { uid, isContainer, addChild, moveChild } from './model'
 import { getNodePath } from './utils'
-import { testModeStore, setTestModeOverride, removeTestModeOverride } from '../stores/testModeStore.svelte'
+import {
+  testModeStore,
+  setTestModeOverride,
+  removeTestModeOverride
+} from '../stores/testModeStore.svelte'
 import { getParentOf } from './utils'
 
 /**

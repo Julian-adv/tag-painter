@@ -19,16 +19,10 @@
     onkeydown={(e) => e.stopPropagation()}
   />
   {#if filterText}
-    <button
-      type="button"
-      class="filter-clear"
-      onclick={clear}
-      aria-label="Clear filter"
-    >
+    <button type="button" class="filter-clear" onclick={clear} aria-label="Clear filter">
       ×
     </button>
   {/if}
-  
 </div>
 
 <style>
