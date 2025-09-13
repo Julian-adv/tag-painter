@@ -4,6 +4,7 @@
   import TreeNodePath from './TreeNodePath.svelte'
   import TreeFilter from './TreeFilter.svelte'
   import { treeKeyboard } from './treeKeyboard'
+  import { getNextSelectionId, findNearestVisibleAncestorId } from './nav'
   import type { TreeModel, LeafNode, ArrayNode, ObjectNode, AnyNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
   import { addChild, isContainer, uid, removeNode, moveChild, rebuildPathSymbols } from './model'
@@ -14,7 +15,6 @@
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
   import { isConsistentRandomArray, getNodePath } from './utils'
   import { addBySelectionAction } from './addBySelection'
-  import { shouldNodeBeVisible } from './utils'
   import {
     testModeStore,
     setTestModeOverride,
@@ -46,50 +46,17 @@
   // Track whether a filter was active previously to react when it is cleared
   let hadFilter: boolean = $state(false)
 
-  // Build a flat list of currently visible node ids in render order
-  function flattenVisibleNodeIds(): string[] {
-    const result: string[] = []
-    function dfs(curId: string) {
-      const n = model.nodes[curId]
-      if (!n) return
-      // Only traverse subtrees that are visible under current filter
-      if (!shouldNodeBeVisible(model, curId, filterText)) return
-      if (curId !== model.rootId) result.push(curId)
-      if (isContainer(n) && !n.collapsed) {
-        for (const cid of n.children || []) dfs(cid)
-      }
-    }
-    dfs(model.rootId)
-    return result
-  }
-
   function focusSelectedSoon() {
     tick().then(() => scrollSelectedIntoView())
   }
 
   function moveSelectionBy(delta: number) {
-    const visible = flattenVisibleNodeIds()
-    if (visible.length === 0) return
-    // Prefer lastSelectedId when available
     const currentId = lastSelectedId || selectedIds[0] || null
-    if (!currentId) {
-      selectedIds = [visible[0]]
-      lastSelectedId = visible[0]
-      focusSelectedSoon()
-      return
-    }
-    let idx = visible.indexOf(currentId)
-    if (idx === -1) {
-      // Fallback: select nearest visible ancestor
-      const newId = findNearestVisibleAncestorId(currentId)
-      idx = Math.max(0, visible.indexOf(newId))
-    }
-    const next = Math.min(visible.length - 1, Math.max(0, idx + delta))
-    if (visible[next]) {
-      selectedIds = [visible[next]]
-      lastSelectedId = visible[next]
-      focusSelectedSoon()
-    }
+    const nextId = getNextSelectionId(model, currentId, delta, filterText)
+    if (!nextId) return
+    selectedIds = [nextId]
+    lastSelectedId = nextId
+    focusSelectedSoon()
   }
 
   function collapseOrFocusParent() {
@@ -344,22 +311,7 @@
     }
   }
 
-  function findNearestVisibleAncestorId(id: string): string {
-    const start = model.nodes[id]
-    if (!start) return model.rootId
-    let current = start
-    while (current.parentId) {
-      const parent = model.nodes[current.parentId]
-      if (!parent) break
-      // If parent is collapsed, current is hidden; move up to parent
-      if (parent.collapsed) {
-        current = parent
-        continue
-      }
-      break
-    }
-    return current.id
-  }
+  // findNearestVisibleAncestorId moved to nav.ts
 
   function handleExpandAll() {
     expandAll(model)
@@ -373,7 +325,7 @@
     // If current selection becomes hidden, select nearest visible ancestor
     if (selectedIds.length === 1) {
       const selId = selectedIds[0]
-      const newId = findNearestVisibleAncestorId(selId)
+      const newId = findNearestVisibleAncestorId(model, selId)
       if (newId !== selId) {
         selectedIds = [newId]
         lastSelectedId = newId
@@ -745,7 +697,7 @@
   <div class="grid">
     <section>
       <!-- Filter input -->
-      <TreeFilter bind:filterText={filterText} />
+      <TreeFilter bind:filterText />
 
       <!-- Path breadcrumb -->
       <TreeNodePath
@@ -766,6 +718,8 @@
         tabindex="-1"
         bind:this={treeContainer}
         data-tree-root
+        onkeydown={() => { /* keyboard handled by treeKeyboard action */ }}
+        onkeyup={() => { /* keyboard handled by treeKeyboard action */ }}
         use:treeKeyboard={{
           reorder: reorderSelection,
           startEditingSelection,
