@@ -285,6 +285,7 @@ describe('fileIO utilities', () => {
         sampler: 'euler',
         outputDirectory: '/test/output',
         selectedVae: '__embedded__',
+        clipSkip: 2,
         perModel: {}
       }
 

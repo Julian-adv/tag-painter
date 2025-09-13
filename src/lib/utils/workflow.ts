@@ -4,19 +4,49 @@ export const FINAL_SAVE_NODE_ID = 'final_save_output' // Consistent ID for our d
 
 import type { ComfyUIWorkflow } from '$lib/types'
 
+// Configure CLIP skip for the workflow
+export function configureClipSkip(workflow: ComfyUIWorkflow, clipSkip: number) {
+  // Update standalone CLIP skip nodes
+  if (workflow['97']) { // Inpainting workflow
+    workflow['97'].inputs.stop_at_clip_layer = -clipSkip
+  }
+  if (workflow['98']) { // Default workflow
+    workflow['98'].inputs.stop_at_clip_layer = -clipSkip
+  }
+  if (workflow['99']) { // LoRA chain workflow
+    workflow['99'].inputs.stop_at_clip_layer = -clipSkip
+  }
+}
+
 // Dynamic LoRA chain generation
 export function generateLoraChain(
   selectedLoras: { name: string; weight: number }[],
-  workflow: ComfyUIWorkflow
+  workflow: ComfyUIWorkflow,
+  clipSkip: number = 2
 ) {
-  // Remove existing LoRA nodes (70-85)
+  
+  // Remove existing LoRA nodes (70-85) and CLIP skip node (99)
   for (let i = 70; i <= 85; i++) {
     delete workflow[i.toString()]
   }
+  delete workflow['99']
 
   if (selectedLoras.length === 0) {
-    // If no LoRAs selected, update all references to point to node '11'
-    updateLoraReferences(workflow, '11')
+    // If no LoRAs selected, add CLIP skip node for base checkpoint
+    const clipSkipNodeId = '99'
+    workflow[clipSkipNodeId] = {
+      inputs: {
+        stop_at_clip_layer: -clipSkip,
+        clip: ['11', 1]
+      },
+      class_type: 'CLIPSetLastLayer',
+      _meta: {
+        title: 'CLIP Set Last Layer (Base)'
+      }
+    }
+    
+    // Update all references to point to node '11' for model, CLIP skip node for CLIP
+    updateLoraReferences(workflow, '11', clipSkipNodeId)
     return
   }
 
@@ -47,11 +77,24 @@ export function generateLoraChain(
     lastLoraNodeId = nodeId
   })
 
-  // Update all references to the last LoRA node
-  updateLoraReferences(workflow, lastLoraNodeId)
+  // Add CLIP skip node after LoRA chain
+  const clipSkipNodeId = '99'
+  workflow[clipSkipNodeId] = {
+    inputs: {
+      stop_at_clip_layer: -clipSkip,
+      clip: [lastLoraNodeId, 1]
+    },
+    class_type: 'CLIPSetLastLayer',
+    _meta: {
+      title: 'CLIP Set Last Layer (LoRA)'
+    }
+  }
+
+  // Update all references to use the CLIP skip node for CLIP outputs
+  updateLoraReferences(workflow, lastLoraNodeId, clipSkipNodeId)
 }
 
-function updateLoraReferences(workflow: ComfyUIWorkflow, targetNodeId: string) {
+function updateLoraReferences(workflow: ComfyUIWorkflow, targetNodeId: string, clipSkipNodeId?: string) {
   // Update all nodes that were referencing '85' to use the target node
   const nodesToUpdate = ['10', '12', '13', '18', '51', '56', '69']
 
@@ -61,7 +104,8 @@ function updateLoraReferences(workflow: ComfyUIWorkflow, targetNodeId: string) {
         workflow[nodeId].inputs.model = [targetNodeId, 0]
       }
       if (workflow[nodeId].inputs.clip && Array.isArray(workflow[nodeId].inputs.clip)) {
-        workflow[nodeId].inputs.clip = [targetNodeId, 1]
+        // If we have a CLIP skip node, use it for CLIP references, otherwise use the target node
+        workflow[nodeId].inputs.clip = clipSkipNodeId ? [clipSkipNodeId, 0] : [targetNodeId, 1]
       }
     }
   })
@@ -129,10 +173,20 @@ export const inpaintingWorkflowPrompt = {
       title: 'Load Checkpoint'
     }
   },
+  '97': {
+    inputs: {
+      stop_at_clip_layer: -2,
+      clip: ['11', 1]
+    },
+    class_type: 'CLIPSetLastLayer',
+    _meta: {
+      title: 'CLIP Set Last Layer (Inpainting)'
+    }
+  },
   '12': {
     inputs: {
       text: 'inpainting prompt',
-      clip: ['11', 1]
+      clip: ['97', 0]
     },
     class_type: 'CLIPTextEncode',
     _meta: {
@@ -142,7 +196,7 @@ export const inpaintingWorkflowPrompt = {
   '18': {
     inputs: {
       text: 'negative prompt',
-      clip: ['11', 1]
+      clip: ['97', 0]
     },
     class_type: 'CLIPTextEncode',
     _meta: {
@@ -361,10 +415,20 @@ export const defaultWorkflowPrompt = {
       title: 'Load Checkpoint'
     }
   },
+  '98': {
+    inputs: {
+      stop_at_clip_layer: -2,
+      clip: ['11', 1]
+    },
+    class_type: 'CLIPSetLastLayer',
+    _meta: {
+      title: 'CLIP Set Last Layer'
+    }
+  },
   '12': {
     inputs: {
       text: 'overall base prompt',
-      clip: ['11', 1]
+      clip: ['98', 0]
     },
     class_type: 'CLIPTextEncode',
     _meta: {
@@ -374,7 +438,7 @@ export const defaultWorkflowPrompt = {
   '13': {
     inputs: {
       text: 'left side prompt',
-      clip: ['85', 1]
+      clip: ['98', 0]
     },
     class_type: 'CLIPTextEncode',
     _meta: {
@@ -421,7 +485,7 @@ export const defaultWorkflowPrompt = {
   '18': {
     inputs: {
       text: 'negative prompt',
-      clip: ['11', 1]
+      clip: ['98', 0]
     },
     class_type: 'CLIPTextEncode',
     _meta: {
@@ -453,7 +517,7 @@ export const defaultWorkflowPrompt = {
   '51': {
     inputs: {
       text: 'right side prompt',
-      clip: ['85', 1]
+      clip: ['98', 0]
     },
     class_type: 'CLIPTextEncode',
     _meta: {

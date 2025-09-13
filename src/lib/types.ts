@@ -35,6 +35,7 @@ export interface ModelSettings {
   steps: number
   sampler: string
   selectedVae: string
+  clipSkip: number
 }
 
 export interface Settings {
@@ -47,6 +48,7 @@ export interface Settings {
   outputDirectory: string
   // VAE selection: '__embedded__' means use checkpoint's embedded VAE
   selectedVae: string
+  clipSkip: number
   // Per-model overrides including Default pseudo-model
   perModel: Record<string, ModelSettings>
 }

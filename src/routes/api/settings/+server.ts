@@ -27,6 +27,7 @@ export async function GET() {
           sampler: 'euler_ancestral',
           outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
           selectedVae: '__embedded__',
+          clipSkip: 2,
           perModel: {}
         }
       })
@@ -35,6 +36,11 @@ export async function GET() {
     // Read existing settings
     const settingsData = await fs.readFile(SETTINGS_FILE, 'utf-8')
     const settings = JSON.parse(settingsData)
+    
+    // Ensure clipSkip exists with default value
+    if (settings.clipSkip == null) {
+      settings.clipSkip = 2
+    }
 
     return json({
       success: true,

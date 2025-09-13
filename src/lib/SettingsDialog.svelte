@@ -25,6 +25,7 @@
     sampler: settings.sampler,
     outputDirectory: settings.outputDirectory,
     selectedVae: settings.selectedVae,
+    clipSkip: settings.clipSkip,
     perModel: settings.perModel || {}
   })
 
@@ -39,6 +40,7 @@
     sampler: '',
     outputDirectory: '',
     selectedVae: '',
+    clipSkip: 0,
     perModel: {}
   })
   let hasUnsavedChanges: boolean = $state(false)
@@ -63,6 +65,7 @@
         sampler: settings.sampler,
         outputDirectory: settings.outputDirectory,
         selectedVae: settings.selectedVae,
+        clipSkip: settings.clipSkip,
         perModel: settings.perModel || {}
       }
       // Reset session init so we can capture a fresh baseline below
@@ -84,7 +87,8 @@
             cfgScale: localSettings.cfgScale,
             steps: localSettings.steps,
             sampler: localSettings.sampler,
-            selectedVae: localSettings.selectedVae
+            selectedVae: localSettings.selectedVae,
+            clipSkip: localSettings.clipSkip
           }
         }
       }
@@ -128,7 +132,8 @@
         cfgScale: localSettings.cfgScale,
         steps: localSettings.steps,
         sampler: localSettings.sampler,
-        selectedVae: localSettings.selectedVae
+        selectedVae: localSettings.selectedVae,
+        clipSkip: localSettings.clipSkip
       }
     }
   }
@@ -251,6 +256,7 @@
           step="1"
           class="two-col-input"
         />
+
         <!-- Output directory remains global -->
         <label for="output-directory" class="output-dir-label">Output Directory:</label>
         <input
@@ -329,6 +335,17 @@
               <option value={vae}>{vae}</option>
             {/each}
           </select>
+
+          <label for="pm-clipskip" class="two-col-label">CLIP Skip:</label>
+          <input
+            id="pm-clipskip"
+            type="number"
+            bind:value={localSettings.perModel[selectedModelKey].clipSkip}
+            min="1"
+            max="12"
+            step="1"
+            class="two-col-input"
+          />
 
           <label for="pm-quality" class="two-col-label">Quality Prefix:</label>
           <div class="two-col-input-wide">

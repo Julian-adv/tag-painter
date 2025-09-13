@@ -8,7 +8,8 @@ import {
   defaultWorkflowPrompt,
   inpaintingWorkflowPrompt,
   FINAL_SAVE_NODE_ID,
-  generateLoraChain
+  generateLoraChain,
+  configureClipSkip
 } from './workflow'
 import {
   expandCustomTags,
@@ -227,17 +228,21 @@ export async function generateImage(options: GenerationOptions): Promise<{
       workflow['86'].inputs.image = maskImagePath
     }
 
+    // Configure workflow based on settings merged with per-model overrides
+    const appliedSettings = applyPerModelOverrides(settings, promptsData.selectedCheckpoint)
+
     // Configure LoRA chain with per-model overrides
     const effectiveLoras = getEffectiveLoras(
       settings,
       promptsData.selectedCheckpoint,
       promptsData.selectedLoras
     )
-    generateLoraChain(effectiveLoras, workflow)
+    generateLoraChain(effectiveLoras, workflow, appliedSettings.clipSkip)
 
-    // Configure workflow based on settings merged with per-model overrides
-    const appliedSettings = applyPerModelOverrides(settings, promptsData.selectedCheckpoint)
     configureWorkflow(workflow, promptsData, appliedSettings, isInpainting, inpaintDenoiseStrength)
+
+    // Configure CLIP skip
+    configureClipSkip(workflow, appliedSettings.clipSkip)
 
     // If a custom VAE is selected, inject VAELoader and rewire all VAE inputs
     if (appliedSettings.selectedVae && appliedSettings.selectedVae !== '__embedded__') {
@@ -552,6 +557,13 @@ function applyPerModelOverrides(settings: Settings, modelName: string | null): S
     base.steps = ms.steps
     base.sampler = ms.sampler
     base.selectedVae = ms.selectedVae
+    base.clipSkip = ms.clipSkip ?? base.clipSkip ?? 2
   }
+  
+  // Ensure clipSkip has a default value (use global setting as fallback, then default to 2)
+  if (base.clipSkip == null) {
+    base.clipSkip = 2
+  }
+  
   return base
 }

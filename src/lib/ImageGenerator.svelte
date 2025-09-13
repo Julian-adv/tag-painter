@@ -109,6 +109,7 @@
     sampler: 'euler_ancestral',
     outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
     selectedVae: '__embedded__',
+    clipSkip: 2,
     perModel: {}
   })
 
