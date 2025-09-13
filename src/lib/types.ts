@@ -34,6 +34,7 @@ export interface ModelSettings {
   cfgScale: number
   steps: number
   sampler: string
+  scheduler: string
   selectedVae: string
   clipSkip: number
 }

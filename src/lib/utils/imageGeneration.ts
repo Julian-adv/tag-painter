@@ -308,15 +308,25 @@ function configureWorkflow(
     workflow['11'].inputs.ckpt_name = promptsData.selectedCheckpoint
   }
 
+  // Get effective model settings (includes scheduler)
+  const effectiveModel = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
+  const scheduler = effectiveModel?.scheduler || 'simple'
+
   if (isInpainting) {
     // Inpainting workflow configuration
     workflow['10'].inputs.steps = settings.steps
     workflow['10'].inputs.cfg = settings.cfgScale
     workflow['10'].inputs.sampler_name = settings.sampler
+    workflow['10'].inputs.scheduler = scheduler
 
     // Apply custom denoise strength if provided, otherwise use default
     if (inpaintDenoiseStrength !== undefined) {
       workflow['10'].inputs.denoise = inpaintDenoiseStrength
+    }
+
+    // Configure FaceDetailer scheduler for inpainting
+    if (workflow['56']) {
+      workflow['56'].inputs.scheduler = scheduler
     }
 
     // For inpainting, image size is determined by input image, not by EmptyLatentImage
@@ -324,10 +334,19 @@ function configureWorkflow(
     // Regular workflow configuration
     // Apply settings values to workflow
     workflow['45'].inputs.steps = settings.steps
+    workflow['45'].inputs.scheduler = scheduler
     workflow['14'].inputs.cfg = settings.cfgScale
     workflow['15'].inputs.sampler_name = settings.sampler
     workflow['16'].inputs.width = settings.imageWidth
     workflow['16'].inputs.height = settings.imageHeight
+
+    // Configure FaceDetailer schedulers
+    if (workflow['56']) {
+      workflow['56'].inputs.scheduler = scheduler
+    }
+    if (workflow['69']) {
+      workflow['69'].inputs.scheduler = scheduler
+    }
 
     // Configure optional features
     if (promptsData.useUpscale) {
@@ -559,11 +578,11 @@ function applyPerModelOverrides(settings: Settings, modelName: string | null): S
     base.selectedVae = ms.selectedVae
     base.clipSkip = ms.clipSkip ?? base.clipSkip ?? 2
   }
-  
+
   // Ensure clipSkip has a default value (use global setting as fallback, then default to 2)
   if (base.clipSkip == null) {
     base.clipSkip = 2
   }
-  
+
   return base
 }

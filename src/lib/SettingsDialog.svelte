@@ -87,6 +87,7 @@
             cfgScale: localSettings.cfgScale,
             steps: localSettings.steps,
             sampler: localSettings.sampler,
+            scheduler: 'simple',
             selectedVae: localSettings.selectedVae,
             clipSkip: localSettings.clipSkip
           }
@@ -132,6 +133,7 @@
         cfgScale: localSettings.cfgScale,
         steps: localSettings.steps,
         sampler: localSettings.sampler,
+        scheduler: 'simple',
         selectedVae: localSettings.selectedVae,
         clipSkip: localSettings.clipSkip
       }
@@ -317,11 +319,65 @@
             bind:value={localSettings.perModel[selectedModelKey].sampler}
             class="two-col-input"
           >
-            <option value="euler_ancestral">Euler Ancestral</option>
             <option value="euler">Euler</option>
-            <option value="dpmpp_2m">DPM++ 2M</option>
+            <option value="euler_cfg_pp">Euler CFG++</option>
+            <option value="euler_ancestral">Euler Ancestral</option>
+            <option value="euler_ancestral_cfg_pp">Euler Ancestral CFG++</option>
+            <option value="heun">Heun</option>
+            <option value="heunpp2">Heun++2</option>
+            <option value="dpm_2">DPM 2</option>
+            <option value="dpm_2_ancestral">DPM 2 Ancestral</option>
+            <option value="lms">LMS</option>
+            <option value="dpm_fast">DPM Fast</option>
+            <option value="dpm_adaptive">DPM Adaptive</option>
+            <option value="dpmpp_2s_ancestral">DPM++ 2S Ancestral</option>
+            <option value="dpmpp_2s_ancestral_cfg_pp">DPM++ 2S Ancestral CFG++</option>
             <option value="dpmpp_sde">DPM++ SDE</option>
+            <option value="dpmpp_sde_gpu">DPM++ SDE GPU</option>
+            <option value="dpmpp_2m">DPM++ 2M</option>
+            <option value="dpmpp_2m_cfg_pp">DPM++ 2M CFG++</option>
+            <option value="dpmpp_2m_sde">DPM++ 2M SDE</option>
+            <option value="dpmpp_2m_sde_gpu">DPM++ 2M SDE GPU</option>
+            <option value="dpmpp_2m_sde_heun">DPM++ 2M SDE Heun</option>
+            <option value="dpmpp_2m_sde_heun_gpu">DPM++ 2M SDE Heun GPU</option>
+            <option value="dpmpp_3m_sde">DPM++ 3M SDE</option>
+            <option value="dpmpp_3m_sde_gpu">DPM++ 3M SDE GPU</option>
+            <option value="ddpm">DDPM</option>
+            <option value="lcm">LCM</option>
+            <option value="ipndm">IPNDM</option>
+            <option value="ipndm_v">IPNDM V</option>
+            <option value="deis">DEIS</option>
+            <option value="res_multistep">RES Multistep</option>
+            <option value="res_multistep_cfg_pp">RES Multistep CFG++</option>
+            <option value="res_multistep_ancestral">RES Multistep Ancestral</option>
+            <option value="res_multistep_ancestral_cfg_pp">RES Multistep Ancestral CFG++</option>
+            <option value="gradient_estimation">Gradient Estimation</option>
+            <option value="gradient_estimation_cfg_pp">Gradient Estimation CFG++</option>
+            <option value="er_sde">ER SDE</option>
+            <option value="seeds_2">Seeds 2</option>
+            <option value="seeds_3">Seeds 3</option>
+            <option value="sa_solver">SA Solver</option>
+            <option value="sa_solver_pece">SA Solver PECE</option>
             <option value="ddim">DDIM</option>
+            <option value="uni_pc">Uni PC</option>
+            <option value="uni_pc_bh2">Uni PC BH2</option>
+          </select>
+
+          <label for="pm-scheduler" class="two-col-label">Scheduler:</label>
+          <select
+            id="pm-scheduler"
+            bind:value={localSettings.perModel[selectedModelKey].scheduler}
+            class="two-col-input"
+          >
+            <option value="simple">Simple</option>
+            <option value="sgm_uniform">SGM Uniform</option>
+            <option value="karras">Karras</option>
+            <option value="exponential">Exponential</option>
+            <option value="ddim_uniform">DDIM Uniform</option>
+            <option value="beta">Beta</option>
+            <option value="normal">Normal</option>
+            <option value="linear_quadratic">Linear Quadratic</option>
+            <option value="kl_optimal">KL Optimal</option>
           </select>
 
           <label for="pm-vae" class="two-col-label">VAE:</label>
