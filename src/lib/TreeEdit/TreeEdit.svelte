@@ -2,6 +2,8 @@
   import TreeNode from './TreeNode.svelte'
   import TreeEditControlPanel from './TreeEditControlPanel.svelte'
   import TreeNodePath from './TreeNodePath.svelte'
+  import TreeFilter from './TreeFilter.svelte'
+  import { treeKeyboard } from './treeKeyboard'
   import type { TreeModel, LeafNode, ArrayNode, ObjectNode, AnyNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
   import { addChild, isContainer, uid, removeNode, moveChild, rebuildPathSymbols } from './model'
@@ -381,6 +383,25 @@
     tick().then(() => scrollSelectedIntoView())
   }
 
+  // Reorder current single selection within its parent
+  function reorderSelection(direction: 'up' | 'down') {
+    if (selectedIds.length !== 1) return
+    const sid = selectedIds[0]
+    const node = model.nodes[sid]
+    const pid = node?.parentId || null
+    if (!pid) return
+    const parent = model.nodes[pid]
+    if (!parent || !isContainer(parent)) return
+    const children = (parent as ObjectNode | ArrayNode).children
+    const idx = children.indexOf(sid)
+    if (idx === -1) return
+    const to = direction === 'up' ? idx - 1 : idx + 1
+    if (to < 0 || to >= children.length) return
+    moveChild(model, pid, idx, to)
+    hasUnsavedChanges = true
+    tick().then(() => scrollSelectedIntoView())
+  }
+
   function handleCollapseSiblings() {
     if (selectedIds.length !== 1) return
     const selectedId = selectedIds[0]
@@ -711,10 +732,12 @@
     hasUnsavedChanges = true
   }
 
-  function clearFilter() {
-    filterText = ''
-    // After clearing via the button, ensure current selection is visible
-    tick().then(() => scrollSelectedIntoView())
+  // Expose simple setters for tree keyboard action
+  function setTabbingActiveState(v: boolean) {
+    tabbingActive = v
+  }
+  function setLastTabWithShiftState(v: boolean) {
+    lastTabWasWithShift = v
   }
 </script>
 
@@ -722,25 +745,7 @@
   <div class="grid">
     <section>
       <!-- Filter input -->
-      <div class="filter-container">
-        <input
-          type="text"
-          class="filter-input"
-          placeholder="Filter nodes..."
-          bind:value={filterText}
-          onkeydown={(e) => e.stopPropagation()}
-        />
-        {#if filterText}
-          <button
-            type="button"
-            class="filter-clear"
-            onclick={clearFilter}
-            aria-label="Clear filter"
-          >
-            ×
-          </button>
-        {/if}
-      </div>
+      <TreeFilter bind:filterText={filterText} />
 
       <!-- Path breadcrumb -->
       <TreeNodePath
@@ -761,98 +766,17 @@
         tabindex="-1"
         bind:this={treeContainer}
         data-tree-root
-        onkeydown={(e) => {
-          // Tree-level keyboard handling (navigation and actions)
-          if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-            // Reorder within parent
-            if (selectedIds.length === 1) {
-              const sid = selectedIds[0]
-              const node = model.nodes[sid]
-              const pid = node?.parentId || null
-              if (pid) {
-                const parent = model.nodes[pid]
-                if (parent && isContainer(parent)) {
-                  const children = (parent as ObjectNode | ArrayNode).children
-                  const idx = children.indexOf(sid)
-                  if (idx !== -1) {
-                    const to = e.key === 'ArrowUp' ? idx - 1 : idx + 1
-                    if (to >= 0 && to < children.length) {
-                      moveChild(model, pid, idx, to)
-                      hasUnsavedChanges = true
-                      // Keep selection and ensure visibility
-                      tick().then(() => scrollSelectedIntoView())
-                    }
-                  }
-                }
-              }
-            }
-            e.preventDefault()
-            return
-          }
-
-          if (!e.ctrlKey && (e.key === 'Enter' || e.key === 'F2')) {
-            // Start editing current selection
-            e.preventDefault()
-            startEditingSelection()
-            return
-          }
-
-          if (e.ctrlKey && e.key === 'Enter') {
-            // Ctrl+Enter: add child (or sibling if leaf)
-            e.preventDefault()
-            addChildForSelection()
-            return
-          }
-
-          if (e.key === 'ArrowUp') {
-            e.preventDefault()
-            moveSelectionBy(-1)
-            return
-          }
-          if (e.key === 'ArrowDown') {
-            e.preventDefault()
-            moveSelectionBy(1)
-            return
-          }
-          if (e.key === 'ArrowLeft') {
-            e.preventDefault()
-            collapseOrFocusParent()
-            return
-          }
-          if (e.key === 'ArrowRight') {
-            e.preventDefault()
-            expandOrFocusFirstChild()
-            return
-          }
-
-          if (e.key === 'Delete') {
-            // Delete selected node(s) via keyboard
-            e.preventDefault()
-            deleteBySelection()
-          } else if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
-            // Duplicate selected node via Ctrl+D / Cmd+D
-            e.preventDefault()
-            duplicateBySelection()
-          }
-          // Record Shift+Tab to enable range selection on focus movement
-          if (e.key === 'Tab') {
-            tabbingActive = true
-            lastTabWasWithShift = !!e.shiftKey
-          } else {
-            tabbingActive = false
-            lastTabWasWithShift = false
-          }
-        }}
-        onkeyup={(e) => {
-          if (e.key === 'Tab') {
-            tabbingActive = false
-            lastTabWasWithShift = false
-          }
-        }}
-        onmousedown={() => {
-          // Mouse interactions should not trigger focus-driven selection
-          tabbingActive = false
-          lastTabWasWithShift = false
+        use:treeKeyboard={{
+          reorder: reorderSelection,
+          startEditingSelection,
+          addChildForSelection,
+          moveSelectionBy,
+          collapseOrFocusParent,
+          expandOrFocusFirstChild,
+          deleteBySelection,
+          duplicateBySelection,
+          setTabbingActive: setTabbingActiveState,
+          setLastTabWasWithShift: setLastTabWithShiftState
         }}
       >
         <TreeNode
@@ -920,47 +844,6 @@
     display: flex;
     flex-direction: column;
     min-height: 0; /* enable internal scrolling */
-  }
-  .filter-container {
-    position: relative;
-    margin: 0.5rem 0.5rem 0 0.5rem;
-  }
-  .filter-input {
-    width: 100%;
-    padding: 0.5rem;
-    padding-right: 2rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.375rem;
-    font-size: 0.875rem;
-    background-color: white;
-    color: #374151;
-  }
-  .filter-input:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 1px #3b82f6;
-  }
-  .filter-clear {
-    position: absolute;
-    right: 0.5rem;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: #6b7280;
-    font-size: 1.25rem;
-    cursor: pointer;
-    padding: 0;
-    width: 1.5rem;
-    height: 1.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 0.25rem;
-  }
-  .filter-clear:hover {
-    color: #374151;
-    background-color: #f3f4f6;
   }
   .tree {
     /* remove border; rely on column divider instead */
