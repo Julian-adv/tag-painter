@@ -36,7 +36,7 @@ export async function GET() {
     // Read existing settings
     const settingsData = await fs.readFile(SETTINGS_FILE, 'utf-8')
     const settings = JSON.parse(settingsData)
-    
+
     // Ensure clipSkip exists with default value
     if (settings.clipSkip == null) {
       settings.clipSkip = 2

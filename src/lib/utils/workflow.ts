@@ -7,13 +7,16 @@ import type { ComfyUIWorkflow } from '$lib/types'
 // Configure CLIP skip for the workflow
 export function configureClipSkip(workflow: ComfyUIWorkflow, clipSkip: number) {
   // Update standalone CLIP skip nodes
-  if (workflow['97']) { // Inpainting workflow
+  if (workflow['97']) {
+    // Inpainting workflow
     workflow['97'].inputs.stop_at_clip_layer = -clipSkip
   }
-  if (workflow['98']) { // Default workflow
+  if (workflow['98']) {
+    // Default workflow
     workflow['98'].inputs.stop_at_clip_layer = -clipSkip
   }
-  if (workflow['99']) { // LoRA chain workflow
+  if (workflow['99']) {
+    // LoRA chain workflow
     workflow['99'].inputs.stop_at_clip_layer = -clipSkip
   }
 }
@@ -24,7 +27,6 @@ export function generateLoraChain(
   workflow: ComfyUIWorkflow,
   clipSkip: number = 2
 ) {
-  
   // Remove existing LoRA nodes (70-85) and CLIP skip node (99)
   for (let i = 70; i <= 85; i++) {
     delete workflow[i.toString()]
@@ -44,7 +46,7 @@ export function generateLoraChain(
         title: 'CLIP Set Last Layer (Base)'
       }
     }
-    
+
     // Update all references to point to node '11' for model, CLIP skip node for CLIP
     updateLoraReferences(workflow, '11', clipSkipNodeId)
     return
@@ -94,7 +96,11 @@ export function generateLoraChain(
   updateLoraReferences(workflow, lastLoraNodeId, clipSkipNodeId)
 }
 
-function updateLoraReferences(workflow: ComfyUIWorkflow, targetNodeId: string, clipSkipNodeId?: string) {
+function updateLoraReferences(
+  workflow: ComfyUIWorkflow,
+  targetNodeId: string,
+  clipSkipNodeId?: string
+) {
   // Update all nodes that were referencing '85' to use the target node
   const nodesToUpdate = ['10', '12', '13', '18', '51', '56', '69']
 
