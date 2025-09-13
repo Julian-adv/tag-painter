@@ -4,6 +4,8 @@
 
 import type { TreeModel, ArrayNode, ObjectNode, LeafNode, RefNode } from './model'
 import { uid, isContainer, addChild, moveChild } from './model'
+import { getNodePath } from './utils'
+import { testModeStore, setTestModeOverride, removeTestModeOverride } from '../stores/testModeStore.svelte'
 import { getParentOf } from './utils'
 
 /**
@@ -254,4 +256,61 @@ export function duplicateSubtreeNextToSource(
   }
   moveChild(model, parentId, appendedIndex, targetIndex)
   return { success: true, newRootId }
+}
+
+/**
+ * Toggle pin for a given leaf node.
+ * - Scopes pinning to the nearest array ancestor (pinKey is the array path)
+ * - Enforces exclusivity within the same object group (parent of the array)
+ * Returns true if an action was taken.
+ */
+export function togglePinForLeaf(model: TreeModel, leafId: string): boolean {
+  const n = model.nodes[leafId]
+  if (!n || n.kind !== 'leaf') return false
+
+  // Find nearest array ancestor
+  let parentId: string | null = n.parentId
+  let arrayAncestorId: string | null = null
+  while (parentId) {
+    const p = model.nodes[parentId]
+    if (!p) break
+    if (p.kind === 'array') {
+      arrayAncestorId = p.id
+      break
+    }
+    parentId = p.parentId || null
+  }
+  if (!arrayAncestorId) return false
+
+  // Pin scope key is the array path
+  const pinKey = getNodePath(model, arrayAncestorId)
+  // Group path is the nearest object ancestor path to ensure exclusivity
+  let groupPath: string | null = null
+  const arrayParentId = model.nodes[arrayAncestorId]?.parentId || null
+  if (arrayParentId) groupPath = getNodePath(model, arrayParentId)
+
+  const val = String(n.value ?? '')
+  const store = testModeStore[pinKey]
+  const selectedNodePath = getNodePath(model, leafId)
+  const isPinned =
+    !!store &&
+    !!store.enabled &&
+    (store.pinnedLeafPath === selectedNodePath || store.overrideTag === val)
+
+  if (isPinned) {
+    removeTestModeOverride(pinKey)
+    return true
+  }
+
+  // Remove existing pins within the same group, except the current pinKey
+  if (groupPath && groupPath.length > 0) {
+    for (const k of Object.keys(testModeStore)) {
+      if (k !== pinKey && (k === groupPath || k.startsWith(groupPath + '/'))) {
+        removeTestModeOverride(k)
+      }
+    }
+  }
+
+  setTestModeOverride(pinKey, '', selectedNodePath)
+  return true
 }
