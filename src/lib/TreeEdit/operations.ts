@@ -2,8 +2,8 @@
  * Advanced TreeEdit operations for complex model manipulations
  */
 
-import type { TreeModel, ArrayNode, ObjectNode } from './model'
-import { uid, isContainer } from './model'
+import type { TreeModel, ArrayNode, ObjectNode, LeafNode, RefNode } from './model'
+import { uid, isContainer, addChild, moveChild } from './model'
 import { getParentOf } from './utils'
 
 /**
@@ -161,4 +161,97 @@ export function collapseAll(model: TreeModel): void {
   for (const node of Object.values(model.nodes)) {
     if (node && isContainer(node) && node.id !== model.rootId) node.collapsed = true
   }
+}
+
+/**
+ * Clone a subtree under a given parent with a provided name and return the new root id.
+ */
+export function cloneSubtreeUnderParent(
+  model: TreeModel,
+  srcId: string,
+  tgtParentId: string,
+  newName: string
+): string {
+  const src = model.nodes[srcId]
+  if (!src) return ''
+
+  if (src.kind === 'leaf') {
+    const newId = uid()
+    const cloned: LeafNode = {
+      id: newId,
+      name: newName,
+      kind: 'leaf',
+      parentId: tgtParentId,
+      value: (src as LeafNode).value
+    }
+    addChild(model, tgtParentId, cloned)
+    return newId
+  }
+
+  if (src.kind === 'ref') {
+    const newId = uid()
+    const cloned: RefNode = {
+      id: newId,
+      name: src.name,
+      kind: 'ref',
+      parentId: tgtParentId,
+      refName: src.refName
+    }
+    addChild(model, tgtParentId, cloned)
+    return newId
+  }
+
+  // container
+  const newId = uid()
+  const container: ObjectNode | ArrayNode = {
+    id: newId,
+    name: newName,
+    kind: src.kind,
+    parentId: tgtParentId,
+    children: [] as string[],
+    collapsed: !!src.collapsed
+  } as ObjectNode | ArrayNode
+  addChild(model, tgtParentId, container)
+
+  for (const childId of (src as ObjectNode | ArrayNode).children) {
+    const child = model.nodes[childId]
+    if (!child) continue
+    const childName = child.name
+    cloneSubtreeUnderParent(model, childId, newId, childName)
+  }
+  return newId
+}
+
+/**
+ * Duplicate a node subtree next to its source (inserted right after the source sibling position).
+ * Returns the id of the duplicated root when successful.
+ */
+export function duplicateSubtreeNextToSource(
+  model: TreeModel,
+  sourceId: string
+): { success: boolean; newRootId?: string; error?: string } {
+  if (sourceId === model.rootId) return { success: false, error: 'Cannot duplicate root' }
+  const source = model.nodes[sourceId]
+  if (!source) return { success: false, error: 'Source not found' }
+  const parentId = source.parentId
+  if (!parentId) return { success: false, error: 'Source has no parent' }
+  const parent = model.nodes[parentId]
+  if (!parent || !isContainer(parent)) return { success: false, error: 'Invalid parent' }
+
+  const siblings = parent.children
+  const srcIndex = siblings.indexOf(sourceId)
+  if (srcIndex === -1) return { success: false, error: 'Source not in parent children' }
+  const insertIndex = srcIndex + 1
+
+  const newName = parent.kind === 'array' ? String(siblings.length) : source.name
+  const newRootId = cloneSubtreeUnderParent(model, sourceId, parentId, newName)
+  if (!newRootId) return { success: false, error: 'Clone failed' }
+
+  const appendedIndex = siblings.length - 1
+  let targetIndex = insertIndex
+  if (appendedIndex < insertIndex) {
+    targetIndex = Math.min(insertIndex, siblings.length - 1)
+  }
+  moveChild(model, parentId, appendedIndex, targetIndex)
+  return { success: true, newRootId }
 }
