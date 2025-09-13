@@ -4,8 +4,9 @@
   import WildcardsEditorDialog from './TreeEdit/WildcardsEditorDialog.svelte'
   import { promptsData, updateTags, savePromptsData } from './stores/promptsStore'
   import { wildcardTagType } from './stores/tagsStore'
+  import { testModeStore, clearAllPins as clearAllPinsStore } from './stores/testModeStore.svelte'
   import { onMount } from 'svelte'
-  import { Tag } from 'svelte-heros-v2'
+  import { Tag, LockOpen } from 'svelte-heros-v2'
   import { get } from 'svelte/store'
   import type { CustomTag, Settings } from './types'
   // Use callback prop instead of deprecated createEventDispatcher
@@ -147,19 +148,41 @@
 
     showTreeEditDialog = true
   }
+
+  // Check if there are any pinned tags across all zones
+  function hasAnyPinnedTags(): boolean {
+    return Object.values(testModeStore).some((state) => state?.pinnedLeafPath)
+  }
+
+  // Clear all pinned tag resolutions
+  function clearAllPins() {
+    clearAllPinsStore()
+  }
 </script>
 
 <div class="flex h-full w-full flex-shrink-1 flex-col">
   <div class="flex items-center justify-between pb-2">
     <h3 class="text-left text-sm font-bold text-gray-800">Tags</h3>
-    <button
-      type="button"
-      onclick={openTreeEditDialog}
-      class="flex h-5 w-5 items-center justify-center rounded bg-gray-300 text-gray-700 transition-colors hover:bg-gray-400 focus:ring-2 focus:ring-gray-300 focus:ring-offset-1 focus:outline-none"
-      title="Manage custom tags"
-    >
-      <Tag class="h-3 w-3" />
-    </button>
+    <div class="flex gap-1">
+      {#if hasAnyPinnedTags()}
+        <button
+          type="button"
+          onclick={clearAllPins}
+          class="flex h-5 w-5 items-center justify-center rounded bg-gray-300 text-gray-700 transition-colors hover:bg-gray-400 focus:ring-2 focus:ring-gray-300 focus:ring-offset-1 focus:outline-none"
+          title="Clear all pinned tags"
+        >
+          <LockOpen class="h-3 w-3" />
+        </button>
+      {/if}
+      <button
+        type="button"
+        onclick={openTreeEditDialog}
+        class="flex h-5 w-5 items-center justify-center rounded bg-gray-300 text-gray-700 transition-colors hover:bg-gray-400 focus:ring-2 focus:ring-gray-300 focus:ring-offset-1 focus:outline-none"
+        title="Manage custom tags"
+      >
+        <Tag class="h-3 w-3" />
+      </button>
+    </div>
   </div>
 
   <!-- Tag zones input sections -->

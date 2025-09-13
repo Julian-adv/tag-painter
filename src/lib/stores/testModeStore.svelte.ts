@@ -40,3 +40,11 @@ export function removeTestModeOverride(customTagName: string) {
     testModeStore[customTagName].pinnedLeafPath = undefined
   }
 }
+
+export function clearAllPins() {
+  for (const tagName in testModeStore) {
+    if (testModeStore[tagName]?.pinnedLeafPath) {
+      testModeStore[tagName].pinnedLeafPath = undefined
+    }
+  }
+}

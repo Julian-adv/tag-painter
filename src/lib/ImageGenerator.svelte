@@ -152,6 +152,7 @@
   function openSettingsFromTagZones(focusField: 'quality' | 'negative') {
     generationControlsRef?.openSettingsDialogExternal(focusField)
   }
+
   async function handleGenerate(seedToUse: number | null = null) {
     // Check if checkpoints are available before generating
     if (!availableCheckpoints || availableCheckpoints.length === 0) {
