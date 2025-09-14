@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { isContainer, setLeafValue, toggle, renameNode, moveChild, addChild, uid } from './model'
+  import { isContainer, setLeafValue, toggle, renameNode } from './model'
   import type { ArrayNode, LeafNode, NodeKind, ObjectNode, RefNode, TreeModel } from './model'
   import TreeNode from './TreeNode.svelte'
   import InlineEditor from './InlineEditor.svelte'
   import { ChevronDown, ChevronRight, LockClosed } from 'svelte-heros-v2'
   import { isConsistentRandomArray, isLeafPinned, shouldNodeBeVisible } from './utils'
   import { testModeStore } from '../stores/testModeStore.svelte'
+  import { computeDropPosition, dropOnNode } from './dnd'
 
   let {
     model,
@@ -85,9 +86,7 @@
     toggle(model, id)
   }
 
-  // Removed unused per-node handlers: onDelete, handleAddChild, handleConvertLeafToArray
-
-  // Removed unused add* helpers after moving actions to TreeEdit
+  
 
   function handleDragStart(event: DragEvent) {
     isDragging = true
@@ -102,12 +101,7 @@
   function handleDragOver(event: DragEvent) {
     event.preventDefault()
     event.dataTransfer!.dropEffect = 'move'
-
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-    const y = event.clientY - rect.top
-    const height = rect.height
-
-    dragOverPosition = y < height / 2 ? 'before' : 'after'
+    dragOverPosition = computeDropPosition(event)
   }
 
   function handleDragLeave() {
@@ -117,388 +111,7 @@
   function handleDrop(event: DragEvent) {
     event.preventDefault()
     const draggedId = event.dataTransfer!.getData('text/plain')
-
-    if (draggedId === id) {
-      dragOverPosition = null
-      return
-    }
-
-    const targetNode = model.nodes[id]
-    const draggedNode = model.nodes[draggedId]
-
-    // Helper to guard against creating cycles
-    function isAncestor(ancestorId: string, nodeId: string): boolean {
-      let cur = model.nodes[nodeId]
-      while (cur && cur.parentId) {
-        if (cur.parentId === ancestorId) return true
-        cur = model.nodes[cur.parentId]
-      }
-      return false
-    }
-
-    // If dropping between nodes adjacent to a collapsed container, insert as a sibling
-    // under that container (do not make it a child of the target node).
-    let siblingParentId: string | null = null
-    if (targetNode && isContainer(targetNode) && targetNode.collapsed) {
-      siblingParentId = targetNode.parentId
-    } else {
-      const targetParentId0 = model.nodes[id]?.parentId ?? null
-      if (targetParentId0) {
-        const targetParent0 = model.nodes[targetParentId0]
-        if (targetParent0 && isContainer(targetParent0) && targetParent0.collapsed) {
-          siblingParentId = targetParentId0
-        }
-      }
-    }
-    if (siblingParentId) {
-      // Prevent cycles: dragged cannot be moved under its descendant
-      if (isAncestor(draggedId, siblingParentId)) {
-        dragOverPosition = null
-        return
-      }
-      const siblings = (model.nodes[siblingParentId] as ObjectNode | ArrayNode).children
-      const targetIndex = siblings.indexOf(id)
-      if (targetIndex !== -1) {
-        let newIndex = targetIndex
-        if (dragOverPosition === 'after') newIndex = targetIndex + 1
-
-        const currentParentId = model.nodes[draggedId]?.parentId ?? null
-        if (currentParentId === siblingParentId) {
-          const fromIndex = siblings.indexOf(draggedId)
-          if (fromIndex !== -1) {
-            if (fromIndex < newIndex) newIndex -= 1
-            moveChild(model, siblingParentId, fromIndex, newIndex)
-            onMutate(true)
-          }
-        } else {
-          // Detach from old parent
-          if (currentParentId) {
-            const oldParent = model.nodes[currentParentId]
-            if (oldParent && isContainer(oldParent)) {
-              const oc = (oldParent as ObjectNode | ArrayNode).children
-              const oi = oc.indexOf(draggedId)
-              if (oi !== -1) oc.splice(oi, 1)
-            }
-          }
-          // Clamp index and insert
-          if (newIndex < 0) newIndex = 0
-          if (newIndex > siblings.length) newIndex = siblings.length
-          siblings.splice(newIndex, 0, draggedId)
-          if (draggedNode) draggedNode.parentId = siblingParentId
-          onMutate(true)
-        }
-        dragOverPosition = null
-        return
-      }
-    }
-
-    // If dropping a container onto a child within an array, and the drop
-    // is between children (middle), split the array around the drop index
-    // into two arrays with the dragged container placed between them.
-    const targetParentIdEarly = model.nodes[id]?.parentId ?? null
-    const draggedParentIdEarly = model.nodes[draggedId]?.parentId ?? null
-    if (targetParentIdEarly && draggedNode && isContainer(draggedNode)) {
-      const targetParentEarly = model.nodes[targetParentIdEarly]
-      if (targetParentEarly && targetParentEarly.kind === 'array') {
-        const children = (targetParentEarly as ArrayNode).children
-        const targetIndex = children.indexOf(id)
-        if (targetIndex !== -1) {
-          let insertIndex = targetIndex
-          if (dragOverPosition === 'after') insertIndex = targetIndex + 1
-          // Only apply split behavior when dropping strictly in the middle
-          if (insertIndex > 0 && insertIndex < children.length) {
-            const bId = targetParentEarly.id
-            const bName = targetParentEarly.name
-            const bParentId = targetParentEarly.parentId
-
-            const leftIds = children.slice(0, insertIndex)
-            const rightIds = children.slice(insertIndex)
-
-            const leftId = uid()
-            const leftArr: ArrayNode = {
-              id: leftId,
-              name: 'new_parent1',
-              kind: 'array',
-              parentId: bId,
-              children: [],
-              collapsed: false
-            }
-            leftIds.forEach((cid, idx) => {
-              const ch = model.nodes[cid]
-              if (ch) {
-                ch.parentId = leftId
-                ch.name = String(idx)
-                leftArr.children.push(cid)
-              }
-            })
-
-            const rightId = uid()
-            const rightArr: ArrayNode = {
-              id: rightId,
-              name: 'new_parent2',
-              kind: 'array',
-              parentId: bId,
-              children: [],
-              collapsed: false
-            }
-            rightIds.forEach((cid, idx) => {
-              const ch = model.nodes[cid]
-              if (ch) {
-                ch.parentId = rightId
-                ch.name = String(idx)
-                rightArr.children.push(cid)
-              }
-            })
-
-            // Convert b (array) to object in-place
-            const newB: ObjectNode = {
-              id: bId,
-              name: bName,
-              kind: 'object',
-              parentId: bParentId,
-              children: [],
-              collapsed: false
-            }
-
-            // Detach dragged from its old parent
-            if (draggedParentIdEarly) {
-              const oldParent = model.nodes[draggedParentIdEarly]
-              if (oldParent && isContainer(oldParent)) {
-                const oc = oldParent.children
-                const oi = oc.indexOf(draggedId)
-                if (oi !== -1) oc.splice(oi, 1)
-              }
-            }
-
-            // Persist new arrays
-            model.nodes[leftId] = leftArr
-            model.nodes[rightId] = rightArr
-
-            // Rebuild b's children: left, dragged, right
-            newB.children.push(leftId)
-            draggedNode.parentId = bId
-            newB.children.push(draggedId)
-            newB.children.push(rightId)
-
-            // Write new b
-            model.nodes[bId] = newB
-
-            onMutate(true)
-            dragOverPosition = null
-            return
-          } else {
-            // Not a middle position: convert array to object with a single
-            // child array containing all previous items, then place dragged
-            // either before or after that array based on drop index.
-            const bId = targetParentEarly.id
-            const bName = targetParentEarly.name
-            const bParentId = targetParentEarly.parentId
-            const prevChildren = [...children]
-
-            const cId = uid()
-            const cNode: ArrayNode = {
-              id: cId,
-              name: 'items',
-              kind: 'array',
-              parentId: bId,
-              children: [],
-              collapsed: false
-            }
-            prevChildren.forEach((cid, idx) => {
-              const ch = model.nodes[cid]
-              if (ch) {
-                ch.parentId = cId
-                ch.name = String(idx)
-                cNode.children.push(cid)
-              }
-            })
-
-            const newB: ObjectNode = {
-              id: bId,
-              name: bName,
-              kind: 'object',
-              parentId: bParentId,
-              children: [],
-              collapsed: false
-            }
-
-            // Detach dragged from old parent
-            if (draggedParentIdEarly) {
-              const oldParent = model.nodes[draggedParentIdEarly]
-              if (oldParent && isContainer(oldParent)) {
-                const oc = oldParent.children
-                const oi = oc.indexOf(draggedId)
-                if (oi !== -1) oc.splice(oi, 1)
-              }
-            }
-
-            // Persist c
-            model.nodes[cId] = cNode
-
-            // Order: if inserting at start, [dragged, c]; else [c, dragged]
-            if (insertIndex === 0) {
-              draggedNode.parentId = bId
-              newB.children.push(draggedId)
-              newB.children.push(cId)
-            } else {
-              newB.children.push(cId)
-              draggedNode.parentId = bId
-              newB.children.push(draggedId)
-            }
-
-            model.nodes[bId] = newB
-            onMutate(true)
-            dragOverPosition = null
-            return
-          }
-        }
-      }
-    }
-
-    // New behavior: dropping a container (array/object) onto another container
-    if (targetNode && draggedNode && isContainer(targetNode) && isContainer(draggedNode)) {
-      // Prevent moving a node into its own subtree
-      if (isAncestor(draggedId, id)) {
-        dragOverPosition = null
-        return
-      }
-
-      // If target is object: make dragged a child of target
-      if (targetNode.kind === 'object') {
-        // Detach from old parent if present
-        const oldPid = draggedNode.parentId
-        if (oldPid) {
-          const oldParent = model.nodes[oldPid]
-          if (oldParent && isContainer(oldParent)) {
-            const oc = oldParent.children
-            const oi = oc.indexOf(draggedId)
-            if (oi !== -1) oc.splice(oi, 1)
-          }
-        }
-        // Attach to target object
-        addChild(model, targetNode.id, draggedNode)
-        onMutate(true)
-        dragOverPosition = null
-        return
-      }
-
-      // If target is array: convert it into an object with two children:
-      //  - a new array "c" containing previous items
-      //  - the dragged container "a"
-      if (targetNode.kind === 'array') {
-        const bId = targetNode.id
-        const bName = targetNode.name
-        const bParentId = targetNode.parentId
-        const prevChildren = [...targetNode.children]
-
-        // Build new array node "c" with previous children
-        const cId = uid()
-        const cNode: ArrayNode = {
-          id: cId,
-          name: 'items',
-          kind: 'array',
-          parentId: bId,
-          children: [],
-          collapsed: false
-        }
-
-        // Reparent previous children under c and renumber
-        prevChildren.forEach((cid, idx) => {
-          const ch = model.nodes[cid]
-          if (ch) {
-            ch.parentId = cId
-            ch.name = String(idx)
-            cNode.children.push(cid)
-          }
-        })
-
-        // Convert b (array) to object in-place, preserving id/name/parent
-        const newB: ObjectNode = {
-          id: bId,
-          name: bName,
-          kind: 'object',
-          parentId: bParentId,
-          children: [cId],
-          collapsed: false
-        }
-
-        // Write c and new b into model
-        model.nodes[cId] = cNode
-        model.nodes[bId] = newB
-
-        // Detach dragged from old parent
-        const oldPid = draggedNode.parentId
-        if (oldPid) {
-          const oldParent = model.nodes[oldPid]
-          if (oldParent && isContainer(oldParent)) {
-            const oc = oldParent.children
-            const oi = oc.indexOf(draggedId)
-            if (oi !== -1) oc.splice(oi, 1)
-          }
-        }
-        // Attach dragged under new b
-        addChild(model, bId, draggedNode)
-
-        onMutate(true)
-        dragOverPosition = null
-        return
-      }
-    }
-
-    // Determine target parent (container of the target row)
-    const targetParentId = model.nodes[id]?.parentId ?? null
-    const draggedParentId = model.nodes[draggedId]?.parentId ?? null
-
-    if (targetParentId) {
-      const targetParent = model.nodes[targetParentId]
-      if (!targetParent || !isContainer(targetParent)) {
-        dragOverPosition = null
-        return
-      }
-      const children = (targetParent as ObjectNode | ArrayNode).children
-      const targetIndex = children.indexOf(id)
-      if (targetIndex === -1) {
-        dragOverPosition = null
-        return
-      }
-
-      let newIndex = targetIndex
-      if (dragOverPosition === 'after') newIndex = targetIndex + 1
-
-      if (draggedParentId === targetParentId) {
-        // Same-parent reorder
-        const draggedIndex = children.indexOf(draggedId)
-        if (draggedIndex === -1) {
-          dragOverPosition = null
-          return
-        }
-        if (draggedIndex < newIndex) newIndex -= 1
-        moveChild(model, targetParentId, draggedIndex, newIndex)
-        onMutate(true)
-      } else {
-        // Cross-parent move
-        const draggedNode = model.nodes[draggedId]
-        if (!draggedNode) {
-          dragOverPosition = null
-          return
-        }
-        // Remove from old parent
-        if (draggedParentId) {
-          const oldParent = model.nodes[draggedParentId]
-          if (oldParent && isContainer(oldParent)) {
-            const oldChildren = (oldParent as ObjectNode | ArrayNode).children
-            const oldIdx = oldChildren.indexOf(draggedId)
-            if (oldIdx !== -1) oldChildren.splice(oldIdx, 1)
-          }
-        }
-        // Insert into new parent
-        children.splice(newIndex, 0, draggedId)
-        // Update parent link
-        draggedNode.parentId = targetParentId
-        onMutate(true)
-      }
-    }
-
+    dropOnNode(model, id, draggedId, dragOverPosition, onMutate)
     dragOverPosition = null
   }
 
@@ -834,7 +447,7 @@
     flex: 1 1 auto;
     min-width: 0;
   }
-  /* Removed unused selectors targeting child component internals */
+  
 
   .sep {
     flex-shrink: 0; /* keep colon visible */
@@ -851,7 +464,7 @@
     margin-top: calc(0.25rem + 1px);
     margin-bottom: calc(0.25rem + 1px);
   }
-  /* spacer removed */
+  
 
   /* Drag and drop styles */
   .row.dragging {
