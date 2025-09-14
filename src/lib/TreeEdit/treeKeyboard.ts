@@ -15,6 +15,13 @@ type Options = {
 
 export function treeKeyboard(node: HTMLElement, options: Options) {
   function onKeyDown(e: KeyboardEvent) {
+    // Skip tree navigation if the event originated from an input or textarea (editing mode)
+    const target = e.target as HTMLElement
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+      // Let the input/textarea handle its own key events
+      return
+    }
+
     // Alt+ArrowUp/Down: reorder within parent
     if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
       e.preventDefault()
