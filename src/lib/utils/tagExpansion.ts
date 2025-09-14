@@ -527,9 +527,7 @@ function expandChoicePatterns(text: string, disables?: DisabledContext): string 
     if (disables && disables.patterns.length > 0) {
       validOptions = allOptions.filter((option: string) => {
         const optionLower = option.toLowerCase()
-        return !disables.patterns.some(pattern =>
-          optionLower.includes(pattern.toLowerCase())
-        )
+        return !disables.patterns.some((pattern) => optionLower.includes(pattern.toLowerCase()))
       })
     }
 

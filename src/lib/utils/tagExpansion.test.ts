@@ -255,8 +255,8 @@ describe('tagExpansion utilities', () => {
       // With mocked crypto returning 0, first options should be chosen
       // First option should be one of the two leaf values with patterns expanded
       const possibleResults = [
-        'red dress',  // choice-1 with first option
-        'happy expression, short hair'  // choice-2 with first options
+        'red dress', // choice-1 with first option
+        'happy expression, short hair' // choice-2 with first options
       ]
 
       expect(possibleResults).toContain(expandedTag)
@@ -451,7 +451,14 @@ describe('tagExpansion utilities', () => {
       // Create disabled context with "red" pattern
       const disabledContext = { names: new Set<string>(), patterns: ['red'] }
 
-      const result = expandCustomTags(['test-disables'], testModel, new Set(), {}, {}, disabledContext)
+      const result = expandCustomTags(
+        ['test-disables'],
+        testModel,
+        new Set(),
+        {},
+        {},
+        disabledContext
+      )
 
       // Should avoid "red" and select either "blue dress" or "green dress"
       const expandedTag = result.expandedTags[0]
@@ -493,7 +500,14 @@ describe('tagExpansion utilities', () => {
       // Create disabled context that disables all options
       const disabledContext = { names: new Set<string>(), patterns: ['red', 'blue', 'green'] }
 
-      const result = expandCustomTags(['test-empty-result'], testModel, new Set(), {}, {}, disabledContext)
+      const result = expandCustomTags(
+        ['test-empty-result'],
+        testModel,
+        new Set(),
+        {},
+        {},
+        disabledContext
+      )
 
       // Should return empty string when all choice options are disabled
       expect(result.expandedTags).toHaveLength(1)
