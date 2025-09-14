@@ -212,18 +212,21 @@
 
     if (isSpecial) {
       const closing = hasClosing ? '' : specialTriggerPrefix
-      value = beforeWord + specialTriggerPrefix + suggestion + closing + afterWord
+      const processedSuggestion = suggestion.replace(/_/g, ' ')
+      value = beforeWord + specialTriggerPrefix + processedSuggestion + closing + afterWord
     } else {
-      value = beforeWord + suggestion + afterWord
+      const processedSuggestion = suggestion.replace(/_/g, ' ')
+      value = beforeWord + processedSuggestion + afterWord
     }
     showSuggestions = false
     onValueChange?.(value)
 
     // Set cursor position after the inserted suggestion
     setTimeout(() => {
+      const processedSuggestion = suggestion.replace(/_/g, ' ')
       const addedPrefixLen = isSpecial ? specialTriggerPrefix.length : 0
       const addedSuffixLen = isSpecial ? (hasClosing ? 0 : specialTriggerPrefix.length) : 0
-      const newCursorPosition = startIndex + addedPrefixLen + suggestion.length + addedSuffixLen
+      const newCursorPosition = startIndex + addedPrefixLen + processedSuggestion.length + addedSuffixLen
       textareaElement.setSelectionRange(newCursorPosition, newCursorPosition)
       textareaElement.focus()
     }, 0)
