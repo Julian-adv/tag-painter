@@ -16,7 +16,7 @@ describe('tagExpansion utilities', () => {
         name: 'root',
         kind: 'object',
         parentId: null,
-        children: ['hair-color', 'eye-color', 'character-base'],
+        children: ['hair-color', 'eye-color', 'character-base', 'choice-patterns'],
         collapsed: false
       },
       'hair-color': {
@@ -94,12 +94,35 @@ describe('tagExpansion utilities', () => {
         kind: 'leaf',
         parentId: 'character-base',
         value: 'looking at viewer'
+      },
+      'choice-patterns': {
+        id: 'choice-patterns',
+        name: 'choice-patterns',
+        kind: 'array',
+        parentId: 'root',
+        children: ['choice-1', 'choice-2'],
+        collapsed: false
+      },
+      'choice-1': {
+        id: 'choice-1',
+        name: '0',
+        kind: 'leaf',
+        parentId: 'choice-patterns',
+        value: '{red|blue|green} dress'
+      },
+      'choice-2': {
+        id: 'choice-2',
+        name: '1',
+        kind: 'leaf',
+        parentId: 'choice-patterns',
+        value: '{happy|sad|angry} expression, {short|long} hair'
       }
     },
     symbols: {
       'hair-color': 'hair-color',
       'eye-color': 'eye-color',
-      'character-base': 'character-base'
+      'character-base': 'character-base',
+      'choice-patterns': 'choice-patterns'
     },
     pathSymbols: {},
     refIndex: {}
@@ -217,5 +240,265 @@ describe('tagExpansion utilities', () => {
     })
 
     // Multi-tag test relying on sequential behavior removed.
+
+    it('should expand {a|b|c} patterns in leaf node values', () => {
+      const result = expandCustomTags(['choice-patterns'], mockTreeModel)
+
+      expect(result.expandedTags).toHaveLength(1)
+
+      const expandedTag = result.expandedTags[0]
+
+      // The leaf values contain choice patterns that should be expanded
+      // choice-1: '{red|blue|green} dress'
+      // choice-2: '{happy|sad|angry} expression, {short|long} hair'
+
+      // With mocked crypto returning 0, first options should be chosen
+      // First option should be one of the two leaf values with patterns expanded
+      const possibleResults = [
+        'red dress',  // choice-1 with first option
+        'happy expression, short hair'  // choice-2 with first options
+      ]
+
+      expect(possibleResults).toContain(expandedTag)
+      expect(result.randomTagResolutions['choice-patterns']).toBeDefined()
+    })
+
+    it('should handle multiple choice patterns in single leaf value', () => {
+      // Use choice-2 which has multiple patterns: '{happy|sad|angry} expression, {short|long} hair'
+      // We need to set up crypto mock to return 0 for deterministic testing
+      Object.defineProperty(global, 'crypto', {
+        value: {
+          getRandomValues: vi.fn().mockReturnValue(new Uint32Array([0]))
+        },
+        writable: true
+      })
+
+      const result = expandCustomTags(['choice-patterns'], mockTreeModel)
+
+      expect(result.expandedTags).toHaveLength(1)
+
+      // With crypto mocked to return 0, and assuming choice-2 is selected (index 0 selects choice-1)
+      // Let's test this differently - we'll check that patterns are expanded
+      const expandedTag = result.expandedTags[0]
+
+      // Should not contain any { } patterns after expansion
+      expect(expandedTag).not.toMatch(/\{[^}]*\}/)
+      expect(result.randomTagResolutions['choice-patterns']).toBeDefined()
+    })
+
+    it('should handle choice patterns with empty options gracefully', () => {
+      // Create a temporary test model with problematic patterns
+      const testModel: TreeModel = {
+        ...mockTreeModel,
+        nodes: {
+          ...mockTreeModel.nodes,
+          'test-empty': {
+            id: 'test-empty',
+            name: 'test-empty',
+            kind: 'array',
+            parentId: 'root',
+            children: ['empty-choice'],
+            collapsed: false
+          },
+          'empty-choice': {
+            id: 'empty-choice',
+            name: '0',
+            kind: 'leaf',
+            parentId: 'test-empty',
+            value: '{} empty pattern'
+          }
+        },
+        symbols: {
+          ...mockTreeModel.symbols,
+          'test-empty': 'test-empty'
+        }
+      }
+
+      const result = expandCustomTags(['test-empty'], testModel)
+
+      // Empty choice pattern should remain unchanged
+      expect(result.expandedTags).toEqual(['{} empty pattern'])
+    })
+
+    it('should handle single option choice patterns', () => {
+      const testModel: TreeModel = {
+        ...mockTreeModel,
+        nodes: {
+          ...mockTreeModel.nodes,
+          'test-single': {
+            id: 'test-single',
+            name: 'test-single',
+            kind: 'array',
+            parentId: 'root',
+            children: ['single-choice'],
+            collapsed: false
+          },
+          'single-choice': {
+            id: 'single-choice',
+            name: '0',
+            kind: 'leaf',
+            parentId: 'test-single',
+            value: '{only} option'
+          }
+        },
+        symbols: {
+          ...mockTreeModel.symbols,
+          'test-single': 'test-single'
+        }
+      }
+
+      const result = expandCustomTags(['test-single'], testModel)
+
+      // Single option should be selected directly
+      expect(result.expandedTags).toEqual(['only option'])
+    })
+
+    it('should handle choice patterns with empty options like {a|}', () => {
+      const testModel: TreeModel = {
+        ...mockTreeModel,
+        nodes: {
+          ...mockTreeModel.nodes,
+          'test-empty-option': {
+            id: 'test-empty-option',
+            name: 'test-empty-option',
+            kind: 'array',
+            parentId: 'root',
+            children: ['empty-option-choice'],
+            collapsed: false
+          },
+          'empty-option-choice': {
+            id: 'empty-option-choice',
+            name: '0',
+            kind: 'leaf',
+            parentId: 'test-empty-option',
+            value: '{red|} dress'
+          }
+        },
+        symbols: {
+          ...mockTreeModel.symbols,
+          'test-empty-option': 'test-empty-option'
+        }
+      }
+
+      const result = expandCustomTags(['test-empty-option'], testModel)
+
+      // Should result in either "red dress" or " dress" (with empty option)
+      const expandedTag = result.expandedTags[0]
+      expect(['red dress', ' dress']).toContain(expandedTag)
+    })
+
+    it('should handle choice patterns with whitespace preserved', () => {
+      const testModel: TreeModel = {
+        ...mockTreeModel,
+        nodes: {
+          ...mockTreeModel.nodes,
+          'test-whitespace': {
+            id: 'test-whitespace',
+            name: 'test-whitespace',
+            kind: 'array',
+            parentId: 'root',
+            children: ['whitespace-choice'],
+            collapsed: false
+          },
+          'whitespace-choice': {
+            id: 'whitespace-choice',
+            name: '0',
+            kind: 'leaf',
+            parentId: 'test-whitespace',
+            value: '{ spaced | more space |}'
+          }
+        },
+        symbols: {
+          ...mockTreeModel.symbols,
+          'test-whitespace': 'test-whitespace'
+        }
+      }
+
+      const result = expandCustomTags(['test-whitespace'], testModel)
+
+      // Should preserve whitespace in options
+      const expandedTag = result.expandedTags[0]
+      expect([' spaced ', ' more space ', '']).toContain(expandedTag)
+    })
+
+    it('should avoid disabled patterns in choice expansion', () => {
+      const testModel: TreeModel = {
+        ...mockTreeModel,
+        nodes: {
+          ...mockTreeModel.nodes,
+          'test-disables': {
+            id: 'test-disables',
+            name: 'test-disables',
+            kind: 'array',
+            parentId: 'root',
+            children: ['disable-target'],
+            collapsed: false
+          },
+          'disable-target': {
+            id: 'disable-target',
+            name: '0',
+            kind: 'leaf',
+            parentId: 'test-disables',
+            value: '{red|blue|green} dress'
+          }
+        },
+        symbols: {
+          ...mockTreeModel.symbols,
+          'test-disables': 'test-disables'
+        }
+      }
+
+      // Create disabled context with "red" pattern
+      const disabledContext = { names: new Set<string>(), patterns: ['red'] }
+
+      const result = expandCustomTags(['test-disables'], testModel, new Set(), {}, {}, disabledContext)
+
+      // Should avoid "red" and select either "blue dress" or "green dress"
+      const expandedTag = result.expandedTags[0]
+      expect(expandedTag).not.toContain('red')
+      expect(['blue dress', 'green dress']).toContain(expandedTag)
+    })
+
+    it('should return empty string if all options are disabled', () => {
+      // Test the expandChoicePatterns function directly
+      // Import the function for testing (we need to make it accessible)
+      // For now, let's create a simple test with a leaf that should return empty string
+
+      const testModel: TreeModel = {
+        ...mockTreeModel,
+        nodes: {
+          ...mockTreeModel.nodes,
+          'test-empty-result': {
+            id: 'test-empty-result',
+            name: 'test-empty-result',
+            kind: 'array',
+            parentId: 'root',
+            children: ['empty-result-leaf'],
+            collapsed: false
+          },
+          'empty-result-leaf': {
+            id: 'empty-result-leaf',
+            name: '0',
+            kind: 'leaf',
+            parentId: 'test-empty-result',
+            value: '{red|blue|green}'
+          }
+        },
+        symbols: {
+          ...mockTreeModel.symbols,
+          'test-empty-result': 'test-empty-result'
+        }
+      }
+
+      // Create disabled context that disables all options
+      const disabledContext = { names: new Set<string>(), patterns: ['red', 'blue', 'green'] }
+
+      const result = expandCustomTags(['test-empty-result'], testModel, new Set(), {}, {}, disabledContext)
+
+      // Should return empty string when all choice options are disabled
+      expect(result.expandedTags).toHaveLength(1)
+      const expandedTag = result.expandedTags[0]
+      expect(expandedTag).toBe('')
+    })
   })
 })

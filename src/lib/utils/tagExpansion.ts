@@ -224,8 +224,9 @@ export function cleanDirectivesFromTags(tagsText: string): string {
 
 function expandNodeOnce(ctx: TagExpansionCtx, node: AnyNode): string[] {
   if (node.kind === 'leaf') {
-    // Return raw value including weight directives; they will be cleaned later before ComfyUI
-    return [String(node.value)]
+    // Apply choice pattern expansion to leaf values before returning
+    const expandedValue = expandChoicePatterns(String(node.value), ctx.disables)
+    return [expandedValue]
   }
   if (node.kind === 'ref') {
     const target = findNodeByName(ctx.model, node.refName)
@@ -505,6 +506,45 @@ function getSecureRandomIndex(max: number): number {
 }
 
 /**
+ * Expand {a|b|c} patterns in leaf node values by randomly selecting one option
+ */
+function expandChoicePatterns(text: string, disables?: DisabledContext): string {
+  const choicePattern = /\{([^}]+)\}/g
+
+  return text.replace(choicePattern, (match, choices) => {
+    const allOptions = choices.split('|')
+
+    if (allOptions.length === 0) {
+      return match // Return original if no valid options
+    }
+
+    if (allOptions.length === 1) {
+      return allOptions[0] // Return single option directly
+    }
+
+    // Filter out disabled options if disables context is provided
+    let validOptions = allOptions
+    if (disables && disables.patterns.length > 0) {
+      validOptions = allOptions.filter((option: string) => {
+        const optionLower = option.toLowerCase()
+        return !disables.patterns.some(pattern =>
+          optionLower.includes(pattern.toLowerCase())
+        )
+      })
+    }
+
+    // If all options are disabled, return empty string
+    if (validOptions.length === 0) {
+      return ''
+    }
+
+    // Use secure random selection
+    const randomIndex = getSecureRandomIndex(validOptions.length)
+    return validOptions[randomIndex]
+  })
+}
+
+/**
  * Helper function to handle random tag selection and expansion
  */
 // CustomTag branch removed — we only support TreeModel-driven expansion.
@@ -629,7 +669,7 @@ export function expandCustomTags(
     else out.push(tag)
   }
 
-  out = out.filter((t) => String(t ?? '').trim().length > 0)
+  out = out.filter((t) => t !== null && t !== undefined)
 
   return { expandedTags: out, randomTagResolutions: ctx.randomTagResolutions }
 }
