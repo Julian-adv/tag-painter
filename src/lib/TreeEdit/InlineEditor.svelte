@@ -3,6 +3,7 @@
   import AutoCompleteTextarea from '../AutoCompleteTextarea.svelte'
   import PlaceholderChipDisplay from './PlaceholderChipDisplay.svelte'
   import type { TreeModel } from './model'
+  import { formatCommaSeparatedValues, isCommaSeparated } from '../utils/textFormatting'
 
   interface Props {
     value: string
@@ -19,6 +20,7 @@
     onChipDoubleClick?: (tagName: string) => void
     specialSuggestions?: string[]
     specialTrigger?: string
+    isLeafNode?: boolean
   }
 
   let {
@@ -35,7 +37,8 @@
     model = null,
     onChipDoubleClick,
     specialSuggestions = [],
-    specialTrigger = '__'
+    specialTrigger = '__',
+    isLeafNode = false
   }: Props = $props()
 
   let isEditing = $state(false)
@@ -204,8 +207,15 @@
   }
 
   function finishEditing() {
-    if (editingValue.trim() && editingValue !== value) {
-      onSave(editingValue.trim())
+    let finalValue = editingValue.trim()
+
+    // Apply comma formatting for leaf nodes
+    if (isLeafNode && finalValue && isCommaSeparated(finalValue)) {
+      finalValue = formatCommaSeparatedValues(finalValue)
+    }
+
+    if (finalValue && finalValue !== value) {
+      onSave(finalValue)
     }
     isEditing = false
     onEditingChange?.(false)

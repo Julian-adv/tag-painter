@@ -286,6 +286,7 @@
               onFinish={handleValueFinish}
               enterStartsEditing={false}
               {onChipDoubleClick}
+              isLeafNode={true}
             />
             {#if isLeafPinned(model, id)}
               <span class="lock-icon"><LockClosed size="12" /></span>
