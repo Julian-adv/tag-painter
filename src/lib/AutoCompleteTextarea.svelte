@@ -226,7 +226,8 @@
       const processedSuggestion = suggestion.replace(/_/g, ' ')
       const addedPrefixLen = isSpecial ? specialTriggerPrefix.length : 0
       const addedSuffixLen = isSpecial ? (hasClosing ? 0 : specialTriggerPrefix.length) : 0
-      const newCursorPosition = startIndex + addedPrefixLen + processedSuggestion.length + addedSuffixLen
+      const newCursorPosition =
+        startIndex + addedPrefixLen + processedSuggestion.length + addedSuffixLen
       textareaElement.setSelectionRange(newCursorPosition, newCursorPosition)
       textareaElement.focus()
     }, 0)

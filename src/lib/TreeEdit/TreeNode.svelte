@@ -86,8 +86,6 @@
     toggle(model, id)
   }
 
-  
-
   function handleDragStart(event: DragEvent) {
     isDragging = true
     event.dataTransfer!.effectAllowed = 'move'
@@ -448,7 +446,6 @@
     flex: 1 1 auto;
     min-width: 0;
   }
-  
 
   .sep {
     flex-shrink: 0; /* keep colon visible */
@@ -465,7 +462,6 @@
     margin-top: calc(0.25rem + 1px);
     margin-bottom: calc(0.25rem + 1px);
   }
-  
 
   /* Drag and drop styles */
   .row.dragging {

@@ -117,10 +117,7 @@
   let displayParts = $derived.by(() => {
     const weight = tag.weight ?? 1.0
 
-    if (
-      (tag.type === 'random' || tag.type === 'sequential' || tag.type === 'consistent-random') &&
-      currentRandomTagResolutions[tag.name]
-    ) {
+    if (currentRandomTagResolutions[tag.name]) {
       // For expanded tags, use the resolution directly (no parsing needed)
       return {
         name: tag.name,

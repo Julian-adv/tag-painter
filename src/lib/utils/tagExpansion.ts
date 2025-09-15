@@ -176,7 +176,7 @@ function buildOverrideMap(
   // 2) Previous run results (do not override explicit pins)
   for (const [k, v] of Object.entries(previousRunResults || {})) {
     if (map[k]) continue
-    if (v && String(v).trim()) map[k] = String(v)
+    if (v && String(v).trim()) map[k] = replaceWildcardsFromCache(String(v))
   }
   return map
 }
@@ -214,6 +214,9 @@ export function cleanDirectivesFromTags(tagsText: string): string {
   // Remove weight directives
   cleaned = cleaned.replace(/,?\s*weight=\d+(?:\.\d+)?/gi, '')
 
+  // Remove any unexpanded wildcards directives just in case
+  cleaned = cleaned.replace(/,?\s*wildcards=[^,\s]+/gi, '')
+
   // Clean up any double commas or extra spaces
   cleaned = cleaned.replace(/,\s*,/g, ',')
   cleaned = cleaned.replace(/^\s*,\s*|\s*,\s*$/g, '')
@@ -222,11 +225,168 @@ export function cleanDirectivesFromTags(tagsText: string): string {
   return cleaned.trim()
 }
 
+// --- Wildcard file lines caching (module-level) ---
+const wildcardFileLinesCache = new Map<string, string[]>()
+const wildcardFileLinesInFlight = new Map<string, Promise<string[]>>()
+
+async function loadWildcardLines(name: string): Promise<string[]> {
+  const cached = wildcardFileLinesCache.get(name)
+  if (cached) return cached
+  const inflight = wildcardFileLinesInFlight.get(name)
+  if (inflight) return inflight
+  const p = (async () => {
+    try {
+      const res = await fetch(`/api/wildcard-file?name=${encodeURIComponent(name)}`)
+      if (!res.ok) return []
+      const body = await res.text()
+      const lines = body
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0 && !l.startsWith('#'))
+      wildcardFileLinesCache.set(name, lines)
+      return lines
+    } catch {
+      return []
+    } finally {
+      wildcardFileLinesInFlight.delete(name)
+    }
+  })()
+  wildcardFileLinesInFlight.set(name, p)
+  return p
+}
+
+function replaceWildcardsFromCache(text: string): string {
+  if (!text || !/wildcards=/i.test(text)) return text
+  const re = /wildcards=([^,\s]+)/gi
+  return text.replace(re, (_full, name: string) => {
+    const lines = wildcardFileLinesCache.get(name) || []
+    if (lines.length === 0) return ''
+    const idx = getSecureRandomIndex(lines.length)
+    return lines[idx]
+  })
+}
+
+function extractWildcardFilesFromText(text: string, out: Set<string>) {
+  const re = /wildcards=([^,\s]+)/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    if (m[1]) out.add(m[1])
+  }
+}
+
+function collectWildcardFilesFromNode(
+  model: TreeModel,
+  node: AnyNode | undefined,
+  files: Set<string>,
+  seen: Set<string>
+) {
+  if (!node) return
+  if (seen.has(node.id)) return
+  seen.add(node.id)
+
+  if (node.kind === 'leaf') {
+    const v = String(node.value)
+    extractWildcardFilesFromText(v, files)
+    return
+  }
+  if (node.kind === 'ref') {
+    const target = findNodeByName(model, node.refName)
+    collectWildcardFilesFromNode(model, target, files, seen)
+    return
+  }
+  if (node.kind === 'array' || node.kind === 'object') {
+    for (const cid of node.children || []) {
+      collectWildcardFilesFromNode(model, model.nodes[cid], files, seen)
+    }
+  }
+}
+
+export async function prefetchWildcardFilesForTags(
+  tags: string[],
+  model: TreeModel
+): Promise<void> {
+  const files = new Set<string>()
+  const seen = new Set<string>()
+  for (const t of tags || []) {
+    // Also collect files referenced directly in freeform tag strings
+    extractWildcardFilesFromText(String(t), files)
+    const node = findNodeByName(model, t)
+    collectWildcardFilesFromNode(model, node, files, seen)
+  }
+  const toLoad = Array.from(files)
+  await Promise.all(toLoad.map((f) => loadWildcardLines(f)))
+}
+
+export async function prefetchWildcardFilesFromTexts(texts: string[]): Promise<void> {
+  const files = new Set<string>()
+  for (const t of texts || []) {
+    extractWildcardFilesFromText(String(t), files)
+  }
+  const toLoad = Array.from(files)
+  await Promise.all(toLoad.map((f) => loadWildcardLines(f)))
+}
+
+/**
+ * Resolve occurrences of "wildcards=filename.txt" by fetching data/filename.txt
+ * and replacing each directive with a random non-empty, non-comment line.
+ */
+export async function resolveWildcardDirectives(
+  text: string,
+  presetChoices: Record<string, string> = {}
+): Promise<string> {
+  if (!text || !/wildcards=/i.test(text)) return text
+
+  // Compile regex once
+  const re = /wildcards=([^,\s]+)/gi
+
+  // In-memory cache for wildcard file lines (per app session)
+  // Key: file name, Value: array of non-empty, non-comment lines
+  const linesCache: Record<string, string[]> = {}
+
+  // Collect unique file names first so we can fetch each file only once
+  const files: string[] = []
+  {
+    const seen = new Set<string>()
+    let m: RegExpExecArray | null
+    while ((m = re.exec(text)) !== null) {
+      const name = m[1]
+      if (name && !seen.has(name)) {
+        seen.add(name)
+        files.push(name)
+      }
+    }
+  }
+  if (files.length === 0) return text
+
+  // Fetch and cache file contents (trimmed, comments removed)
+  await Promise.all(
+    files.map(async (name) => {
+      const lines = await loadWildcardLines(name)
+      if (lines.length > 0) linesCache[name] = lines
+    })
+  )
+
+  // Replace each occurrence independently:
+  // - If presetChoices has a value for this file, use it.
+  // - Otherwise, choose a random line per occurrence.
+  re.lastIndex = 0
+  return text.replace(re, (_full, name: string) => {
+    const preset = presetChoices[name]
+    if (preset) return preset
+    const lines = linesCache[name] || []
+    if (lines.length === 0) return ''
+    const idx = getSecureRandomIndex(lines.length)
+    return lines[idx]
+  })
+}
+
 function expandNodeOnce(ctx: TagExpansionCtx, node: AnyNode): string[] {
   if (node.kind === 'leaf') {
     // Apply choice pattern expansion to leaf values before returning
     const expandedValue = expandChoicePatterns(String(node.value), ctx.disables)
-    return [expandedValue]
+    // Replace any wildcards= directives using preloaded cache (per occurrence random)
+    const replaced = replaceWildcardsFromCache(expandedValue)
+    return [replaced]
   }
   if (node.kind === 'ref') {
     const target = findNodeByName(ctx.model, node.refName)
@@ -289,7 +449,7 @@ function expandArrayNode(
     selected = ctx.overrideMap[tag]
   }
   if (!selected && ctx.previousRunResults[tag]) {
-    const previousResult = ctx.previousRunResults[tag]
+    const previousResult = replaceWildcardsFromCache(ctx.previousRunResults[tag])
     const previousTags = previousResult.split(', ')
     return { expandedTags: previousTags, resolution: previousResult }
   }
@@ -366,17 +526,20 @@ function expandArrayNode(
     const idx = getWeightedRandomIndex(options)
     selected = options[idx].content
   }
-  return { expandedTags: [selected!], resolution: selected! }
+  const resolvedSelected = replaceWildcardsFromCache(selected!)
+  return { expandedTags: [resolvedSelected], resolution: resolvedSelected }
 }
 
 function expandObjectNode(
   ctx: TagExpansionCtx,
   tag: string
 ): { expandedTags: string[]; resolution: string } {
-  if (ctx.overrideMap[tag])
-    return { expandedTags: [ctx.overrideMap[tag]], resolution: ctx.overrideMap[tag] }
+  if (ctx.overrideMap[tag]) {
+    const resolved = replaceWildcardsFromCache(ctx.overrideMap[tag])
+    return { expandedTags: [resolved], resolution: resolved }
+  }
   if (ctx.previousRunResults[tag]) {
-    const previousResult = ctx.previousRunResults[tag]
+    const previousResult = replaceWildcardsFromCache(ctx.previousRunResults[tag])
     const previousTags = previousResult.split(', ')
     return { expandedTags: previousTags, resolution: previousResult }
   }
@@ -663,8 +826,8 @@ export function expandCustomTags(
       continue
     }
 
-    if (tagWeight) out.push(applyWeight(tag, tagWeight))
-    else out.push(tag)
+    if (tagWeight) out.push(replaceWildcardsFromCache(applyWeight(tag, tagWeight)))
+    else out.push(replaceWildcardsFromCache(tag))
   }
 
   out = out.filter((t) => t !== null && t !== undefined)
