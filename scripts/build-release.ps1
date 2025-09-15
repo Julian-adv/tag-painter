@@ -65,7 +65,7 @@ try {
   # Copy specific data files only
   $dataDir = Join-Path $payloadRoot "data"
   New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
-  $dataFiles = @("prompts.json", "settings.json", "wildcards.yaml")
+  $dataFiles = @("prompts.json", "settings.json", "wildcards.yaml", "outfits.txt")
   foreach ($file in $dataFiles) {
     $srcPath = Join-Path "data" $file
     if (Test-Path $srcPath) {
