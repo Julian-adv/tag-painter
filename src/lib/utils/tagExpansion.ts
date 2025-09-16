@@ -274,6 +274,12 @@ function extractWildcardFilesFromText(text: string, out: Set<string>) {
   }
 }
 
+function resolveLeafContent(ctx: TagExpansionCtx, rawValue: unknown): string {
+  const text = String(rawValue ?? '')
+  const expanded = expandChoicePatterns(text, ctx.disables)
+  return replaceWildcardsFromCache(expanded)
+}
+
 function collectWildcardFilesFromNode(
   model: TreeModel,
   node: AnyNode | undefined,
@@ -382,11 +388,8 @@ export async function resolveWildcardDirectives(
 
 function expandNodeOnce(ctx: TagExpansionCtx, node: AnyNode): string[] {
   if (node.kind === 'leaf') {
-    // Apply choice pattern expansion to leaf values before returning
-    const expandedValue = expandChoicePatterns(String(node.value), ctx.disables)
-    // Replace any wildcards= directives using preloaded cache (per occurrence random)
-    const replaced = replaceWildcardsFromCache(expandedValue)
-    return [replaced]
+    // Apply choice pattern and wildcard expansion to leaf values before returning
+    return [resolveLeafContent(ctx, node.value)]
   }
   if (node.kind === 'ref') {
     const target = findNodeByName(ctx.model, node.refName)
@@ -449,7 +452,7 @@ function expandArrayNode(
     selected = ctx.overrideMap[tag]
   }
   if (!selected && ctx.previousRunResults[tag]) {
-    const previousResult = replaceWildcardsFromCache(ctx.previousRunResults[tag])
+    const previousResult = resolveLeafContent(ctx, ctx.previousRunResults[tag])
     const previousTags = previousResult.split(', ')
     return { expandedTags: previousTags, resolution: previousResult }
   }
@@ -526,7 +529,7 @@ function expandArrayNode(
     const idx = getWeightedRandomIndex(options)
     selected = options[idx].content
   }
-  const resolvedSelected = replaceWildcardsFromCache(selected!)
+  const resolvedSelected = resolveLeafContent(ctx, selected!)
   return { expandedTags: [resolvedSelected], resolution: resolvedSelected }
 }
 
@@ -535,11 +538,11 @@ function expandObjectNode(
   tag: string
 ): { expandedTags: string[]; resolution: string } {
   if (ctx.overrideMap[tag]) {
-    const resolved = replaceWildcardsFromCache(ctx.overrideMap[tag])
+    const resolved = resolveLeafContent(ctx, ctx.overrideMap[tag])
     return { expandedTags: [resolved], resolution: resolved }
   }
   if (ctx.previousRunResults[tag]) {
-    const previousResult = replaceWildcardsFromCache(ctx.previousRunResults[tag])
+    const previousResult = resolveLeafContent(ctx, ctx.previousRunResults[tag])
     const previousTags = previousResult.split(', ')
     return { expandedTags: previousTags, resolution: previousResult }
   }
