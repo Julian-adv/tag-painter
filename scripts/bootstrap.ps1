@@ -550,21 +550,29 @@ try {
   New-DirectoryIfMissing "vendor"
 
   $nodeHome = Install-Node -vendorDir (Resolve-Path "vendor")
-  if ($ComfyPortableUrl) {
-    Install-ComfyUIPortable -vendorDir (Resolve-Path "vendor") -comfyDir $ComfyDir -portableUrl $ComfyPortableUrl
+  $uv = $null
+  $venvPy = $null
+
+  if (-not $SkipComfy) {
+    if ($ComfyPortableUrl) {
+      Install-ComfyUIPortable -vendorDir (Resolve-Path "vendor") -comfyDir $ComfyDir -portableUrl $ComfyPortableUrl
+    } else {
+      Install-ComfyUISource -vendorDir (Resolve-Path "vendor") -comfyDir $ComfyDir
+      Initialize-PythonVenv -vendorDir (Resolve-Path "vendor") -comfyDir $ComfyDir -pythonVersion $PythonVersion
+    }
+
+    $uv = Install-Uv (Resolve-Path "vendor")
+    $venvPy = Join-Path (Resolve-Path "vendor") "comfy-venv\Scripts\python.exe"
+    Install-CustomNode -comfyDir $ComfyDir -repoUrl $CustomNodeRepo -branch $CustomNodeBranch -venvPy $venvPy -uv $uv
+    Install-CustomScripts -comfyDir $ComfyDir -repoUrl $CustomScriptsRepo -branch $CustomScriptsBranch -venvPy $venvPy -uv $uv
+    Install-ImpactPack -comfyDir $ComfyDir -repoUrl $ImpactPackRepo -branch $ImpactPackBranch -venvPy $venvPy -uv $uv
+    Install-ImpactSubpack -comfyDir $ComfyDir -repoUrl $ImpactSubpackRepo -branch $ImpactSubpackBranch -venvPy $venvPy -uv $uv
+    # Common extras used by some custom nodes (e.g., matplotlib for cgem156-ComfyUI)
+    if (Test-Path $venvPy) {
+      Install-PythonPackages -py $venvPy -uv $uv -packages @('matplotlib')
+    }
   } else {
-    Install-ComfyUISource -vendorDir (Resolve-Path "vendor") -comfyDir $ComfyDir
-    Initialize-PythonVenv -vendorDir (Resolve-Path "vendor") -comfyDir $ComfyDir -pythonVersion $PythonVersion
-  }
-  $uv = Install-Uv (Resolve-Path "vendor")
-  $venvPy = Join-Path (Resolve-Path "vendor") "comfy-venv\Scripts\python.exe"
-  Install-CustomNode -comfyDir $ComfyDir -repoUrl $CustomNodeRepo -branch $CustomNodeBranch -venvPy $venvPy -uv $uv
-  Install-CustomScripts -comfyDir $ComfyDir -repoUrl $CustomScriptsRepo -branch $CustomScriptsBranch -venvPy $venvPy -uv $uv
-  Install-ImpactPack -comfyDir $ComfyDir -repoUrl $ImpactPackRepo -branch $ImpactPackBranch -venvPy $venvPy -uv $uv
-  Install-ImpactSubpack -comfyDir $ComfyDir -repoUrl $ImpactSubpackRepo -branch $ImpactSubpackBranch -venvPy $venvPy -uv $uv
-  # Common extras used by some custom nodes (e.g., matplotlib for cgem156-ComfyUI)
-  if (Test-Path $venvPy) {
-    Install-PythonPackages -py $venvPy -uv $uv -packages @('matplotlib')
+    Write-Host "Skipping ComfyUI environment setup (SkipComfy)." -ForegroundColor Yellow
   }
 
   if (-not $SkipBuild) {
@@ -576,7 +584,11 @@ try {
 
   Write-Header "Done"
   Write-Host "Next: run scripts\\start.ps1 to launch ComfyUI + app server." -ForegroundColor Green
-  Write-Host "Installed ComfyUI from latest source ZIP (or Portable if URL provided)." -ForegroundColor Yellow
+  if (-not $SkipComfy) {
+    Write-Host "Installed ComfyUI from latest source ZIP (or Portable if URL provided)." -ForegroundColor Yellow
+  } else {
+    Write-Host "ComfyUI installation was skipped (SkipComfy)." -ForegroundColor Yellow
+  }
 } finally {
   Pop-Location
 }

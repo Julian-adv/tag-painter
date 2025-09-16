@@ -352,8 +352,16 @@ try {
   # Check if this is a fresh release (has build/ but no node_modules)
   if ((Test-Path "build\\index.js") -and -not (Test-Path "node_modules")) {
     Write-Header "Setting up release dependencies"
-    Write-Host "Running bootstrap to prepare environment (Node, ComfyUI)..." -ForegroundColor DarkCyan
-    & pwsh -File "scripts\\bootstrap.ps1" -SkipBuild | Write-Host
+
+    if ($NoComfy) {
+      Write-Host "Running bootstrap to prepare environment (Node only, skipping ComfyUI)..." -ForegroundColor DarkCyan
+    } else {
+      Write-Host "Running bootstrap to prepare environment (Node, ComfyUI)..." -ForegroundColor DarkCyan
+    }
+
+    $bootstrapArgs = @('-File', "scripts\\bootstrap.ps1", '-SkipBuild')
+    if ($NoComfy) { $bootstrapArgs += '-SkipComfy' }
+    & pwsh @bootstrapArgs | Write-Host
 
     # Ensure Node deps are installed without rebuilding app
     Write-Host "Installing Node dependencies (npm ci)..." -ForegroundColor DarkCyan

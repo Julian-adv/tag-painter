@@ -86,16 +86,16 @@ try {
     }
   }
 
-  # Place wrapper start scripts at archive root
-  $wrapperPs1 = Join-Path "release" "start.ps1"
+  # Place wrapper scripts at archive root
+  $wrapperBat = Join-Path "release" "start.bat"
   $wrapperSh  = Join-Path "release" "start.sh"
-  if (Test-Path $wrapperPs1) { Copy-Item $wrapperPs1 -Destination (Join-Path $temp "start.ps1") -Force }
+  if (Test-Path $wrapperBat) { Copy-Item $wrapperBat -Destination (Join-Path $temp "start.bat") -Force }
   if (Test-Path $wrapperSh)  { Copy-Item $wrapperSh  -Destination (Join-Path $temp "start.sh")  -Force }
 
-  # Include updater scripts at archive root
-  $updaterPs1 = Join-Path "scripts" "update.ps1"
+  # Include updater wrappers at archive root
+  $updaterBat = Join-Path "release" "update.bat"
   $updaterSh  = Join-Path "scripts" "update.sh"
-  if (Test-Path $updaterPs1) { Copy-Item $updaterPs1 -Destination (Join-Path $temp "update.ps1") -Force }
+  if (Test-Path $updaterBat) { Copy-Item $updaterBat -Destination (Join-Path $temp "update.bat") -Force }
   if (Test-Path $updaterSh)  { Copy-Item $updaterSh  -Destination (Join-Path $temp "update.sh")  -Force }
 
   if (Test-Path $OutFile) { Remove-Item $OutFile -Force }
