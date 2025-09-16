@@ -3,7 +3,9 @@ param(
   [string]$ComfyDir = "vendor\\ComfyUI",
   [switch]$OpenBrowser,
   [switch]$ForceCPU,
-  [switch]$ComfyOnly
+  [switch]$ComfyOnly,
+  [switch]$NoComfy,
+  [switch]$Help
 )
 
 <#
@@ -12,10 +14,55 @@ param(
   - Starts ComfyUI, waits for port 8188 to respond
   - Starts Node server (adapter-node build) on -Port (default 3000)
   - Use -ComfyOnly flag to start only ComfyUI without the Node server
+  - Use -NoComfy flag to skip ComfyUI installation and assume it's already running
 #>
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# Trap for handling parameter binding errors (unknown parameters)
+trap {
+  if ($_.Exception -is [System.Management.Automation.ParameterBindingException]) {
+    Write-Host "ERROR: Unknown parameter or invalid usage." -ForegroundColor Red
+    Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host ""
+    Show-Help
+    exit 1
+  }
+  throw
+}
+
+function Show-Help {
+  Write-Host "Tag Painter - Start Script" -ForegroundColor Cyan
+  Write-Host "Starts ComfyUI and/or the Tag Painter web application" -ForegroundColor White
+  Write-Host ""
+  Write-Host "USAGE:" -ForegroundColor Yellow
+  Write-Host "  .\scripts\start.ps1 [OPTIONS]" -ForegroundColor White
+  Write-Host ""
+  Write-Host "OPTIONS:" -ForegroundColor Yellow
+  Write-Host "  -Port <number>     Port for the web server (default: 3000)" -ForegroundColor White
+  Write-Host "  -ComfyDir <path>   ComfyUI directory path (default: vendor\ComfyUI)" -ForegroundColor White
+  Write-Host "  -OpenBrowser       Open browser automatically after starting" -ForegroundColor White
+  Write-Host "  -ForceCPU          Force CPU mode for ComfyUI (disable GPU)" -ForegroundColor White
+  Write-Host "  -ComfyOnly         Start only ComfyUI without the web server" -ForegroundColor White
+  Write-Host "  -NoComfy           Skip ComfyUI installation/startup (assume already running)" -ForegroundColor White
+  Write-Host "  -Help              Show this help message" -ForegroundColor White
+  Write-Host ""
+  Write-Host "EXAMPLES:" -ForegroundColor Yellow
+  Write-Host "  .\scripts\start.ps1                    # Start both ComfyUI and web server" -ForegroundColor Gray
+  Write-Host "  .\scripts\start.ps1 -Port 8080         # Use port 8080 for web server" -ForegroundColor Gray
+  Write-Host "  .\scripts\start.ps1 -ComfyOnly         # Start only ComfyUI" -ForegroundColor Gray
+  Write-Host "  .\scripts\start.ps1 -NoComfy           # Skip ComfyUI, start only web server" -ForegroundColor Gray
+  Write-Host "  .\scripts\start.ps1 -ForceCPU          # Use CPU mode for ComfyUI" -ForegroundColor Gray
+  Write-Host ""
+}
+
+if ($args.Count -gt 0) {
+  Write-Host "ERROR: Unsupported option(s): $($args -join ', ')" -ForegroundColor Red
+  Write-Host ""
+  Show-Help
+  exit 1
+}
 
 function Write-Header($text) {
   Write-Host "`n=== $text ===" -ForegroundColor Cyan
@@ -285,6 +332,20 @@ function Start-NodeServer($port) {
 
 Push-Location (Resolve-Path (Join-Path $PSScriptRoot ".."))
 try {
+  # Show help if requested
+  if ($Help) {
+    Show-Help
+    exit 0
+  }
+
+  # Validate conflicting parameters
+  if ($ComfyOnly -and $NoComfy) {
+    Write-Host "ERROR: -ComfyOnly and -NoComfy cannot be used together." -ForegroundColor Red
+    Write-Host ""
+    Show-Help
+    exit 1
+  }
+
   Write-Header "Prerequisite check"
   New-DirectoryIfMissing "vendor"
 
@@ -308,104 +369,112 @@ try {
 
   # Configure ComfyUI (source install only)
   $useCpu = $ForceCPU
+  $comfy = $null
 
-  # Ensure ComfyUI + venv exist; run bootstrap (without building app) if missing
-  $venvPy = Join-Path (Resolve-Path "vendor") "comfy-venv\\Scripts\\python.exe"
-  $needsBootstrap = $false
+  if (-not $NoComfy) {
+    # Ensure ComfyUI + venv exist; run bootstrap (without building app) if missing
+    $venvPy = Join-Path (Resolve-Path "vendor") "comfy-venv\\Scripts\\python.exe"
+    $needsBootstrap = $false
 
-  if (-not (Test-Path $ComfyDir) -or -not (Test-Path $venvPy)) {
-    $needsBootstrap = $true
-    Write-Host "ComfyUI or Python venv missing. Running bootstrap..." -ForegroundColor DarkCyan
-  } elseif (-not (Test-ComfyUIIntegrity -comfyDir $ComfyDir)) {
-    $needsBootstrap = $true
-    Write-Host "ComfyUI installation incomplete or corrupted. Running bootstrap to repair..." -ForegroundColor DarkCyan
-  }
-
-  if ($needsBootstrap) {
-    Write-Header "Setting up ComfyUI (latest source)"
-    & pwsh -File "scripts\\bootstrap.ps1" -SkipBuild | Write-Host
-  }
-
-  # Ensure CUDA-enabled torch is installed when NVIDIA is present; decide CPU fallback
-  if (-not $useCpu -and (Test-Path $venvPy)) {
-    $ok = Install-TorchCudaIfNeeded -venvPy $venvPy
-    if (-not $ok) {
-      Write-Host "CUDA Torch not available. Use -ForceCPU to run on CPU, or ensure NVIDIA drivers/CUDA are installed." -ForegroundColor Yellow
+    if (-not (Test-Path $ComfyDir) -or -not (Test-Path $venvPy)) {
+      $needsBootstrap = $true
+      Write-Host "ComfyUI or Python venv missing. Running bootstrap..." -ForegroundColor DarkCyan
+    } elseif (-not (Test-ComfyUIIntegrity -comfyDir $ComfyDir)) {
+      $needsBootstrap = $true
+      Write-Host "ComfyUI installation incomplete or corrupted. Running bootstrap to repair..." -ForegroundColor DarkCyan
     }
-  }
-  if ($useCpu) {
-    $env:CUDA_VISIBLE_DEVICES = "-1"
-    Write-Host "CPU mode active (either forced or CUDA not available)." -ForegroundColor Yellow
-  } else {
-    Remove-Item Env:CUDA_VISIBLE_DEVICES -ErrorAction SilentlyContinue
-  }
 
-  # Ensure common extras used by custom nodes and check custom node dependencies
-  if (Test-Path $venvPy) {
-    Install-PythonPackages -venvPy $venvPy -packages @('matplotlib')
+    if ($needsBootstrap) {
+      Write-Header "Setting up ComfyUI (latest source)"
+      & pwsh -File "scripts\\bootstrap.ps1" -SkipBuild | Write-Host
+    }
 
-    # Check and install custom node dependencies if missing
-    $customNodesDir = Join-Path $ComfyDir "custom_nodes"
-    if (Test-Path $customNodesDir) {
-      $customNodes = Get-ChildItem -Path $customNodesDir -Directory
-      foreach ($node in $customNodes) {
-        $requirementsFile = Join-Path $node.FullName "requirements.txt"
-        if (Test-Path $requirementsFile) {
-          Write-Host "Checking dependencies for $($node.Name)..." -ForegroundColor DarkCyan
-          $uvExe = Join-Path (Resolve-Path "vendor") "uv.exe"
-          if (Test-Path $uvExe) {
-            & $uvExe pip install -p $venvPy -r $requirementsFile
-          } else {
-            & $venvPy -m pip install -r $requirementsFile
+    # Ensure CUDA-enabled torch is installed when NVIDIA is present; decide CPU fallback
+    if (-not $useCpu -and (Test-Path $venvPy)) {
+      $ok = Install-TorchCudaIfNeeded -venvPy $venvPy
+      if (-not $ok) {
+        Write-Host "CUDA Torch not available. Use -ForceCPU to run on CPU, or ensure NVIDIA drivers/CUDA are installed." -ForegroundColor Yellow
+      }
+    }
+    if ($useCpu) {
+      $env:CUDA_VISIBLE_DEVICES = "-1"
+      Write-Host "CPU mode active (either forced or CUDA not available)." -ForegroundColor Yellow
+    } else {
+      Remove-Item Env:CUDA_VISIBLE_DEVICES -ErrorAction SilentlyContinue
+    }
+
+    # Ensure common extras used by custom nodes and check custom node dependencies
+    if (Test-Path $venvPy) {
+      Install-PythonPackages -venvPy $venvPy -packages @('matplotlib')
+
+      # Check and install custom node dependencies if missing
+      $customNodesDir = Join-Path $ComfyDir "custom_nodes"
+      if (Test-Path $customNodesDir) {
+        $customNodes = Get-ChildItem -Path $customNodesDir -Directory
+        foreach ($node in $customNodes) {
+          $requirementsFile = Join-Path $node.FullName "requirements.txt"
+          if (Test-Path $requirementsFile) {
+            Write-Host "Checking dependencies for $($node.Name)..." -ForegroundColor DarkCyan
+            $uvExe = Join-Path (Resolve-Path "vendor") "uv.exe"
+            if (Test-Path $uvExe) {
+              & $uvExe pip install -p $venvPy -r $requirementsFile
+            } else {
+              & $venvPy -m pip install -r $requirementsFile
+            }
           }
         }
       }
     }
-  }
 
-  # Download essential models for Impact Subpack
-  if (Test-Path (Join-Path $ComfyDir "custom_nodes\\ComfyUI-Impact-Subpack")) {
-    Write-Host "Downloading essential models for Impact Subpack..." -ForegroundColor DarkCyan
-    $personYoloModel = Join-Path $ComfyDir "models\\ultralytics\\segm\\person_yolov8m-seg.pt"
-    Get-ModelIfMissing -url "https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt" -destPath $personYoloModel
+    # Download essential models for Impact Subpack
+    if (Test-Path (Join-Path $ComfyDir "custom_nodes\\ComfyUI-Impact-Subpack")) {
+      Write-Host "Downloading essential models for Impact Subpack..." -ForegroundColor DarkCyan
+      $personYoloModel = Join-Path $ComfyDir "models\\ultralytics\\segm\\person_yolov8m-seg.pt"
+      Get-ModelIfMissing -url "https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt" -destPath $personYoloModel
 
-    $faceYoloModel = Join-Path $ComfyDir "models\\ultralytics\\bbox\\face_yolov8m.pt"
-    Get-ModelIfMissing -url "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt" -destPath $faceYoloModel
-  }
+      $faceYoloModel = Join-Path $ComfyDir "models\\ultralytics\\bbox\\face_yolov8m.pt"
+      Get-ModelIfMissing -url "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt" -destPath $faceYoloModel
+    }
 
-  # Download essential VAE model
-  Write-Host "Downloading essential VAE model..." -ForegroundColor DarkCyan
-  $vaeModel = Join-Path $ComfyDir "models\\vae\\fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors"
-  Get-ModelIfMissing -url "https://huggingface.co/moonshotmillion/VAEfixFP16ErrorsSDXLLowerMemoryUse_v10/resolve/main/fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors" -destPath $vaeModel
+    # Download essential VAE model
+    Write-Host "Downloading essential VAE model..." -ForegroundColor DarkCyan
+    $vaeModel = Join-Path $ComfyDir "models\\vae\\fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors"
+    Get-ModelIfMissing -url "https://huggingface.co/moonshotmillion/VAEfixFP16ErrorsSDXLLowerMemoryUse_v10/resolve/main/fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors" -destPath $vaeModel
 
-  # Download LoRA models
-  Write-Host "Downloading LoRA models..." -ForegroundColor DarkCyan
-  $loraModel1 = Join-Path $ComfyDir "models\\loras\\MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors"
-  Get-ModelIfMissing -url "https://huggingface.co/NeigeSnowflake/neigeworkflow/resolve/main/MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors" -destPath $loraModel1
+    # Download LoRA models
+    Write-Host "Downloading LoRA models..." -ForegroundColor DarkCyan
+    $loraModel1 = Join-Path $ComfyDir "models\\loras\\MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors"
+    Get-ModelIfMissing -url "https://huggingface.co/NeigeSnowflake/neigeworkflow/resolve/main/MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors" -destPath $loraModel1
 
-  $loraModel2 = Join-Path $ComfyDir "models\\loras\\spo_sdxl_10ep_4k-data_lora_webui.safetensors"
-  Get-ModelIfMissing -url "https://civitai.com/api/download/models/567119" -destPath $loraModel2
+    $loraModel2 = Join-Path $ComfyDir "models\\loras\\spo_sdxl_10ep_4k-data_lora_webui.safetensors"
+    Get-ModelIfMissing -url "https://civitai.com/api/download/models/567119" -destPath $loraModel2
 
-  $loraModel3 = Join-Path $ComfyDir "models\\loras\\Sinozick_Style_XL_Pony.safetensors"
-  Get-ModelIfMissing -url "https://civitai.com/api/download/models/481798" -destPath $loraModel3
+    $loraModel3 = Join-Path $ComfyDir "models\\loras\\Sinozick_Style_XL_Pony.safetensors"
+    Get-ModelIfMissing -url "https://civitai.com/api/download/models/481798" -destPath $loraModel3
 
-  $loraModel4 = Join-Path $ComfyDir "models\\loras\\Fant5yP0ny.safetensors"
-  Get-ModelIfMissing -url "https://huggingface.co/LyliaEngine/Fant5yP0ny/resolve/main/Fant5yP0ny.safetensors?download=true" -destPath $loraModel4
+    $loraModel4 = Join-Path $ComfyDir "models\\loras\\Fant5yP0ny.safetensors"
+    Get-ModelIfMissing -url "https://huggingface.co/LyliaEngine/Fant5yP0ny/resolve/main/Fant5yP0ny.safetensors?download=true" -destPath $loraModel4
 
-  # Download SAM model
-  Write-Host "Downloading SAM model..." -ForegroundColor DarkCyan
-  $samModel = Join-Path $ComfyDir "models\\sams\\sam_vit_b_01ec64.pth"
-  Get-ModelIfMissing -url "https://huggingface.co/datasets/Gourieff/ReActor/resolve/main/models/sams/sam_vit_b_01ec64.pth" -destPath $samModel
+    # Download SAM model
+    Write-Host "Downloading SAM model..." -ForegroundColor DarkCyan
+    $samModel = Join-Path $ComfyDir "models\\sams\\sam_vit_b_01ec64.pth"
+    Get-ModelIfMissing -url "https://huggingface.co/datasets/Gourieff/ReActor/resolve/main/models/sams/sam_vit_b_01ec64.pth" -destPath $samModel
 
-  Write-Header "Start ComfyUI"
-  $comfy = Start-ComfyUI -dir $ComfyDir -Cpu:$useCpu
-  if (-not (Wait-For-Port8188)) {
-    Write-Host "ComfyUI did not respond on 8188 in time. You may still continue if starting manually." -ForegroundColor Yellow
+    Write-Header "Start ComfyUI"
+    $comfy = Start-ComfyUI -dir $ComfyDir -Cpu:$useCpu
+    if (-not (Wait-For-Port8188)) {
+      Write-Host "ComfyUI did not respond on 8188 in time. You may still continue if starting manually." -ForegroundColor Yellow
+    }
+  } else {
+    # NoComfy mode - assume ComfyUI is already running
+    Write-Host "Skipping ComfyUI setup (NoComfy mode). Assuming ComfyUI is already running at http://127.0.0.1:8188" -ForegroundColor Yellow
   }
 
   if ($ComfyOnly) {
     # ComfyUI-only mode
-    if ($comfy) {
+    if ($NoComfy) {
+      Write-Host "ComfyUI-only mode with NoComfy option. Assuming ComfyUI is already running at http://127.0.0.1:8188" -ForegroundColor Green
+    } elseif ($comfy) {
       Write-Host "ComfyUI PID: $($comfy.Id)" -ForegroundColor Green
       Write-Host "ComfyUI is running at http://127.0.0.1:8188" -ForegroundColor Cyan
     } else {
@@ -419,7 +488,9 @@ try {
 
     Start-Process "http://127.0.0.1:$Port"
 
-    if ($comfy) {
+    if ($NoComfy) {
+      Write-Host "ComfyUI: Assuming already running at http://127.0.0.1:8188" -ForegroundColor Green
+    } elseif ($comfy) {
       Write-Host "ComfyUI PID: $($comfy.Id)" -ForegroundColor Green
     } else {
       Write-Host "ComfyUI not started (portable scripts or venv python missing)" -ForegroundColor Yellow
