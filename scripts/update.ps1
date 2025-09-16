@@ -191,6 +191,11 @@ try {
         if ($exclude -contains $item.Name) { continue }
         $dest = Join-Path -Path $targetDir -ChildPath $item.Name
 
+        if ($item.PSIsContainer -and $item.Name -ieq 'build' -and (Test-Path -LiteralPath $dest -PathType Container)) {
+            Write-Host 'Replacing existing build directory...'
+            Remove-Item -LiteralPath $dest -Recurse -Force
+        }
+
         if ($item.PSIsContainer -and $item.Name -ieq 'data') {
             if ($DebugLog) { Write-DebugLog ("Copy (data with preserve): {0} -> {1}" -f $item.FullName, $dest) }
             Copy-DataDirWithPreserve -SrcDataDir $item.FullName -DstDataDir $dest
