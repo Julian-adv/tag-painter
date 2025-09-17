@@ -85,6 +85,9 @@ else
   "$VENV_PY" -m pip install torch torchvision torchaudio
 fi
 
+echo "Installing additional Python dependencies..."
+"$VENV_PY" -m pip install matplotlib
+
 echo "Installing custom node: cgem156-ComfyUI"
 CUSTOM_NODE_DIR="$COMFY_DIR/custom_nodes/cgem156-ComfyUI"
 mkdir -p "$COMFY_DIR/custom_nodes"

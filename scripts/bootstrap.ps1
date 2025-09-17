@@ -340,6 +340,15 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion) {
       & $uv pip install -p $py torch torchvision torchaudio
     }
   }
+
+  Write-Header "Additional Python packages"
+  if ($pipOk) {
+    & $py -m pip install matplotlib
+  } else {
+    & $uv pip install -p $py matplotlib
+  }
+
+  return @{ PythonPath = $py; UvPath = $uv }
 }
 
 function Install-PythonPackages($py, $uv, [string[]]$packages) {
