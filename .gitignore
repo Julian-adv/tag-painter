@@ -22,7 +22,6 @@ Thumbs.db
 # Data folder
 data/
 .claude/
-static/temp_mask.png
 vendor/
 
 # Release artifacts
