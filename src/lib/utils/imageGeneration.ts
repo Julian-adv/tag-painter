@@ -33,6 +33,43 @@ import type {
   ModelSettings
 } from '$lib/types'
 
+function generateClientId(): string {
+  const cryptoObj = typeof globalThis !== 'undefined' ? globalThis.crypto : undefined
+  if (cryptoObj && typeof cryptoObj.randomUUID === 'function') {
+    return cryptoObj.randomUUID()
+  }
+  if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
+    const bytes = cryptoObj.getRandomValues(new Uint8Array(16))
+    bytes[6] = (bytes[6] & 0x0f) | 0x40
+    bytes[8] = (bytes[8] & 0x3f) | 0x80
+    const segments = [
+      bytes.subarray(0, 4),
+      bytes.subarray(4, 6),
+      bytes.subarray(6, 8),
+      bytes.subarray(8, 10),
+      bytes.subarray(10, 16)
+    ].map((segment) =>
+      Array.from(segment)
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('')
+    )
+    return `${segments[0]}-${segments[1]}-${segments[2]}-${segments[3]}-${segments[4]}`
+  }
+  let value = ''
+  for (let index = 0; index < 36; index += 1) {
+    if (index === 8 || index === 13 || index === 18 || index === 23) {
+      value += '-'
+    } else if (index === 14) {
+      value += '4'
+    } else {
+      const random = Math.floor(Math.random() * 16)
+      const hex = index === 19 ? (random & 0x3) | 0x8 : random
+      value += hex.toString(16)
+    }
+  }
+  return value
+}
+
 export interface GenerationOptions {
   promptsData: PromptsData
   settings: Settings
@@ -91,7 +128,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     onProgressUpdate({ value: 0, max: 100, currentNode: '' })
 
     // Generate unique client ID
-    const clientId = crypto.randomUUID()
+    const clientId = generateClientId()
 
     // Expand custom tags and create prompt parts, using previous resolutions if regenerating
     const previousAll = previousRandomTagResolutions?.all || {}

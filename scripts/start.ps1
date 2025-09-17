@@ -306,7 +306,7 @@ function Wait-For-Port8188() {
 function Start-NodeServer($port) {
   $env:PORT = "$port"
   # Increase SvelteKit request body size limit (bytes) to allow PNG uploads
-  if (-not $env:BODY_SIZE_LIMIT) { $env:BODY_SIZE_LIMIT = "10485760" } # 10 MB
+  if (-not $env:BODY_SIZE_LIMIT) { $env:BODY_SIZE_LIMIT = "52428800" } # 50 MB
   # Ensure production mode so hooks relying on NODE_ENV work as intended
   if (-not $env:NODE_ENV) { $env:NODE_ENV = "production" }
 

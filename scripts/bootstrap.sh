@@ -14,6 +14,12 @@ COMFY_DIR="$VENDOR_DIR/ComfyUI"
 VENV_DIR="$VENDOR_DIR/comfy-venv"
 CUSTOM_NODE_REPO="https://github.com/laksjdjf/cgem156-ComfyUI"
 CUSTOM_NODE_BRANCH="main"
+CUSTOM_SCRIPTS_REPO="https://github.com/pythongosssss/ComfyUI-Custom-Scripts"
+CUSTOM_SCRIPTS_BRANCH="main"
+IMPACT_PACK_REPO="https://github.com/ltdrdata/ComfyUI-Impact-Pack"
+IMPACT_PACK_BRANCH="Main"
+IMPACT_SUBPACK_REPO="https://github.com/ltdrdata/ComfyUI-Impact-Subpack"
+IMPACT_SUBPACK_BRANCH="main"
 PY_REQ_MAJOR=3
 PY_REQ_MINOR=13
 
@@ -85,22 +91,56 @@ else
   "$VENV_PY" -m pip install torch torchvision torchaudio
 fi
 
-echo "Installing additional Python dependencies..."
-"$VENV_PY" -m pip install matplotlib
+install_node_requirements() {
+  local node_dir="$1"
+  local requirements_file="$node_dir/requirements.txt"
+  if [[ -f "$requirements_file" ]]; then
+    echo "Installing dependencies for $(basename "$node_dir")..."
+    "$VENV_PY" -m pip install -r "$requirements_file"
+  fi
+}
 
-echo "Installing custom node: cgem156-ComfyUI"
-CUSTOM_NODE_DIR="$COMFY_DIR/custom_nodes/cgem156-ComfyUI"
-mkdir -p "$COMFY_DIR/custom_nodes"
-if [[ ! -d "$CUSTOM_NODE_DIR" ]]; then
+install_custom_node() {
+  local repo_url="$1"
+  local dest_dir="$2"
+  local branch="$3"
+
+  if [[ -d "$dest_dir" ]]; then
+    echo "Custom node already present: $dest_dir"
+    install_node_requirements "$dest_dir"
+    return
+  fi
+
+  mkdir -p "$(dirname "$dest_dir")"
+
   if command -v git >/dev/null 2>&1; then
-    git clone --depth 1 --branch "$CUSTOM_NODE_BRANCH" "$CUSTOM_NODE_REPO" "$CUSTOM_NODE_DIR"
+    git clone --depth 1 --branch "$branch" "$repo_url" "$dest_dir"
   else
+    if ! command -v curl >/dev/null 2>&1; then
+      echo "Error: git or curl required to install custom nodes." >&2
+      exit 1
+    fi
     TMPDIR="$(mktemp -d)"
-    curl -L "$CUSTOM_NODE_REPO/archive/refs/heads/$CUSTOM_NODE_BRANCH.zip" -o "$TMPDIR/cgem156.zip"
-    unzip -q "$TMPDIR/cgem156.zip" -d "$TMPDIR"
-    mv "$TMPDIR"/cgem156-ComfyUI-* "$CUSTOM_NODE_DIR"
+    ARCHIVE="$TMPDIR/custom_node.zip"
+    curl -L "$repo_url/archive/refs/heads/$branch.zip" -o "$ARCHIVE"
+    unzip -q "$ARCHIVE" -d "$TMPDIR"
+    local extracted
+    extracted="$(find "$TMPDIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+    if [[ -z "$extracted" ]]; then
+      echo "Error: failed to extract custom node from archive." >&2
+      exit 1
+    fi
+    mv "$extracted" "$dest_dir"
     rm -rf "$TMPDIR"
   fi
-fi
+
+  install_node_requirements "$dest_dir"
+}
+
+echo "Installing custom nodes..."
+install_custom_node "$CUSTOM_NODE_REPO" "$COMFY_DIR/custom_nodes/cgem156-ComfyUI" "$CUSTOM_NODE_BRANCH"
+install_custom_node "$CUSTOM_SCRIPTS_REPO" "$COMFY_DIR/custom_nodes/ComfyUI-Custom-Scripts" "$CUSTOM_SCRIPTS_BRANCH"
+install_custom_node "$IMPACT_PACK_REPO" "$COMFY_DIR/custom_nodes/ComfyUI-Impact-Pack" "$IMPACT_PACK_BRANCH"
+install_custom_node "$IMPACT_SUBPACK_REPO" "$COMFY_DIR/custom_nodes/ComfyUI-Impact-Subpack" "$IMPACT_SUBPACK_BRANCH"
 
 echo "Done. Use scripts/start.sh to run ComfyUI + app server."
