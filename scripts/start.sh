@@ -26,7 +26,7 @@ fi
 source "$VENV_DIR/bin/activate"
 
 echo "Starting ComfyUI..."
-(cd "$COMFY_DIR" && python main.py) > "$VENDOR_DIR/comfyui.log" 2>&1 &
+(cd "$COMFY_DIR" && python main.py --listen 0.0.0.0 --port 8188 --disable-auto-launch --enable-cors-header '*') &
 COMFY_PID=$!
 
 WAIT_URL="http://127.0.0.1:8188/"
