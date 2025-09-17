@@ -46,6 +46,7 @@ export interface Settings {
   steps: number
   seed: number
   sampler: string
+  comfyUrl: string
   outputDirectory: string
   // VAE selection: '__embedded__' means use checkpoint's embedded VAE
   selectedVae: string

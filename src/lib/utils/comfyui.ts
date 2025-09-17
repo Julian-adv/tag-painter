@@ -6,11 +6,46 @@
 // - Processes execution status and image data from ComfyUI
 // - Extracts node titles from workflow metadata for user-friendly display
 
+import { DEFAULT_COMFY_URL } from '$lib/constants'
 import type { ProgressData } from '$lib/types'
 
-export async function fetchCheckpoints(): Promise<string[]> {
+export function normalizeBaseUrl(baseUrl: string): string {
+  const candidate = baseUrl ? baseUrl.trim() : ''
+  if (!candidate) {
+    return DEFAULT_COMFY_URL
+  }
+  if (/^https?:\/\//i.test(candidate)) {
+    return candidate
+  }
+  return `http://${candidate}`
+}
+
+export function buildComfyHttpUrl(baseUrl: string, resourcePath: string): string {
+  const normalized = normalizeBaseUrl(baseUrl)
+  const baseWithSlash = normalized.endsWith('/') ? normalized : `${normalized}/`
+  const cleanPath = resourcePath.startsWith('/') ? resourcePath.slice(1) : resourcePath
+  return new URL(cleanPath, baseWithSlash).toString()
+}
+
+function buildComfyWsUrl(baseUrl: string, resourcePath: string, params: Record<string, string>): string {
+  const httpUrl = buildComfyHttpUrl(baseUrl, resourcePath)
+  const url = new URL(httpUrl)
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value)
+  })
+  if (url.protocol === 'https:') {
+    url.protocol = 'wss:'
+  } else if (url.protocol === 'http:') {
+    url.protocol = 'ws:'
+  }
+  return url.toString()
+}
+
+export async function fetchCheckpoints(baseUrl: string): Promise<string[]> {
   try {
-    const response = await fetch('http://127.0.0.1:8188/object_info/CheckpointLoaderSimple')
+    const response = await fetch(
+      buildComfyHttpUrl(baseUrl, 'object_info/CheckpointLoaderSimple')
+    )
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -34,9 +69,9 @@ export async function fetchCheckpoints(): Promise<string[]> {
   }
 }
 
-export async function fetchVaeModels(): Promise<string[]> {
+export async function fetchVaeModels(baseUrl: string): Promise<string[]> {
   try {
-    const response = await fetch('http://127.0.0.1:8188/object_info/VAELoader')
+    const response = await fetch(buildComfyHttpUrl(baseUrl, 'object_info/VAELoader'))
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -73,9 +108,11 @@ export function connectWebSocket(
   generatedClientId: string,
   finalSaveNodeId: string,
   workflow: Record<string, { _meta?: { title?: string } }>,
-  callbacks: WebSocketCallbacks
+  callbacks: WebSocketCallbacks,
+  baseUrl: string
 ): void {
-  const ws = new WebSocket(`ws://127.0.0.1:8188/ws?clientId=${generatedClientId}`)
+  const wsUrl = buildComfyWsUrl(baseUrl, 'ws', { clientId: generatedClientId })
+  const ws = new WebSocket(wsUrl)
   ws.binaryType = 'arraybuffer'
 
   let lastExecutingNode: string | null = null

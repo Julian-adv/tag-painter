@@ -11,7 +11,14 @@ VENV_DIR="$VENDOR_DIR/comfy-venv"
 
 echo "=== Start (macOS/Linux) ==="
 
+NEEDS_BOOTSTRAP=0
 if [[ ! -d "$COMFY_DIR" || ! -d "$VENV_DIR" ]]; then
+  NEEDS_BOOTSTRAP=1
+elif [[ ! -f "$VENV_DIR/bin/activate" ]]; then
+  NEEDS_BOOTSTRAP=1
+fi
+
+if [[ $NEEDS_BOOTSTRAP -eq 1 ]]; then
   echo "Running bootstrap (macOS/Linux) for ComfyUI/venv ..."
   bash "$REPO_ROOT/scripts/bootstrap.sh"
 fi
@@ -22,13 +29,44 @@ echo "Starting ComfyUI..."
 (cd "$COMFY_DIR" && python main.py) > "$VENDOR_DIR/comfyui.log" 2>&1 &
 COMFY_PID=$!
 
-echo "Waiting for ComfyUI on http://127.0.0.1:8188 ..."
-for i in {1..90}; do
-  if curl -sSf "http://127.0.0.1:8188/" >/dev/null; then
-    break
-  fi
-  sleep 2
-done
+WAIT_URL="http://127.0.0.1:8188/"
+PROBE_TOOL=""
+if command -v curl >/dev/null 2>&1; then
+  PROBE_TOOL="curl"
+elif command -v wget >/dev/null 2>&1; then
+  PROBE_TOOL="wget"
+elif command -v python3 >/dev/null 2>&1; then
+  PROBE_TOOL="python3"
+fi
+
+if [[ -n "$PROBE_TOOL" ]]; then
+  echo "Waiting for ComfyUI on $WAIT_URL ..."
+  for i in {1..90}; do
+    if [[ "$PROBE_TOOL" == "curl" ]]; then
+      if curl -sSf "$WAIT_URL" >/dev/null; then
+        break
+      fi
+    elif [[ "$PROBE_TOOL" == "wget" ]]; then
+      if wget -qO- "$WAIT_URL" >/dev/null; then
+        break
+      fi
+    else
+      if python3 - "$WAIT_URL" <<'PY'
+import sys
+import urllib.request
+
+urllib.request.urlopen(sys.argv[1], timeout=2)
+PY
+      then
+        break
+      fi
+    fi
+    sleep 2
+  done
+else
+  echo "Warning: curl, wget, or python3 not found; skipping ComfyUI readiness check." >&2
+  sleep 5
+fi
 
 if [[ ! -f "$REPO_ROOT/build/index.js" ]]; then
   echo "Missing build output. Please build the app first (npm run build) or use a release ZIP including build/." >&2

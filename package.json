@@ -1,13 +1,13 @@
 {
   "name": "tag-painter",
   "private": true,
-  "version": "0.2.7",
+  "version": "0.2.8",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "release": "pwsh -File scripts/build-release.ps1",
+    "release": "pwsh -File scripts/build-release.ps1 || bash scripts/build-release.sh",
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",

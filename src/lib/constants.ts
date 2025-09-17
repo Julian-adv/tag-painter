@@ -1,6 +1,7 @@
 export const CONSISTENT_RANDOM_MARKER = '=consistent-random'
 export const DEFAULT_OUTPUT_DIRECTORY = 'data/output'
 export const DEFAULT_ARRAY_WEIGHT = 100
+export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8188'
 
 // Placeholder pattern used for __name__ style tags (non-greedy to avoid merging adjacent placeholders)
 export const PLACEHOLDER_RE_SOURCE = '__([\\p{L}\\p{N}_\\- /]+?)__'

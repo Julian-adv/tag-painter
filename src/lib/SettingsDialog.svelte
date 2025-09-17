@@ -23,6 +23,7 @@
     steps: settings.steps,
     seed: settings.seed,
     sampler: settings.sampler,
+    comfyUrl: settings.comfyUrl,
     outputDirectory: settings.outputDirectory,
     selectedVae: settings.selectedVae,
     clipSkip: settings.clipSkip,
@@ -38,6 +39,7 @@
     steps: 0,
     seed: 0,
     sampler: '',
+    comfyUrl: '',
     outputDirectory: '',
     selectedVae: '',
     clipSkip: 0,
@@ -63,6 +65,7 @@
         steps: settings.steps,
         seed: settings.seed,
         sampler: settings.sampler,
+        comfyUrl: settings.comfyUrl,
         outputDirectory: settings.outputDirectory,
         selectedVae: settings.selectedVae,
         clipSkip: settings.clipSkip,
@@ -144,14 +147,14 @@
 
   $effect(() => {
     if (show) {
-      fetchVaeModels()
+      fetchVaeModels(localSettings.comfyUrl)
         .then((vaes) => {
           availableVaes = vaes || []
         })
         .catch(() => {
           availableVaes = []
         })
-      fetchCheckpoints()
+      fetchCheckpoints(localSettings.comfyUrl)
         .then((cps) => {
           availableCheckpoints = ['Default', ...(cps || [])]
         })
@@ -266,6 +269,15 @@
           type="text"
           bind:value={localSettings.outputDirectory}
           placeholder="/path/to/output/directory"
+          class="output-dir-input"
+        />
+
+        <label for="comfy-url" class="output-dir-label">ComfyUI URL:</label>
+        <input
+          id="comfy-url"
+          type="text"
+          bind:value={localSettings.comfyUrl}
+          placeholder="http://127.0.0.1:8188"
           class="output-dir-input"
         />
 

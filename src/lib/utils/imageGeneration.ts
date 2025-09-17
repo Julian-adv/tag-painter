@@ -3,7 +3,12 @@
 // This module orchestrates the complete image generation workflow with ComfyUI
 
 import { saveImage } from './fileIO'
-import { connectWebSocket, type WebSocketCallbacks } from './comfyui'
+import {
+  buildComfyHttpUrl,
+  connectWebSocket,
+  normalizeBaseUrl,
+  type WebSocketCallbacks
+} from './comfyui'
 import {
   defaultWorkflowPrompt,
   inpaintingWorkflowPrompt,
@@ -534,8 +539,10 @@ async function submitToComfyUI(
     client_id: clientId
   }
 
+  const comfyBase = normalizeBaseUrl(settings.comfyUrl)
+
   // Submit prompt to ComfyUI
-  const response = await fetch('http://127.0.0.1:8188/prompt', {
+  const response = await fetch(buildComfyHttpUrl(comfyBase, 'prompt'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -568,7 +575,14 @@ async function submitToComfyUI(
     onError: callbacks.onError
   }
 
-  await connectWebSocket(result.prompt_id, clientId, FINAL_SAVE_NODE_ID, workflow, wsCallbacks)
+  await connectWebSocket(
+    result.prompt_id,
+    clientId,
+    FINAL_SAVE_NODE_ID,
+    workflow,
+    wsCallbacks,
+    comfyBase
+  )
 }
 
 function getEffectiveModelSettings(

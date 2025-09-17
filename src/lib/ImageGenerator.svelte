@@ -12,7 +12,7 @@
   import { fetchCheckpoints } from './utils/comfyui'
   import { ArrowPath } from 'svelte-heros-v2'
   import { generateImage } from './utils/imageGeneration'
-  import { DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
+  import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
   import {
     promptsData,
     initializePromptsStore,
@@ -74,7 +74,7 @@
     event.preventDefault()
     try {
       // Re-fetch checkpoints (ComfyUI updates lists on demand)
-      const checkpoints = await fetchCheckpoints()
+      const checkpoints = await fetchCheckpoints(settings.comfyUrl)
       if (checkpoints && checkpoints.length > 0) {
         // Preserve selected checkpoint if still present; otherwise pick first
         let prevSelected: string | null = null
@@ -107,6 +107,7 @@
     steps: 28,
     seed: -1,
     sampler: 'euler_ancestral',
+    comfyUrl: DEFAULT_COMFY_URL,
     outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
     selectedVae: '__embedded__',
     clipSkip: 2,
@@ -125,12 +126,13 @@
     if (savedSettings) {
       // Merge with defaults to ensure new fields like selectedVae exist
       settings = { ...settings, ...savedSettings }
+      if (!settings.comfyUrl) settings.comfyUrl = DEFAULT_COMFY_URL
       if (!settings.selectedVae) settings.selectedVae = '__embedded__'
       if (!settings.perModel) settings.perModel = {}
     }
 
     // Load available checkpoints
-    const checkpoints = await fetchCheckpoints()
+    const checkpoints = await fetchCheckpoints(settings.comfyUrl)
     if (checkpoints && checkpoints.length > 0) {
       availableCheckpoints = checkpoints
       promptsData.update((data) => {

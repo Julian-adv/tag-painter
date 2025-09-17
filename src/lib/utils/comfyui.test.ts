@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fetchCheckpoints, connectWebSocket, type WebSocketCallbacks } from './comfyui'
+import {
+  fetchCheckpoints,
+  connectWebSocket,
+  type WebSocketCallbacks
+} from './comfyui'
 
 // Mock fetch globally
 const mockFetch = vi.fn()
@@ -94,7 +98,7 @@ describe('comfyui utilities', () => {
 
       mockFetch.mockResolvedValueOnce(mockResponse)
 
-      const result = await fetchCheckpoints()
+      const result = await fetchCheckpoints('http://127.0.0.1:8188')
 
       expect(mockFetch).toHaveBeenCalledWith(
         'http://127.0.0.1:8188/object_info/CheckpointLoaderSimple'
@@ -110,7 +114,7 @@ describe('comfyui utilities', () => {
 
       mockFetch.mockResolvedValueOnce(mockResponse)
 
-      const result = await fetchCheckpoints()
+      const result = await fetchCheckpoints('http://127.0.0.1:8188')
 
       expect(result).toEqual([])
     })
@@ -126,7 +130,7 @@ describe('comfyui utilities', () => {
 
       mockFetch.mockResolvedValueOnce(mockResponse)
 
-      const result = await fetchCheckpoints()
+      const result = await fetchCheckpoints('http://127.0.0.1:8188')
 
       expect(result).toEqual([])
     })
@@ -134,7 +138,7 @@ describe('comfyui utilities', () => {
     it('should return empty array when fetch throws error', async () => {
       mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
-      const result = await fetchCheckpoints()
+      const result = await fetchCheckpoints('http://127.0.0.1:8188')
 
       expect(result).toEqual([])
     })
@@ -154,7 +158,7 @@ describe('comfyui utilities', () => {
 
       mockFetch.mockResolvedValueOnce(mockResponse)
 
-      const result = await fetchCheckpoints()
+      const result = await fetchCheckpoints('http://127.0.0.1:8188')
 
       expect(result).toEqual([])
     })
@@ -183,7 +187,14 @@ describe('comfyui utilities', () => {
       const clientId = 'test-client-456'
       const finalSaveNodeId = '3'
 
-      connectWebSocket(promptId, clientId, finalSaveNodeId, mockWorkflow, mockCallbacks)
+      connectWebSocket(
+        promptId,
+        clientId,
+        finalSaveNodeId,
+        mockWorkflow,
+        mockCallbacks,
+        'http://127.0.0.1:8188'
+      )
 
       // Check that WebSocket was created with correct URL
       expect(mockWebSocketConstructor).toHaveBeenCalledWith(
@@ -196,7 +207,14 @@ describe('comfyui utilities', () => {
       const clientId = 'test-client-456'
       const finalSaveNodeId = '3'
 
-      connectWebSocket(promptId, clientId, finalSaveNodeId, mockWorkflow, mockCallbacks)
+      connectWebSocket(
+        promptId,
+        clientId,
+        finalSaveNodeId,
+        mockWorkflow,
+        mockCallbacks,
+        'http://127.0.0.1:8188'
+      )
 
       // Check that WebSocket was created and binaryType was set
       expect(mockWebSocketConstructor).toHaveBeenCalled()
@@ -211,7 +229,14 @@ describe('comfyui utilities', () => {
 
       // Test that the connectWebSocket function can be called without throwing
       expect(() => {
-        connectWebSocket(promptId, clientId, finalSaveNodeId, mockWorkflow, mockCallbacks)
+        connectWebSocket(
+          promptId,
+          clientId,
+          finalSaveNodeId,
+          mockWorkflow,
+          mockCallbacks,
+          'http://127.0.0.1:8188'
+        )
       }).not.toThrow()
 
       expect(mockWebSocketConstructor).toHaveBeenCalledWith(
@@ -230,7 +255,14 @@ describe('comfyui utilities', () => {
       }
 
       expect(() => {
-        connectWebSocket(promptId, clientId, finalSaveNodeId, workflowWithoutTitles, mockCallbacks)
+        connectWebSocket(
+          promptId,
+          clientId,
+          finalSaveNodeId,
+          workflowWithoutTitles,
+          mockCallbacks,
+          'http://127.0.0.1:8188'
+        )
       }).not.toThrow()
     })
 
@@ -241,7 +273,14 @@ describe('comfyui utilities', () => {
       const emptyWorkflow = {}
 
       expect(() => {
-        connectWebSocket(promptId, clientId, finalSaveNodeId, emptyWorkflow, mockCallbacks)
+        connectWebSocket(
+          promptId,
+          clientId,
+          finalSaveNodeId,
+          emptyWorkflow,
+          mockCallbacks,
+          'http://127.0.0.1:8188'
+        )
       }).not.toThrow()
     })
 
@@ -257,7 +296,14 @@ describe('comfyui utilities', () => {
       expect(mockCallbacks.onError).toBeInstanceOf(Function)
 
       expect(() => {
-        connectWebSocket(promptId, clientId, finalSaveNodeId, mockWorkflow, mockCallbacks)
+        connectWebSocket(
+          promptId,
+          clientId,
+          finalSaveNodeId,
+          mockWorkflow,
+          mockCallbacks,
+          'http://127.0.0.1:8188'
+        )
       }).not.toThrow()
     })
   })

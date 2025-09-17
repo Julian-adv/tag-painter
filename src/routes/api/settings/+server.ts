@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit'
 import fs from 'fs/promises'
 import path from 'path'
-import { DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
+import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
 
 const SETTINGS_FILE = path.resolve(process.cwd(), 'data', 'settings.json')
 
@@ -25,6 +25,7 @@ export async function GET() {
           steps: 28,
           seed: -1,
           sampler: 'euler_ancestral',
+          comfyUrl: DEFAULT_COMFY_URL,
           outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
           selectedVae: '__embedded__',
           clipSkip: 2,
@@ -40,6 +41,10 @@ export async function GET() {
     // Ensure clipSkip exists with default value
     if (settings.clipSkip == null) {
       settings.clipSkip = 2
+    }
+
+    if (!settings.comfyUrl) {
+      settings.comfyUrl = DEFAULT_COMFY_URL
     }
 
     return json({
