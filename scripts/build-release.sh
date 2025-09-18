@@ -123,8 +123,11 @@ done
 
 SETTINGS_PATH="$DATA_DIR/settings.json"
 if [[ -f "$SETTINGS_PATH" ]]; then
-  if command -v node >/dev/null 2>&1; then
-    if node - "$SETTINGS_PATH" <<'NODE'; then
+  if ! command -v node >/dev/null 2>&1; then
+    echo "Error: Node.js is required to process settings.json for release. Please install Node.js." >&2
+    exit 1
+  fi
+  if node - "$SETTINGS_PATH" <<'NODE'; then
 const fs = require('fs');
 const path = process.argv[2];
 if (!path) {
@@ -134,34 +137,19 @@ try {
   const raw = fs.readFileSync(path, 'utf8');
   const data = JSON.parse(raw);
   data.outputDirectory = '';
+  data.comfyUrl = 'http://127.0.0.1:8188';
   fs.writeFileSync(path, JSON.stringify(data, null, 2));
 } catch (err) {
   console.error(err.message);
   process.exit(1);
 }
 NODE
-      echo "Release settings.json: outputDirectory blanked"
-    else
-      echo "Warning: failed to process settings.json for release." >&2
-    fi
-  elif command -v python3 >/dev/null 2>&1; then
-    if python3 - "$SETTINGS_PATH" <<'PY'; then
-import json
-import sys
-
-path = sys.argv[1]
-with open(path, 'r', encoding='utf-8') as fh:
-    data = json.load(fh)
-data['outputDirectory'] = ''
-with open(path, 'w', encoding='utf-8') as fh:
-    json.dump(data, fh, indent=2)
-PY
-      echo "Release settings.json: outputDirectory blanked"
+      echo "Release settings.json: comfyUrl and outputDirectory reset"
     else
       echo "Warning: failed to process settings.json for release." >&2
     fi
   else
-    echo "Warning: cannot blank settings.json without node or python3." >&2
+    echo "Warning: failed to process settings.json for release." >&2
   fi
 fi
 

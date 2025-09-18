@@ -5,6 +5,7 @@ set -euo pipefail
 
 PORT="${PORT:-3000}"
 REINSTALL_COMFY=0
+COMFY_ONLY=0
 MODELS_BACKUP_DIR=""
 
 while [[ $# -gt 0 ]]; do
@@ -12,13 +13,16 @@ while [[ $# -gt 0 ]]; do
     --reinstall-comfy)
       REINSTALL_COMFY=1
       ;;
+    --comfy-only)
+      COMFY_ONLY=1
+      ;;
     --help|-h)
-      echo "Usage: $(basename "$0") [--reinstall-comfy]" >&2
+      echo "Usage: $(basename "$0") [--reinstall-comfy] [--comfy-only]" >&2
       exit 0
       ;;
     *)
       echo "Unknown option: $1" >&2
-      echo "Usage: $(basename "$0") [--reinstall-comfy]" >&2
+      echo "Usage: $(basename "$0") [--reinstall-comfy] [--comfy-only]" >&2
       exit 1
       ;;
   esac
@@ -233,26 +237,33 @@ else
   sleep 5
 fi
 
-if [[ ! -f "$REPO_ROOT/build/index.js" ]]; then
-  echo "Missing build output. Please build the app first (npm run build) or use a release ZIP including build/." >&2
-  exit 1
+if [[ $COMFY_ONLY -eq 0 ]]; then
+  if [[ ! -f "$REPO_ROOT/build/index.js" ]]; then
+    echo "Missing build output. Please build the app first (npm run build) or use a release ZIP including build/." >&2
+    exit 1
+  fi
+
+  export PORT
+  if [[ -z "${BODY_SIZE_LIMIT:-}" ]]; then
+    export BODY_SIZE_LIMIT=52428800
+  fi
+  if [[ -z "${NODE_ENV:-}" ]]; then
+    export NODE_ENV=production
+  fi
+
+  echo "Starting Node server on http://127.0.0.1:$PORT ..."
+  cd "$REPO_ROOT"
+  echo "Mirroring Node server logs to console"
+  node build/index.js 2>&1 &
+  APP_PID=$!
+
+  echo "ComfyUI PID: $COMFY_PID"
+  echo "App PID: $APP_PID"
+  echo "Press Ctrl+C to exit (this won't stop background processes)."
+else
+  echo "ComfyUI PID: $COMFY_PID"
+  echo "Comfy-only mode; Node server not started."
+  echo "Press Ctrl+C to exit (this won't stop background processes)."
 fi
 
-export PORT
-if [[ -z "${BODY_SIZE_LIMIT:-}" ]]; then
-  export BODY_SIZE_LIMIT=52428800
-fi
-if [[ -z "${NODE_ENV:-}" ]]; then
-  export NODE_ENV=production
-fi
-
-echo "Starting Node server on http://127.0.0.1:$PORT ..."
-cd "$REPO_ROOT"
-echo "Mirroring Node server logs to console"
-node build/index.js 2>&1 &
-APP_PID=$!
-
-echo "ComfyUI PID: $COMFY_PID"
-echo "App PID: $APP_PID"
-echo "Press Ctrl+C to exit (this won't stop background processes)."
 wait
