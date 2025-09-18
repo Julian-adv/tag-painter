@@ -86,9 +86,23 @@ fi
 
 echo "Installing torch (auto-detect NVIDIA)..."
 if command -v nvidia-smi >/dev/null 2>&1; then
-  "$VENV_PY" -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+  GPU_CAP_RAW=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -n1 | tr -d ' ')
+  if [[ "$GPU_CAP_RAW" =~ ^([0-9]+)\.([0-9]+)$ ]]; then
+    GPU_CAP_MAJOR="${BASH_REMATCH[1]}"
+    # Compute capability 12.x corresponds to sm120 (RTX 50-series).
+    if (( GPU_CAP_MAJOR >= 12 )); then
+      echo "Detected compute capability $GPU_CAP_RAW; installing PyTorch nightly (CUDA 12.9) for RTX 50-series."
+      "$VENV_PY" -m pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu129
+    else
+      echo "Detected compute capability $GPU_CAP_RAW; installing CUDA 12.1 PyTorch wheels."
+      "$VENV_PY" -m pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+    fi
+  else
+    echo "Warning: could not parse compute capability from nvidia-smi; installing CUDA 12.1 PyTorch wheels." >&2
+    "$VENV_PY" -m pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+  fi
 else
-  "$VENV_PY" -m pip install torch torchvision torchaudio
+  "$VENV_PY" -m pip install --upgrade torch torchvision torchaudio
 fi
 
 install_node_requirements() {
