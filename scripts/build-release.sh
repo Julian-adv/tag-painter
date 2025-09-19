@@ -43,7 +43,6 @@ if [[ "$OUT_FILE" == "tag-painter-release.zip" ]]; then
   else
     echo "Warning: could not read version from package.json; using default name." >&2
   fi
-fi
 
 if [[ $NO_BUILD -eq 0 ]]; then
   echo "Building app..."
@@ -114,7 +113,7 @@ done
 
 DATA_DIR="$PAYLOAD_ROOT/data"
 mkdir -p "$DATA_DIR"
-for data_file in prompts.json settings.json wildcards.yaml outfits.txt; do
+for data_file in prompts.json settings.json wildcards.yaml outfits.txt lights.txt; do
   src_path="data/$data_file"
   if [[ -f "$src_path" ]]; then
     cp "$src_path" "$DATA_DIR/"
