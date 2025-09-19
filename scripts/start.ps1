@@ -79,6 +79,28 @@ function Test-Http($url) {
   } catch { return $false }
 }
 
+function Invoke-Bootstrap {
+  param(
+    [string[]]$BootstrapArgs
+  )
+  $scriptPath = Resolve-Path "scripts\\bootstrap.ps1"
+  $pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
+  if ($pwshCmd) {
+    & $pwshCmd.Path -File $scriptPath @BootstrapArgs
+    if ($LASTEXITCODE -ne 0) { throw "bootstrap.ps1 failed (pwsh exit code $LASTEXITCODE)" }
+    return
+  }
+
+  $powershellCmd = Get-Command powershell -ErrorAction SilentlyContinue
+  if ($powershellCmd) {
+    & $powershellCmd.Path -ExecutionPolicy Bypass -File $scriptPath @BootstrapArgs
+    if ($LASTEXITCODE -ne 0) { throw "bootstrap.ps1 failed (powershell exit code $LASTEXITCODE)" }
+    return
+  }
+
+  & $scriptPath @BootstrapArgs
+}
+
 function Install-PythonPackages($venvPy, [string[]]$packages) {
   try { & $venvPy -m ensurepip --upgrade } catch {}
   $pipOk = $false
@@ -359,9 +381,9 @@ try {
       Write-Host "Running bootstrap to prepare environment (Node, ComfyUI)..." -ForegroundColor DarkCyan
     }
 
-    $bootstrapArgs = @('-File', "scripts\\bootstrap.ps1", '-SkipBuild')
+    $bootstrapArgs = @('-SkipBuild')
     if ($NoComfy) { $bootstrapArgs += '-SkipComfy' }
-    & pwsh @bootstrapArgs | Write-Host
+    Invoke-Bootstrap -bootstrapArgs $bootstrapArgs
 
     # Ensure Node deps are installed without rebuilding app
     Write-Host "Installing Node dependencies (npm ci)..." -ForegroundColor DarkCyan
@@ -394,7 +416,7 @@ try {
 
     if ($needsBootstrap) {
       Write-Header "Setting up ComfyUI (latest source)"
-      & pwsh -File "scripts\\bootstrap.ps1" -SkipBuild | Write-Host
+      Invoke-Bootstrap -bootstrapArgs @('-SkipBuild')
     }
 
     # Ensure CUDA-enabled torch is installed when NVIDIA is present; decide CPU fallback
