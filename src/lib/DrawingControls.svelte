@@ -1,5 +1,7 @@
 <!-- Drawing controls for mask editing -->
 <script lang="ts">
+  import { m } from '$lib/paraglide/messages'
+
   interface Props {
     isDrawingMode: boolean
     drawingTool: 'brush' | 'fill'
@@ -15,7 +17,7 @@
       ? 'border-blue-400 bg-sky-500 text-white hover:bg-blue-600'
       : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50'}"
     onclick={() => (isDrawingMode = !isDrawingMode)}
-    aria-label="Draw mask"
+    aria-label={m['drawingControls.toggle']()}
   >
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
       <path
@@ -31,7 +33,7 @@
           ? 'rounded-full bg-teal-500 text-white shadow-sm'
           : 'rounded-full text-gray-700 hover:bg-gray-200'}"
         onclick={() => (drawingTool = 'brush')}
-        aria-label="Brush mode"
+        aria-label={m['drawingControls.brush']()}
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
           <path
@@ -45,7 +47,7 @@
           ? 'rounded-full bg-teal-500 text-white shadow-sm'
           : 'rounded-full text-gray-700 hover:bg-gray-200'}"
         onclick={() => (drawingTool = 'fill')}
-        aria-label="Fill mode"
+        aria-label={m['drawingControls.fill']()}
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
           <path
@@ -58,7 +60,7 @@
     <button
       class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-red-300 bg-red-50 text-red-600 transition-all duration-200 hover:scale-105 hover:border-red-400 hover:bg-red-100 active:scale-95"
       onclick={onClearMask}
-      aria-label="Clear mask"
+      aria-label={m['drawingControls.clear']()}
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <path d="M3 6h18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />

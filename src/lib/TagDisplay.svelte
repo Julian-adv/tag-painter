@@ -10,6 +10,7 @@
   import type { CustomTag } from './types'
   import { getWildcardModel } from './stores/tagsStore'
   import { createPlaceholderRegex } from '$lib/constants'
+  import { m } from '$lib/paraglide/messages'
 
   // Cache referenced placeholder containers per model+tag to avoid rescanning on every render
   const refCacheByModel: WeakMap<object, Map<string, string[]>> = new WeakMap()
@@ -280,7 +281,7 @@
   class="min-h-[6rem] w-full rounded-lg border border-gray-300 bg-white p-1"
   tabindex="-1"
   role="textbox"
-  aria-label="Tag display area"
+  aria-label={m['tagDisplay.aria']()}
   onkeydown={handleKeydown}
 >
   {#if tags.length > 0}
@@ -327,7 +328,7 @@
         {@const isForceOverridden = !!(store?.overrideTag || store?.pinnedLeafPath)}
         <LockClosed class="h-4 w-4 {isForceOverridden ? 'text-orange-500' : 'text-gray-500'}" />
         <span>
-          {isForceOverridden ? 'Unpin this option' : 'Pin this option'}
+          {isForceOverridden ? m['tagDisplay.unpin']() : m['tagDisplay.pin']()}
         </span>
       {/if}
     </button>
@@ -339,12 +340,13 @@
 
       {#if displayContent && !isForceOverridden}
         <div class="border-t border-gray-200 px-3 py-1 text-xs text-gray-500">
-          Will pin: <span class="font-medium">{displayContent}</span>
+          {m['tagDisplay.willPinLabel']()} <span class="font-medium">{displayContent}</span>
         </div>
       {/if}
       {#if isForceOverridden}
         <div class="border-t border-gray-200 px-3 py-1 text-xs text-gray-500">
-          Pinned to: <span class="font-medium">{store?.overrideTag || 'path-based pin'}</span>
+          {m['tagDisplay.pinnedToLabel']()}{' '}
+          <span class="font-medium">{store?.overrideTag || m['tagDisplay.pathPin']()}</span>
         </div>
       {/if}
     {/if}

@@ -9,6 +9,7 @@
   import { Tag, LockOpen } from 'svelte-heros-v2'
   import { get } from 'svelte/store'
   import type { CustomTag, Settings } from './types'
+  import { m } from '$lib/paraglide/messages'
   // Use callback prop instead of deprecated createEventDispatcher
 
   interface Props {
@@ -162,14 +163,14 @@
 
 <div class="flex h-full w-full flex-shrink-1 flex-col">
   <div class="flex items-center justify-between pb-2">
-    <h3 class="text-left text-sm font-bold text-gray-800">Tags</h3>
+    <h3 class="text-left text-sm font-bold text-gray-800">{m['tagZones.title']()}</h3>
     <div class="flex gap-1">
       {#if hasAnyPinnedTags()}
         <button
           type="button"
           onclick={clearAllPins}
           class="flex h-5 w-5 items-center justify-center rounded bg-gray-300 text-gray-700 transition-colors hover:bg-gray-400 focus:ring-2 focus:ring-gray-300 focus:ring-offset-1 focus:outline-none"
-          title="Clear all pinned tags"
+          title={m['tagZones.clearPins']()}
         >
           <LockOpen class="h-3 w-3" />
         </button>
@@ -178,7 +179,7 @@
         type="button"
         onclick={openTreeEditDialog}
         class="flex h-5 w-5 items-center justify-center rounded bg-gray-300 text-gray-700 transition-colors hover:bg-gray-400 focus:ring-2 focus:ring-gray-300 focus:ring-offset-1 focus:outline-none"
-        title="Manage custom tags"
+        title={m['tagZones.manageCustom']()}
       >
         <Tag class="h-3 w-3" />
       </button>
@@ -190,7 +191,7 @@
     <!-- Settings-derived prefixes preview -->
     <div>
       <div class="mb-1 flex items-center justify-between">
-        <div class="text-left text-xs font-medium text-gray-700">Quality Prefix (Settings)</div>
+        <div class="text-left text-xs font-medium text-gray-700">{m['tagZones.qualityPreview']()}</div>
       </div>
       <div
         id="quality-prefix-preview"
@@ -205,7 +206,7 @@
 
     <div>
       <div class="mb-1 flex items-center justify-between">
-        <div class="text-left text-xs font-medium text-gray-700">Negative Prefix (Settings)</div>
+        <div class="text-left text-xs font-medium text-gray-700">{m['tagZones.negativePreview']()}</div>
       </div>
       <div
         id="negative-prefix-preview"
@@ -219,7 +220,7 @@
     </div>
     <TagInput
       id="all-tags"
-      label="All"
+      label={m['tagZones.allLabel']()}
       bind:tags={allTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('all', name)}
@@ -228,7 +229,7 @@
 
     <TagInput
       id="first-zone-tags"
-      label="First Zone"
+      label={m['tagZones.firstLabel']()}
       bind:tags={firstZoneTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
@@ -237,7 +238,7 @@
 
     <TagInput
       id="second-zone-tags"
-      label="Second Zone"
+      label={m['tagZones.secondLabel']()}
       bind:tags={secondZoneTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
@@ -247,7 +248,7 @@
 
     <TagInput
       id="negative-tags"
-      label="Negative Tags"
+      label={m['tagZones.negativeLabel']()}
       bind:tags={negativeTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('negative', name)}
@@ -256,7 +257,7 @@
 
     <TagInput
       id="inpainting-tags"
-      label="Inpainting Prompt"
+      label={m['tagZones.inpaintingLabel']()}
       bind:tags={inpaintingTags}
       onTagsChange={saveTags}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('inpainting', name)}

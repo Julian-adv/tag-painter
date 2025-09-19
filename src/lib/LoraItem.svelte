@@ -1,6 +1,7 @@
 <!-- Individual LoRA item component with weight adjustment and removal functionality -->
 <script lang="ts">
   import { XMark } from 'svelte-heros-v2'
+  import { m } from '$lib/paraglide/messages'
 
   interface LoraData {
     name: string
@@ -53,7 +54,7 @@
   onwheel={handleWheel}
   role="button"
   tabindex="-1"
-  aria-label="LoRA: {lora.name}. Weight: {lora.weight}. Ctrl+Scroll to adjust weight."
+  aria-label={m['loraItem.aria']({ name: lora.name, weight: String(lora.weight) })}
   class="relative inline-block max-w-full rounded-md border border-purple-300 bg-purple-50 px-3 py-0.5 pr-1 pl-1.5 text-left text-sm text-purple-800 hover:bg-purple-100"
 >
   <div class="inline-block">
@@ -75,7 +76,7 @@
       class="flex h-4 w-4 items-center justify-center rounded-full bg-transparent text-purple-600 hover:bg-purple-200 hover:text-purple-800"
       tabindex="-1"
       onclick={() => onRemove(lora.name)}
-      aria-label="Remove {lora.name}"
+      aria-label={m['loraItem.removeAria']({ name: lora.name })}
     >
       <XMark class="h-3 w-3" />
     </button>

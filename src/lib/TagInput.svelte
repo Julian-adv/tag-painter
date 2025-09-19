@@ -4,6 +4,7 @@
   import TagDisplay from './TagDisplay.svelte'
   import { wildcardTagType } from './stores/tagsStore'
   import type { CustomTag } from './types'
+  import { m } from '$lib/paraglide/messages'
 
   interface Props {
     id: string
@@ -85,7 +86,7 @@
     <AutoCompleteTextarea
       id={`${id}-quick`}
       bind:value={quickTagInput}
-      placeholder="Type tags to add (press Enter to add)..."
+      placeholder={m['tagInput.quickPlaceholder']()}
       rows={1}
       class="w-full rounded border border-gray-200 p-1 text-sm focus:border-sky-500 focus:ring-sky-500"
       readonly={disabled}

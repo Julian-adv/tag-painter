@@ -3,6 +3,7 @@
   import { XMark, LockClosed } from 'svelte-heros-v2'
   import { getTagClasses, getTagRemoveButtonClasses } from './utils/tagStyling'
   import type { CustomTag } from './types'
+  import { m } from '$lib/paraglide/messages'
 
   interface Props {
     tag: CustomTag
@@ -154,7 +155,7 @@
     oncontextmenu={handleRightClick}
     role="button"
     tabindex="-1"
-    aria-label="Drag to reorder tag: {tag.name}. Ctrl+Scroll to adjust weight. Right-click for options."
+    aria-label={m['tagItem.aria']({ name: tag.name })}
     class="relative inline-block max-w-full {getTagClasses({
       tag,
       dragged: draggedIndex === index,
@@ -175,12 +176,16 @@
       ondblclick={handleTagDoubleClick}
       onkeydown={handleTagKeydown}
       oncontextmenu={handleRightClick}
-      title={tag.type === 'regular'
-        ? `Double-click to create custom tag from: ${tag.name}`
-        : `Double-click to edit ${tag.name}. Right-click for options.`}
-      aria-label={tag.type === 'regular'
-        ? `Create custom tag from ${tag.name}`
-        : `Edit custom tag ${tag.name}. Right-click for options.`}
+      title={
+        tag.type === 'regular'
+          ? m['tagItem.titleCreate']({ name: tag.name })
+          : m['tagItem.titleEdit']({ name: tag.name })
+      }
+      aria-label={
+        tag.type === 'regular'
+          ? m['tagItem.ariaCreate']({ name: tag.name })
+          : m['tagItem.ariaEdit']({ name: tag.name })
+      }
       role="button"
     >
       <div class="inline-block">
@@ -213,7 +218,7 @@
         class={getTagRemoveButtonClasses(tag, isTestSelected)}
         tabindex="-1"
         onclick={() => onRemove(tag.name)}
-        aria-label="Remove {tag.name}"
+        aria-label={m['tagItem.removeAria']({ name: tag.name })}
       >
         <XMark class="h-3 w-3" />
       </button>

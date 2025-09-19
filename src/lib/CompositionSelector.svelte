@@ -3,14 +3,23 @@
   import { onMount } from 'svelte'
   import { promptsData, updateComposition } from './stores/promptsStore'
   import { maskOverlay } from './stores/maskOverlayStore'
+  import { m } from '$lib/paraglide/messages'
 
   let tempMaskTimestamp = $state(0)
 
   const getCompositions = () => [
-    { id: 'all', src: '/all-mask.png', alt: 'All' },
-    { id: 'left-horizontal', src: '/left-horizontal-mask.png', alt: 'Left Horizontal' },
-    { id: 'top-vertical', src: '/top-vertical-mask.png', alt: 'Top Vertical' },
-    { id: 'temp-mask', src: `/temp_mask.png?t=${tempMaskTimestamp}`, alt: 'Custom Mask' }
+    { id: 'all', src: '/all-mask.png', alt: m['compositionSelector.altAll']() },
+    {
+      id: 'left-horizontal',
+      src: '/left-horizontal-mask.png',
+      alt: m['compositionSelector.altLeftHorizontal']()
+    },
+    { id: 'top-vertical', src: '/top-vertical-mask.png', alt: m['compositionSelector.altTopVertical']() },
+    {
+      id: 'temp-mask',
+      src: `/temp_mask.png?t=${tempMaskTimestamp}`,
+      alt: m['compositionSelector.altCustom']()
+    }
   ]
 
   onMount(() => {
@@ -42,7 +51,7 @@
 </script>
 
 <div class="border-gray-200">
-  <h3 class="text-left text-sm font-bold text-gray-800">Composition</h3>
+  <h3 class="text-left text-sm font-bold text-gray-800">{m['compositionSelector.title']()}</h3>
   <div class="m-2 flex flex-wrap gap-1 rounded-lg bg-gray-200 p-1">
     {#each getCompositions() as composition (composition.id)}
       <button

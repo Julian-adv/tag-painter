@@ -2,6 +2,7 @@
 <script lang="ts">
   import SettingsDialog from './SettingsDialog.svelte'
   import { Cog8Tooth, Play, Stop, ArrowPath, PaintBrush } from 'svelte-heros-v2'
+  import { m } from '$lib/paraglide/messages'
   import type { Settings, ProgressData } from '$lib/types'
 
   interface Props {
@@ -67,17 +68,21 @@
       onclick={onGenerate}
       disabled={isLoading || isGeneratingForever}
     >
-      {isLoading ? 'Generating...' : 'Generate'}
+      {isLoading ? m['generationControls.generating']() : m['generationControls.generate']()}
     </button>
 
     <button
       class="flex h-9 cursor-pointer items-center justify-center gap-1 rounded-md border-none bg-green-500 px-2 py-1.5 text-sm font-semibold text-white transition-all duration-200 hover:enabled:-translate-y-0.5 hover:enabled:bg-green-600 hover:enabled:shadow-lg active:enabled:translate-y-0 disabled:transform-none disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
       onclick={onRegenerate}
       disabled={isLoading || isGeneratingForever || lastSeed === null}
-      title={lastSeed !== null ? `Regenerate with seed: ${lastSeed}` : 'No previous seed available'}
+      title={
+        lastSeed !== null
+          ? m['generationControls.regenTooltip']({ seed: String(lastSeed) })
+          : m['generationControls.regenTooltipMissing']()
+      }
     >
       <ArrowPath class="h-4 w-4" />
-      Regen
+      {m['generationControls.regen']()}
     </button>
 
     <button
@@ -96,7 +101,7 @@
       class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-gray-100 text-gray-600 transition-all duration-200 hover:enabled:-translate-y-0.5 hover:enabled:bg-gray-200 hover:enabled:shadow-lg active:enabled:translate-y-0 disabled:transform-none disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none"
       onclick={openSettingsDialog}
       disabled={isLoading}
-      aria-label="Settings"
+      aria-label={m['generationControls.settings']()}
       ><Cog8Tooth />
     </button>
   </div>
@@ -109,11 +114,13 @@
       disabled={isLoading || isGeneratingForever}
     >
       <PaintBrush class="h-4 w-4" />
-      Inpaint
+      {m['generationControls.inpaint']()}
     </button>
 
     <div class="flex items-center gap-2">
-      <label for="denoise-strength" class="text-sm font-medium text-gray-600">Denoise:</label>
+      <label for="denoise-strength" class="text-sm font-medium text-gray-600">
+        {m['generationControls.denoise']()}
+      </label>
       <input
         id="denoise-strength"
         type="number"
@@ -145,7 +152,7 @@
     class="min-h-[1.2em] text-left text-xs text-gray-500 italic opacity-0"
     class:!opacity-100={isLoading && progressData.currentNode}
   >
-    {progressData.currentNode || 'Ready'}
+    {progressData.currentNode || m['generationControls.ready']()}
   </div>
 </div>
 

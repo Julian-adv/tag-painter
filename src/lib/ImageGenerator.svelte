@@ -7,6 +7,7 @@
   import TagZones from './TagZones.svelte'
   import LoraSelector from './LoraSelector.svelte'
   import { dev } from '$app/environment'
+  import { m } from '$lib/paraglide/messages'
   import NoCheckpointsDialog from './NoCheckpointsDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import { loadSettings, saveSettings as saveSettingsToFile, saveMaskData } from './utils/fileIO'
@@ -234,7 +235,7 @@
     promptsData.subscribe((data) => (currentPromptsData = data))()
 
     if (!currentPromptsData!.tags.inpainting || currentPromptsData!.tags.inpainting.length === 0) {
-      alert('Please add inpainting prompts before using inpainting.')
+      alert(m['imageGenerator.missingInpaintingAlert']())
       return
     }
 
@@ -411,12 +412,13 @@
       <div class="flex flex-shrink-0 flex-col gap-1">
         <div class="flex flex-col gap-2">
           <div class="flex items-center justify-between gap-2">
-            <label for="checkpoint" class="text-left text-sm font-bold text-black">Checkpoint</label
-            >
+            <label for="checkpoint" class="text-left text-sm font-bold text-black">
+              {m['imageGenerator.checkpointLabel']()}
+            </label>
             <button
               type="button"
               class="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-1 py-0.5 text-xs text-gray-700 hover:bg-gray-50"
-              title="Reload lists from ComfyUI"
+              title={m['imageGenerator.reloadCheckpoints']()}
               onclick={refreshModels}
             >
               <ArrowPath class="h-3 w-3" />
@@ -428,7 +430,7 @@
             onchange={(e) => updateCheckpoint((e.target as HTMLSelectElement).value)}
             class="box-border w-full rounded border border-gray-300 bg-white p-1 text-xs transition-colors duration-200 focus:border-green-500 focus:shadow-[0_0_0_2px_rgba(76,175,80,0.2)] focus:outline-none"
           >
-            <option value="">Select checkpoint...</option>
+            <option value="">{m['imageGenerator.selectCheckpoint']()}</option>
             {#each availableCheckpoints as checkpoint (checkpoint)}
               <option value={checkpoint}>{checkpoint}</option>
             {/each}
@@ -452,7 +454,7 @@
               onchange={(e) => updateUpscale((e.target as HTMLInputElement).checked)}
               class="m-0 cursor-pointer"
             />
-            Use Upscale
+            {m['imageGenerator.useUpscale']()}
           </label>
         </div>
 
@@ -464,7 +466,7 @@
               checked={$promptsData.useFaceDetailer}
               onchange={(e) => updateFaceDetailer((e.target as HTMLInputElement).checked)}
             />
-            Use Face Detailer
+            {m['imageGenerator.useFaceDetailer']()}
           </label>
         </div>
       </div>
@@ -490,7 +492,7 @@
           class="self-start rounded border border-dashed border-gray-300 bg-white px-2 py-1 text-xs text-gray-600 shadow-sm transition hover:border-gray-400 hover:text-gray-800"
           onclick={openNoCheckpointsDialog}
         >
-          Show No Checkpoints Dialog
+          {m['imageGenerator.devShowDialog']()}
         </button>
       {/if}
     </section>

@@ -4,6 +4,7 @@
   import LoraSelector from './LoraSelector.svelte'
   import { promptsData } from './stores/promptsStore'
   import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
+  import { m } from '$lib/paraglide/messages'
 
   interface Props {
     show: boolean
@@ -223,13 +224,15 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="dialog-content" onclick={(e) => e.stopPropagation()}>
       <div class="dialog-header">
-        <h3>Settings</h3>
-        <button class="close-button" onclick={onClose}>×</button>
+        <h3>{m['settingsDialog.title']()}</h3>
+        <button class="close-button" onclick={onClose} aria-label={m['settingsDialog.close']()}>
+          ×
+        </button>
       </div>
 
       <div class="dialog-body">
         <!-- Global settings -->
-        <label for="image-width" class="two-col-label">Image Width:</label>
+        <label for="image-width" class="two-col-label">{m['settingsDialog.imageWidth']()}</label>
         <input
           id="image-width"
           type="number"
@@ -240,7 +243,7 @@
           class="two-col-input"
         />
 
-        <label for="image-height" class="two-col-label">Image Height:</label>
+        <label for="image-height" class="two-col-label">{m['settingsDialog.imageHeight']()}</label>
         <input
           id="image-height"
           type="number"
@@ -251,7 +254,7 @@
           class="two-col-input"
         />
 
-        <label for="seed" class="two-col-label">Seed (-1 for random):</label>
+        <label for="seed" class="two-col-label">{m['settingsDialog.seed']()}</label>
         <input
           id="seed"
           type="number"
@@ -263,21 +266,21 @@
         />
 
         <!-- Output directory remains global -->
-        <label for="output-directory" class="output-dir-label">Output Directory:</label>
+        <label for="output-directory" class="output-dir-label">{m['settingsDialog.outputDirectory']()}</label>
         <input
           id="output-directory"
           type="text"
           bind:value={localSettings.outputDirectory}
-          placeholder="/path/to/output/directory"
+          placeholder={m['settingsDialog.outputPlaceholder']()}
           class="output-dir-input"
         />
 
-        <label for="comfy-url" class="output-dir-label">ComfyUI URL:</label>
+        <label for="comfy-url" class="output-dir-label">{m['settingsDialog.comfyUrl']()}</label>
         <input
           id="comfy-url"
           type="text"
           bind:value={localSettings.comfyUrl}
-          placeholder="http://127.0.0.1:8188"
+          placeholder={m['settingsDialog.comfyUrlPlaceholder']()}
           class="output-dir-input"
         />
 
@@ -287,10 +290,10 @@
           class="section-title"
           style="grid-column: 1 / 4; font-weight: 600; color: #333; text-align: left; justify-self: start;"
         >
-          Per-Model Overrides
+          {m['settingsDialog.perModelTitle']()}
         </div>
 
-        <label for="model-key" class="two-col-label">Model:</label>
+        <label for="model-key" class="two-col-label">{m['settingsDialog.model']()}</label>
         <select
           id="model-key"
           class="two-col-input"
@@ -303,7 +306,7 @@
         </select>
 
         {#if localSettings.perModel[selectedModelKey]}
-          <label for="pm-cfg" class="two-col-label">CFG Scale:</label>
+          <label for="pm-cfg" class="two-col-label">{m['settingsDialog.cfgScale']()}</label>
           <input
             id="pm-cfg"
             type="number"
@@ -314,7 +317,7 @@
             class="two-col-input"
           />
 
-          <label for="pm-steps" class="two-col-label">Steps:</label>
+          <label for="pm-steps" class="two-col-label">{m['settingsDialog.steps']()}</label>
           <input
             id="pm-steps"
             type="number"
@@ -325,7 +328,7 @@
             class="two-col-input"
           />
 
-          <label for="pm-sampler" class="two-col-label">Sampler:</label>
+          <label for="pm-sampler" class="two-col-label">{m['settingsDialog.sampler']()}</label>
           <select
             id="pm-sampler"
             bind:value={localSettings.perModel[selectedModelKey].sampler}
@@ -375,7 +378,7 @@
             <option value="uni_pc_bh2">Uni PC BH2</option>
           </select>
 
-          <label for="pm-scheduler" class="two-col-label">Scheduler:</label>
+          <label for="pm-scheduler" class="two-col-label">{m['settingsDialog.scheduler']()}</label>
           <select
             id="pm-scheduler"
             bind:value={localSettings.perModel[selectedModelKey].scheduler}
@@ -392,19 +395,19 @@
             <option value="kl_optimal">KL Optimal</option>
           </select>
 
-          <label for="pm-vae" class="two-col-label">VAE:</label>
+          <label for="pm-vae" class="two-col-label">{m['settingsDialog.vae']()}</label>
           <select
             id="pm-vae"
             bind:value={localSettings.perModel[selectedModelKey].selectedVae}
             class="two-col-input-wide"
           >
-            <option value="__embedded__">Use checkpoint's embedded VAE (default)</option>
+            <option value="__embedded__">{m['settingsDialog.useEmbeddedVae']()}</option>
             {#each availableVaes as vae (vae)}
               <option value={vae}>{vae}</option>
             {/each}
           </select>
 
-          <label for="pm-clipskip" class="two-col-label">CLIP Skip:</label>
+          <label for="pm-clipskip" class="two-col-label">{m['settingsDialog.clipSkip']()}</label>
           <input
             id="pm-clipskip"
             type="number"
@@ -415,29 +418,29 @@
             class="two-col-input"
           />
 
-          <label for="pm-quality" class="two-col-label">Quality Prefix:</label>
+          <label for="pm-quality" class="two-col-label">{m['settingsDialog.qualityPrefix']()}</label>
           <div class="two-col-input-wide">
             <AutoCompleteTextarea
               id="pm-quality"
               value={localSettings.perModel[selectedModelKey].qualityPrefix}
               onValueChange={(v) => (localSettings.perModel[selectedModelKey].qualityPrefix = v)}
-              placeholder="e.g., masterwork, high quality"
+              placeholder={m['settingsDialog.qualityPlaceholder']()}
               rows={3}
             />
           </div>
 
-          <label for="pm-negative" class="two-col-label">Negative Prefix:</label>
+          <label for="pm-negative" class="two-col-label">{m['settingsDialog.negativePrefix']()}</label>
           <div class="two-col-input-wide">
             <AutoCompleteTextarea
               id="pm-negative"
               value={localSettings.perModel[selectedModelKey].negativePrefix}
               onValueChange={(v) => (localSettings.perModel[selectedModelKey].negativePrefix = v)}
-              placeholder="e.g., lowres, bad anatomy"
+              placeholder={m['settingsDialog.negativePlaceholder']()}
               rows={3}
             />
           </div>
 
-          <div class="two-col-label" style="text-align: right;">LoRA Models:</div>
+          <div class="two-col-label" style="text-align: right;">{m['settingsDialog.loraModels']()}</div>
           <div class="two-col-input-wide lora-embed">
             <LoraSelector
               selectedLoras={localSettings.perModel[selectedModelKey].loras as LoraWithWeight[]}
@@ -457,14 +460,14 @@
           onclick={handleSave}
           disabled={!hasUnsavedChanges}
         >
-          Save
+          {m['settingsDialog.save']()}
         </button>
         <button
           type="button"
           class="rounded-md bg-gray-200 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:outline-none"
           onclick={onClose}
         >
-          Close
+          {m['settingsDialog.close']()}
         </button>
       </div>
     </div>

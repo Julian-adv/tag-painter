@@ -2,6 +2,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { initTags, isCustomTag, combinedTags } from './stores/tagsStore'
+  import { m } from '$lib/paraglide/messages'
 
   interface Props {
     id?: string
@@ -19,7 +20,7 @@
   let {
     id,
     value = $bindable(),
-    placeholder = 'Enter text...',
+    placeholder,
     rows = 1,
     class: className = '',
     readonly = false,
@@ -28,6 +29,8 @@
     specialSuggestions = [],
     specialTriggerPrefix = '__'
   }: Props = $props()
+
+  const resolvedPlaceholder = $derived(() => placeholder ?? m['autoComplete.placeholder']())
 
   let textareaElement: HTMLTextAreaElement
   let suggestions: string[] = $state([])
@@ -354,7 +357,7 @@
     {id}
     bind:this={textareaElement}
     bind:value
-    {placeholder}
+    placeholder={resolvedPlaceholder()}
     {readonly}
     {rows}
     class="box-border block w-full resize-y rounded border border-gray-300 bg-white p-1 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200 focus:outline-none {readonly

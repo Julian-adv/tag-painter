@@ -3,6 +3,7 @@
   import LoraItem from './LoraItem.svelte'
   import LoraSelectionModal from './LoraSelectionModal.svelte'
   import { Plus } from 'svelte-heros-v2'
+  import { m } from '$lib/paraglide/messages'
 
   interface LoraWithWeight {
     name: string
@@ -33,11 +34,11 @@
         availableLoras = data.loras || []
         error = ''
       } else {
-        error = data.error || 'Failed to fetch LoRA models'
+        error = data.error ? String(data.error) : m['loraSelector.fetchError']()
         availableLoras = []
       }
     } catch (err) {
-      error = 'Failed to connect to ComfyUI'
+      error = m['loraSelector.connectError']()
       availableLoras = []
       console.error('Error fetching LoRAs:', err)
     } finally {
@@ -80,18 +81,18 @@
 </script>
 
 <div class="lora-selector">
-  <h3 class="mb-2 pt-1 text-left text-sm font-bold text-gray-700">LoRA Models</h3>
+  <h3 class="mb-2 pt-1 text-left text-sm font-bold text-gray-700">{m['loraSelector.title']()}</h3>
 
   <!-- Stable-height container prevents layout jump during refresh -->
   <div
     class="lora-display-area max-h-24 min-h-[6rem] w-full overflow-y-auto rounded-lg border border-gray-300 bg-white p-2"
   >
     {#if loading}
-      <div class="text-sm text-gray-500" aria-live="polite">Loading LoRA models...</div>
+      <div class="text-sm text-gray-500" aria-live="polite">{m['loraSelector.loading']()}</div>
     {:else if error}
       <div class="text-sm text-red-600">{error}</div>
       <button onclick={fetchLoras} class="mt-1 text-xs text-blue-600 hover:text-blue-800">
-        Retry
+        {m['loraSelector.retry']()}
       </button>
     {:else if selectedLoras.length > 0}
       <div class="flex flex-wrap gap-1">
@@ -111,11 +112,11 @@
       disabled={loading || availableLoras.length === 0}
     >
       <Plus class="h-3 w-3" />
-      Add LoRA
+      {m['loraSelector.add']()}
     </button>
 
     <div class="text-xs text-gray-600">
-      {selectedLoras.length} selected
+      {m['loraSelector.selectedCount']({ count: String(selectedLoras.length) })}
     </div>
   </div>
 </div>

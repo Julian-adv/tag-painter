@@ -6,6 +6,7 @@
   import { maskOverlay } from './stores/maskOverlayStore'
   import DrawingControls from './DrawingControls.svelte'
   import DrawingCanvas from './DrawingCanvas.svelte'
+  import { m } from '$lib/paraglide/messages'
 
   interface Props {
     imageUrl: string | null
@@ -171,7 +172,7 @@
       {#if $maskOverlay.isVisible && $maskOverlay.maskSrc}
         <img
           src={$maskOverlay.maskSrc}
-          alt="Mask overlay"
+          alt={m['imageViewer.maskOverlay']()}
           class="pointer-events-none absolute top-0 left-0 h-full w-full rounded-lg object-contain opacity-40 mix-blend-multiply"
         />
       {/if}
@@ -181,7 +182,7 @@
     <div
       class="flex h-[1216px] w-[832px] items-center justify-center rounded-lg bg-gray-100 text-lg text-gray-500"
     >
-      <p>No image to display</p>
+      <p>{m['imageViewer.noImage']()}</p>
     </div>
   {/if}
 
@@ -196,7 +197,7 @@
       <button
         class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-gray-300 bg-gray-100 text-gray-600 transition-all duration-200 hover:scale-105 hover:border-gray-400 hover:bg-gray-200 active:scale-95"
         onclick={goToPreviousImage}
-        aria-label="Previous image"
+        aria-label={m['imageViewer.previous']()}
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path
@@ -215,7 +216,7 @@
       <button
         class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-gray-300 bg-gray-100 text-gray-600 transition-all duration-200 hover:scale-105 hover:border-gray-400 hover:bg-gray-200 active:scale-95"
         onclick={goToNextImage}
-        aria-label="Next image"
+        aria-label={m['imageViewer.next']()}
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
