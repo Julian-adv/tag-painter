@@ -27,3 +27,6 @@ vendor/
 # Release artifacts
 tag-painter-*.zip
 release/_*/
+
+# Paraglide cache
+project.inlang/cache/

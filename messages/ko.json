@@ -1,0 +1,13 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "noCheckpoints.title": "체크포인트 모델을 찾을 수 없습니다",
+  "noCheckpoints.body": "ComfyUI에서 체크포인트 모델을 찾을 수 없습니다. 이미지를 생성하려면 체크포인트 모델을 최소 한 개 다운로드해서 다음 폴더에 넣으세요.",
+  "noCheckpoints.installationPath": "폴더 경로:",
+  "noCheckpoints.openButton": "열기",
+  "noCheckpoints.openFolderTitle": "폴더 열기",
+  "noCheckpoints.downloadFrom": "모델 다운로드:",
+  "noCheckpoints.nextStepsLabel": "다음 단계:",
+  "noCheckpoints.nextStepsBody": "모델 파일을 다운로드한 뒤 체크포인트 폴더에 넣고 새로 고침 버튼(🔄)을 눌러 모델 목록을 다시 불러오세요.",
+  "noCheckpoints.closeDialogLabel": "대화 상자 닫기",
+  "noCheckpoints.gotIt": "확인"
+}

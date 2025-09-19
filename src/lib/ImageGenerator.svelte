@@ -6,6 +6,7 @@
   import CompositionSelector from './CompositionSelector.svelte'
   import TagZones from './TagZones.svelte'
   import LoraSelector from './LoraSelector.svelte'
+  import { dev } from '$app/environment'
   import NoCheckpointsDialog from './NoCheckpointsDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import { loadSettings, saveSettings as saveSettingsToFile, saveMaskData } from './utils/fileIO'
@@ -482,6 +483,16 @@
         onStopGeneration={handleStopGeneration}
         onSettingsChange={handleSettingsChange}
       />
+
+      {#if dev}
+        <button
+          type="button"
+          class="self-start rounded border border-dashed border-gray-300 bg-white px-2 py-1 text-xs text-gray-600 shadow-sm transition hover:border-gray-400 hover:text-gray-800"
+          onclick={openNoCheckpointsDialog}
+        >
+          Show No Checkpoints Dialog
+        </button>
+      {/if}
     </section>
 
     <section class="min-w-0">

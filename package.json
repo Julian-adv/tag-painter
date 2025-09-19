@@ -20,6 +20,8 @@
   "devDependencies": {
     "@eslint/compat": "^1.2.5",
     "@eslint/js": "^9.18.0",
+    "@inlang/paraglide-js": "^2.3.2",
+    "@inlang/paraglide-sveltekit": "^0.16.1",
     "@sveltejs/adapter-auto": "^6.0.0",
     "@sveltejs/adapter-node": "^5.0.0",
     "@sveltejs/kit": "^2.16.0",
@@ -55,6 +57,7 @@
     "png-chunk-text": "^1.0.0",
     "png-chunks-encode": "^1.0.0",
     "png-chunks-extract": "^1.0.0",
-    "sharp": "^0.34.3"
+    "sharp": "^0.34.3",
+    "yaml": "^2.8.1"
   }
 }

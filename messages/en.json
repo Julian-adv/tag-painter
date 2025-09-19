@@ -1,0 +1,13 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "noCheckpoints.title": "No Checkpoint Models Found",
+  "noCheckpoints.body": "No checkpoint models were found in ComfyUI. Download at least one checkpoint model and place it in the folder below to generate images.",
+  "noCheckpoints.installationPath": "Folder path:",
+  "noCheckpoints.openButton": "Open",
+  "noCheckpoints.openFolderTitle": "Open folder",
+  "noCheckpoints.downloadFrom": "Download models from:",
+  "noCheckpoints.nextStepsLabel": "Next steps:",
+  "noCheckpoints.nextStepsBody": "After downloading a model file, place it in the checkpoints folder and click the refresh button (🔄) to reload the model list.",
+  "noCheckpoints.closeDialogLabel": "Close dialog",
+  "noCheckpoints.gotIt": "Got it"
+}

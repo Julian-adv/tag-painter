@@ -1,0 +1,34 @@
+// eslint-disable
+import { getLocale, trackMessageCall, experimentalMiddlewareLocaleSplitting, isServer } from '../runtime.js';
+
+const en_nocheckpoints_body1 = /** @type {(inputs: {}) => string} */ () => {
+	return `No checkpoint models were found in ComfyUI. Download at least one checkpoint model and place it in the folder below to generate images.`
+};
+
+const ko_nocheckpoints_body1 = /** @type {(inputs: {}) => string} */ () => {
+	return `ComfyUI에서 체크포인트 모델을 찾을 수 없습니다. 이미지를 생성하려면 체크포인트 모델을 최소 한 개 다운로드해서 다음 폴더에 넣으세요.`
+};
+
+/**
+* This function has been compiled by [Paraglide JS](https://inlang.com/m/gerre34r).
+*
+* - Changing this function will be over-written by the next build.
+*
+* - If you want to change the translations, you can either edit the source files e.g. `en.json`, or
+* use another inlang app like [Fink](https://inlang.com/m/tdozzpar) or the [VSCode extension Sherlock](https://inlang.com/m/r7kp499g).
+* 
+* @param {{}} inputs
+* @param {{ locale?: "en" | "ko" }} options
+* @returns {string}
+*/
+/* @__NO_SIDE_EFFECTS__ */
+const nocheckpoints_body1 = (inputs = {}, options = {}) => {
+	if (experimentalMiddlewareLocaleSplitting && isServer === false) {
+		return /** @type {any} */ (globalThis).__paraglide_ssr.nocheckpoints_body1(inputs) 
+	}
+	const locale = options.locale ?? getLocale()
+	trackMessageCall("nocheckpoints_body1", locale)
+	if (locale === "en") return en_nocheckpoints_body1(inputs)
+	return ko_nocheckpoints_body1(inputs)
+};
+export { nocheckpoints_body1 as "noCheckpoints.body" }
