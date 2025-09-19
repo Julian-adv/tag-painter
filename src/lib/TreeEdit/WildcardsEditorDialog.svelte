@@ -2,6 +2,7 @@
   import TreeEdit from './TreeEdit.svelte'
   import { updateWildcardsFromText } from '../stores/tagsStore'
   import { fetchWildcardsText, saveWildcardsText } from '../api/wildcards'
+  import { m } from '$lib/paraglide/messages'
 
   interface Props {
     isOpen: boolean
@@ -166,13 +167,13 @@
         class="flex cursor-move items-center justify-between border-b border-gray-300 p-6 select-none"
         onpointerdown={startDrag}
       >
-        <h2 class="text-lg font-semibold text-gray-900">Wildcards Editor</h2>
+        <h2 class="text-lg font-semibold text-gray-900">{m['wildcardsEditor.title']()}</h2>
         <button
           type="button"
           class="text-gray-400 transition-colors hover:text-gray-600"
           onclick={handleClose}
           onpointerdown={(e) => e.stopPropagation()}
-          aria-label="Close dialog"
+          aria-label={m['wildcardsEditor.closeAria']()}
         >
           <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -191,7 +192,7 @@
           <TreeEdit bind:this={tree} bind:hasUnsavedChanges />
         {:else}
           <div class="flex h-full items-center justify-center text-gray-500">
-            Loading wildcards...
+            {m['wildcardsEditor.loading']()}
           </div>
         {/if}
       </div>
@@ -204,14 +205,14 @@
           onclick={onSave}
           disabled={!hasUnsavedChanges}
         >
-          Save
+          {m['wildcardsEditor.save']()}
         </button>
         <button
           type="button"
           class="rounded-md bg-gray-200 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:outline-none"
           onclick={handleClose}
         >
-          Close
+          {m['wildcardsEditor.close']()}
         </button>
       </div>
     </div>
