@@ -46,13 +46,19 @@
     const cursorPosition = textareaElement.selectionStart
     const text = value
 
-    // Find the start of the current word (looking for spaces or commas)
+    // Find the start of the current word (treat spaces, commas, newlines, braces, parentheses, colons, and pipes as delimiters)
     let startIndex = cursorPosition - 1
     while (
       startIndex >= 0 &&
       text[startIndex] !== ' ' &&
       text[startIndex] !== ',' &&
-      text[startIndex] !== '\n'
+      text[startIndex] !== '\n' &&
+      text[startIndex] !== '{' &&
+      text[startIndex] !== '}' &&
+      text[startIndex] !== '(' &&
+      text[startIndex] !== ')' &&
+      text[startIndex] !== ':' &&
+      text[startIndex] !== '|'
     ) {
       startIndex--
     }
@@ -64,7 +70,13 @@
       endIndex < text.length &&
       text[endIndex] !== ' ' &&
       text[endIndex] !== ',' &&
-      text[endIndex] !== '\n'
+      text[endIndex] !== '\n' &&
+      text[endIndex] !== '{' &&
+      text[endIndex] !== '}' &&
+      text[endIndex] !== '(' &&
+      text[endIndex] !== ')' &&
+      text[endIndex] !== ':' &&
+      text[endIndex] !== '|'
     ) {
       endIndex++
     }
