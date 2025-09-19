@@ -3,6 +3,7 @@
   import type { TreeModel } from './model'
   import { isContainer } from './model'
   import { findNodeByName } from './utils'
+  import { m } from '$lib/paraglide/messages'
 
   interface Props {
     items: string[]
@@ -39,21 +40,26 @@
         class="chip"
         class:purple={isContainerName(item)}
         class:blue={!isContainerName(item)}
-        aria-label={`Disable ${item}`}
+        aria-label={m['treeEdit.disableChipAria']({ name: item })}
       >
         <span class="chip-label">{item}</span>
-        <button class="chip-remove" title={`Remove ${item}`} onclick={() => onRemove(item)}>
+        <button
+          class="chip-remove"
+          title={m['treeEdit.disableChipRemoveTitle']({ name: item })}
+          onclick={() => onRemove(item)}
+        >
           ×
         </button>
       </span>
     {/each}
   </div>
   <div class="adder">
-    <div class="input-wrapper w-full max-w-[360px] min-w-[220px]">
+    <div class="input-wrapper">
       <AutoCompleteTextarea
         id={inputId}
         value={newItem}
-        placeholder="Add disable (name or pattern)"
+        rows={1}
+        placeholder={m['treeEdit.disablesPlaceholder']()}
         onValueChange={(v) => (newItem = v)}
         onkeydown={(e: KeyboardEvent) => {
           if (e.key === 'Enter') {
@@ -65,7 +71,14 @@
         specialTriggerPrefix=""
       />
     </div>
-    <button class="add-btn" type="button" onclick={addItem} title="Add disable"> Add </button>
+    <button
+      class="add-btn"
+      type="button"
+      onclick={addItem}
+      title={m['treeEdit.disablesAddTitle']()}
+    >
+      {m['treeEdit.disablesAdd']()}
+    </button>
   </div>
 </div>
 
@@ -76,11 +89,13 @@
     gap: 0.375rem;
     align-items: flex-start;
     flex: 1;
+    width: 100%;
   }
   .chips {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
+    width: 100%;
   }
   .chip {
     display: inline-flex;
@@ -122,15 +137,25 @@
     background: #e0e7ff;
   }
   .adder {
-    display: inline-flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.5rem;
+    width: 100%;
   }
   .input-wrapper {
     border: 1px solid #d1d5db;
     border-radius: 0.375rem;
     padding: 0.125rem;
     background: #ffffff;
+    flex: 1;
+    width: 100%;
+  }
+  .input-wrapper :global(textarea) {
+    min-height: 2rem;
+    white-space: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
   .add-btn {
     font-size: 0.875rem;

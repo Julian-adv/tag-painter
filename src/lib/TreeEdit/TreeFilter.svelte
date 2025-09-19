@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte'
+  import { m } from '$lib/paraglide/messages'
 
   let { filterText = $bindable('') }: { filterText: string } = $props()
 
@@ -14,12 +15,17 @@
   <input
     type="text"
     class="filter-input"
-    placeholder="Filter nodes..."
+    placeholder={m['treeEdit.filterPlaceholder']()}
     bind:value={filterText}
     onkeydown={(e) => e.stopPropagation()}
   />
   {#if filterText}
-    <button type="button" class="filter-clear" onclick={clear} aria-label="Clear filter">
+    <button
+      type="button"
+      class="filter-clear"
+      onclick={clear}
+      aria-label={m['treeEdit.filterClear']()}
+    >
       ×
     </button>
   {/if}

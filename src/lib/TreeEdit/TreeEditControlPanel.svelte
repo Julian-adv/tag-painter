@@ -25,6 +25,7 @@
   import { getParentOf, isConsistentRandomArray } from './utils'
   import { renameNode } from './model'
   import DisablesEditor from './DisablesEditor.svelte'
+  import { m } from '$lib/paraglide/messages'
 
   let {
     model,
@@ -424,9 +425,9 @@
 </script>
 
 <section class="right-col">
-  <div class="array-mode" aria-label="Array selection mode">
+  <div class="array-mode" aria-label={m['treeEdit.arrayModeAria']()}>
     <fieldset class:disabled={!isSelectedArrayNode()} disabled={!isSelectedArrayNode()}>
-      <legend class="section-label">Node type</legend>
+      <legend class="section-label">{m['treeEdit.nodeTypeLegend']()}</legend>
       <label class="mode-option">
         <input
           type="radio"
@@ -435,7 +436,7 @@
           checked={isSelectedArrayNode() && !isSelectedConsistentRandom()}
           onchange={() => setSelectedArrayMode('random')}
         />
-        <span>Random</span>
+        <span>{m['treeEdit.randomMode']()}</span>
       </label>
       <label class="mode-option">
         <input
@@ -445,32 +446,34 @@
           checked={isSelectedConsistentRandom()}
           onchange={() => setSelectedArrayMode('consistent-random')}
         />
-        <span>Consistent Random</span>
+        <span>{m['treeEdit.consistentRandomMode']()}</span>
       </label>
     </fieldset>
   </div>
 
   <!-- Directives section -->
   {#if isSelectedLeafNode()}
-    <div class="directives" aria-label="Content directives">
+    <div class="directives" aria-label={m['treeEdit.directivesAria']()}>
       <fieldset>
-        <legend class="section-label">Directives</legend>
+        <legend class="section-label">{m['treeEdit.directivesLegend']()}</legend>
         <div class="directive-row">
-          <label for="composition-select" class="directive-label">Composition</label>
+          <label for="composition-select" class="directive-label">
+            {m['treeEdit.compositionLabel']()}
+          </label>
           <select
             id="composition-select"
             class="directive-select"
             value={getSelectedLeafComposition() || ''}
             onchange={(e) => updateSelectedComposition(e.currentTarget.value)}
           >
-            <option value="">None</option>
-            <option value="all">all</option>
-            <option value="2h">2h (horizontal split)</option>
-            <option value="2v">2v (vertical split)</option>
+            <option value="">{m['treeEdit.compositionNone']()}</option>
+            <option value="all">{m['treeEdit.compositionAll']()}</option>
+            <option value="2h">{m['treeEdit.composition2h']()}</option>
+            <option value="2v">{m['treeEdit.composition2v']()}</option>
           </select>
         </div>
         <div class="directive-row">
-          <label for="weight-input" class="directive-label">Weight</label>
+          <label for="weight-input" class="directive-label">{m['treeEdit.weightLabel']()}</label>
           <div class="weight-info">
             <WheelAdjustableInput
               value={getSelectedLeafWeight() ?? DEFAULT_ARRAY_WEIGHT}
@@ -491,7 +494,7 @@
           </div>
         </div>
         <div class="directive-row stacked">
-          <label class="directive-label" for="disables-input">Disables</label>
+          <label class="directive-label" for="disables-input">{m['treeEdit.disablesLabel']()}</label>
           <DisablesEditor
             items={getSelectedLeafDisables()}
             suggestions={parentNameSuggestions}
@@ -513,11 +516,11 @@
 
   <!-- Array node weight section (when array is child of object) -->
   {#if isSelectedArrayInObject()}
-    <div class="directives" aria-label="Array weight in object">
+    <div class="directives" aria-label={m['treeEdit.arrayWeightAria']()}>
       <fieldset>
-        <legend class="section-label">Array Weight</legend>
+        <legend class="section-label">{m['treeEdit.arrayWeightLegend']()}</legend>
         <div class="directive-row">
-          <label for="array-weight-input" class="directive-label">Weight</label>
+          <label for="array-weight-input" class="directive-label">{m['treeEdit.weightLabel']()}</label>
           <div class="weight-info">
             <WheelAdjustableInput
               value={getSelectedArrayWeight() ?? DEFAULT_ARRAY_WEIGHT}
@@ -547,28 +550,28 @@
       variant="gray"
       size="md"
       icon={ChevronDown}
-      title="Expand all nodes"
+      title={m['treeEdit.expandAllTitle']()}
     >
-      Expand all
+      {m['treeEdit.expandAll']()}
     </ActionButton>
     <ActionButton
       onclick={() => onCollapseAll?.()}
       variant="gray"
       size="md"
       icon={ChevronRight}
-      title="Collapse all nodes"
+      title={m['treeEdit.collapseAllTitle']()}
     >
-      Collapse all
+      {m['treeEdit.collapseAll']()}
     </ActionButton>
     <ActionButton
       onclick={() => collapseSiblings?.()}
       variant="gray"
       size="md"
       icon={ChevronRight}
-      title="Collapse selected node and its siblings"
+      title={m['treeEdit.collapseSiblingsTitle']()}
       disabled={!canCollapseSiblings()}
     >
-      Collapse siblings
+      {m['treeEdit.collapseSiblings']()}
     </ActionButton>
     <ActionButton
       onclick={togglePinSelected}
@@ -577,62 +580,68 @@
       icon={LockClosed}
       title={selectedIds.length === 1
         ? isLeafPinned(model, selectedIds[0])
-          ? 'Unpin this option'
-          : 'Pin this option'
-        : 'Pin this option'}
+          ? m['tagDisplay.unpin']()
+          : m['tagDisplay.pin']()
+        : m['tagDisplay.pin']()}
       disabled={!canPinSelected()}
     >
-      {selectedIds.length === 1 ? (isLeafPinned(model, selectedIds[0]) ? 'Unpin' : 'Pin') : 'Pin'}
+      {selectedIds.length === 1
+        ? isLeafPinned(model, selectedIds[0])
+          ? m['treeEdit.unpinButton']()
+          : m['treeEdit.pinButton']()
+        : m['treeEdit.pinButton']()}
     </ActionButton>
     <ActionButton
       onclick={startRenaming}
       variant="gray"
       size="md"
       icon={PencilSquare}
-      title="Rename selected node"
+      title={m['treeEdit.renameTitle']()}
       disabled={!canRenameSelected()}
     >
-      Rename
+      {m['treeEdit.rename']()}
     </ActionButton>
     <ActionButton
       onclick={duplicateBySelection}
       variant="gray"
       size="md"
       icon={DocumentDuplicate}
-      title="Duplicate selected node (Ctrl+D / Cmd+D)"
+      title={m['treeEdit.duplicateTitle']()}
       disabled={!canDuplicateSelected()}
     >
-      Duplicate
+      {m['treeEdit.duplicate']()}
     </ActionButton>
     <ActionButton
       onclick={groupSelected}
       variant="blue"
       size="md"
       icon={RectangleGroup}
-      title="Group selected leaves"
+      title={m['treeEdit.groupTitle']()}
       disabled={!canGroupSelected(model, selectedIds)}
     >
-      Group
+      {m['treeEdit.group']()}
     </ActionButton>
     <ActionButton
       onclick={addBySelection}
       variant="green"
       size="md"
       icon={Plus}
-      title={selectedIds.length === 1 ? 'Add child to selected' : 'Add top-level node'}
+      title={selectedIds.length === 1
+        ? m['treeEdit.addChildTitle']()
+        : m['treeEdit.addTopLevelTitle']()}
       disabled={isAddDisabled()}
     >
-      {selectedIds.length === 1 ? 'Add child' : 'Add top level'}
+      {selectedIds.length === 1 ? m['treeEdit.addChild']() : m['treeEdit.addTopLevel']()}
     </ActionButton>
     <ActionButton
       onclick={deleteBySelection}
       variant="red"
       size="md"
       icon={Trash}
-      title="Delete selected node (Delete)"
+      title={m['treeEdit.deleteTitle']()}
       disabled={selectedIds.length === 0 || selectedIds.includes(model.rootId)}
     >
-      Delete
+      {m['treeEdit.delete']()}
     </ActionButton>
   </div>
 </section>
@@ -652,20 +661,36 @@
     gap: 0.5rem;
     padding: 0.25rem 0;
   }
+  .directives {
+    width: 100%;
+    max-width: 520px;
+  }
   .directive-row {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 8rem minmax(0, 1fr);
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    width: 100%;
   }
   .directive-row.stacked {
+    display: flex;
     flex-direction: column;
     align-items: flex-start;
+    gap: 0.5rem;
+    width: 100%;
   }
   .directive-label {
     font-size: 0.875rem;
     color: #374151;
     font-weight: 500;
+    justify-self: start;
+  }
+  .directive-row.stacked > .directive-label {
+    width: 100%;
+    text-align: left;
+  }
+  .directive-row.stacked > :global(.directive-multiedit) {
+    width: 100%;
   }
   .directive-select {
     font-size: 0.875rem;
@@ -675,6 +700,8 @@
     background-color: white;
     color: #374151;
     min-width: 80px;
+    justify-self: start;
+    width: auto;
   }
   .directive-select:focus {
     outline: none;
@@ -685,6 +712,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    justify-self: start;
   }
   .probability-display {
     font-size: 0.75rem;

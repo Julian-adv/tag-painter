@@ -21,6 +21,7 @@
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
   import { isConsistentRandomArray } from './utils'
   import { addBySelectionAction } from './addBySelection'
+  import { m } from '$lib/paraglide/messages'
 
   let {
     initialYAML = '',
@@ -589,7 +590,7 @@
       <div
         class="tree"
         role="button"
-        aria-label="Clear selection"
+        aria-label={m['treeEdit.clearSelection']()}
         onclick={() => {
           selectedIds = []
           lastSelectedId = null

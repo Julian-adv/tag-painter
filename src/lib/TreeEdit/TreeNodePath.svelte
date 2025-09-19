@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { TreeModel } from './model'
   import { tick } from 'svelte'
+  import { m } from '$lib/paraglide/messages'
 
   let {
     model,
@@ -66,12 +67,14 @@
         </button>
       {/each}
     {:else}
-      <span class="no-selection">No path available</span>
+      <span class="no-selection">{m['treeEdit.breadcrumbNoPath']()}</span>
     {/if}
   {:else if selectedIds.length > 1}
-    <span class="multiple-selection">{selectedIds.length} nodes selected</span>
+    <span class="multiple-selection">
+      {m['treeEdit.breadcrumbMultiple']({ count: String(selectedIds.length) })}
+    </span>
   {:else}
-    <span class="no-selection">No node selected</span>
+    <span class="no-selection">{m['treeEdit.breadcrumbNoSelection']()}</span>
   {/if}
 </div>
 
