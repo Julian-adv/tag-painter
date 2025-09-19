@@ -287,6 +287,7 @@ describe('fileIO utilities', () => {
         outputDirectory: '/test/output',
         selectedVae: '__embedded__',
         clipSkip: 2,
+        locale: 'en',
         perModel: {}
       }
 

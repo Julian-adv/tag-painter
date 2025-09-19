@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit'
 import fs from 'fs/promises'
 import path from 'path'
 import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
+import { baseLocale } from '$lib/paraglide/runtime.js'
 
 const SETTINGS_FILE = path.resolve(process.cwd(), 'data', 'settings.json')
 
@@ -29,6 +30,7 @@ export async function GET() {
           outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
           selectedVae: '__embedded__',
           clipSkip: 2,
+          locale: baseLocale,
           perModel: {}
         }
       })
@@ -45,6 +47,10 @@ export async function GET() {
 
     if (!settings.comfyUrl) {
       settings.comfyUrl = DEFAULT_COMFY_URL
+    }
+
+    if (!settings.locale) {
+      settings.locale = baseLocale
     }
 
     return json({

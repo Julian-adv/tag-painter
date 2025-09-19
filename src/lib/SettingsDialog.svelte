@@ -5,6 +5,7 @@
   import { promptsData } from './stores/promptsStore'
   import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
   import { m } from '$lib/paraglide/messages'
+  import { locales, baseLocale } from '$lib/paraglide/runtime.js'
 
   interface Props {
     show: boolean
@@ -28,6 +29,7 @@
     outputDirectory: settings.outputDirectory,
     selectedVae: settings.selectedVae,
     clipSkip: settings.clipSkip,
+    locale: settings.locale || baseLocale,
     perModel: settings.perModel || {}
   })
 
@@ -44,6 +46,7 @@
     outputDirectory: '',
     selectedVae: '',
     clipSkip: 0,
+    locale: baseLocale,
     perModel: {}
   })
   let hasUnsavedChanges: boolean = $state(false)
@@ -54,6 +57,12 @@
   }
   function deepEqual(a: unknown, b: unknown): boolean {
     return JSON.stringify(a) === JSON.stringify(b)
+  }
+
+  function localeLabel(code: string): string {
+    if (code === 'ko') return m['settingsDialog.localeKorean']()
+    if (code === 'en') return m['settingsDialog.localeEnglish']()
+    return code
   }
 
   // Update local settings when props change
@@ -70,6 +79,7 @@
         outputDirectory: settings.outputDirectory,
         selectedVae: settings.selectedVae,
         clipSkip: settings.clipSkip,
+        locale: settings.locale || baseLocale,
         perModel: settings.perModel || {}
       }
       // Reset session init so we can capture a fresh baseline below
@@ -205,7 +215,7 @@
   })
 
   function handleSave() {
-    onSave(localSettings)
+    onSave(deepClone(localSettings))
     // Update baseline immediately so button disables if dialog remains open
     originalLocalSettings = deepClone(localSettings)
     hasUnsavedChanges = false
@@ -231,6 +241,13 @@
       </div>
 
       <div class="dialog-body">
+        <label for="app-locale" class="two-col-label">{m['settingsDialog.locale']()}</label>
+        <select id="app-locale" class="two-col-input" bind:value={localSettings.locale}>
+          {#each locales as localeCode (localeCode)}
+            <option value={localeCode}>{localeLabel(localeCode)}</option>
+          {/each}
+        </select>
+
         <!-- Global settings -->
         <label for="image-width" class="two-col-label">{m['settingsDialog.imageWidth']()}</label>
         <input

@@ -15,6 +15,7 @@
   import { ArrowPath } from 'svelte-heros-v2'
   import { generateImage } from './utils/imageGeneration'
   import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
+  import { baseLocale, setLocale, getLocale, isLocale } from '$lib/paraglide/runtime.js'
   import {
     promptsData,
     initializePromptsStore,
@@ -44,12 +45,13 @@
         hasMask: () => boolean
       }
     | undefined
-  let compositionSelector: { selectTempMask: () => void } | undefined
-  let loraSelectorRef: { refresh: () => void } | undefined
+  let compositionSelector = $state<{ selectTempMask: () => void } | undefined>(undefined)
+  let loraSelectorRef = $state<{ refresh: () => void } | undefined>(undefined)
   let isGeneratingForever = $state(false)
   let shouldStopGeneration = $state(false)
   let lastSeed: number | null = $state(null)
   let showNoCheckpointsDialog = $state(false)
+  let localeVersion = $state(0)
   let currentRandomTagResolutions: {
     all: Record<string, string>
     zone1: Record<string, string>
@@ -113,8 +115,18 @@
     outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
     selectedVae: '__embedded__',
     clipSkip: 2,
+    locale: baseLocale,
     perModel: {}
   })
+
+  function applyLocaleIfSupported(nextLocale: string) {
+    const normalized = nextLocale?.toLowerCase()
+    if (!normalized || !isLocale(normalized)) return
+    if (getLocale() !== normalized) {
+      setLocale(normalized, { reload: false })
+    }
+    localeVersion += 1
+  }
 
   // Prompts state is now managed by the central store
 
@@ -131,7 +143,10 @@
       if (!settings.comfyUrl) settings.comfyUrl = DEFAULT_COMFY_URL
       if (!settings.selectedVae) settings.selectedVae = '__embedded__'
       if (!settings.perModel) settings.perModel = {}
+      if (!settings.locale) settings.locale = baseLocale
     }
+
+    applyLocaleIfSupported(settings.locale)
 
     // Load available checkpoints
     const checkpoints = await fetchCheckpoints(settings.comfyUrl)
@@ -150,9 +165,11 @@
   })
 
   // Event handlers
-  let generationControlsRef:
-    | { openSettingsDialogExternal: (focusField: 'quality' | 'negative' | null) => void }
-    | undefined
+  let generationControlsRef =
+    $state<
+      | { openSettingsDialogExternal: (focusField: 'quality' | 'negative' | null) => void }
+      | undefined
+    >(undefined)
   function openSettingsFromTagZones(focusField: 'quality' | 'negative') {
     generationControlsRef?.openSettingsDialogExternal(focusField)
   }
@@ -371,6 +388,8 @@
 
   async function handleSettingsChange(newSettings: Settings) {
     settings = { ...newSettings }
+    if (!settings.locale) settings.locale = baseLocale
+    applyLocaleIfSupported(settings.locale)
 
     // Save settings to file
     const success = await saveSettingsToFile(settings)
@@ -398,114 +417,116 @@
   class="m-0 box-border flex h-screen w-screen flex-col bg-gradient-to-br from-gray-100 to-gray-200 p-4"
 >
   <div class="grid h-full w-full grid-cols-[1fr_minmax(0,832px)] gap-4 max-lg:grid-cols-1">
-    <section class="flex h-full min-w-0 flex-col gap-2 overflow-auto">
-      <CompositionSelector bind:this={compositionSelector} />
+    {#key localeVersion}
+      <section class="flex h-full min-w-0 flex-col gap-2 overflow-auto">
+        <CompositionSelector bind:this={compositionSelector} />
 
-      <div class="flex min-h-0 flex-1 flex-shrink-1">
-        <TagZones
-          {currentRandomTagResolutions}
-          {settings}
-          onOpenSettings={openSettingsFromTagZones}
-        />
-      </div>
-
-      <div class="flex flex-shrink-0 flex-col gap-1">
-        <div class="flex flex-col gap-2">
-          <div class="flex items-center justify-between gap-2">
-            <label for="checkpoint" class="text-left text-sm font-bold text-black">
-              {m['imageGenerator.checkpointLabel']()}
-            </label>
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-1 py-0.5 text-xs text-gray-700 hover:bg-gray-50"
-              title={m['imageGenerator.reloadCheckpoints']()}
-              onclick={refreshModels}
-            >
-              <ArrowPath class="h-3 w-3" />
-            </button>
-          </div>
-          <select
-            id="checkpoint"
-            value={$promptsData.selectedCheckpoint || ''}
-            onchange={(e) => updateCheckpoint((e.target as HTMLSelectElement).value)}
-            class="box-border w-full rounded border border-gray-300 bg-white p-1 text-xs transition-colors duration-200 focus:border-green-500 focus:shadow-[0_0_0_2px_rgba(76,175,80,0.2)] focus:outline-none"
-          >
-            <option value="">{m['imageGenerator.selectCheckpoint']()}</option>
-            {#each availableCheckpoints as checkpoint (checkpoint)}
-              <option value={checkpoint}>{checkpoint}</option>
-            {/each}
-          </select>
-        </div>
-
-        <!-- LoRA Selector -->
-        <div class="flex flex-col gap-2">
-          <LoraSelector
-            bind:this={loraSelectorRef}
-            selectedLoras={$promptsData.selectedLoras}
-            onLoraChange={handleLoraChange}
+        <div class="flex min-h-0 flex-1 flex-shrink-1">
+          <TagZones
+            {currentRandomTagResolutions}
+            {settings}
+            onOpenSettings={openSettingsFromTagZones}
           />
         </div>
 
-        <div class="flex flex-col gap-2">
-          <label class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal">
-            <input
-              type="checkbox"
-              checked={$promptsData.useUpscale}
-              onchange={(e) => updateUpscale((e.target as HTMLInputElement).checked)}
-              class="m-0 cursor-pointer"
+        <div class="flex flex-shrink-0 flex-col gap-1">
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between gap-2">
+              <label for="checkpoint" class="text-left text-sm font-bold text-black">
+                {m['imageGenerator.checkpointLabel']()}
+              </label>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-1 py-0.5 text-xs text-gray-700 hover:bg-gray-50"
+                title={m['imageGenerator.reloadCheckpoints']()}
+                onclick={refreshModels}
+              >
+                <ArrowPath class="h-3 w-3" />
+              </button>
+            </div>
+            <select
+              id="checkpoint"
+              value={$promptsData.selectedCheckpoint || ''}
+              onchange={(e) => updateCheckpoint((e.target as HTMLSelectElement).value)}
+              class="box-border w-full rounded border border-gray-300 bg-white p-1 text-xs transition-colors duration-200 focus:border-green-500 focus:shadow-[0_0_0_2px_rgba(76,175,80,0.2)] focus:outline-none"
+            >
+              <option value="">{m['imageGenerator.selectCheckpoint']()}</option>
+              {#each availableCheckpoints as checkpoint (checkpoint)}
+                <option value={checkpoint}>{checkpoint}</option>
+              {/each}
+            </select>
+          </div>
+
+          <!-- LoRA Selector -->
+          <div class="flex flex-col gap-2">
+            <LoraSelector
+              bind:this={loraSelectorRef}
+              selectedLoras={$promptsData.selectedLoras}
+              onLoraChange={handleLoraChange}
             />
-            {m['imageGenerator.useUpscale']()}
-          </label>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <label class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal">
+              <input
+                type="checkbox"
+                checked={$promptsData.useUpscale}
+                onchange={(e) => updateUpscale((e.target as HTMLInputElement).checked)}
+                class="m-0 cursor-pointer"
+              />
+              {m['imageGenerator.useUpscale']()}
+            </label>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <label class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal">
+              <input
+                type="checkbox"
+                class="m-0 cursor-pointer accent-sky-600"
+                checked={$promptsData.useFaceDetailer}
+                onchange={(e) => updateFaceDetailer((e.target as HTMLInputElement).checked)}
+              />
+              {m['imageGenerator.useFaceDetailer']()}
+            </label>
+          </div>
         </div>
 
-        <div class="flex flex-col gap-2">
-          <label class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal">
-            <input
-              type="checkbox"
-              class="m-0 cursor-pointer accent-sky-600"
-              checked={$promptsData.useFaceDetailer}
-              onchange={(e) => updateFaceDetailer((e.target as HTMLInputElement).checked)}
-            />
-            {m['imageGenerator.useFaceDetailer']()}
-          </label>
-        </div>
-      </div>
+        <GenerationControls
+          bind:this={generationControlsRef}
+          {isLoading}
+          {progressData}
+          {settings}
+          {isGeneratingForever}
+          {lastSeed}
+          onGenerate={() => handleGenerate(null)}
+          onInpaint={handleInpaint}
+          onRegenerate={() => handleGenerate(lastSeed)}
+          onGenerateForever={handleGenerateForever}
+          onStopGeneration={handleStopGeneration}
+          onSettingsChange={handleSettingsChange}
+        />
 
-      <GenerationControls
-        bind:this={generationControlsRef}
-        {isLoading}
-        {progressData}
-        {settings}
-        {isGeneratingForever}
-        {lastSeed}
-        onGenerate={() => handleGenerate(null)}
-        onInpaint={handleInpaint}
-        onRegenerate={() => handleGenerate(lastSeed)}
-        onGenerateForever={handleGenerateForever}
-        onStopGeneration={handleStopGeneration}
-        onSettingsChange={handleSettingsChange}
-      />
-
-      {#if dev}
-        <button
-          type="button"
-          class="self-start rounded border border-dashed border-gray-300 bg-white px-2 py-1 text-xs text-gray-600 shadow-sm transition hover:border-gray-400 hover:text-gray-800"
-          onclick={openNoCheckpointsDialog}
-        >
-          {m['imageGenerator.devShowDialog']()}
-        </button>
-      {/if}
-    </section>
+        {#if dev}
+          <button
+            type="button"
+            class="self-start rounded border border-dashed border-gray-300 bg-white px-2 py-1 text-xs text-gray-600 shadow-sm transition hover:border-gray-400 hover:text-gray-800"
+            onclick={openNoCheckpointsDialog}
+          >
+            {m['imageGenerator.devShowDialog']()}
+          </button>
+        {/if}
+      </section>
+    {/key}
 
     <section class="min-w-0">
       <ImageViewer
         bind:this={imageViewer}
         {imageUrl}
-        {currentImageFileName}
-        outputDirectory={settings.outputDirectory}
-        onImageChange={handleImageChange}
-      />
-    </section>
+          {currentImageFileName}
+          outputDirectory={settings.outputDirectory}
+          onImageChange={handleImageChange}
+        />
+      </section>
   </div>
 </main>
 
