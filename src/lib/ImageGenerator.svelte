@@ -509,10 +509,12 @@
         {#if dev}
           <button
             type="button"
-            class="self-start rounded border border-dashed border-gray-300 bg-white px-2 py-1 text-xs text-gray-600 shadow-sm transition hover:border-gray-400 hover:text-gray-800"
+            class="self-start flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
             onclick={openNoCheckpointsDialog}
+            aria-label={m['imageGenerator.devShowDialog']()}
+            title={m['imageGenerator.devShowDialog']()}
           >
-            {m['imageGenerator.devShowDialog']()}
+            !
           </button>
         {/if}
       </section>

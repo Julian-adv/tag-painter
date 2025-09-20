@@ -1,93 +1,110 @@
 # Tag Painter
 
+English | [한국어](README.ko.md)
+
 Tag Painter is a SvelteKit-based web application that integrates with ComfyUI for AI image generation. Create diverse character art using zone-based prompting with regional composition control.
 
-![Tag Painter Screenshot](docs/images/app-screenshot.png)
+![Tag Painter Screenshot](docs/images/app-screenshot-en.png)
 
 ## Installation
 
-### 1. Prerequisites
+### 1. Download Release
 
-- **Node.js** (v22 or higher) - [Download from nodejs.org](https://nodejs.org/)
-- **Git** - For cloning the repository - [Download from git-scm.com](https://git-scm.com/)
+- Get the latest `tag-painter-release-*.zip` from GitHub Releases: https://github.com/Julian-adv/tag-painter/releases
+- Extract it to any folder you like.
 
-### 2. Clone Repository
+### 2. Start Application
 
-```bash
-git clone https://github.com/Julian-adv/tag-painter
-cd tag-painter
-```
+- Windows: `start.bat`
+- macOS/Linux: `./start.sh`
 
-### 3. Install Dependencies
+The script starts the app and opens it in your browser.
+If it doesn't open automatically, go to `http://127.0.0.1:3000/`.
 
-```bash
-npm install
-```
+After installation, you may see a "No checkpoints" dialog. In that case, download a checkpoint (base model) from Civitai or Hugging Face and place it in `ComfyUI/models/checkpoints/`. After placing the file, click the refresh (🔄) button to reload the model list.
 
-### 4. ComfyUI Setup
+<img src="docs/images/no-checkpoints-en.png" alt="No checkpoints dialog" width="333" />
 
-This application requires a local ComfyUI instance:
+<img src="docs/images/checkpoints-refresh-en.png" alt="Refresh checkpoints list" width="274" />
 
-- **ComfyUI Portable** - [Download from comfyanonymous/ComfyUI releases](https://github.com/comfyanonymous/ComfyUI/releases)
-- ComfyUI must be running at `http://127.0.0.1:8188`
-- The following nodes must be installed:
-  - **SaveImageWebsocket** - For real-time image delivery
-  - **FaceDetailer** - For face enhancement (optional)
-  - **AttentionCouple** - For regional prompting
-  - **UltralyticsDetectorProvider** - For face detection
-  - **SAMLoader (Impact)** - For segmentation
-  - Standard ComfyUI nodes (CheckpointLoaderSimple, CLIPTextEncode, etc.)
+- Zeniji_Mix K-illust — https://civitai.com/models/1651774?modelVersionId=1869616
+  (The screenshot above was generated with this model.)
 
-**Easy Setup**:
+### Open Settings
 
-1. Load `docs/example-workflow.json` into your ComfyUI interface
-2. Use **ComfyUI Manager** to install any missing nodes automatically
-3. If the workflow runs successfully, ComfyUI is properly configured
+Click the gear (Settings) button in the top toolbar to open the settings dialog. You can configure:
+- Language: switch between English/Korean
+- Output folder: image generation output directory
+- Generation parameters: sampler, steps, CFG scale, seed, etc.
+- Default quality prompt: quality-related prefix text
+- LoRA list: select/manage LoRA models
 
-### 5. Development Server
+![Settings dialog](docs/images/settings-en.png)
 
-```bash
-npm run dev
-```
+### Composition & Zone Prompts
 
-Then open your browser and navigate to `http://localhost:5173`
+Choose a composition to split the canvas into zones (e.g., left/right or top/bottom). Enter prompts for each zone to apply them only to that region.
 
-Or to automatically open in browser:
+<img src="docs/images/zones-en.png" alt="Composition and zone prompts" width="273" />
 
-```bash
-npm run dev -- --open
-```
+- ALL prompt: applies to every zone.
+- Zone 1 / Zone 2 prompts: apply only to the respective zone.
+- Inpainting prompt: used when you perform inpainting.
 
-## Example Model Files
+Using composition with per-zone prompts lets you control different elements (character, background, outfit, etc.) precisely by region.
 
-The screenshot above was generated using these models. Download and place them in your ComfyUI directories:
+### Tags & Wildcards Editor
 
-### Base Model
+When you press Generate, the UI shows which tags will actually be used based on the current combination so you can verify them at a glance.
 
-- **Zeniji_Mix K-illust** - [Download from Civitai](https://civitai.com/models/1651774?modelVersionId=1869616)
-  - Place in `ComfyUI/models/checkpoints/`
+Double-click a tag to open the wildcards editor and fine‑tune random choices.
 
-### LoRA Models
+<img src="docs/images/tags-en.png" alt="Tags area" width="265" />
 
-- **MoriiMee Gothic Niji Lora** - [Download from Civitai](https://civitai.com/models/915918?modelVersionId=1244133)
-  - Place in `ComfyUI/models/loras/`
-- **Niji anime style illustrious lora** - [Download from Civitai](https://civitai.com/models/1261988?modelVersionId=1939768)
-  - Place in `ComfyUI/models/loras/`
+<img src="docs/images/wildcards-editor-en.png" alt="Wildcards editor" width="600" />
 
-## Troubleshooting
+Usage
 
-### Common Issues
+| Item | Description |
+| --- | --- |
+| Node double-click (Enter) | Edit the node name/content inline. |
+| Ctrl+Enter | Add a sibling node next to the current node. |
+| Drag & drop | Reorder or move nodes. |
+| Random | Picks a new candidate at random on every generation. |
+| Consistent random | Picks the same candidate across ALL, Zone 1, and Zone 2 for the same seed/structure (useful for poses or elements that must match across zones). |
+| Composition | Determines the image layout: single zone, left/right split, or top/bottom split. |
+| Weight | Controls selection probability (higher weight increases the chance this node is chosen among candidates). |
+| Disable | Exclude specific nodes (or patterns) from generation. |
+| Multi‑select/Group (Shift+click) | Select a range, then press Group to create a parent with the selected nodes as children. |
+| Add/Delete | Use the toolbar/context menu to add a child, add a top‑level node, or delete. |
+| Expand/Collapse | Expand/collapse all nodes to review the structure quickly. |
+| Pin | Force a node to be selected during generation. |
 
-1. **ComfyUI not running** - Ensure ComfyUI is started at `http://127.0.0.1:8188`
-2. **Missing nodes** - Install required custom nodes listed above
-3. **No checkpoints** - Place model files in ComfyUI's `models/checkpoints/` directory
-4. **Generation fails** - Check ComfyUI console for workflow errors
+### What Gets Installed Automatically
 
-### File Locations
+- ComfyUI with a Python venv (created/fixed as needed).
+- Required custom nodes:
+  - cgem156-ComfyUI — https://github.com/laksjdjf/cgem156-ComfyUI
+  - ComfyUI-Custom-Scripts — https://github.com/pythongosssss/ComfyUI-Custom-Scripts
+  - ComfyUI-Impact-Pack — https://github.com/ltdrdata/ComfyUI-Impact-Pack
+  - ComfyUI-Impact-Subpack — https://github.com/ltdrdata/ComfyUI-Impact-Subpack
+- Helper models for the above nodes:
+  - YOLO (person/face):
+    - person_yolov8m-seg.pt — https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt
+    - face_yolov8m.pt — https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt
+  - SAM: sam_vit_b_01ec64.pth — https://huggingface.co/datasets/Gourieff/ReActor/resolve/main/models/sams/sam_vit_b_01ec64.pth
+  - VAE: fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors — https://huggingface.co/moonshotmillion/VAEfixFP16ErrorsSDXLLowerMemoryUse_v10/resolve/main/fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors
+- Example LoRA models downloaded to `ComfyUI/models/loras/`:
+  - MoriiMee_Gothic_Niji_Style_Illustrious_r1 — https://huggingface.co/NeigeSnowflake/neigeworkflow/resolve/main/MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors
+  - spo_sdxl_10ep_4k-data_lora_webui — https://civitai.com/api/download/models/567119
+  - Sinozick_Style_XL_Pony — https://civitai.com/api/download/models/481798
+  - Fant5yP0ny — https://huggingface.co/LyliaEngine/Fant5yP0ny/resolve/main/Fant5yP0ny.safetensors?download=true
 
-- Generated images: `data/output/YYYY-MM-DD/`
-- Settings: `data/settings.json`
-- Tag database: `data/danbooru_tags.txt`
+### Run Options
+
+- `-NoComfy`: Use your existing ComfyUI; skip install/start.
+- `-ComfyOnly`: Start only ComfyUI; do not launch Tag Painter.
+ 
 
 ## License
 
