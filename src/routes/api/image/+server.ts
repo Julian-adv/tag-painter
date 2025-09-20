@@ -199,7 +199,9 @@ export async function POST({ request }) {
       // Extract parameters from workflow and settings
       const steps = workflowData?.['45']?.inputs?.steps || 28
       const sampler = workflowData?.['15']?.inputs?.sampler_name || 'euler_ancestral'
-      const scheduler = 'simple' // Basic scheduler doesn't have configurable scheduler type
+      // Prefer scheduler from the main sampler, fall back to KSampler used by inpainting
+      const scheduler =
+        workflowData?.['45']?.inputs?.scheduler || workflowData?.['10']?.inputs?.scheduler || 'simple'
       const cfg = workflowData?.['14']?.inputs?.cfg || 5
       const workflowSeed = workflowData?.['14']?.inputs?.noise_seed || seed
       const width = workflowData?.['16']?.inputs?.width || 832
@@ -209,9 +211,14 @@ export async function POST({ request }) {
       // Convert scheduler to proper format
       const schedulerMap: Record<string, string> = {
         simple: 'Simple',
+        sgm_uniform: 'SGM Uniform',
         karras: 'Karras',
         exponential: 'Exponential',
-        sgm_uniform: 'SGM Uniform'
+        ddim_uniform: 'DDIM Uniform',
+        beta: 'Beta',
+        normal: 'Normal',
+        linear_quadratic: 'Linear Quadratic',
+        kl_optimal: 'KL Optimal'
       }
       const scheduleType = schedulerMap[scheduler] || 'Simple'
 
