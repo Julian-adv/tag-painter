@@ -88,17 +88,32 @@ Usage
   - ComfyUI-Custom-Scripts — https://github.com/pythongosssss/ComfyUI-Custom-Scripts
   - ComfyUI-Impact-Pack — https://github.com/ltdrdata/ComfyUI-Impact-Pack
   - ComfyUI-Impact-Subpack — https://github.com/ltdrdata/ComfyUI-Impact-Subpack
+  - ComfyUI_essentials — https://github.com/cubiq/ComfyUI_essentials
+  - comfyui_controlnet_aux (OpenPose/DWpose preprocessors) — https://github.com/Fannovel16/comfyui_controlnet_aux
+- Additional Python packages:
+  - pandas — required by the WD tagger utilities in cgem156-ComfyUI
 - Helper models for the above nodes:
   - YOLO (person/face):
     - person_yolov8m-seg.pt — https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt
     - face_yolov8m.pt — https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt
   - SAM: sam_vit_b_01ec64.pth — https://huggingface.co/datasets/Gourieff/ReActor/resolve/main/models/sams/sam_vit_b_01ec64.pth
   - VAE: fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors — https://huggingface.co/moonshotmillion/VAEfixFP16ErrorsSDXLLowerMemoryUse_v10/resolve/main/fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors
+  - ControlNet (OpenPose XL): OpenPoseXL2.safetensors — attempts from Hugging Face; placed in `ComfyUI/models/controlnet/`
+  - ControlNet Aux annotators:
+    - body_pose_model.pth — https://huggingface.co/lllyasviel/Annotators/resolve/main/body_pose_model.pth
+    - hand_pose_model.pth — https://huggingface.co/lllyasviel/Annotators/resolve/main/hand_pose_model.pth
+    - facenet.pth — https://huggingface.co/lllyasviel/Annotators/resolve/main/facenet.pth
 - Example LoRA models downloaded to `ComfyUI/models/loras/`:
   - MoriiMee_Gothic_Niji_Style_Illustrious_r1 — https://huggingface.co/NeigeSnowflake/neigeworkflow/resolve/main/MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors
   - spo_sdxl_10ep_4k-data_lora_webui — https://civitai.com/api/download/models/567119
   - Sinozick_Style_XL_Pony — https://civitai.com/api/download/models/481798
   - Fant5yP0ny — https://huggingface.co/LyliaEngine/Fant5yP0ny/resolve/main/Fant5yP0ny.safetensors?download=true
+
+In addition, the setup installs onnxruntime for the DWpose/OpenPose preprocessors used by inpainting:
+- If an NVIDIA GPU is detected: installs `onnxruntime-gpu` (falls back to `onnxruntime` if needed)
+- Otherwise: installs `onnxruntime`
+
+If auto-download of `OpenPoseXL2.safetensors` fails, download it manually and place it at `ComfyUI/models/controlnet/OpenPoseXL2.safetensors`.
 
 ### Run Options
 

@@ -219,7 +219,9 @@ function Test-ComfyUIIntegrity($comfyDir) {
     "cgem156-ComfyUI",
     "ComfyUI-Custom-Scripts", 
     "ComfyUI-Impact-Pack",
-    "ComfyUI-Impact-Subpack"
+    "ComfyUI-Impact-Subpack",
+    "ComfyUI_essentials",
+    "comfyui_controlnet_aux"
   )
   
   $missingNodes = @()
@@ -489,6 +491,37 @@ try {
     Write-Host "Downloading SAM model..." -ForegroundColor DarkCyan
     $samModel = Join-Path $ComfyDir "models\\sams\\sam_vit_b_01ec64.pth"
     Get-ModelIfMissing -url "https://huggingface.co/datasets/Gourieff/ReActor/resolve/main/models/sams/sam_vit_b_01ec64.pth" -destPath $samModel
+
+    # Download ControlNet model used by OpenPose (inpainting workflow)
+    Write-Host "Ensuring ControlNet OpenPose XL model..." -ForegroundColor DarkCyan
+    $cnDir = Join-Path $ComfyDir "models\\controlnet"
+    New-DirectoryIfMissing $cnDir
+    $openposeXl2 = Join-Path $cnDir "OpenPoseXL2.safetensors"
+    if (-not (Test-Path $openposeXl2)) {
+      # Try multiple candidate sources
+      $tried = $false
+      try { Get-ModelIfMissing -url "https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0/resolve/main/OpenPoseXL2.safetensors" -destPath $openposeXl2; $tried = $true } catch {}
+      if (-not (Test-Path $openposeXl2)) {
+        try { Get-ModelIfMissing -url "https://huggingface.co/SteezyAI/ControlNet-OpenPose-SDXL/resolve/main/OpenPoseXL2.safetensors" -destPath $openposeXl2; $tried = $true } catch {}
+      }
+      if (-not (Test-Path $openposeXl2)) {
+        Write-Host "Warning: Could not auto-download OpenPoseXL2.safetensors. Place it at: $openposeXl2" -ForegroundColor Yellow
+      }
+    }
+
+    # Download ControlNet Aux annotator models required by comfyui_controlnet_aux
+    if (Test-Path (Join-Path $ComfyDir "custom_nodes\\comfyui_controlnet_aux")) {
+      Write-Host "Ensuring ControlNet Aux annotator models..." -ForegroundColor DarkCyan
+      $auxAnnotatorsDir = Join-Path $ComfyDir "custom_nodes\\comfyui_controlnet_aux\\ckpts\\lllyasviel\\Annotators"
+      $bodyPose = Join-Path $auxAnnotatorsDir "body_pose_model.pth"
+      Get-ModelIfMissing -url "https://huggingface.co/lllyasviel/Annotators/resolve/main/body_pose_model.pth" -destPath $bodyPose
+
+      $handPose = Join-Path $auxAnnotatorsDir "hand_pose_model.pth"
+      Get-ModelIfMissing -url "https://huggingface.co/lllyasviel/Annotators/resolve/main/hand_pose_model.pth" -destPath $handPose
+
+      $faceNet = Join-Path $auxAnnotatorsDir "facenet.pth"
+      Get-ModelIfMissing -url "https://huggingface.co/lllyasviel/Annotators/resolve/main/facenet.pth" -destPath $faceNet
+    }
 
     Write-Header "Start ComfyUI"
     $comfy = Start-ComfyUI -dir $ComfyDir -Cpu:$useCpu

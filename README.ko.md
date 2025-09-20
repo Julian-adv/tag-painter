@@ -88,17 +88,32 @@ Tag Painter는 ComfyUI와 연동되는 SvelteKit 기반 웹 애플리케이션�
   - ComfyUI-Custom-Scripts — https://github.com/pythongosssss/ComfyUI-Custom-Scripts
   - ComfyUI-Impact-Pack — https://github.com/ltdrdata/ComfyUI-Impact-Pack
   - ComfyUI-Impact-Subpack — https://github.com/ltdrdata/ComfyUI-Impact-Subpack
+  - ComfyUI_essentials — https://github.com/cubiq/ComfyUI_essentials
+  - comfyui_controlnet_aux (OpenPose/DWpose 전처리기) — https://github.com/Fannovel16/comfyui_controlnet_aux
+- 추가 Python 패키지:
+  - pandas — cgem156-ComfyUI의 WD tagger 기능에 필요합니다.
 - 커스텀 노드 동작에 필요한 보조 모델도 자동 다운로드됩니다.
   - YOLO (사람/얼굴):
     - person_yolov8m-seg.pt — https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt
     - face_yolov8m.pt — https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt
   - SAM: sam_vit_b_01ec64.pth — https://huggingface.co/datasets/Gourieff/ReActor/resolve/main/models/sams/sam_vit_b_01ec64.pth
   - VAE: fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors — https://huggingface.co/moonshotmillion/VAEfixFP16ErrorsSDXLLowerMemoryUse_v10/resolve/main/fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors
+  - ControlNet (OpenPose XL): OpenPoseXL2.safetensors — 우선적으로 Hugging Face에서 시도하며, `ComfyUI/models/controlnet/`에 배치됩니다.
+  - ControlNet Aux Annotators:
+    - body_pose_model.pth — https://huggingface.co/lllyasviel/Annotators/resolve/main/body_pose_model.pth
+    - hand_pose_model.pth — https://huggingface.co/lllyasviel/Annotators/resolve/main/hand_pose_model.pth
+    - facenet.pth — https://huggingface.co/lllyasviel/Annotators/resolve/main/facenet.pth
 - 예시 LoRA 모델이 자동으로 다운로드되어 `ComfyUI/models/loras/`에 설치됩니다.
   - MoriiMee_Gothic_Niji_Style_Illustrious_r1 — https://huggingface.co/NeigeSnowflake/neigeworkflow/resolve/main/MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors
   - spo_sdxl_10ep_4k-data_lora_webui — https://civitai.com/api/download/models/567119
   - Sinozick_Style_XL_Pony — https://civitai.com/api/download/models/481798
   - Fant5yP0ny — https://huggingface.co/LyliaEngine/Fant5yP0ny/resolve/main/Fant5yP0ny.safetensors?download=true
+
+또한 인페인팅에서 사용하는 DWpose/OpenPose 전처리기를 위해 onnxruntime를 자동 설치합니다.
+- NVIDIA GPU가 감지되면: `onnxruntime-gpu` 설치(필요 시 `onnxruntime`로 대체)
+- 그 외 환경: `onnxruntime` 설치
+
+`OpenPoseXL2.safetensors` 자동 다운로드에 실패하면 수동으로 내려받아 `ComfyUI/models/controlnet/OpenPoseXL2.safetensors` 경로에 넣어주세요.
 
 ### 실행 옵션
 

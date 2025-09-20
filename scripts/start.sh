@@ -52,14 +52,14 @@ download_model_if_missing() {
   local label="$3"
 
   if [[ -f "$dest" && -s "$dest" ]]; then
-    return
+    return 0
   fi
 
   local tool
   tool=$(ensure_download_tool)
   if [[ -z "$tool" ]]; then
     echo "Error: neither curl nor wget is available to download $label." >&2
-    exit 1
+    return 1
   fi
 
   echo "Downloading $label..."
@@ -71,13 +71,13 @@ download_model_if_missing() {
     if ! curl -L --fail --silent --show-error "$url" -o "$tmp"; then
       rm -f "$tmp"
       echo "Error: failed to download $label from $url" >&2
-      exit 1
+      return 1
     fi
   else
     if ! wget -q "$url" -O "$tmp"; then
       rm -f "$tmp"
       echo "Error: failed to download $label from $url" >&2
-      exit 1
+      return 1
     fi
   fi
 
@@ -86,10 +86,26 @@ download_model_if_missing() {
   if [[ "$size" -lt 102400 ]]; then
     rm -f "$tmp"
     echo "Error: downloaded file for $label looks too small ($size bytes)." >&2
-    exit 1
+    rm -f "$tmp"
+    return 1
   fi
 
   mv "$tmp" "$dest"
+  return 0
+}
+
+download_first_available() {
+  local dest="$1"; shift
+  local label="$1"; shift
+  local tried=0
+  while [[ $# -gt 0 ]]; do
+    local url="$1"; shift
+    tried=$((tried+1))
+    if download_model_if_missing "$url" "$dest" "$label"; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 ensure_required_models() {
@@ -132,6 +148,19 @@ ensure_required_models() {
     "$COMFY_DIR/models/loras/Fant5yP0ny.safetensors" \
     "LoRA Fant5yP0ny"
 
+  # ControlNet model for OpenPose (used by inpainting workflow)
+  # Try a couple of common sources; if both fail, leave a clear message.
+  if [[ ! -f "$COMFY_DIR/models/controlnet/OpenPoseXL2.safetensors" ]]; then
+    mkdir -p "$COMFY_DIR/models/controlnet"
+    if ! download_first_available \
+      "$COMFY_DIR/models/controlnet/OpenPoseXL2.safetensors" \
+      "ControlNet OpenPose XL (OpenPoseXL2.safetensors)" \
+      "https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0/resolve/main/OpenPoseXL2.safetensors" \
+      "https://huggingface.co/SteezyAI/ControlNet-OpenPose-SDXL/resolve/main/OpenPoseXL2.safetensors"; then
+      echo "Warning: Could not auto-download OpenPoseXL2.safetensors. Please place it at: $COMFY_DIR/models/controlnet/OpenPoseXL2.safetensors" >&2
+    fi
+  fi
+
   download_model_if_missing \
     "https://huggingface.co/datasets/Gourieff/ReActor/resolve/main/models/sams/sam_vit_b_01ec64.pth" \
     "$COMFY_DIR/models/sams/sam_vit_b_01ec64.pth" \
@@ -141,6 +170,22 @@ ensure_required_models() {
     "https://huggingface.co/FacehugmanIII/4x_foolhardy_Remacri/resolve/main/4x_foolhardy_Remacri.pth?download=true" \
     "$COMFY_DIR/models/upscale_models/4x_foolhardy_Remacri.pt" \
     "Upscale model 4x_foolhardy_Remacri"
+
+  local aux_annotators_dir="$COMFY_DIR/custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators"
+  download_model_if_missing \
+    "https://huggingface.co/lllyasviel/Annotators/resolve/main/body_pose_model.pth" \
+    "$aux_annotators_dir/body_pose_model.pth" \
+    "ControlNet Aux body pose model"
+
+  download_model_if_missing \
+    "https://huggingface.co/lllyasviel/Annotators/resolve/main/hand_pose_model.pth" \
+    "$aux_annotators_dir/hand_pose_model.pth" \
+    "ControlNet Aux hand pose model"
+
+  download_model_if_missing \
+    "https://huggingface.co/lllyasviel/Annotators/resolve/main/facenet.pth" \
+    "$aux_annotators_dir/facenet.pth" \
+    "ControlNet Aux facenet model"
 }
 
 echo "=== Start (macOS/Linux) ==="

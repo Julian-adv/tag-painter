@@ -11,7 +11,11 @@ param(
   [string]$ImpactPackBranch = "Main",
   [string]$ImpactSubpackRepo = "https://github.com/ltdrdata/ComfyUI-Impact-Subpack",
   [string]$ImpactSubpackBranch = "main",
-  [string]$PythonVersion = "3.13",
+  [string]$ControlNetAuxRepo = "https://github.com/Fannovel16/comfyui_controlnet_aux",
+  [string]$ControlNetAuxBranch = "main",
+  [string]$EssentialsRepo = "https://github.com/cubiq/ComfyUI_essentials",
+  [string]$EssentialsBranch = "main",
+  [string]$PythonVersion = "3.12",
   [switch]$SkipNode,
   [switch]$SkipComfy,
   [switch]$SkipBuild
@@ -27,6 +31,7 @@ param(
   - Installs custom node cgem156-ComfyUI into ComfyUI/custom_nodes
   - Installs ComfyUI-Impact-Pack into ComfyUI/custom_nodes
   - Installs ComfyUI-Impact-Subpack into ComfyUI/custom_nodes
+  - Installs cubiq/ComfyUI_essentials into ComfyUI/custom_nodes
 
   Usage examples:
     pwsh -File scripts/bootstrap.ps1 -ComfyPortableUrl "<portable_zip_url>"
@@ -343,9 +348,9 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion) {
 
   Write-Header "Additional Python packages"
   if ($pipOk) {
-    & $py -m pip install matplotlib
+    & $py -m pip install matplotlib pandas
   } else {
-    & $uv pip install -p $py matplotlib
+    & $uv pip install -p $py matplotlib pandas
   }
 
   return @{ PythonPath = $py; UvPath = $uv }
@@ -553,6 +558,77 @@ function Install-ImpactSubpack($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
   Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
 }
 
+function Install-Essentials($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
+  $dest = Join-Path $comfyDir "custom_nodes\\ComfyUI_essentials"
+  if (-not (Test-Path $comfyDir)) {
+    Write-Host "ComfyUI not found at $comfyDir; skipping ComfyUI_essentials install." -ForegroundColor Yellow
+    return
+  }
+  if (Test-Path $dest) {
+    Write-Host "ComfyUI_essentials already present: $dest" -ForegroundColor Green
+    Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
+    return
+  }
+
+  Write-Header "Install ComfyUI_essentials"
+
+  try { git --version *> $null; $useGit = $true } catch { $useGit = $false }
+  New-DirectoryIfMissing (Join-Path $comfyDir "custom_nodes")
+  if ($useGit) {
+    Write-Host "Cloning via git..." -ForegroundColor DarkCyan
+    git clone --depth 1 --branch $branch $repoUrl $dest
+  } else {
+    $zipUrl = "$repoUrl/archive/refs/heads/$branch.zip"
+    $tmp = Join-Path $comfyDir "custom_nodes\\.tmp_comfyui_essentials"
+    New-DirectoryIfMissing $tmp
+    $zipPath = Join-Path $tmp "comfyui_essentials.zip"
+    Save-UrlIfMissing $zipUrl $zipPath
+    Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
+    $extracted = Get-ChildItem -Path $tmp | Where-Object { $_.PSIsContainer -and $_.Name -like "ComfyUI_essentials*" } | Select-Object -First 1
+    if (-not $extracted) { throw "Failed to extract ComfyUI_essentials archive" }
+    Move-Item -Path $extracted.FullName -Destination $dest
+    Remove-Item -Recurse -Force $tmp
+  }
+
+  Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
+}
+
+function Install-ControlNetAux($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
+  $dest = Join-Path $comfyDir "custom_nodes\comfyui_controlnet_aux"
+  if (-not (Test-Path $comfyDir)) {
+    Write-Host "ComfyUI not found at $comfyDir; skipping ControlNet Aux install." -ForegroundColor Yellow
+    return
+  }
+  if (Test-Path $dest) {
+    Write-Host "ControlNet Aux already present: $dest" -ForegroundColor Green
+    Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
+    return
+  }
+
+  Write-Header "Install comfyui_controlnet_aux"
+
+  try { git --version *> $null; $useGit = $true } catch { $useGit = $false }
+  New-DirectoryIfMissing (Join-Path $comfyDir "custom_nodes")
+  if ($useGit) {
+    Write-Host "Cloning via git..." -ForegroundColor DarkCyan
+    git clone --depth 1 --branch $branch $repoUrl $dest
+  } else {
+    $zipUrl = "$repoUrl/archive/refs/heads/$branch.zip"
+    $tmp = Join-Path $comfyDir "custom_nodes\.tmp_controlnet_aux"
+    New-DirectoryIfMissing $tmp
+    $zipPath = Join-Path $tmp "controlnet_aux.zip"
+    Save-UrlIfMissing $zipUrl $zipPath
+    Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
+    $extracted = Get-ChildItem -Path $tmp | Where-Object { $_.PSIsContainer -and $_.Name -like "comfyui_controlnet_aux*" } | Select-Object -First 1
+    if (-not $extracted) { throw "Failed to extract comfyui_controlnet_aux archive" }
+    Move-Item -Path $extracted.FullName -Destination $dest
+    Remove-Item -Recurse -Force $tmp
+  }
+
+  # Install node requirements
+  Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
+}
+
 # Main
 Push-Location (Resolve-Path (Join-Path $PSScriptRoot ".."))
 try {
@@ -576,9 +652,18 @@ try {
     Install-CustomScripts -comfyDir $ComfyDir -repoUrl $CustomScriptsRepo -branch $CustomScriptsBranch -venvPy $venvPy -uv $uv
     Install-ImpactPack -comfyDir $ComfyDir -repoUrl $ImpactPackRepo -branch $ImpactPackBranch -venvPy $venvPy -uv $uv
     Install-ImpactSubpack -comfyDir $ComfyDir -repoUrl $ImpactSubpackRepo -branch $ImpactSubpackBranch -venvPy $venvPy -uv $uv
+    Install-Essentials -comfyDir $ComfyDir -repoUrl $EssentialsRepo -branch $EssentialsBranch -venvPy $venvPy -uv $uv
+    Install-ControlNetAux -comfyDir $ComfyDir -repoUrl $ControlNetAuxRepo -branch $ControlNetAuxBranch -venvPy $venvPy -uv $uv
     # Common extras used by some custom nodes (e.g., matplotlib for cgem156-ComfyUI)
     if (Test-Path $venvPy) {
-      Install-PythonPackages -py $venvPy -uv $uv -packages @('matplotlib')
+      # onnxruntime-gpu for DWpose if NVIDIA is present; fallback to CPU onnxruntime
+      $hasNvidia = $false
+      try { Get-Command nvidia-smi -ErrorAction SilentlyContinue | Out-Null; $hasNvidia = $true } catch {}
+      if ($hasNvidia) {
+        Install-PythonPackages -py $venvPy -uv $uv -packages @('matplotlib','pandas','onnxruntime-gpu')
+      } else {
+        Install-PythonPackages -py $venvPy -uv $uv -packages @('matplotlib','pandas','onnxruntime')
+      }
     }
   } else {
     Write-Host "Skipping ComfyUI environment setup (SkipComfy)." -ForegroundColor Yellow

@@ -20,8 +20,12 @@ IMPACT_PACK_REPO="https://github.com/ltdrdata/ComfyUI-Impact-Pack"
 IMPACT_PACK_BRANCH="Main"
 IMPACT_SUBPACK_REPO="https://github.com/ltdrdata/ComfyUI-Impact-Subpack"
 IMPACT_SUBPACK_BRANCH="main"
+CONTROLNET_AUX_REPO="https://github.com/Fannovel16/comfyui_controlnet_aux"
+CONTROLNET_AUX_BRANCH="main"
+ESSENTIALS_REPO="https://github.com/cubiq/ComfyUI_essentials"
+ESSENTIALS_BRANCH="main"
 PY_REQ_MAJOR=3
-PY_REQ_MINOR=13
+PY_REQ_MINOR=12
 
 echo "=== Bootstrap (macOS/Linux) ==="
 
@@ -105,6 +109,17 @@ else
   "$VENV_PY" -m pip install --upgrade torch torchvision torchaudio
 fi
 
+# Install onnxruntime runtime for ControlNet Aux (GPU if available)
+echo "Installing onnxruntime for ControlNet Aux..."
+if command -v nvidia-smi >/dev/null 2>&1; then
+  "$VENV_PY" -m pip install --upgrade onnxruntime-gpu || "$VENV_PY" -m pip install --upgrade onnxruntime
+else
+  "$VENV_PY" -m pip install --upgrade onnxruntime
+fi
+
+echo "Installing additional Python packages for custom nodes..."
+"$VENV_PY" -m pip install --upgrade pandas
+
 install_node_requirements() {
   local node_dir="$1"
   local requirements_file="$node_dir/requirements.txt"
@@ -156,5 +171,8 @@ install_custom_node "$CUSTOM_NODE_REPO" "$COMFY_DIR/custom_nodes/cgem156-ComfyUI
 install_custom_node "$CUSTOM_SCRIPTS_REPO" "$COMFY_DIR/custom_nodes/ComfyUI-Custom-Scripts" "$CUSTOM_SCRIPTS_BRANCH"
 install_custom_node "$IMPACT_PACK_REPO" "$COMFY_DIR/custom_nodes/ComfyUI-Impact-Pack" "$IMPACT_PACK_BRANCH"
 install_custom_node "$IMPACT_SUBPACK_REPO" "$COMFY_DIR/custom_nodes/ComfyUI-Impact-Subpack" "$IMPACT_SUBPACK_BRANCH"
+install_custom_node "$ESSENTIALS_REPO" "$COMFY_DIR/custom_nodes/ComfyUI_essentials" "$ESSENTIALS_BRANCH"
+# ControlNet Aux (OpenPose, DWpose, etc.) for preprocessors used by inpainting workflow
+install_custom_node "$CONTROLNET_AUX_REPO" "$COMFY_DIR/custom_nodes/comfyui_controlnet_aux" "$CONTROLNET_AUX_BRANCH"
 
 echo "Done. Use scripts/start.sh to run ComfyUI + app server."

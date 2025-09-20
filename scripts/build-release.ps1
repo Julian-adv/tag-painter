@@ -48,6 +48,8 @@ try {
     "tsconfig.json",
     "README.md",
     "LICENSE",
+    "project.inlang",
+    "messages",
     "danbooru_tags.txt",
     "src",
     "static",
@@ -60,6 +62,12 @@ try {
     if (Test-Path $p) {
       Copy-Item $p -Destination $payloadRoot -Recurse -Force
     }
+  }
+
+  # Remove inlang cache from payload if present
+  $inlangCache = Join-Path $payloadRoot "project.inlang/cache"
+  if (Test-Path $inlangCache) {
+    Remove-Item $inlangCache -Recurse -Force -ErrorAction SilentlyContinue
   }
 
   # Copy specific data files only

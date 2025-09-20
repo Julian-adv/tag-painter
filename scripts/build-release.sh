@@ -83,6 +83,8 @@ copy_paths=(
   "tsconfig.json"
   "README.md"
   "LICENSE"
+  "project.inlang"
+  "messages"
   "danbooru_tags.txt"
   "src"
   "static"
@@ -101,10 +103,17 @@ for path in "${copy_paths[@]}"; do
     continue
   fi
   if [[ $use_rsync -eq 1 ]]; then
-    rsync -a "$path" "$PAYLOAD_ROOT/"
+    if [[ "$path" == "project.inlang" ]]; then
+      rsync -a --exclude 'cache' "$path" "$PAYLOAD_ROOT/"
+    else
+      rsync -a "$path" "$PAYLOAD_ROOT/"
+    fi
   else
     if [[ -d "$path" ]]; then
       cp -R "$path" "$PAYLOAD_ROOT/"
+      if [[ "$path" == "project.inlang" ]]; then
+        rm -rf "$PAYLOAD_ROOT/project.inlang/cache" 2>/dev/null || true
+      fi
     else
       cp "$path" "$PAYLOAD_ROOT/"
     fi
