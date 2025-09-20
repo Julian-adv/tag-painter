@@ -16,9 +16,9 @@ Tag Painter is a SvelteKit-based web application that integrates with ComfyUI fo
 ### 2. Start Application
 
 - Windows: `start.bat`
-- macOS/Linux: `./start.sh`
+- macOS/Linux: `bash start.sh`
 
-The script starts the app and opens it in your browser.
+The script starts the app and opens it in your browser. The first launch can take a while due to environment setup (ComfyUI installation/venv setup/model downloads).
 If it doesn't open automatically, go to `http://127.0.0.1:3000/`.
 
 After installation, you may see a "No checkpoints" dialog. In that case, download a checkpoint (base model) from Civitai or Hugging Face and place it in `ComfyUI/models/checkpoints/`. After placing the file, click the refresh (🔄) button to reload the model list.
@@ -28,7 +28,7 @@ After installation, you may see a "No checkpoints" dialog. In that case, downloa
 <img src="docs/images/checkpoints-refresh-en.png" alt="Refresh checkpoints list" width="274" />
 
 - Zeniji_Mix K-illust — https://civitai.com/models/1651774?modelVersionId=1869616
-  (The screenshot above was generated with this model.)
+  _The screenshot above was generated with this model._
 
 ### Open Settings
 

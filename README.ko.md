@@ -16,10 +16,10 @@ Tag Painter는 ComfyUI와 연동되는 SvelteKit 기반 웹 애플리케이션�
 ### 2. 애플리케이션 실행
 
 - Windows: `start.bat`
-- macOS/Linux: `./start.sh`
+- macOS/Linux: `bash start.sh`
 
 스크립트를 실행하면 애플리케이션이 자동으로 시작되어 브라우저에서 사용할 수 있습니다.
-자동으로 열리지 않으면 브라우저에서 `http://127.0.0.1:3000/` 을 여세요.
+처음 실행은 환경 준비(ComfyUI 설치/가상환경 구성/모델 다운로드 등)로 인해 시간이 꽤 걸릴 수 있습니다. 자동으로 열리지 않으면 브라우저에서 `http://127.0.0.1:3000/` 을 여세요.
 
 설치가 완료되면 아래와 같은 "체크포인트 없음" 안내 대화상자가 나타날 수 있습니다. 이 경우 Civitai나 Hugging Face에서 체크포인트(베이스 모델) 파일을 내려받아 `ComfyUI/models/checkpoints/` 폴더에 넣어주세요. 파일을 넣은 뒤에는 새로 고침(🔄) 버튼을 눌러 모델 목록을 갱신하면 됩니다.
 
@@ -28,7 +28,7 @@ Tag Painter는 ComfyUI와 연동되는 SvelteKit 기반 웹 애플리케이션�
 <img src="docs/images/checkpoints-refresh-ko.png" alt="체크포인트 목록 새로고침" width="273" />
 
 - Zeniji_Mix K-illust — https://civitai.com/models/1651774?modelVersionId=1869616
-  (위 스크린샷은 이 모델로 생성되었습니다.)
+  _위 스크린샷은 이 모델로 생성되었습니다._
 
 ### 설정 열기
 
