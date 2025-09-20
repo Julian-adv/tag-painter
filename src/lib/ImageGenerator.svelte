@@ -82,10 +82,10 @@
       if (checkpoints && checkpoints.length > 0) {
         // Preserve selected checkpoint if still present; otherwise pick first
         let prevSelected: string | null = null
-        promptsData.subscribe((d) => (prevSelected = d.selectedCheckpoint || null))()
+        promptsData.subscribe((d: PromptsData) => (prevSelected = d.selectedCheckpoint || null))()
         availableCheckpoints = checkpoints
         if (!prevSelected || !checkpoints.includes(prevSelected)) {
-          promptsData.update((data) => ({ ...data, selectedCheckpoint: checkpoints[0] }))
+          promptsData.update((data: PromptsData) => ({ ...data, selectedCheckpoint: checkpoints[0] }))
         }
       } else {
         availableCheckpoints = []
@@ -152,7 +152,7 @@
     const checkpoints = await fetchCheckpoints(settings.comfyUrl)
     if (checkpoints && checkpoints.length > 0) {
       availableCheckpoints = checkpoints
-      promptsData.update((data) => {
+      promptsData.update((data: PromptsData) => {
         if (!data.selectedCheckpoint && checkpoints.length > 0) {
           return { ...data, selectedCheckpoint: checkpoints[0] }
         }
@@ -190,7 +190,7 @@
     const isRegeneration = seedToUse !== null
 
     let currentPromptsData: PromptsData
-    promptsData.subscribe((data) => (currentPromptsData = data))()
+    promptsData.subscribe((data: PromptsData) => (currentPromptsData = data))()
 
     // Get mask data from ImageViewer if available and save it
     let maskFilePath: string | null = null
@@ -249,7 +249,7 @@
   async function handleInpaint(denoiseStrength: number) {
     // Check if inpainting tags exist
     let currentPromptsData: PromptsData
-    promptsData.subscribe((data) => (currentPromptsData = data))()
+    promptsData.subscribe((data: PromptsData) => (currentPromptsData = data))()
 
     if (!currentPromptsData!.tags.inpainting || currentPromptsData!.tags.inpainting.length === 0) {
       alert(m['imageGenerator.missingInpaintingAlert']())
@@ -267,7 +267,7 @@
     await savePromptsData()
 
     let currentPromptsData: PromptsData
-    promptsData.subscribe((data) => (currentPromptsData = data))()
+    promptsData.subscribe((data: PromptsData) => (currentPromptsData = data))()
 
     // Get mask data from ImageViewer if available and save it
     let maskFilePath: string | null = null
