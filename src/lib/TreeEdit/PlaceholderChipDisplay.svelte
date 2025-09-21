@@ -17,6 +17,8 @@
     | { kind: 'text'; text: string }
     | { kind: 'chip'; name: string; type: 'random' | 'consistent-random' | 'unknown' }
 
+  type ChoiceSeg = { kind: 'text'; text: string } | { kind: 'choice'; options: string[] }
+
   // Use shared regex factory to avoid state sharing across matches
   const placeholderRe = createPlaceholderRegex()
 
@@ -51,46 +53,109 @@
     }
     return segs
   })
+
+  function splitChoiceSegments(text: string): ChoiceSeg[] {
+    const result: ChoiceSeg[] = []
+    const choiceRe = /\{([^{}]*\|[^{}]*)\}/g
+    let lastIndex = 0
+    let match: RegExpExecArray | null
+
+    while ((match = choiceRe.exec(text)) !== null) {
+      const index = match.index ?? 0
+      if (index > lastIndex) {
+        result.push({ kind: 'text', text: text.slice(lastIndex, index) })
+      }
+
+      const rawOptions = match[1]?.split('|') ?? []
+      const options = rawOptions.map((option) => option.trim())
+
+      if (options.length > 0) {
+        result.push({ kind: 'choice', options })
+      } else {
+        result.push({ kind: 'text', text: match[0] })
+      }
+
+      lastIndex = choiceRe.lastIndex
+    }
+
+    if (lastIndex < text.length) {
+      result.push({ kind: 'text', text: text.slice(lastIndex) })
+    }
+
+    return result
+  }
 </script>
 
 {#if value}
-  {#if displaySegments.length === 0}
-    {value}
-  {:else}
-    {#each displaySegments as seg, i (i)}
-      {#if seg.kind === 'text'}
-        <span>{seg.text}</span>
-      {:else}
-        <span
-          class="chip {seg.type === 'random'
-            ? 'random'
-            : seg.type === 'consistent-random'
-              ? 'consistent'
-              : 'unknown'}"
-          title={seg.type}
-          ondblclick={(e) => {
-            e.stopPropagation()
-            onChipDoubleClick?.(seg.name)
-          }}
-          role="button"
-          tabindex="-1"
-        >
-          {seg.name}
-        </span>
-      {/if}
-    {/each}
-  {/if}
+  <span class="chip-flow">
+    {#if displaySegments.length === 0}
+      <span class="text-segment">{value}</span>
+    {:else}
+      {#each displaySegments as seg, i (i)}
+        {#if seg.kind === 'text'}
+          {@const choiceSegments = splitChoiceSegments(seg.text)}
+          {#each choiceSegments as choice, j (`text-${i}-${j}`)}
+            {#if choice.kind === 'text'}
+              <span class="text-segment">{choice.text}</span>
+            {:else}
+              {@const accessibleLabel = choice.options
+                .map((option) => (option === '' ? 'empty choice' : option))
+                .join(' or ')}
+              <span class="chip choice" tabindex="-1" aria-label={accessibleLabel}>
+                {#each choice.options as option, k ('choice-' + i + '-' + j + '-' + k)}
+                  {#if k > 0}
+                    <span class="choice-separator" aria-hidden="true"></span>
+                  {/if}
+                  <span class="choice-option">
+                    {option === '' ? String.fromCharCode(160) : option}
+                  </span>
+                {/each}
+              </span>
+            {/if}
+          {/each}
+        {:else}
+          <span
+            class="chip {seg.type === 'random'
+              ? 'random'
+              : seg.type === 'consistent-random'
+                ? 'consistent'
+                : 'unknown'}"
+            title={seg.type}
+            ondblclick={(e) => {
+              e.stopPropagation()
+              onChipDoubleClick?.(seg.name)
+            }}
+            role="button"
+            tabindex="-1"
+          >
+            {seg.name}
+          </span>
+        {/if}
+      {/each}
+    {/if}
+  </span>
 {:else}
   {placeholder}
 {/if}
 
 <style>
+  .chip-flow {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    row-gap: 2px;
+  }
+  .text-segment {
+    display: inline;
+    white-space: pre-wrap;
+    min-width: 0;
+  }
   .chip {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    padding: 0.125rem 0.25rem;
-    margin: 0 0.15rem;
+    padding: 0 0.35rem 0.0625rem 0.35rem;
+    margin: 0 0.1rem;
     border-radius: 0.375rem;
     border: 1px dashed #d1d5db;
     white-space: nowrap;
@@ -120,5 +185,25 @@
   }
   .chip.unknown:hover {
     background-color: #d1d5db;
+  }
+  .chip.choice {
+    background-color: #ecfccb;
+    color: #1f3c08;
+    border-color: #166534;
+  }
+  .chip.choice:hover {
+    background-color: #d9f99d;
+  }
+  .choice-separator {
+    display: inline-flex;
+    align-self: stretch;
+    width: 0;
+    border-left: 1px dashed #166534;
+    box-sizing: border-box;
+  }
+  .choice-option {
+    display: inline-flex;
+    align-items: center;
+    white-space: pre;
   }
 </style>
