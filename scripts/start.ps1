@@ -373,8 +373,18 @@ try {
   Write-Header "Prerequisite check"
   New-DirectoryIfMissing "vendor"
 
-  # Check if this is a fresh release (has build/ but no node_modules)
-  if ((Test-Path "build\\index.js") -and -not (Test-Path "node_modules")) {
+  # Check if this is a fresh release or if dependencies are incomplete (e.g., missing sharp)
+  $needsNodeDeps = $false
+  if (Test-Path "build\\index.js") {
+    if (-not (Test-Path "node_modules")) {
+      $needsNodeDeps = $true
+    } elseif (-not (Test-Path "node_modules\\sharp")) {
+      $needsNodeDeps = $true
+      Write-Host "Detected missing 'sharp' dependency. Reinstalling Node dependencies..." -ForegroundColor Yellow
+    }
+  }
+
+  if ($needsNodeDeps) {
     Write-Header "Setting up release dependencies"
 
     if ($NoComfy) {
