@@ -303,13 +303,23 @@
     autoEditBehavior = 'selectAll'
   }
 
+  function handleTreeMutate(structural: boolean) {
+    if (structural) rebuildPathSymbols(model)
+    hasUnsavedChanges = true
+  }
+
   function scrollSelectedIntoView() {
     if (!treeContainer) return
     const el = treeContainer.querySelector('.row.selected:first-of-type') as HTMLElement | null
     if (el) {
       el.scrollIntoView({ block: 'center', inline: 'nearest' })
-      // Move keyboard focus to the selected row so keyboard nav (Tab/Enter) applies to it
-      el.focus()
+      const active = typeof document !== 'undefined' ? document.activeElement : null
+      const filterHasFocus =
+        active instanceof HTMLElement && active.classList.contains('filter-input')
+      if (!filterHasFocus) {
+        // Move keyboard focus to the selected row so keyboard nav (Tab/Enter) applies to it
+        el.focus()
+      }
     }
   }
 
@@ -623,10 +633,7 @@
           isRootChild={true}
           autoEditChildId={autoEditChildId ?? newlyAddedRootChildId}
           {autoEditBehavior}
-          onMutate={(structural: boolean) => {
-            if (structural) rebuildPathSymbols(model)
-            hasUnsavedChanges = true
-          }}
+          onMutate={handleTreeMutate}
           {selectedIds}
           onSelect={selectNode}
           {setAutoEditChildId}
