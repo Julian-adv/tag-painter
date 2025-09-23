@@ -24,6 +24,7 @@
     updateCheckpoint,
     updateUpscale,
     updateFaceDetailer,
+    updateComposition,
     updateSelectedLoras
   } from './stores/promptsStore'
 
@@ -52,6 +53,7 @@
   let lastSeed: number | null = $state(null)
   let showNoCheckpointsDialog = $state(false)
   let localeVersion = $state(0)
+  let isQwenModel = $state(false)
   let currentRandomTagResolutions: {
     all: Record<string, string>
     zone1: Record<string, string>
@@ -119,6 +121,25 @@
     perModel: {}
   })
 
+  function validateSettings(input: Settings): Settings {
+    const next: Settings = {
+      ...input,
+      comfyUrl: input.comfyUrl || DEFAULT_COMFY_URL,
+      selectedVae: input.selectedVae || '__embedded__',
+      perModel: input.perModel || {},
+      locale: input.locale || baseLocale
+    }
+
+    for (const key of Object.keys(next.perModel)) {
+      const entry = next.perModel[key]
+      if (entry && !entry.modelType) {
+        entry.modelType = 'sdxl'
+      }
+    }
+
+    return next
+  }
+
   function applyLocaleIfSupported(nextLocale: string) {
     const normalized = nextLocale?.toLowerCase()
     if (!normalized || !isLocale(normalized)) return
@@ -138,12 +159,7 @@
     // Load settings
     const savedSettings = await loadSettings()
     if (savedSettings) {
-      // Merge with defaults to ensure new fields like selectedVae exist
-      settings = { ...settings, ...savedSettings }
-      if (!settings.comfyUrl) settings.comfyUrl = DEFAULT_COMFY_URL
-      if (!settings.selectedVae) settings.selectedVae = '__embedded__'
-      if (!settings.perModel) settings.perModel = {}
-      if (!settings.locale) settings.locale = baseLocale
+      settings = validateSettings({ ...settings, ...savedSettings })
     }
 
     applyLocaleIfSupported(settings.locale)
@@ -161,6 +177,30 @@
     } else {
       // Show dialog when no checkpoints are found
       openNoCheckpointsDialog()
+    }
+  })
+
+  let wasQwenModel = false
+
+  $effect(() => {
+    const perModel = settings.perModel || {}
+    const selectedKey = $promptsData.selectedCheckpoint || 'Default'
+    const modelEntry = perModel[selectedKey] || perModel['Default']
+    const qwenSelected = modelEntry?.modelType === 'qwen'
+    isQwenModel = qwenSelected
+
+    if (qwenSelected) {
+      if (!wasQwenModel) {
+        wasQwenModel = true
+        if ($promptsData.selectedComposition !== 'all') {
+          updateComposition('all')
+        }
+        if ($promptsData.useFaceDetailer) {
+          updateFaceDetailer(false)
+        }
+      }
+    } else if (wasQwenModel) {
+      wasQwenModel = false
     }
   })
 
@@ -247,6 +287,9 @@
   }
 
   async function handleInpaint(denoiseStrength: number) {
+    if (isQwenModel) {
+      return
+    }
     // Check if inpainting tags exist
     let currentPromptsData: PromptsData
     promptsData.subscribe((data: PromptsData) => (currentPromptsData = data))()
@@ -485,6 +528,7 @@
                 class="m-0 cursor-pointer accent-sky-600"
                 checked={$promptsData.useFaceDetailer}
                 onchange={(e) => updateFaceDetailer((e.target as HTMLInputElement).checked)}
+                disabled={isQwenModel}
               />
               {m['imageGenerator.useFaceDetailer']()}
             </label>
@@ -504,6 +548,7 @@
           onGenerateForever={handleGenerateForever}
           onStopGeneration={handleStopGeneration}
           onSettingsChange={handleSettingsChange}
+          disableInpaint={isQwenModel}
         />
 
         {#if dev}

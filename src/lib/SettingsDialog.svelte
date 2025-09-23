@@ -68,53 +68,20 @@
   // Update local settings when props change
   $effect(() => {
     if (show) {
-      localSettings = {
-        imageWidth: settings.imageWidth,
-        imageHeight: settings.imageHeight,
-        cfgScale: settings.cfgScale,
-        steps: settings.steps,
-        seed: settings.seed,
-        sampler: settings.sampler,
-        comfyUrl: settings.comfyUrl,
-        outputDirectory: settings.outputDirectory,
-        selectedVae: settings.selectedVae,
-        clipSkip: settings.clipSkip,
-        locale: settings.locale || baseLocale,
-        perModel: settings.perModel || {}
+      const cloned = deepClone(settings)
+      cloned.locale = cloned.locale || baseLocale
+      if (!cloned.perModel) {
+        cloned.perModel = {}
       }
+      localSettings = cloned
       // Reset session init so we can capture a fresh baseline below
       sessionInitialized = false
-    }
-  })
-
-  // When dialog opens, ensure 'Default' per-model entry exists for initial render
-  $effect(() => {
-    if (show) {
-      const hasDefault = !!(localSettings.perModel && localSettings.perModel['Default'])
-      if (!hasDefault) {
-        localSettings.perModel = {
-          ...(localSettings.perModel || {}),
-          Default: {
-            qualityPrefix: '',
-            negativePrefix: '',
-            loras: [],
-            cfgScale: localSettings.cfgScale,
-            steps: localSettings.steps,
-            sampler: localSettings.sampler,
-            scheduler: 'simple',
-            selectedVae: localSettings.selectedVae,
-            clipSkip: localSettings.clipSkip
-          }
-        }
-      }
     }
   })
 
   // Initialize baseline once per open session
   $effect(() => {
     if (show && !sessionInitialized) {
-      // Ensure we have the 'Default' entry before snapshot
-      ensureModelEntry('Default')
       // If dialog was opened with a target focus from TagZones,
       // ensure the selected model entry exists as well so the field renders.
       let currentSelected: string | null = null
@@ -124,6 +91,8 @@
         ensureModelEntry(keyToEnsure)
         selectedModelKey = keyToEnsure
       }
+      ensureModelEntry('Default')
+      ensureModelEntry(keyToEnsure)
       originalLocalSettings = deepClone(localSettings)
       hasUnsavedChanges = false
       sessionInitialized = true
@@ -139,17 +108,25 @@
   let selectedModelKey: string = $state('Default')
 
   function ensureModelEntry(key: string) {
-    if (!localSettings.perModel[key]) {
-      localSettings.perModel[key] = {
-        qualityPrefix: '',
-        negativePrefix: '',
-        loras: [],
-        cfgScale: localSettings.cfgScale,
-        steps: localSettings.steps,
-        sampler: localSettings.sampler,
-        scheduler: 'simple',
-        selectedVae: localSettings.selectedVae,
-        clipSkip: localSettings.clipSkip
+    if (localSettings.perModel[key]) {
+      return
+    }
+    localSettings = {
+      ...localSettings,
+      perModel: {
+        ...localSettings.perModel,
+        [key]: {
+          qualityPrefix: '',
+          negativePrefix: '',
+          loras: [],
+          cfgScale: localSettings.cfgScale,
+          steps: localSettings.steps,
+          sampler: localSettings.sampler,
+          scheduler: 'simple',
+          selectedVae: localSettings.selectedVae,
+          clipSkip: localSettings.clipSkip,
+          modelType: 'sdxl'
+        }
       }
     }
   }
@@ -183,15 +160,10 @@
       let currentSelected: string | null = null
       promptsData.subscribe((d) => (currentSelected = d.selectedCheckpoint || null))()
       selectedModelKey = currentSelected || 'Default'
-    }
-  })
-
-  // Ensure model entry exists whenever selectedModelKey changes
-  $effect(() => {
-    if (show && selectedModelKey) {
       ensureModelEntry(selectedModelKey)
     }
   })
+
 
   // Focus requested field when dialog opens or when initialFocus changes
   $effect(() => {
@@ -323,6 +295,16 @@
         </select>
 
         {#if localSettings.perModel[selectedModelKey]}
+          <label for="pm-model-type" class="two-col-label">{m['settingsDialog.modelType']()}</label>
+          <select
+            id="pm-model-type"
+            class="two-col-input"
+            bind:value={localSettings.perModel[selectedModelKey].modelType}
+          >
+            <option value="sdxl">SDXL</option>
+            <option value="qwen">Qwen</option>
+          </select>
+
           <label for="pm-cfg" class="two-col-label">{m['settingsDialog.cfgScale']()}</label>
           <input
             id="pm-cfg"

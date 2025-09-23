@@ -17,6 +17,7 @@
     isGeneratingForever: boolean
     onSettingsChange: (settings: Settings) => void
     lastSeed: number | null
+    disableInpaint?: boolean
   }
 
   let {
@@ -30,7 +31,8 @@
     onStopGeneration,
     isGeneratingForever,
     onSettingsChange,
-    lastSeed
+    lastSeed,
+    disableInpaint = false
   }: Props = $props()
 
   let showSettingsDialog = $state(false)
@@ -111,7 +113,7 @@
     <button
       class="flex h-9 cursor-pointer items-center justify-center gap-1 rounded-md border-none bg-purple-500 px-3 py-1.5 text-sm font-semibold text-white transition-all duration-200 hover:enabled:-translate-y-0.5 hover:enabled:bg-purple-600 hover:enabled:shadow-lg active:enabled:translate-y-0 disabled:transform-none disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
       onclick={() => onInpaint(inpaintDenoiseStrength)}
-      disabled={isLoading || isGeneratingForever}
+      disabled={disableInpaint || isLoading || isGeneratingForever}
     >
       <PaintBrush class="h-4 w-4" />
       {m['generationControls.inpaint']()}

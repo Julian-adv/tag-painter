@@ -64,6 +64,7 @@
   "settingsDialog.imageWidth": "Image Width:",
   "settingsDialog.loraModels": "LoRA Models:",
   "settingsDialog.model": "Model:",
+  "settingsDialog.modelType": "Model type:",
   "settingsDialog.negativePlaceholder": "e.g., lowres, bad anatomy",
   "settingsDialog.negativePrefix": "Negative Prefix:",
   "settingsDialog.outputDirectory": "Output Directory:",

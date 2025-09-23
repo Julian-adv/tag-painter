@@ -64,6 +64,7 @@
   "settingsDialog.imageWidth": "가로 크기:",
   "settingsDialog.loraModels": "LoRA 모델:",
   "settingsDialog.model": "모델:",
+  "settingsDialog.modelType": "모델 유형:",
   "settingsDialog.negativePlaceholder": "예: lowres, bad anatomy",
   "settingsDialog.negativePrefix": "네거티브 접두사:",
   "settingsDialog.outputDirectory": "출력 폴더:",

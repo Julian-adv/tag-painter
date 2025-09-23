@@ -42,6 +42,7 @@
   // Display-only prefixes from Settings per selected model
   let qualityPrefixText = $state('')
   let negativePrefixText = $state('')
+  let isQwenModel = $state(false)
 
   $effect(() => {
     const perModel = settings?.perModel || {}
@@ -49,6 +50,7 @@
     const ms = perModel[key] || perModel['Default']
     qualityPrefixText = ms?.qualityPrefix || ''
     negativePrefixText = ms?.negativePrefix || ''
+    isQwenModel = ms?.modelType === 'qwen'
   })
 
   // Parse weight from tag string
@@ -234,6 +236,7 @@
       onTagsChange={saveTags}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone1}
+      disabled={isQwenModel}
     />
 
     <TagInput
@@ -243,7 +246,7 @@
       onTagsChange={saveTags}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone2}
-      disabled={$promptsData.selectedComposition === 'all'}
+      disabled={isQwenModel || $promptsData.selectedComposition === 'all'}
     />
 
     <TagInput

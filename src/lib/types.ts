@@ -27,6 +27,8 @@ export interface LoraWithWeight {
   weight: number
 }
 
+export type ModelType = 'sdxl' | 'qwen'
+
 export interface ModelSettings {
   qualityPrefix: string
   negativePrefix: string
@@ -37,6 +39,7 @@ export interface ModelSettings {
   scheduler: string
   selectedVae: string
   clipSkip: number
+  modelType: ModelType
 }
 
 export interface Settings {
