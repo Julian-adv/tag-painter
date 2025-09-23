@@ -41,32 +41,38 @@ function buildComfyWsUrl(baseUrl: string, resourcePath: string, params: Record<s
   return url.toString()
 }
 
-export async function fetchCheckpoints(baseUrl: string): Promise<string[]> {
+async function fetchLoaderOptions(
+  baseUrl: string,
+  loaderName: string,
+  fieldName: string
+): Promise<string[]> {
   try {
-    const response = await fetch(
-      buildComfyHttpUrl(baseUrl, 'object_info/CheckpointLoaderSimple')
-    )
+    const response = await fetch(buildComfyHttpUrl(baseUrl, `object_info/${loaderName}`))
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
     const data = await response.json()
-    if (
-      data &&
-      data.CheckpointLoaderSimple &&
-      data.CheckpointLoaderSimple.input &&
-      data.CheckpointLoaderSimple.input.required &&
-      data.CheckpointLoaderSimple.input.required.ckpt_name
-    ) {
-      const checkpoints = data.CheckpointLoaderSimple.input.required.ckpt_name[0]
-      return checkpoints
-    } else {
-      console.error('Could not find checkpoints in API response:', data)
-      return []
+    const options = data?.[loaderName]?.input?.required?.[fieldName]?.[0]
+    if (Array.isArray(options)) {
+      return options
     }
+    console.error(`Could not find ${fieldName} in API response for ${loaderName}:`, data)
+    return []
   } catch (error) {
-    console.error('Error fetching checkpoints:', error)
+    console.error(`Error fetching options for ${loaderName}:`, error)
     return []
   }
+}
+
+export async function fetchCheckpoints(baseUrl: string): Promise<string[]> {
+  const [checkpointLoader, unetLoader] = await Promise.all([
+    fetchLoaderOptions(baseUrl, 'CheckpointLoaderSimple', 'ckpt_name'),
+    fetchLoaderOptions(baseUrl, 'UNETLoader', 'unet_name')
+  ])
+
+  const combined = [...checkpointLoader, ...unetLoader]
+  const unique = Array.from(new Set(combined))
+  return unique
 }
 
 export async function fetchVaeModels(baseUrl: string): Promise<string[]> {
