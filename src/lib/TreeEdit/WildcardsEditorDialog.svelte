@@ -8,9 +8,10 @@
     isOpen: boolean
     initialSelectedName?: string
     initialTargetText?: string
+    modelType?: string
   }
 
-  let { isOpen = $bindable(), initialSelectedName = '', initialTargetText = '' }: Props = $props()
+  let { isOpen = $bindable(), initialSelectedName = '', initialTargetText = '', modelType }: Props = $props()
   let loading = $state(false)
   let pendingText: string | null = $state(null)
 
@@ -94,7 +95,7 @@
   $effect(() => {
     if (isOpen) {
       loading = true
-      fetchWildcardsText()
+      fetchWildcardsText(modelType)
         .then((text) => {
           // Yield a frame so the dialog paints before heavy parse
           requestAnimationFrame(() => {
@@ -140,7 +141,7 @@
     // Immediately reflect changes in combinedTags using the text we save
     // (avoids waiting for a subsequent fetch)
     updateWildcardsFromText(body)
-    saveWildcardsText(body)
+    saveWildcardsText(body, modelType)
       .then(() => tree?.markSaved())
       .catch((err) => console.error('Save failed:', err))
   }

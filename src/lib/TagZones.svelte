@@ -273,6 +273,7 @@
     bind:isOpen={showTreeEditDialog}
     initialSelectedName={preselectTagName}
     initialTargetText={preselectTargetText}
+    modelType={isQwenModel ? 'qwen' : undefined}
   />
 </div>
 

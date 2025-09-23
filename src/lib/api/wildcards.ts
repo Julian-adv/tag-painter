@@ -1,22 +1,28 @@
 // APIs for reading/writing wildcards.yaml
 // Keep minimal and reusable across components.
 
-export async function fetchWildcardsText(): Promise<string> {
+import { getWildcardsFileName } from '../utils/wildcards'
+
+export async function fetchWildcardsText(modelType?: string): Promise<string> {
   try {
-    const res = await fetch('/api/wildcards')
+    const params = modelType ? `?modelType=${encodeURIComponent(modelType)}` : ''
+    const res = await fetch(`/api/wildcards${params}`)
     if (!res.ok) return ''
     return await res.text()
   } catch (e) {
-    console.error('Failed to load wildcards.yaml:', e)
+    const fileName = getWildcardsFileName(modelType)
+    console.error(`Failed to load ${fileName}:`, e)
     return ''
   }
 }
 
-export async function saveWildcardsText(text: string): Promise<void> {
-  const res = await fetch('/api/wildcards', {
+export async function saveWildcardsText(text: string, modelType?: string): Promise<void> {
+  const params = modelType ? `?modelType=${encodeURIComponent(modelType)}` : ''
+  const res = await fetch(`/api/wildcards${params}`, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     body: text
   })
-  if (!res.ok) throw new Error('Failed to save wildcards.yaml')
+  const fileName = getWildcardsFileName(modelType)
+  if (!res.ok) throw new Error(`Failed to save ${fileName}`)
 }

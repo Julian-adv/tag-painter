@@ -14,7 +14,7 @@ let wildcardModel: TreeModel = fromYAML('')
 export const combinedTags = writable<string[]>([])
 let initPromise: Promise<void> | null = null
 
-export async function initTags(): Promise<void> {
+export async function initTags(modelType?: string): Promise<void> {
   // Return cached tags if already loaded
   const currentCombinedTags = get(combinedTags)
   if (tags.length > 0 && currentCombinedTags.length > 0) {
@@ -30,7 +30,7 @@ export async function initTags(): Promise<void> {
   initPromise = (async () => {
     try {
       // Load both danbooru tags and wildcards.yaml
-      const [tagsRes, wcRes] = await Promise.allSettled([fetch('/api/tags'), fetchWildcardsText()])
+      const [tagsRes, wcRes] = await Promise.allSettled([fetch('/api/tags'), fetchWildcardsText(modelType)])
 
       if (tagsRes.status === 'fulfilled' && tagsRes.value.ok) {
         try {
@@ -134,9 +134,9 @@ export function updateWildcardsFromText(text: string) {
 }
 
 // Public helper to re-fetch wildcards from server and refresh combined tags
-export async function refreshWildcardsFromServer() {
+export async function refreshWildcardsFromServer(modelType?: string) {
   try {
-    const text = await fetchWildcardsText()
+    const text = await fetchWildcardsText(modelType)
     updateWildcardsFromText(text)
   } catch (e) {
     console.error('refreshWildcardsFromServer failed:', e)
