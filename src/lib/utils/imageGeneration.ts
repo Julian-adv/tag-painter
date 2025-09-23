@@ -511,6 +511,7 @@ async function generateQwenImage(
       _meta: { title: 'Final Save Image Websocket' }
     }
 
+    console.log('workflow (qwen)', workflow)
     await submitToComfyUI(
       workflow,
       clientId,
@@ -826,9 +827,13 @@ function applyQwenLoraChain(
   loras: { name: string; weight: number }[]
 ) {
   const baseNodeId = '37'
+  const samplerNodeId = '66'
 
   if (!Array.isArray(loras) || loras.length === 0) {
-    workflow['3'].inputs.model = [baseNodeId, 0]
+    if (workflow[samplerNodeId]) {
+      workflow[samplerNodeId].inputs.model = [baseNodeId, 0]
+    }
+    workflow['3'].inputs.model = [samplerNodeId, 0]
     return
   }
 
@@ -851,18 +856,33 @@ function applyQwenLoraChain(
     previousNodeId = nodeId
   })
 
-  workflow['3'].inputs.model = [previousNodeId, 0]
+  if (workflow[samplerNodeId]) {
+    workflow[samplerNodeId].inputs.model = [previousNodeId, 0]
+  }
+  workflow['3'].inputs.model = [samplerNodeId, 0]
 }
 
 function applyPerModelOverrides(settings: Settings, modelName: string | null): Settings {
   const base: Settings = { ...settings, perModel: settings.perModel }
   const ms = getEffectiveModelSettings(settings, modelName)
-  if (ms) {
-    base.cfgScale = ms.cfgScale
-    base.steps = ms.steps
-    base.sampler = ms.sampler
-    base.selectedVae = ms.selectedVae
-    base.clipSkip = ms.clipSkip ?? base.clipSkip ?? 2
+  let effective = ms
+
+  if (ms?.modelType === 'qwen') {
+    effective = {
+      ...ms,
+      cfgScale: ms.cfgScale ?? 1.5,
+      steps: ms.steps ?? 8,
+      sampler: ms.sampler || 'euler',
+      scheduler: ms.scheduler || 'simple'
+    }
+  }
+
+  if (effective) {
+    base.cfgScale = effective.cfgScale
+    base.steps = effective.steps
+    base.sampler = effective.sampler
+    base.selectedVae = effective.selectedVae
+    base.clipSkip = effective.clipSkip ?? base.clipSkip ?? 2
   }
 
   // Ensure clipSkip has a default value (use global setting as fallback, then default to 2)

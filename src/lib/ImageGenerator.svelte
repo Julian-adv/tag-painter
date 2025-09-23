@@ -135,6 +135,12 @@
       if (entry && !entry.modelType) {
         entry.modelType = 'sdxl'
       }
+      if (entry?.modelType === 'qwen') {
+        if (entry.steps == null) entry.steps = 8
+        if (entry.cfgScale == null) entry.cfgScale = 1.5
+        if (!entry.sampler) entry.sampler = 'euler'
+        if (!entry.scheduler) entry.scheduler = 'simple'
+      }
     }
 
     return next

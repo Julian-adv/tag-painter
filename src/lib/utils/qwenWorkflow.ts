@@ -9,7 +9,7 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
       sampler_name: 'euler_ancestral',
       scheduler: 'simple',
       denoise: 1,
-      model: ['37', 0],
+      model: ['66', 0],
       positive: ['6', 0],
       negative: ['7', 0],
       latent_image: ['58', 0]
@@ -88,6 +88,16 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
     class_type: 'EmptySD3LatentImage',
     _meta: {
       title: 'Empty Latent Image'
+    }
+  },
+  '66': {
+    inputs: {
+      model: ['37', 0],
+      shift: 3.1
+    },
+    class_type: 'ModelSamplingAuraFlow',
+    _meta: {
+      title: 'Model Sampling Aura Flow'
     }
   }
 }
