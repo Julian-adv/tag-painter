@@ -2,13 +2,6 @@
 //
 // This module orchestrates the complete image generation workflow with ComfyUI
 
-import { saveImage } from './fileIO'
-import {
-  buildComfyHttpUrl,
-  connectWebSocket,
-  normalizeBaseUrl,
-  type WebSocketCallbacks
-} from './comfyui'
 import {
   defaultWorkflowPrompt,
   inpaintingWorkflowPrompt,
@@ -16,7 +9,14 @@ import {
   generateLoraChain,
   configureClipSkip
 } from './workflow'
-import { qwenWorkflowPrompt } from './qwenWorkflow'
+import { generateQwenImage } from './qwenImageGeneration'
+import {
+  generateClientId,
+  getEffectiveModelSettings,
+  getEffectiveLoras,
+  applyPerModelOverrides,
+  submitToComfyUI
+} from './generationCommon'
 import {
   expandCustomTags,
   detectCompositionFromTags,
@@ -31,46 +31,9 @@ import type {
   PromptsData,
   Settings,
   ProgressData,
-  ComfyUIWorkflow,
-  ModelSettings
+  ComfyUIWorkflow
 } from '$lib/types'
 
-function generateClientId(): string {
-  const cryptoObj = typeof globalThis !== 'undefined' ? globalThis.crypto : undefined
-  if (cryptoObj && typeof cryptoObj.randomUUID === 'function') {
-    return cryptoObj.randomUUID()
-  }
-  if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
-    const bytes = cryptoObj.getRandomValues(new Uint8Array(16))
-    bytes[6] = (bytes[6] & 0x0f) | 0x40
-    bytes[8] = (bytes[8] & 0x3f) | 0x80
-    const segments = [
-      bytes.subarray(0, 4),
-      bytes.subarray(4, 6),
-      bytes.subarray(6, 8),
-      bytes.subarray(8, 10),
-      bytes.subarray(10, 16)
-    ].map((segment) =>
-      Array.from(segment)
-        .map((byte) => byte.toString(16).padStart(2, '0'))
-        .join('')
-    )
-    return `${segments[0]}-${segments[1]}-${segments[2]}-${segments[3]}-${segments[4]}`
-  }
-  let value = ''
-  for (let index = 0; index < 36; index += 1) {
-    if (index === 8 || index === 13 || index === 18 || index === 23) {
-      value += '-'
-    } else if (index === 14) {
-      value += '4'
-    } else {
-      const random = Math.floor(Math.random() * 16)
-      const hex = index === 19 ? (random & 0x3) | 0x8 : random
-      value += hex.toString(16)
-    }
-  }
-  return value
-}
 
 export interface GenerationOptions {
   promptsData: PromptsData
@@ -387,161 +350,6 @@ export async function generateImage(options: GenerationOptions): Promise<{
   }
 }
 
-async function generateQwenImage(
-  options: GenerationOptions,
-  modelSettings: ModelSettings | null
-): Promise<{
-  seed: number
-  randomTagResolutions: {
-    all: Record<string, string>
-    zone1: Record<string, string>
-    zone2: Record<string, string>
-    negative: Record<string, string>
-    inpainting: Record<string, string>
-  }
-}> {
-  const {
-    promptsData,
-    settings,
-    seed,
-    previousRandomTagResolutions,
-    onLoadingChange,
-    onProgressUpdate,
-    onImageReceived,
-    onError
-  } = options
-
-  const workflow = JSON.parse(JSON.stringify(qwenWorkflowPrompt))
-
-  try {
-    onLoadingChange(true)
-    onProgressUpdate({ value: 0, max: 100, currentNode: '' })
-
-    const clientId = generateClientId()
-    const model = getWildcardModel()
-
-    // Read wildcard zones for Qwen model
-    const wildcardZones = await readWildcardZones('qwen')
-
-    const previousAll = previousRandomTagResolutions?.all || {}
-    const previousNegative = previousRandomTagResolutions?.negative || {}
-
-    await prefetchWildcardFilesForTags([...wildcardZones.all, ...wildcardZones.negative], model)
-
-    const prevTextsAll: string[] = Object.values(previousAll)
-    const prevTextsNegative: string[] = Object.values(previousNegative)
-    await prefetchWildcardFilesFromTexts([...prevTextsAll, ...prevTextsNegative])
-
-    const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll)
-    const negativeResult = expandCustomTags(
-      wildcardZones.negative,
-      model,
-      new Set(),
-      { ...allResult.randomTagResolutions },
-      previousNegative
-    )
-
-    let allTagsText = cleanDirectivesFromTags(allResult.expandedTags.join(', '))
-    let negativeTagsText = cleanDirectivesFromTags(negativeResult.expandedTags.join(', '))
-
-    const qualityPrefix = modelSettings?.qualityPrefix ?? ''
-    if (qualityPrefix.trim().length > 0) {
-      allTagsText = [qualityPrefix.trim(), allTagsText].filter((p) => p && p.length > 0).join(', ')
-    }
-
-    const negativePrefix = modelSettings?.negativePrefix ?? ''
-    if (negativePrefix.trim().length > 0) {
-      negativeTagsText = [negativePrefix.trim(), negativeTagsText]
-        .filter((p) => p && p.length > 0)
-        .join(', ')
-    }
-
-    if (promptsData.selectedComposition !== 'all') {
-      updateComposition('all')
-      promptsData.selectedComposition = 'all'
-    }
-
-    const allRandomResolutions = {
-      all: { ...allResult.randomTagResolutions },
-      zone1: {},
-      zone2: {},
-      negative: { ...negativeResult.randomTagResolutions },
-      inpainting: {}
-    }
-
-    const appliedSettings = applyPerModelOverrides(settings, promptsData.selectedCheckpoint)
-    const scheduler = modelSettings?.scheduler || 'simple'
-
-    const effectiveLoras = getEffectiveLoras(
-      settings,
-      promptsData.selectedCheckpoint,
-      promptsData.selectedLoras
-    )
-    applyQwenLoraChain(workflow, effectiveLoras)
-
-    workflow['3'].inputs.steps = appliedSettings.steps
-    workflow['3'].inputs.cfg = appliedSettings.cfgScale
-    workflow['3'].inputs.sampler_name = appliedSettings.sampler
-    workflow['3'].inputs.scheduler = scheduler
-
-    if (workflow['58']) {
-      workflow['58'].inputs.width = appliedSettings.imageWidth
-      workflow['58'].inputs.height = appliedSettings.imageHeight
-    }
-
-    if (promptsData.selectedCheckpoint) {
-      workflow['37'].inputs.unet_name = promptsData.selectedCheckpoint
-    }
-
-    const vaeName =
-      appliedSettings.selectedVae && appliedSettings.selectedVae !== '__embedded__'
-        ? appliedSettings.selectedVae
-        : (workflow['39']?.inputs?.vae_name as string) || 'qwen_image_vae.safetensors'
-    if (workflow['39']) {
-      workflow['39'].inputs.vae_name = vaeName
-    }
-
-    workflow['6'].inputs.text = allTagsText
-    workflow['7'].inputs.text = negativeTagsText
-
-    const appliedSeed = seed ?? Math.floor(Math.random() * 10000000000000000)
-    workflow['3'].inputs.seed = appliedSeed
-
-    workflow[FINAL_SAVE_NODE_ID] = {
-      inputs: { images: ['8', 0] },
-      class_type: 'SaveImageWebsocket',
-      _meta: { title: 'Final Save Image Websocket' }
-    }
-
-    console.log('workflow (qwen)', workflow)
-    await submitToComfyUI(
-      workflow,
-      clientId,
-      {
-        all: allTagsText,
-        zone1: '',
-        zone2: '',
-        negative: negativeTagsText,
-        inpainting: ''
-      },
-      appliedSettings,
-      appliedSeed,
-      {
-        onLoadingChange,
-        onProgressUpdate,
-        onImageReceived,
-        onError
-      }
-    )
-
-    return { seed: appliedSeed, randomTagResolutions: allRandomResolutions }
-  } catch (error) {
-    console.error('Failed to generate Qwen image:', error)
-    onError(error instanceof Error ? error.message : 'Failed to generate image')
-    onLoadingChange(false)
-    throw error
-  }
-}
 
 function configureWorkflow(
   workflow: ComfyUIWorkflow,
@@ -638,7 +446,7 @@ function applySeedsToWorkflow(
   isInpainting: boolean = false
 ): number {
   // Use provided seed or generate a new random seed
-  const seed = providedSeed ?? Math.floor(Math.random() * 10000000000000000)
+  const seed = providedSeed ?? Math.floor(Math.random() * 1000000000000000)
 
   if (isInpainting) {
     // Inpainting workflow - set seed for KSampler node
@@ -721,173 +529,7 @@ function addSaveImageWebsocketNode(
   }
 }
 
-async function submitToComfyUI(
-  workflow: ComfyUIWorkflow,
-  clientId: string,
-  prompts: {
-    all: string
-    zone1: string
-    zone2: string
-    negative: string
-    inpainting: string
-  },
-  settings: Settings,
-  seed: number,
-  callbacks: {
-    onLoadingChange: (loading: boolean) => void
-    onProgressUpdate: (progress: ProgressData) => void
-    onImageReceived: (imageBlob: Blob, filePath: string) => void
-    onError: (error: string) => void
-  }
-) {
-  const payload = {
-    prompt: workflow,
-    client_id: clientId
-  }
 
-  const comfyBase = normalizeBaseUrl(settings.comfyUrl)
 
-  // Submit prompt to ComfyUI
-  const response = await fetch(buildComfyHttpUrl(comfyBase, 'prompt'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  })
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error('ComfyUI API Error:', response.status, errorText)
-    throw new Error(`HTTP error! status: ${response.status}, response: ${errorText}`)
-  }
 
-  const result = await response.json()
-
-  // Connect to WebSocket for real-time updates
-  const wsCallbacks: WebSocketCallbacks = {
-    onLoadingChange: callbacks.onLoadingChange,
-    onProgressUpdate: callbacks.onProgressUpdate,
-    onImageReceived: async (imageBlob: Blob) => {
-      const filePath = await saveImage(imageBlob, prompts, settings.outputDirectory, workflow, seed)
-      if (filePath) {
-        callbacks.onImageReceived(imageBlob, filePath)
-      } else {
-        // If saving returns null, use fallback path
-        const fallbackPath = `unsaved_${Date.now()}.png`
-        callbacks.onImageReceived(imageBlob, fallbackPath)
-      }
-    },
-    onError: callbacks.onError
-  }
-
-  await connectWebSocket(
-    result.prompt_id,
-    clientId,
-    FINAL_SAVE_NODE_ID,
-    workflow,
-    wsCallbacks,
-    comfyBase
-  )
-}
-
-function getEffectiveModelSettings(
-  settings: Settings,
-  modelName: string | null
-): ModelSettings | null {
-  if (settings.perModel && modelName && settings.perModel[modelName]) {
-    return settings.perModel[modelName]
-  }
-  if (settings.perModel && settings.perModel['Default']) {
-    return settings.perModel['Default']
-  }
-  return null
-}
-
-function getEffectiveLoras(
-  settings: Settings,
-  modelName: string | null,
-  fallback: { name: string; weight: number }[]
-): { name: string; weight: number }[] {
-  const ms = getEffectiveModelSettings(settings, modelName)
-  const primary = ms && ms.loras ? ms.loras : []
-  const secondary = Array.isArray(fallback) ? fallback : []
-  // Merge while preserving order and avoiding duplicates by name.
-  const seen = new Set<string>()
-  const merged: { name: string; weight: number }[] = []
-  for (const l of [...primary, ...secondary]) {
-    if (!seen.has(l.name)) {
-      seen.add(l.name)
-      merged.push({ name: l.name, weight: l.weight })
-    }
-  }
-  return merged
-}
-
-function applyQwenLoraChain(workflow: ComfyUIWorkflow, loras: { name: string; weight: number }[]) {
-  const baseNodeId = '37'
-  const samplerNodeId = '66'
-
-  if (!Array.isArray(loras) || loras.length === 0) {
-    if (workflow[samplerNodeId]) {
-      workflow[samplerNodeId].inputs.model = [baseNodeId, 0]
-    }
-    workflow['3'].inputs.model = [samplerNodeId, 0]
-    return
-  }
-
-  let previousNodeId = baseNodeId
-
-  loras.forEach((lora, index) => {
-    const nodeId = (200 + index).toString()
-    workflow[nodeId] = {
-      inputs: {
-        model: [previousNodeId, 0],
-        lora_name: lora.name,
-        strength_model: lora.weight
-      },
-      class_type: 'LoraLoaderModelOnly',
-      _meta: {
-        title: `Load Qwen LoRA ${index + 1}`
-      }
-    }
-
-    previousNodeId = nodeId
-  })
-
-  if (workflow[samplerNodeId]) {
-    workflow[samplerNodeId].inputs.model = [previousNodeId, 0]
-  }
-  workflow['3'].inputs.model = [samplerNodeId, 0]
-}
-
-function applyPerModelOverrides(settings: Settings, modelName: string | null): Settings {
-  const base: Settings = { ...settings, perModel: settings.perModel }
-  const ms = getEffectiveModelSettings(settings, modelName)
-  let effective = ms
-
-  if (ms?.modelType === 'qwen') {
-    effective = {
-      ...ms,
-      cfgScale: ms.cfgScale ?? 1.5,
-      steps: ms.steps ?? 8,
-      sampler: ms.sampler || 'euler',
-      scheduler: ms.scheduler || 'simple'
-    }
-  }
-
-  if (effective) {
-    base.cfgScale = effective.cfgScale
-    base.steps = effective.steps
-    base.sampler = effective.sampler
-    base.selectedVae = effective.selectedVae
-    base.clipSkip = effective.clipSkip ?? base.clipSkip ?? 2
-  }
-
-  // Ensure clipSkip has a default value (use global setting as fallback, then default to 2)
-  if (base.clipSkip == null) {
-    base.clipSkip = 2
-  }
-
-  return base
-}
