@@ -87,7 +87,10 @@
         promptsData.subscribe((d: PromptsData) => (prevSelected = d.selectedCheckpoint || null))()
         availableCheckpoints = checkpoints
         if (!prevSelected || !checkpoints.includes(prevSelected)) {
-          promptsData.update((data: PromptsData) => ({ ...data, selectedCheckpoint: checkpoints[0] }))
+          promptsData.update((data: PromptsData) => ({
+            ...data,
+            selectedCheckpoint: checkpoints[0]
+          }))
         }
       } else {
         availableCheckpoints = []
@@ -211,11 +214,9 @@
   })
 
   // Event handlers
-  let generationControlsRef =
-    $state<
-      | { openSettingsDialogExternal: (focusField: 'quality' | 'negative' | null) => void }
-      | undefined
-    >(undefined)
+  let generationControlsRef = $state<
+    { openSettingsDialogExternal: (focusField: 'quality' | 'negative' | null) => void } | undefined
+  >(undefined)
   function openSettingsFromTagZones(focusField: 'quality' | 'negative') {
     generationControlsRef?.openSettingsDialogExternal(focusField)
   }
@@ -560,7 +561,7 @@
         {#if dev}
           <button
             type="button"
-            class="self-start flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
+            class="flex h-6 w-6 items-center justify-center self-start rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
             onclick={openNoCheckpointsDialog}
             aria-label={m['imageGenerator.devShowDialog']()}
             title={m['imageGenerator.devShowDialog']()}
@@ -575,11 +576,11 @@
       <ImageViewer
         bind:this={imageViewer}
         {imageUrl}
-          {currentImageFileName}
-          outputDirectory={settings.outputDirectory}
-          onImageChange={handleImageChange}
-        />
-      </section>
+        {currentImageFileName}
+        outputDirectory={settings.outputDirectory}
+        onImageChange={handleImageChange}
+      />
+    </section>
   </div>
 </main>
 

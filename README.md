@@ -27,12 +27,13 @@ After installation, you may see a "No checkpoints" dialog. In that case, downloa
 
 <img src="docs/images/checkpoints-refresh-en.png" alt="Refresh checkpoints list" width="274" />
 
-- Zeniji_Mix K-illust — https://civitai.com/models/1651774?modelVersionId=1869616
-  _The screenshot above was generated with this model._
+- Zeniji*Mix K-illust — https://civitai.com/models/1651774?modelVersionId=1869616
+  \_The screenshot above was generated with this model.*
 
 ### Open Settings
 
 Click the gear (Settings) button in the top toolbar to open the settings dialog. You can configure:
+
 - Language: switch between English/Korean
 - Output folder: image generation output directory
 - Generation parameters: sampler, steps, CFG scale, seed, etc.
@@ -65,20 +66,20 @@ Double-click a tag to open the wildcards editor and fine‑tune random choices.
 
 Usage
 
-| Item | Description |
-| --- | --- |
-| Node double-click (Enter) | Edit the node name/content inline. |
-| Ctrl+Enter | Add a sibling node next to the current node. |
-| Drag & drop | Reorder or move nodes. |
-| Random | Picks a new candidate at random on every generation. |
-| Consistent random | Picks the same candidate across ALL, Zone 1, and Zone 2 for the same seed/structure (useful for poses or elements that must match across zones). |
-| Composition | Determines the image layout: single zone, left/right split, or top/bottom split. |
-| Weight | Controls selection probability (higher weight increases the chance this node is chosen among candidates). |
-| Disable | Exclude specific nodes (or patterns) from generation. |
-| Multi‑select/Group (Shift+click) | Select a range, then press Group to create a parent with the selected nodes as children. |
-| Add/Delete | Use the toolbar/context menu to add a child, add a top‑level node, or delete. |
-| Expand/Collapse | Expand/collapse all nodes to review the structure quickly. |
-| Pin | Force a node to be selected during generation. |
+| Item                             | Description                                                                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Node double-click (Enter)        | Edit the node name/content inline.                                                                                                               |
+| Ctrl+Enter                       | Add a sibling node next to the current node.                                                                                                     |
+| Drag & drop                      | Reorder or move nodes.                                                                                                                           |
+| Random                           | Picks a new candidate at random on every generation.                                                                                             |
+| Consistent random                | Picks the same candidate across ALL, Zone 1, and Zone 2 for the same seed/structure (useful for poses or elements that must match across zones). |
+| Composition                      | Determines the image layout: single zone, left/right split, or top/bottom split.                                                                 |
+| Weight                           | Controls selection probability (higher weight increases the chance this node is chosen among candidates).                                        |
+| Disable                          | Exclude specific nodes (or patterns) from generation.                                                                                            |
+| Multi‑select/Group (Shift+click) | Select a range, then press Group to create a parent with the selected nodes as children.                                                         |
+| Add/Delete                       | Use the toolbar/context menu to add a child, add a top‑level node, or delete.                                                                    |
+| Expand/Collapse                  | Expand/collapse all nodes to review the structure quickly.                                                                                       |
+| Pin                              | Force a node to be selected during generation.                                                                                                   |
 
 ### What Gets Installed Automatically
 
@@ -110,6 +111,7 @@ Usage
   - Fant5yP0ny — https://huggingface.co/LyliaEngine/Fant5yP0ny/resolve/main/Fant5yP0ny.safetensors?download=true
 
 In addition, the setup installs onnxruntime for the DWpose/OpenPose preprocessors used by inpainting:
+
 - If an NVIDIA GPU is detected: installs `onnxruntime-gpu` (falls back to `onnxruntime` if needed)
 - Otherwise: installs `onnxruntime`
 
@@ -119,7 +121,6 @@ If auto-download of `OpenPoseXL2.safetensors` fails, download it manually and pl
 
 - `-NoComfy`: Use your existing ComfyUI; skip install/start.
 - `-ComfyOnly`: Start only ComfyUI; do not launch Tag Painter.
- 
 
 ## License
 

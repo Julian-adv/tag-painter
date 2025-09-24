@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import {
-  fetchCheckpoints,
-  connectWebSocket,
-  type WebSocketCallbacks
-} from './comfyui'
+import { fetchCheckpoints, connectWebSocket, type WebSocketCallbacks } from './comfyui'
 
 // Mock fetch globally
 const mockFetch = vi.fn()

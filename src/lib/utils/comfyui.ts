@@ -27,7 +27,11 @@ export function buildComfyHttpUrl(baseUrl: string, resourcePath: string): string
   return new URL(cleanPath, baseWithSlash).toString()
 }
 
-function buildComfyWsUrl(baseUrl: string, resourcePath: string, params: Record<string, string>): string {
+function buildComfyWsUrl(
+  baseUrl: string,
+  resourcePath: string,
+  params: Record<string, string>
+): string {
   const httpUrl = buildComfyHttpUrl(baseUrl, resourcePath)
   const url = new URL(httpUrl)
   Object.entries(params).forEach(([key, value]) => {

@@ -25,6 +25,7 @@ import {
   prefetchWildcardFilesFromTexts
 } from './tagExpansion'
 import { getWildcardModel } from '../stores/tagsStore'
+import { readWildcardZones } from './wildcardZones'
 import { updateComposition } from '../stores/promptsStore'
 import type {
   PromptsData,
@@ -140,23 +141,26 @@ export async function generateImage(options: GenerationOptions): Promise<{
     // Generate unique client ID
     const clientId = generateClientId()
 
+    // Read wildcard zones instead of using promptsData.tags
+    const wildcardZones = await readWildcardZones(modelSettings?.modelType)
+
     // Expand custom tags and create prompt parts, using previous resolutions if regenerating
     const previousAll = previousRandomTagResolutions?.all || {}
     const model = getWildcardModel()
     // Prefetch wildcard files for all zones to allow synchronous replacement during expansion
     await prefetchWildcardFilesForTags(
       [
-        ...promptsData.tags.all,
-        ...promptsData.tags.zone1,
-        ...promptsData.tags.zone2,
-        ...promptsData.tags.negative,
-        ...promptsData.tags.inpainting
+        ...wildcardZones.all,
+        ...wildcardZones.zone1,
+        ...wildcardZones.zone2,
+        ...wildcardZones.negative,
+        ...wildcardZones.inpainting
       ],
       model
     )
     // Also prefetch from previous resolutions to support overrides that contain wildcards
     const prevTextsAll: string[] = Object.values(previousAll || {})
-    const allResult = expandCustomTags(promptsData.tags.all, model, new Set(), {}, previousAll)
+    const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll)
 
     // Check for composition detection
     const detectedComposition = detectCompositionFromTags(allResult.expandedTags)
@@ -170,7 +174,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const previousZone1 = previousRandomTagResolutions?.zone1 || {}
     const prevTextsZone1: string[] = Object.values(previousZone1 || {})
     const zone1Result = expandCustomTags(
-      promptsData.tags.zone1,
+      wildcardZones.zone1,
       model,
       new Set(),
       { ...allResult.randomTagResolutions },
@@ -180,7 +184,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const previousZone2 = previousRandomTagResolutions?.zone2 || {}
     const prevTextsZone2: string[] = Object.values(previousZone2 || {})
     const zone2Result = expandCustomTags(
-      promptsData.tags.zone2,
+      wildcardZones.zone2,
       model,
       new Set(),
       { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions },
@@ -190,7 +194,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const previousNegative = previousRandomTagResolutions?.negative || {}
     const prevTextsNeg: string[] = Object.values(previousNegative || {})
     const negativeResult = expandCustomTags(
-      promptsData.tags.negative,
+      wildcardZones.negative,
       model,
       new Set(),
       {
@@ -212,7 +216,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     ]
     await prefetchWildcardFilesFromTexts(prevTexts)
     const inpaintingResult = expandCustomTags(
-      promptsData.tags.inpainting,
+      wildcardZones.inpainting,
       model,
       new Set(),
       {
@@ -416,21 +420,21 @@ async function generateQwenImage(
     const clientId = generateClientId()
     const model = getWildcardModel()
 
+    // Read wildcard zones for Qwen model
+    const wildcardZones = await readWildcardZones('qwen')
+
     const previousAll = previousRandomTagResolutions?.all || {}
     const previousNegative = previousRandomTagResolutions?.negative || {}
 
-    await prefetchWildcardFilesForTags(
-      [...promptsData.tags.all, ...promptsData.tags.negative],
-      model
-    )
+    await prefetchWildcardFilesForTags([...wildcardZones.all, ...wildcardZones.negative], model)
 
     const prevTextsAll: string[] = Object.values(previousAll)
     const prevTextsNegative: string[] = Object.values(previousNegative)
     await prefetchWildcardFilesFromTexts([...prevTextsAll, ...prevTextsNegative])
 
-    const allResult = expandCustomTags(promptsData.tags.all, model, new Set(), {}, previousAll)
+    const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll)
     const negativeResult = expandCustomTags(
-      promptsData.tags.negative,
+      wildcardZones.negative,
       model,
       new Set(),
       { ...allResult.randomTagResolutions },
@@ -442,9 +446,7 @@ async function generateQwenImage(
 
     const qualityPrefix = modelSettings?.qualityPrefix ?? ''
     if (qualityPrefix.trim().length > 0) {
-      allTagsText = [qualityPrefix.trim(), allTagsText]
-        .filter((p) => p && p.length > 0)
-        .join(', ')
+      allTagsText = [qualityPrefix.trim(), allTagsText].filter((p) => p && p.length > 0).join(', ')
     }
 
     const negativePrefix = modelSettings?.negativePrefix ?? ''
@@ -822,10 +824,7 @@ function getEffectiveLoras(
   return merged
 }
 
-function applyQwenLoraChain(
-  workflow: ComfyUIWorkflow,
-  loras: { name: string; weight: number }[]
-) {
+function applyQwenLoraChain(workflow: ComfyUIWorkflow, loras: { name: string; weight: number }[]) {
   const baseNodeId = '37'
   const samplerNodeId = '66'
 

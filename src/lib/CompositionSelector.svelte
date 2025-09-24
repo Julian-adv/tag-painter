@@ -14,7 +14,11 @@
       src: '/left-horizontal-mask.png',
       alt: m['compositionSelector.altLeftHorizontal']()
     },
-    { id: 'top-vertical', src: '/top-vertical-mask.png', alt: m['compositionSelector.altTopVertical']() },
+    {
+      id: 'top-vertical',
+      src: '/top-vertical-mask.png',
+      alt: m['compositionSelector.altTopVertical']()
+    },
     {
       id: 'temp-mask',
       src: `/temp_mask.png?t=${tempMaskTimestamp}`,

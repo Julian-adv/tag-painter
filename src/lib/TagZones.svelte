@@ -2,10 +2,10 @@
 <script lang="ts">
   import TagInput from './TagInput.svelte'
   import WildcardsEditorDialog from './TreeEdit/WildcardsEditorDialog.svelte'
-  import { promptsData, updateTags, savePromptsData } from './stores/promptsStore'
+  import { promptsData } from './stores/promptsStore'
   import { wildcardTagType } from './stores/tagsStore'
+  import { readWildcardZones, writeWildcardZones } from './utils/wildcardZones'
   import { testModeStore, clearAllPins as clearAllPinsStore } from './stores/testModeStore.svelte'
-  import { onMount } from 'svelte'
   import { Tag, LockOpen } from 'svelte-heros-v2'
   import { get } from 'svelte/store'
   import type { CustomTag, Settings } from './types'
@@ -44,13 +44,22 @@
   let negativePrefixText = $state('')
   let isQwenModel = $state(false)
 
+  let hasLoadedTags = $state(false)
+
   $effect(() => {
     const perModel = settings?.perModel || {}
     const key = $promptsData.selectedCheckpoint || 'Default'
     const ms = perModel[key] || perModel['Default']
     qualityPrefixText = ms?.qualityPrefix || ''
     negativePrefixText = ms?.negativePrefix || ''
-    isQwenModel = ms?.modelType === 'qwen'
+    const newIsQwenModel = ms?.modelType === 'qwen'
+
+    // Load tags if model type changed or if this is the first time with valid settings
+    if (newIsQwenModel !== isQwenModel || (!hasLoadedTags && settings?.perModel)) {
+      isQwenModel = newIsQwenModel
+      hasLoadedTags = true
+      loadTagsFromWildcards()
+    }
   })
 
   // Parse weight from tag string
@@ -87,17 +96,29 @@
     })
   }
 
-  // Load tags from store on mount
-  onMount(() => {
-    const unsubscribe = promptsData.subscribe((data) => {
-      allTags = convertToCustomTags(data.tags.all)
-      firstZoneTags = convertToCustomTags(data.tags.zone1)
-      secondZoneTags = convertToCustomTags(data.tags.zone2)
-      negativeTags = convertToCustomTags(data.tags.negative)
-      inpaintingTags = convertToCustomTags(data.tags.inpainting)
-    })
-    return unsubscribe
-  })
+  // Note: We don't load on mount because settings might not be ready yet
+  // Loading happens in $effect when isQwenModel is properly determined
+
+  // Load tags from wildcard zones
+  async function loadTagsFromWildcards() {
+    try {
+      const modelType = isQwenModel ? 'qwen' : undefined
+      const zones = await readWildcardZones(modelType)
+      allTags = convertToCustomTags(zones.all)
+      firstZoneTags = convertToCustomTags(zones.zone1)
+      secondZoneTags = convertToCustomTags(zones.zone2)
+      negativeTags = convertToCustomTags(zones.negative)
+      inpaintingTags = convertToCustomTags(zones.inpainting)
+    } catch (error) {
+      console.error('Failed to load tags from wildcard zones:', error)
+      // Fallback to empty arrays
+      allTags = []
+      firstZoneTags = []
+      secondZoneTags = []
+      negativeTags = []
+      inpaintingTags = []
+    }
+  }
 
   // Convert CustomTag to string with weight
   function tagToString(tag: CustomTag): string {
@@ -109,14 +130,19 @@
 
   // Save tags whenever they change
   async function saveTags() {
-    updateTags(
-      allTags.map(tagToString),
-      firstZoneTags.map(tagToString),
-      secondZoneTags.map(tagToString),
-      negativeTags.map(tagToString),
-      inpaintingTags.map(tagToString)
-    )
-    await savePromptsData()
+    try {
+      const zones = {
+        all: allTags.map(tagToString),
+        zone1: firstZoneTags.map(tagToString),
+        zone2: secondZoneTags.map(tagToString),
+        negative: negativeTags.map(tagToString),
+        inpainting: inpaintingTags.map(tagToString)
+      }
+
+      await writeWildcardZones(zones, isQwenModel ? 'qwen' : undefined)
+    } catch (error) {
+      console.error('Failed to save tags to wildcard zones:', error)
+    }
   }
 
   function openTreeEditDialog() {
@@ -193,7 +219,9 @@
     <!-- Settings-derived prefixes preview -->
     <div>
       <div class="mb-1 flex items-center justify-between">
-        <div class="text-left text-xs font-medium text-gray-700">{m['tagZones.qualityPreview']()}</div>
+        <div class="text-left text-xs font-medium text-gray-700">
+          {m['tagZones.qualityPreview']()}
+        </div>
       </div>
       <div
         id="quality-prefix-preview"
@@ -208,7 +236,9 @@
 
     <div>
       <div class="mb-1 flex items-center justify-between">
-        <div class="text-left text-xs font-medium text-gray-700">{m['tagZones.negativePreview']()}</div>
+        <div class="text-left text-xs font-medium text-gray-700">
+          {m['tagZones.negativePreview']()}
+        </div>
       </div>
       <div
         id="negative-prefix-preview"

@@ -30,7 +30,10 @@ export async function initTags(modelType?: string): Promise<void> {
   initPromise = (async () => {
     try {
       // Load both danbooru tags and wildcards.yaml
-      const [tagsRes, wcRes] = await Promise.allSettled([fetch('/api/tags'), fetchWildcardsText(modelType)])
+      const [tagsRes, wcRes] = await Promise.allSettled([
+        fetch('/api/tags'),
+        fetchWildcardsText(modelType)
+      ])
 
       if (tagsRes.status === 'fulfilled' && tagsRes.value.ok) {
         try {

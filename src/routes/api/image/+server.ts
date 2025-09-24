@@ -201,7 +201,9 @@ export async function POST({ request }) {
       const sampler = workflowData?.['15']?.inputs?.sampler_name || 'euler_ancestral'
       // Prefer scheduler from the main sampler, fall back to KSampler used by inpainting
       const scheduler =
-        workflowData?.['45']?.inputs?.scheduler || workflowData?.['10']?.inputs?.scheduler || 'simple'
+        workflowData?.['45']?.inputs?.scheduler ||
+        workflowData?.['10']?.inputs?.scheduler ||
+        'simple'
       const cfg = workflowData?.['14']?.inputs?.cfg || 5
       const workflowSeed = workflowData?.['14']?.inputs?.noise_seed || seed
       const width = workflowData?.['16']?.inputs?.width || 832

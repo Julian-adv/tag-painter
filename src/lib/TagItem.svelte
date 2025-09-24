@@ -176,16 +176,12 @@
       ondblclick={handleTagDoubleClick}
       onkeydown={handleTagKeydown}
       oncontextmenu={handleRightClick}
-      title={
-        tag.type === 'regular'
-          ? m['tagItem.titleCreate']({ name: tag.name })
-          : m['tagItem.titleEdit']({ name: tag.name })
-      }
-      aria-label={
-        tag.type === 'regular'
-          ? m['tagItem.ariaCreate']({ name: tag.name })
-          : m['tagItem.ariaEdit']({ name: tag.name })
-      }
+      title={tag.type === 'regular'
+        ? m['tagItem.titleCreate']({ name: tag.name })
+        : m['tagItem.titleEdit']({ name: tag.name })}
+      aria-label={tag.type === 'regular'
+        ? m['tagItem.ariaCreate']({ name: tag.name })
+        : m['tagItem.ariaEdit']({ name: tag.name })}
       role="button"
     >
       <div class="inline-block">

@@ -494,7 +494,8 @@
           </div>
         </div>
         <div class="directive-row stacked">
-          <label class="directive-label" for="disables-input">{m['treeEdit.disablesLabel']()}</label>
+          <label class="directive-label" for="disables-input">{m['treeEdit.disablesLabel']()}</label
+          >
           <DisablesEditor
             items={getSelectedLeafDisables()}
             suggestions={parentNameSuggestions}
@@ -520,7 +521,9 @@
       <fieldset>
         <legend class="section-label">{m['treeEdit.arrayWeightLegend']()}</legend>
         <div class="directive-row">
-          <label for="array-weight-input" class="directive-label">{m['treeEdit.weightLabel']()}</label>
+          <label for="array-weight-input" class="directive-label"
+            >{m['treeEdit.weightLabel']()}</label
+          >
           <div class="weight-info">
             <WheelAdjustableInput
               value={getSelectedArrayWeight() ?? DEFAULT_ARRAY_WEIGHT}

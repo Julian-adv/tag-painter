@@ -77,11 +77,9 @@
       class="flex h-9 cursor-pointer items-center justify-center gap-1 rounded-md border-none bg-green-500 px-2 py-1.5 text-sm font-semibold text-white transition-all duration-200 hover:enabled:-translate-y-0.5 hover:enabled:bg-green-600 hover:enabled:shadow-lg active:enabled:translate-y-0 disabled:transform-none disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
       onclick={onRegenerate}
       disabled={isLoading || isGeneratingForever || lastSeed === null}
-      title={
-        lastSeed !== null
-          ? m['generationControls.regenTooltip']({ seed: String(lastSeed) })
-          : m['generationControls.regenTooltipMissing']()
-      }
+      title={lastSeed !== null
+        ? m['generationControls.regenTooltip']({ seed: String(lastSeed) })
+        : m['generationControls.regenTooltipMissing']()}
     >
       <ArrowPath class="h-4 w-4" />
       {m['generationControls.regen']()}

@@ -164,7 +164,6 @@
     }
   })
 
-
   // Focus requested field when dialog opens or when initialFocus changes
   $effect(() => {
     if (show) {
@@ -255,7 +254,9 @@
         />
 
         <!-- Output directory remains global -->
-        <label for="output-directory" class="output-dir-label">{m['settingsDialog.outputDirectory']()}</label>
+        <label for="output-directory" class="output-dir-label"
+          >{m['settingsDialog.outputDirectory']()}</label
+        >
         <input
           id="output-directory"
           type="text"
@@ -417,7 +418,8 @@
             class="two-col-input"
           />
 
-          <label for="pm-quality" class="two-col-label">{m['settingsDialog.qualityPrefix']()}</label>
+          <label for="pm-quality" class="two-col-label">{m['settingsDialog.qualityPrefix']()}</label
+          >
           <div class="two-col-input-wide">
             <AutoCompleteTextarea
               id="pm-quality"
@@ -428,7 +430,9 @@
             />
           </div>
 
-          <label for="pm-negative" class="two-col-label">{m['settingsDialog.negativePrefix']()}</label>
+          <label for="pm-negative" class="two-col-label"
+            >{m['settingsDialog.negativePrefix']()}</label
+          >
           <div class="two-col-input-wide">
             <AutoCompleteTextarea
               id="pm-negative"
@@ -439,7 +443,9 @@
             />
           </div>
 
-          <div class="two-col-label" style="text-align: right;">{m['settingsDialog.loraModels']()}</div>
+          <div class="two-col-label" style="text-align: right;">
+            {m['settingsDialog.loraModels']()}
+          </div>
           <div class="two-col-input-wide lora-embed">
             <LoraSelector
               selectedLoras={localSettings.perModel[selectedModelKey].loras as LoraWithWeight[]}

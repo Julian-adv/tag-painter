@@ -11,7 +11,12 @@
     modelType?: string
   }
 
-  let { isOpen = $bindable(), initialSelectedName = '', initialTargetText = '', modelType }: Props = $props()
+  let {
+    isOpen = $bindable(),
+    initialSelectedName = '',
+    initialTargetText = '',
+    modelType
+  }: Props = $props()
   let loading = $state(false)
   let pendingText: string | null = $state(null)
 
