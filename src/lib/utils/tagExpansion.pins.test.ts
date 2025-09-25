@@ -40,8 +40,8 @@ pose:
       pinnedLeafPath: undefined
     }
 
-    const { expandedTags } = expandCustomTags(['pose/d'], model)
-    expect(expandedTags.join(',')).toContain('pinned')
+    const { expandedText } = expandCustomTags('pose/d', model)
+    expect(expandedText).toContain('pinned')
   })
 
   it('breaks ties randomly (weighted) among multiple pinned-leading options', () => {
@@ -72,8 +72,8 @@ pose:
       pinnedLeafPath: undefined
     }
 
-    const { expandedTags } = expandCustomTags(['pose/d'], model)
+    const { expandedText } = expandCustomTags('pose/d', model)
     // With mocked crypto=0 and equal weights, the first pinned-leading option is selected
-    expect(expandedTags.join(',')).toContain('g2')
+    expect(expandedText).toContain('g2')
   })
 })

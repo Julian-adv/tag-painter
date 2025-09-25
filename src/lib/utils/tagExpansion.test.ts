@@ -140,66 +140,64 @@ describe('tagExpansion utilities', () => {
 
   describe('expandCustomTags', () => {
     it('should return regular tags unchanged', () => {
-      const result = expandCustomTags(['red dress', 'smile'], mockTreeModel)
+      const result = expandCustomTags('red dress, smile', mockTreeModel)
 
-      expect(result.expandedTags).toEqual(['red dress', 'smile'])
+      expect(result.expandedText).toEqual('red dress, smile')
       expect(result.randomTagResolutions).toEqual({})
     })
 
     // Sequential node behavior removed; test no longer applicable.
 
     it('should expand random custom tags', () => {
-      const result = expandCustomTags(['hair-color'], mockTreeModel)
+      const result = expandCustomTags('hair-color', mockTreeModel)
 
-      expect(result.expandedTags).toHaveLength(1)
-      expect(['blonde hair', 'brown hair', 'black hair']).toContain(result.expandedTags[0])
+      expect(['blonde hair', 'brown hair', 'black hair']).toContain(result.expandedText)
       expect(result.randomTagResolutions['hair-color']).toBeDefined()
     })
 
     it('should expand consistent-random custom tags', () => {
-      const result = expandCustomTags(['eye-color'], mockTreeModel)
+      const result = expandCustomTags('eye-color', mockTreeModel)
 
-      expect(result.expandedTags).toHaveLength(1)
-      expect(['blue eyes', 'green eyes', 'brown eyes']).toContain(result.expandedTags[0])
+      expect(['blue eyes', 'green eyes', 'brown eyes']).toContain(result.expandedText)
       expect(result.randomTagResolutions['eye-color']).toBeDefined()
     })
 
     it('should handle tags with weights', () => {
-      const result = expandCustomTags(['red dress:1.3'], mockTreeModel)
+      const result = expandCustomTags('red dress:1.3', mockTreeModel)
 
-      expect(result.expandedTags).toEqual(['(red dress:1.3)'])
+      expect(result.expandedText).toEqual('red dress:1.3')
     })
 
     it('should skip weight formatting for weight 1.0', () => {
-      const result = expandCustomTags(['red dress:1.0'], mockTreeModel)
+      const result = expandCustomTags('red dress:1.0', mockTreeModel)
 
-      expect(result.expandedTags).toEqual(['red dress'])
+      expect(result.expandedText).toEqual('red dress:1.0')
     })
 
     // Sequential weighted expansion removed; no longer applicable.
 
     it('should use existing random resolutions for consistent-random tags', () => {
       const existingResolutions = { 'eye-color': 'blue eyes' }
-      const result = expandCustomTags(['eye-color'], mockTreeModel, new Set(), existingResolutions)
+      const result = expandCustomTags('eye-color', mockTreeModel, new Set(), existingResolutions)
 
-      expect(result.expandedTags).toEqual(['blue eyes'])
+      expect(result.expandedText).toEqual('blue eyes')
       expect(result.randomTagResolutions['eye-color']).toBe('blue eyes')
     })
 
     it('should NOT reuse existing resolutions for random tags across zones', () => {
       const existingResolutions = { 'hair-color': 'brown hair' }
-      const result = expandCustomTags(['hair-color'], mockTreeModel, new Set(), existingResolutions)
+      const result = expandCustomTags('hair-color', mockTreeModel, new Set(), existingResolutions)
 
       // With mocked crypto returning 0, the first option is chosen deterministically
-      expect(result.expandedTags).toEqual(['blonde hair'])
+      expect(result.expandedText).toEqual('blonde hair')
       expect(result.randomTagResolutions['hair-color']).toBe('blonde hair')
     })
 
     it('should use previous zone random results during regen', () => {
       const previousResults = { 'hair-color': 'brown hair' }
-      const result = expandCustomTags(['hair-color'], mockTreeModel, new Set(), {}, previousResults)
+      const result = expandCustomTags('hair-color', mockTreeModel, new Set(), {}, previousResults)
 
-      expect(result.expandedTags).toEqual(['brown hair'])
+      expect(result.expandedText).toEqual('brown hair')
       expect(result.randomTagResolutions['hair-color']).toBe('brown hair')
     })
 
@@ -210,11 +208,11 @@ describe('tagExpansion utilities', () => {
     })
 
     it.skip('should handle nested custom tag expansion (TODO)', () => {
-      const result = expandCustomTags(['character-base'], mockTreeModel)
+      const result = expandCustomTags('character-base', mockTreeModel)
 
-      expect(result.expandedTags).toHaveLength(4) // 3 from character-base + 1 from hair-color
-      expect(result.expandedTags.slice(0, 3)).toEqual(['1girl', 'solo', 'looking at viewer'])
-      expect(['blonde hair', 'brown hair', 'black hair']).toContain(result.expandedTags[3])
+      expect(result.expandedText).toHaveLength(4) // 3 from character-base + 1 from hair-color
+      expect(result.expandedText.slice(0, 3)).toEqual(['1girl', 'solo', 'looking at viewer'])
+      expect(['blonde hair', 'brown hair', 'black hair']).toContain(result.expandedText[3])
     })
 
     it('should prevent circular references', () => {
@@ -225,9 +223,9 @@ describe('tagExpansion utilities', () => {
 
     it.skip('should prevent circular references (TODO)', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const result = expandCustomTags(['character-base'], mockTreeModel)
+      const result = expandCustomTags('character-base', mockTreeModel)
 
-      expect(result.expandedTags).toEqual([])
+      expect(result.expandedText).toEqual('')
       expect(consoleSpy).toHaveBeenCalledWith('Circular reference detected for tag: tag-a')
 
       consoleSpy.mockRestore()
@@ -242,11 +240,9 @@ describe('tagExpansion utilities', () => {
     // Multi-tag test relying on sequential behavior removed.
 
     it('should expand {a|b|c} patterns in leaf node values', () => {
-      const result = expandCustomTags(['choice-patterns'], mockTreeModel)
+      const result = expandCustomTags('choice-patterns', mockTreeModel)
 
-      expect(result.expandedTags).toHaveLength(1)
-
-      const expandedTag = result.expandedTags[0]
+      const expandedTag = result.expandedText
 
       // The leaf values contain choice patterns that should be expanded
       // choice-1: '{red|blue|green} dress'
@@ -273,13 +269,11 @@ describe('tagExpansion utilities', () => {
         writable: true
       })
 
-      const result = expandCustomTags(['choice-patterns'], mockTreeModel)
-
-      expect(result.expandedTags).toHaveLength(1)
+      const result = expandCustomTags('choice-patterns', mockTreeModel)
 
       // With crypto mocked to return 0, and assuming choice-2 is selected (index 0 selects choice-1)
       // Let's test this differently - we'll check that patterns are expanded
-      const expandedTag = result.expandedTags[0]
+      const expandedTag = result.expandedText
 
       // Should not contain any { } patterns after expansion
       expect(expandedTag).not.toMatch(/\{[^}]*\}/)
@@ -314,10 +308,10 @@ describe('tagExpansion utilities', () => {
         }
       }
 
-      const result = expandCustomTags(['test-empty'], testModel)
+      const result = expandCustomTags('test-empty', testModel)
 
       // Empty choice pattern should remain unchanged
-      expect(result.expandedTags).toEqual(['{} empty pattern'])
+      expect(result.expandedText).toEqual('{} empty pattern')
     })
 
     it('should handle single option choice patterns', () => {
@@ -347,10 +341,10 @@ describe('tagExpansion utilities', () => {
         }
       }
 
-      const result = expandCustomTags(['test-single'], testModel)
+      const result = expandCustomTags('test-single', testModel)
 
       // Single option should be selected directly
-      expect(result.expandedTags).toEqual(['only option'])
+      expect(result.expandedText).toEqual('only option')
     })
 
     it('should handle choice patterns with empty options like {a|}', () => {
@@ -380,10 +374,10 @@ describe('tagExpansion utilities', () => {
         }
       }
 
-      const result = expandCustomTags(['test-empty-option'], testModel)
+      const result = expandCustomTags('test-empty-option', testModel)
 
       // Should result in either "red dress" or " dress" (with empty option)
-      const expandedTag = result.expandedTags[0]
+      const expandedTag = result.expandedText
       expect(['red dress', ' dress']).toContain(expandedTag)
     })
 
@@ -414,10 +408,10 @@ describe('tagExpansion utilities', () => {
         }
       }
 
-      const result = expandCustomTags(['test-whitespace'], testModel)
+      const result = expandCustomTags('test-whitespace', testModel)
 
       // Should preserve whitespace in options
-      const expandedTag = result.expandedTags[0]
+      const expandedTag = result.expandedText
       expect([' spaced ', ' more space ', '']).toContain(expandedTag)
     })
 
@@ -452,7 +446,7 @@ describe('tagExpansion utilities', () => {
       const disabledContext = { names: new Set<string>(), patterns: ['red'] }
 
       const result = expandCustomTags(
-        ['test-disables'],
+        'test-disables',
         testModel,
         new Set(),
         {},
@@ -461,7 +455,7 @@ describe('tagExpansion utilities', () => {
       )
 
       // Should avoid "red" and select either "blue dress" or "green dress"
-      const expandedTag = result.expandedTags[0]
+      const expandedTag = result.expandedText
       expect(expandedTag).not.toContain('red')
       expect(['blue dress', 'green dress']).toContain(expandedTag)
     })
@@ -501,7 +495,7 @@ describe('tagExpansion utilities', () => {
       const disabledContext = { names: new Set<string>(), patterns: ['red', 'blue', 'green'] }
 
       const result = expandCustomTags(
-        ['test-empty-result'],
+        'test-empty-result',
         testModel,
         new Set(),
         {},
@@ -510,8 +504,7 @@ describe('tagExpansion utilities', () => {
       )
 
       // Should return empty string when all choice options are disabled
-      expect(result.expandedTags).toHaveLength(1)
-      const expandedTag = result.expandedTags[0]
+      const expandedTag = result.expandedText
       expect(expandedTag).toBe('')
     })
   })

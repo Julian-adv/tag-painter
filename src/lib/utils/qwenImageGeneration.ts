@@ -7,7 +7,6 @@ import { FINAL_SAVE_NODE_ID } from './workflow'
 import {
   expandCustomTags,
   cleanDirectivesFromTags,
-  prefetchWildcardFilesForTags,
   prefetchWildcardFilesFromTexts
 } from './tagExpansion'
 import { getWildcardModel } from '../stores/tagsStore'
@@ -101,7 +100,7 @@ export async function generateQwenImage(
     const previousAll = previousRandomTagResolutions?.all || {}
     const previousNegative = previousRandomTagResolutions?.negative || {}
 
-    await prefetchWildcardFilesForTags([...wildcardZones.all, ...wildcardZones.negative], model)
+    await prefetchWildcardFilesFromTexts([wildcardZones.all, wildcardZones.negative])
 
     const prevTextsAll: string[] = Object.values(previousAll)
     const prevTextsNegative: string[] = Object.values(previousNegative)
@@ -116,8 +115,8 @@ export async function generateQwenImage(
       previousNegative
     )
 
-    let allTagsText = cleanDirectivesFromTags(allResult.expandedTags.join(', '))
-    let negativeTagsText = cleanDirectivesFromTags(negativeResult.expandedTags.join(', '))
+    let allTagsText = cleanDirectivesFromTags(allResult.expandedText)
+    let negativeTagsText = cleanDirectivesFromTags(negativeResult.expandedText)
 
     const qualityPrefix = modelSettings?.qualityPrefix ?? ''
     if (qualityPrefix.trim().length > 0) {

@@ -21,7 +21,6 @@ import {
   expandCustomTags,
   detectCompositionFromTags,
   cleanDirectivesFromTags,
-  prefetchWildcardFilesForTags,
   prefetchWildcardFilesFromTexts
 } from './tagExpansion'
 import { getWildcardModel } from '../stores/tagsStore'
@@ -111,22 +110,19 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const previousAll = previousRandomTagResolutions?.all || {}
     const model = getWildcardModel()
     // Prefetch wildcard files for all zones to allow synchronous replacement during expansion
-    await prefetchWildcardFilesForTags(
-      [
-        ...wildcardZones.all,
-        ...wildcardZones.zone1,
-        ...wildcardZones.zone2,
-        ...wildcardZones.negative,
-        ...wildcardZones.inpainting
-      ],
-      model
-    )
+    await prefetchWildcardFilesFromTexts([
+      wildcardZones.all,
+      wildcardZones.zone1,
+      wildcardZones.zone2,
+      wildcardZones.negative,
+      wildcardZones.inpainting
+    ])
     // Also prefetch from previous resolutions to support overrides that contain wildcards
     const prevTextsAll: string[] = Object.values(previousAll || {})
     const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll)
 
     // Check for composition detection
-    const detectedComposition = detectCompositionFromTags(allResult.expandedTags)
+    const detectedComposition = detectCompositionFromTags([allResult.expandedText])
     if (detectedComposition) {
       console.log(`Auto-selecting composition: ${detectedComposition}`)
       updateComposition(detectedComposition)
@@ -192,20 +188,15 @@ export async function generateImage(options: GenerationOptions): Promise<{
     )
 
     // Resolve wildcard directives inside leaf expansion already; now just clean directives
-    const allRaw = allResult.expandedTags.join(', ')
-    let allTagsText = cleanDirectivesFromTags(allRaw)
+    let allTagsText = cleanDirectivesFromTags(allResult.expandedText)
 
-    const zone1Raw = zone1Result.expandedTags.join(', ')
-    const zone1TagsText = cleanDirectivesFromTags(zone1Raw)
+    const zone1TagsText = cleanDirectivesFromTags(zone1Result.expandedText)
 
-    const zone2Raw = zone2Result.expandedTags.join(', ')
-    let zone2TagsText = cleanDirectivesFromTags(zone2Raw)
+    let zone2TagsText = cleanDirectivesFromTags(zone2Result.expandedText)
 
-    const negativeRaw = negativeResult.expandedTags.join(', ')
-    let negativeTagsText = cleanDirectivesFromTags(negativeRaw)
+    let negativeTagsText = cleanDirectivesFromTags(negativeResult.expandedText)
 
-    const inpaintingRaw = inpaintingResult.expandedTags.join(', ')
-    const inpaintingTagsText = cleanDirectivesFromTags(inpaintingRaw)
+    const inpaintingTagsText = cleanDirectivesFromTags(inpaintingResult.expandedText)
 
     // Organize random tag resolutions by zone (already resolved, includes wildcard replacements)
     const allRandomResolutions = {

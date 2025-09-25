@@ -1,29 +1,30 @@
 // Utility functions for reading and writing wildcard zone data
 import { refreshWildcardsFromServer, getWildcardModel } from '../stores/tagsStore'
 import { saveWildcardsText } from '../api/wildcards'
+import { toYAML } from '../TreeEdit/yaml-io'
 
 /**
  * Read zone data from the current wildcard model
  */
 export async function readWildcardZones(modelType?: string): Promise<{
-  all: string[]
-  zone1: string[]
-  zone2: string[]
-  negative: string[]
-  inpainting: string[]
+  all: string
+  zone1: string
+  zone2: string
+  negative: string
+  inpainting: string
 }> {
   // Always refresh wildcard data to ensure we have the correct model type
   await refreshWildcardsFromServer(modelType)
 
   const wildcardModel = getWildcardModel()
 
-  const extractZoneData = (zoneName: string): string[] => {
+  const extractZoneData = (zoneName: string): string => {
     // Find the zone node
     const symId = wildcardModel.symbols[zoneName]
     const node = symId ? wildcardModel.nodes[symId] : undefined
 
     if (!node || node.kind !== 'array' || !node.children || node.children.length === 0) {
-      return []
+      return ''
     }
 
     // Get first child (array element)
@@ -31,26 +32,11 @@ export async function readWildcardZones(modelType?: string): Promise<{
     const firstChild = wildcardModel.nodes[firstChildId]
 
     if (!firstChild || firstChild.kind !== 'leaf' || typeof firstChild.value !== 'string') {
-      return []
+      return ''
     }
 
     const value = firstChild.value.trim()
-    if (!value) {
-      return []
-    }
-
-    // For Qwen model, treat as single prompt; for others, split by comma
-    let result: string[]
-    if (modelType === 'qwen') {
-      result = [value]
-    } else {
-      result = value
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter((tag) => tag.length > 0)
-    }
-
-    return result
+    return value || ''
   }
 
   const result = {
@@ -69,11 +55,11 @@ export async function readWildcardZones(modelType?: string): Promise<{
  */
 export async function writeWildcardZones(
   zones: {
-    all: string[]
-    zone1: string[]
-    zone2: string[]
-    negative: string[]
-    inpainting: string[]
+    all: string
+    zone1: string
+    zone2: string
+    negative: string
+    inpainting: string
   },
   modelType?: string
 ): Promise<void> {
@@ -84,8 +70,8 @@ export async function writeWildcardZones(
     const updatedModel = { ...wildcardModel }
     const updatedNodes = { ...updatedModel.nodes }
 
-    const updateZone = (zoneName: string, tags: string[]) => {
-      const joinedTags = tags.join(', ')
+    const updateZone = (zoneName: string, tagsText: string) => {
+      const joinedTags = tagsText
 
       // Find or create the zone array node
       let zoneSymId = updatedModel.symbols[zoneName]
@@ -143,7 +129,6 @@ export async function writeWildcardZones(
     updatedModel.nodes = updatedNodes
 
     // Convert back to YAML and save
-    const { toYAML } = await import('../TreeEdit/yaml-io')
     const yamlText = toYAML(updatedModel)
 
     // Save to server

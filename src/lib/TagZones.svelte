@@ -1,6 +1,6 @@
 <!-- Component for tag input zones -->
 <script lang="ts">
-  import TagInput from './TagInput.svelte'
+  import LeafNodeEditor from './LeafNodeEditor.svelte'
   import WildcardsEditorDialog from './TreeEdit/WildcardsEditorDialog.svelte'
   import { promptsData } from './stores/promptsStore'
   import { wildcardTagType } from './stores/tagsStore'
@@ -8,7 +8,7 @@
   import { testModeStore, clearAllPins as clearAllPinsStore } from './stores/testModeStore.svelte'
   import { Tag, LockOpen } from 'svelte-heros-v2'
   import { get } from 'svelte/store'
-  import type { CustomTag, Settings } from './types'
+  import type { Settings } from './types'
   import { m } from '$lib/paraglide/messages'
   // Use callback prop instead of deprecated createEventDispatcher
 
@@ -30,11 +30,11 @@
     onOpenSettings
   }: Props = $props()
 
-  let allTags = $state<CustomTag[]>([])
-  let firstZoneTags = $state<CustomTag[]>([])
-  let secondZoneTags = $state<CustomTag[]>([])
-  let negativeTags = $state<CustomTag[]>([])
-  let inpaintingTags = $state<CustomTag[]>([])
+  let allTags = $state<string>('')
+  let firstZoneTags = $state<string>('')
+  let secondZoneTags = $state<string>('')
+  let negativeTags = $state<string>('')
+  let inpaintingTags = $state<string>('')
   let showTreeEditDialog = $state(false)
   let preselectTagName = $state('')
   let preselectTargetText = $state('')
@@ -73,70 +73,31 @@
     return { name: tagString }
   }
 
-  // Convert string array to CustomTag array
-  function convertToCustomTags(tagNames: string[]): CustomTag[] {
-    const currentData = get(promptsData)
-    return tagNames.map((tagString: string): CustomTag => {
-      const { name, weight } = parseTagWithWeight(tagString)
-      const customTag = currentData.customTags[name]
-
-      if (customTag) {
-        // Create a copy so each usage can have its own weight
-        return { ...customTag, weight }
-      }
-
-      // Create regular tag object for non-custom tags
-      return {
-        name,
-        tags: [name],
-        // Determine via wildcards.yaml array behavior (random or consistent-random)
-        type: wildcardTagType(name),
-        weight
-      }
-    })
-  }
 
   // Note: We don't load on mount because settings might not be ready yet
   // Loading happens in $effect when isQwenModel is properly determined
 
   // Load tags from wildcard zones
   async function loadTagsFromWildcards() {
-    try {
-      const modelType = isQwenModel ? 'qwen' : undefined
-      const zones = await readWildcardZones(modelType)
-      allTags = convertToCustomTags(zones.all)
-      firstZoneTags = convertToCustomTags(zones.zone1)
-      secondZoneTags = convertToCustomTags(zones.zone2)
-      negativeTags = convertToCustomTags(zones.negative)
-      inpaintingTags = convertToCustomTags(zones.inpainting)
-    } catch (error) {
-      console.error('Failed to load tags from wildcard zones:', error)
-      // Fallback to empty arrays
-      allTags = []
-      firstZoneTags = []
-      secondZoneTags = []
-      negativeTags = []
-      inpaintingTags = []
-    }
+    const modelType = isQwenModel ? 'qwen' : undefined
+    const zones = await readWildcardZones(modelType)
+    allTags = zones.all
+    firstZoneTags = zones.zone1
+    secondZoneTags = zones.zone2
+    negativeTags = zones.negative
+    inpaintingTags = zones.inpainting
   }
 
-  // Convert CustomTag to string with weight
-  function tagToString(tag: CustomTag): string {
-    if (tag.weight && tag.weight !== 1.0) {
-      return `${tag.name}:${tag.weight}`
-    }
-    return tag.name
-  }
 
   // Save tags whenever they change
   async function saveTags() {
     try {
       const zones = {
-        all: allTags.map(tagToString),
-        zone1: firstZoneTags.map(tagToString),
-        zone2: secondZoneTags.map(tagToString),
-        negative: negativeTags.map(tagToString),
-        inpainting: inpaintingTags.map(tagToString)
+        all: allTags,
+        zone1: firstZoneTags,
+        zone2: secondZoneTags,
+        negative: negativeTags,
+        inpainting: inpaintingTags
       }
 
       await writeWildcardZones(zones, isQwenModel ? 'qwen' : undefined)
@@ -156,16 +117,15 @@
     preselectTagName = tagName
     preselectTargetText = ''
 
-    // Determine tag object from the respective zone to check type
-    let src: CustomTag[] = []
+    // Check if the tag exists in the zone string
+    let src: string = ''
     if (zoneId === 'all') src = allTags
     else if (zoneId === 'zone1') src = firstZoneTags
     else if (zoneId === 'zone2') src = secondZoneTags
     else if (zoneId === 'negative') src = negativeTags
     else if (zoneId === 'inpainting') src = inpaintingTags
 
-    const tagObj = src.find((t) => t.name === tagName)
-    const tagType = tagObj ? tagObj.type : wildcardTagType(tagName)
+    const tagType = wildcardTagType(tagName)
 
     if (tagType === 'random' || tagType === 'consistent-random' || tagType === 'sequential') {
       const zoneMap = currentRandomTagResolutions[zoneId] || {}
@@ -250,49 +210,49 @@
         {negativePrefixText || ''}
       </div>
     </div>
-    <TagInput
+    <LeafNodeEditor
       id="all-tags"
       label={m['tagZones.allLabel']()}
-      bind:tags={allTags}
-      onTagsChange={saveTags}
+      bind:value={allTags}
+      onValueChange={saveTags}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('all', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.all}
     />
 
-    <TagInput
+    <LeafNodeEditor
       id="first-zone-tags"
       label={m['tagZones.firstLabel']()}
-      bind:tags={firstZoneTags}
-      onTagsChange={saveTags}
+      bind:value={firstZoneTags}
+      onValueChange={saveTags}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone1}
       disabled={isQwenModel}
     />
 
-    <TagInput
+    <LeafNodeEditor
       id="second-zone-tags"
       label={m['tagZones.secondLabel']()}
-      bind:tags={secondZoneTags}
-      onTagsChange={saveTags}
+      bind:value={secondZoneTags}
+      onValueChange={saveTags}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone2}
       disabled={isQwenModel || $promptsData.selectedComposition === 'all'}
     />
 
-    <TagInput
+    <LeafNodeEditor
       id="negative-tags"
       label={m['tagZones.negativeLabel']()}
-      bind:tags={negativeTags}
-      onTagsChange={saveTags}
+      bind:value={negativeTags}
+      onValueChange={saveTags}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('negative', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.negative}
     />
 
-    <TagInput
+    <LeafNodeEditor
       id="inpainting-tags"
       label={m['tagZones.inpaintingLabel']()}
-      bind:tags={inpaintingTags}
-      onTagsChange={saveTags}
+      bind:value={inpaintingTags}
+      onValueChange={saveTags}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('inpainting', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.inpainting}
     />
