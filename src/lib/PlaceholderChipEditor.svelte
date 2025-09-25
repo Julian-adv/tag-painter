@@ -39,6 +39,23 @@
     }
     setTimeout(() => cb(Date.now()), 0)
   }
+
+  function createChipElement(name: string): HTMLSpanElement {
+    const span = document.createElement('span')
+    span.classList.add('chip')
+    const tagType = getTagType(name)
+    if (tagType === 'random') {
+      span.classList.add('random')
+    } else if (tagType === 'consistent-random') {
+      span.classList.add('consistent')
+    } else {
+      span.classList.add('unknown')
+    }
+    span.dataset.placeholderName = name
+    span.setAttribute('contenteditable', 'false')
+    span.textContent = name
+    return span
+  }
   let editableEl: HTMLDivElement | null = null
   let skipDomSync = false
 
@@ -198,6 +215,77 @@
     return pieces.join('').replace(/\u200B/g, '')
   }
 
+  function convertTypedPlaceholders(root: HTMLElement) {
+    if (!hasDocument) return
+    const selection = document.getSelection()
+    const anchorNode = selection?.anchorNode ?? null
+    const anchorOffset = selection?.anchorOffset ?? 0
+
+    const nodeFilter: NodeFilter = {
+      acceptNode(node) {
+        if (!(node instanceof Text)) return NodeFilter.FILTER_REJECT
+        const parent = node.parentElement
+        if (!parent) return NodeFilter.FILTER_REJECT
+        if (parent.dataset.placeholderName) return NodeFilter.FILTER_REJECT
+        if (parent.dataset.choice === 'true') return NodeFilter.FILTER_REJECT
+        if (parent.dataset.anchor === 'true') return NodeFilter.FILTER_REJECT
+        return NodeFilter.FILTER_ACCEPT
+      }
+    }
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, nodeFilter)
+    const textNodes: Text[] = []
+    while (walker.nextNode()) {
+      const current = walker.currentNode
+      if (current instanceof Text) textNodes.push(current)
+    }
+
+    let caretHost: HTMLElement | null = null
+
+    for (const textNode of textNodes) {
+      const text = textNode.nodeValue ?? ''
+      if (!text.includes('__')) continue
+      const localRe = createPlaceholderRegex()
+      const matches = [...text.matchAll(localRe)]
+      if (matches.length === 0) continue
+
+      const fragment = document.createDocumentFragment()
+      let lastIndex = 0
+
+      for (const match of matches) {
+        const matchIndex = match.index ?? 0
+        if (matchIndex > lastIndex) {
+          fragment.append(text.slice(lastIndex, matchIndex))
+        }
+        const name = match[1]
+        const chip = createChipElement(name)
+        fragment.append(chip)
+        const endIndex = matchIndex + match[0].length
+        if (!caretHost && anchorNode === textNode && anchorOffset >= matchIndex && anchorOffset <= endIndex) {
+          caretHost = chip
+        }
+        lastIndex = endIndex
+      }
+
+      if (lastIndex < text.length) {
+        fragment.append(text.slice(lastIndex))
+      }
+
+      const parent = textNode.parentNode
+      if (parent) {
+        parent.replaceChild(fragment, textNode)
+      }
+    }
+
+    if (caretHost && selection) {
+      const range = document.createRange()
+      range.setStartAfter(caretHost)
+      range.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(range)
+    }
+  }
+
   function syncDomFromValue() {
     if (!editableEl) return
     if (skipDomSync) return
@@ -227,6 +315,9 @@
     if (newValue !== value) {
       value = newValue
       onValueChange(newValue)
+    }
+    if (!disabled) {
+      convertTypedPlaceholders(editableEl)
     }
 
     scheduleFrame(() => {
