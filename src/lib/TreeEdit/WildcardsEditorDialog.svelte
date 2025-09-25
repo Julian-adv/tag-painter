@@ -9,13 +9,15 @@
     initialSelectedName?: string
     initialTargetText?: string
     modelType?: string
+    onSaved: () => void
   }
 
   let {
     isOpen = $bindable(),
     initialSelectedName = '',
     initialTargetText = '',
-    modelType
+    modelType,
+    onSaved = () => {}
   }: Props = $props()
   let loading = $state(false)
   let pendingText: string | null = $state(null)
@@ -140,15 +142,19 @@
     }
   })
 
-  function onSave() {
+  async function onSave() {
     if (!tree) return
     const body = tree.getYaml()
     // Immediately reflect changes in combinedTags using the text we save
     // (avoids waiting for a subsequent fetch)
     updateWildcardsFromText(body)
-    saveWildcardsText(body, modelType)
-      .then(() => tree?.markSaved())
-      .catch((err) => console.error('Save failed:', err))
+    try {
+      await saveWildcardsText(body, modelType)
+      tree?.markSaved()
+      onSaved()
+    } catch (err) {
+      console.error('Save failed:', err)
+    }
   }
 </script>
 

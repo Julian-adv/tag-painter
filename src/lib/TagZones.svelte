@@ -110,6 +110,14 @@
     showTreeEditDialog = true
   }
 
+  async function handleWildcardsSaved() {
+    try {
+      await loadTagsFromWildcards()
+    } catch (error) {
+      console.error('Failed to reload wildcard zones after save:', error)
+    }
+  }
+
   function handleCustomTagDoubleClickForZone(
     zoneId: 'all' | 'zone1' | 'zone2' | 'negative' | 'inpainting',
     tagName: string
@@ -264,6 +272,7 @@
     initialSelectedName={preselectTagName}
     initialTargetText={preselectTargetText}
     modelType={isQwenModel ? 'qwen' : undefined}
+    onSaved={handleWildcardsSaved}
   />
 </div>
 
