@@ -359,6 +359,9 @@
   })
 
   $effect(() => {
+    // Reference value/model so Svelte reruns when either changes and chip styles stay in sync
+    void value
+    void model
     syncDomFromValue()
   })
 </script>
