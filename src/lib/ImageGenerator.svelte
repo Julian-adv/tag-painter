@@ -67,6 +67,7 @@
     negative: {},
     inpainting: {}
   })
+  let tagZonesRef: { saveTagsImmediately: () => Promise<void> } | undefined = $state()
 
   // Show dialog when no checkpoints are found
   function openNoCheckpointsDialog() {
@@ -231,6 +232,11 @@
     // Add current values to options if they're not already there
     autoSaveCurrentValues()
 
+    // Save tag zones immediately before generating
+    if (tagZonesRef) {
+      await tagZonesRef.saveTagsImmediately()
+    }
+
     // Save prompts before generating
     await savePromptsData()
 
@@ -312,6 +318,11 @@
   async function handleInpaintGeneration(denoiseStrength: number) {
     // Add current values to options if they're not already there
     autoSaveCurrentValues()
+
+    // Save tag zones immediately before generating
+    if (tagZonesRef) {
+      await tagZonesRef.saveTagsImmediately()
+    }
 
     // Save prompts before generating
     await savePromptsData()
@@ -473,6 +484,7 @@
 
         <div class="flex min-h-0 flex-1 flex-shrink-1">
           <TagZones
+            bind:this={tagZonesRef}
             {currentRandomTagResolutions}
             {settings}
             onOpenSettings={openSettingsFromTagZones}

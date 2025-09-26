@@ -30,6 +30,9 @@
     onOpenSettings
   }: Props = $props()
 
+  // Expose saveTagsImmediately function for parent component to call
+  export { saveTagsImmediately }
+
   let allTags = $state<string>('')
   let firstZoneTags = $state<string>('')
   let secondZoneTags = $state<string>('')
@@ -45,6 +48,7 @@
   let isQwenModel = $state(false)
 
   let hasLoadedTags = $state(false)
+  let saveTimeout: ReturnType<typeof setTimeout> | null = null
 
   $effect(() => {
     const perModel = settings?.perModel || {}
@@ -62,16 +66,6 @@
     }
   })
 
-  // Parse weight from tag string
-  function parseTagWithWeight(tagString: string): { name: string; weight?: number } {
-    const weightMatch = tagString.match(/^(.+):(\d+(?:\.\d+)?)$/)
-    if (weightMatch) {
-      const [, name, weightStr] = weightMatch
-      const weight = parseFloat(weightStr)
-      return { name, weight: weight !== 1.0 ? weight : undefined }
-    }
-    return { name: tagString }
-  }
 
 
   // Note: We don't load on mount because settings might not be ready yet
@@ -89,7 +83,19 @@
   }
 
 
-  // Save tags whenever they change
+  // Debounced save - only saves after user stops typing for 2 seconds
+  function debouncedSave() {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout)
+    }
+
+    saveTimeout = setTimeout(() => {
+      saveTags()
+      saveTimeout = null
+    }, 10000) // 10 second debounce
+  }
+
+  // Immediate save function for when we need to save right away
   async function saveTags() {
     try {
       const zones = {
@@ -101,12 +107,28 @@
       }
 
       await writeWildcardZones(zones, isQwenModel ? 'qwen' : undefined)
+
+      if (saveTimeout) {
+        clearTimeout(saveTimeout)
+        saveTimeout = null
+      }
     } catch (error) {
       console.error('Failed to save tags to wildcard zones:', error)
     }
   }
 
-  function openTreeEditDialog() {
+  // Force immediate save (for image generation, dialog opening, etc.)
+  async function saveTagsImmediately() {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout)
+      saveTimeout = null
+    }
+    await saveTags()
+  }
+
+  async function openTreeEditDialog() {
+    // Save any pending changes before opening dialog
+    await saveTagsImmediately()
     showTreeEditDialog = true
   }
 
@@ -125,13 +147,6 @@
     preselectTagName = tagName
     preselectTargetText = ''
 
-    // Check if the tag exists in the zone string
-    let src: string = ''
-    if (zoneId === 'all') src = allTags
-    else if (zoneId === 'zone1') src = firstZoneTags
-    else if (zoneId === 'zone2') src = secondZoneTags
-    else if (zoneId === 'negative') src = negativeTags
-    else if (zoneId === 'inpainting') src = inpaintingTags
 
     const tagType = wildcardTagType(tagName)
 
@@ -222,7 +237,7 @@
       id="all-tags"
       label={m['tagZones.allLabel']()}
       bind:value={allTags}
-      onValueChange={saveTags}
+      onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('all', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.all}
     />
@@ -231,7 +246,7 @@
       id="first-zone-tags"
       label={m['tagZones.firstLabel']()}
       bind:value={firstZoneTags}
-      onValueChange={saveTags}
+      onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone1}
       disabled={isQwenModel}
@@ -241,7 +256,7 @@
       id="second-zone-tags"
       label={m['tagZones.secondLabel']()}
       bind:value={secondZoneTags}
-      onValueChange={saveTags}
+      onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone2}
       disabled={isQwenModel || $promptsData.selectedComposition === 'all'}
@@ -251,7 +266,7 @@
       id="negative-tags"
       label={m['tagZones.negativeLabel']()}
       bind:value={negativeTags}
-      onValueChange={saveTags}
+      onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('negative', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.negative}
     />
@@ -260,7 +275,7 @@
       id="inpainting-tags"
       label={m['tagZones.inpaintingLabel']()}
       bind:value={inpaintingTags}
-      onValueChange={saveTags}
+      onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('inpainting', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.inpainting}
     />
