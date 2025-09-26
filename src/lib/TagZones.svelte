@@ -7,9 +7,9 @@
   import { readWildcardZones, writeWildcardZones } from './utils/wildcardZones'
   import { testModeStore, clearAllPins as clearAllPinsStore } from './stores/testModeStore.svelte'
   import { Tag, LockOpen } from 'svelte-heros-v2'
-  import { get } from 'svelte/store'
   import type { Settings } from './types'
   import { m } from '$lib/paraglide/messages'
+  import { getEffectiveModelSettings } from './utils/generationCommon'
   // Use callback prop instead of deprecated createEventDispatcher
 
   interface Props {
@@ -46,24 +46,29 @@
   // Display-only prefixes from Settings per selected model
   let qualityPrefixText = $state('')
   let negativePrefixText = $state('')
-  let isQwenModel = $state(false)
+  let lastModelSignature = $state('')
+
+  let currentModelType = $derived(() => {
+    const key = $promptsData.selectedCheckpoint || 'Default'
+    const effectiveModel = getEffectiveModelSettings(settings, key)
+    return effectiveModel?.modelType === 'qwen' ? 'qwen' : undefined
+  })
+
+  let isQwenModel = $derived(() => currentModelType === 'qwen')
 
   let hasLoadedTags = $state(false)
   let saveTimeout: ReturnType<typeof setTimeout> | null = null
 
   $effect(() => {
-    const perModel = settings?.perModel || {}
     const key = $promptsData.selectedCheckpoint || 'Default'
-    const ms = perModel[key] || perModel['Default']
-    qualityPrefixText = ms?.qualityPrefix || ''
-    negativePrefixText = ms?.negativePrefix || ''
-    const newIsQwenModel = ms?.modelType === 'qwen'
-
-    // Load tags if model type changed or if this is the first time with valid settings
-    if (newIsQwenModel !== isQwenModel || (!hasLoadedTags && settings?.perModel)) {
-      isQwenModel = newIsQwenModel
+    const effectiveModel = getEffectiveModelSettings(settings, key)
+    qualityPrefixText = effectiveModel?.qualityPrefix || ''
+    negativePrefixText = effectiveModel?.negativePrefix || ''
+    const signature = `${currentModelType === 'qwen' ? 'qwen' : 'default'}|${key}`
+    if (signature !== lastModelSignature || !hasLoadedTags) {
+      lastModelSignature = signature
       hasLoadedTags = true
-      loadTagsFromWildcards()
+      void loadTagsFromWildcards(currentModelType)
     }
   })
 
@@ -71,9 +76,9 @@
   // Loading happens in $effect when isQwenModel is properly determined
 
   // Load tags from wildcard zones
-  async function loadTagsFromWildcards() {
-    const modelType = isQwenModel ? 'qwen' : undefined
-    const zones = await readWildcardZones(modelType)
+  async function loadTagsFromWildcards(modelTypeOverride?: string) {
+    const targetModelType = (modelTypeOverride ?? currentModelType) === 'qwen' ? 'qwen' : undefined
+    const zones = await readWildcardZones(targetModelType)
     allTags = zones.all
     firstZoneTags = zones.zone1
     secondZoneTags = zones.zone2
@@ -104,7 +109,8 @@
         inpainting: inpaintingTags
       }
 
-      await writeWildcardZones(zones, isQwenModel ? 'qwen' : undefined)
+      const targetModelType = currentModelType === 'qwen' ? 'qwen' : undefined
+      await writeWildcardZones(zones, targetModelType)
 
       if (saveTimeout) {
         clearTimeout(saveTimeout)
@@ -132,7 +138,7 @@
 
   async function handleWildcardsSaved() {
     try {
-      await loadTagsFromWildcards()
+      await loadTagsFromWildcards(currentModelType)
       wildcardsRefreshToken += 1
     } catch (error) {
       console.error('Failed to reload wildcard zones after save:', error)
@@ -238,7 +244,7 @@
       onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('all', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.all}
-      wildcardsRefreshToken={wildcardsRefreshToken}
+      {wildcardsRefreshToken}
     />
 
     <LeafNodeEditor
@@ -249,7 +255,7 @@
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone1}
       disabled={isQwenModel}
-      wildcardsRefreshToken={wildcardsRefreshToken}
+      {wildcardsRefreshToken}
     />
 
     <LeafNodeEditor
@@ -260,7 +266,7 @@
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone2}
       disabled={isQwenModel || $promptsData.selectedComposition === 'all'}
-      wildcardsRefreshToken={wildcardsRefreshToken}
+      {wildcardsRefreshToken}
     />
 
     <LeafNodeEditor
@@ -270,7 +276,7 @@
       onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('negative', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.negative}
-      wildcardsRefreshToken={wildcardsRefreshToken}
+      {wildcardsRefreshToken}
     />
 
     <LeafNodeEditor
@@ -280,7 +286,7 @@
       onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('inpainting', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.inpainting}
-      wildcardsRefreshToken={wildcardsRefreshToken}
+      {wildcardsRefreshToken}
     />
   </div>
 
@@ -289,7 +295,7 @@
     bind:isOpen={showTreeEditDialog}
     initialSelectedName={preselectTagName}
     initialTargetText={preselectTargetText}
-    modelType={isQwenModel ? 'qwen' : undefined}
+    modelType={currentModelType}
     onSaved={handleWildcardsSaved}
   />
 </div>

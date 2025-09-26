@@ -60,6 +60,7 @@
     bind:value
     placeholder={m['tagInput.quickPlaceholder']()}
     model={wildcardModel}
+    {currentRandomTagResolutions}
     {disabled}
     onValueChange={handleTextChange}
     onChipDoubleClick={(tagName) => onCustomTagDoubleClick?.(tagName)}

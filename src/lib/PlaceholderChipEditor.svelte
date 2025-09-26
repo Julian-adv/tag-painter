@@ -9,6 +9,7 @@
     value: string
     placeholder: string
     model: TreeModel | null
+    currentRandomTagResolutions: Record<string, string>
     disabled: boolean
     onValueChange: (value: string) => void
     onChipDoubleClick: (tagName: string) => void
@@ -20,6 +21,7 @@
     value = $bindable(),
     placeholder,
     model = null,
+    currentRandomTagResolutions = {},
     disabled = false,
     onValueChange = () => {},
     onChipDoubleClick = () => {},
@@ -28,7 +30,12 @@
 
   type Seg =
     | { kind: 'text'; text: string }
-    | { kind: 'chip'; name: string; type: 'random' | 'consistent-random' | 'unknown' }
+    | {
+        kind: 'chip'
+        name: string
+        type: 'random' | 'consistent-random' | 'unknown'
+        resolution: string | null
+      }
     | { kind: 'choice'; options: string[] }
 
   const placeholderRe = createPlaceholderRegex()
@@ -93,7 +100,13 @@
     return 'unknown'
   }
 
-  function getSegments(text: string): Seg[] {
+  function getResolutionSignature(map: Record<string, string>): string {
+    const keys = Object.keys(map).sort()
+    if (keys.length === 0) return ''
+    return keys.map((key) => `${key}=>${map[key]}`).join('|')
+  }
+
+  function getSegments(text: string, resolutions: Record<string, string>): Seg[] {
     const segs: Seg[] = []
     let last = 0
     placeholderRe.lastIndex = 0
@@ -107,7 +120,9 @@
       }
       const name = match[1]
       const t = getTagType(name)
-      segs.push({ kind: 'chip', name, type: t })
+      const hasResolution = Object.prototype.hasOwnProperty.call(resolutions, name)
+      const resolvedValue = hasResolution ? resolutions[name] : null
+      segs.push({ kind: 'chip', name, type: t, resolution: resolvedValue })
       last = idx + match[0].length
     }
     if (last < text.length) {
@@ -149,8 +164,6 @@
 
     return result
   }
-
-
 
   function extractValueFromDom(root: HTMLElement): string {
     return serializeChildren(root)
@@ -291,10 +304,7 @@
     return { kind: 'root-end' }
   }
 
-  function restoreSelectionFromOffsets(
-    root: HTMLElement,
-    offsets: { start: number; end: number }
-  ) {
+  function restoreSelectionFromOffsets(root: HTMLElement, offsets: { start: number; end: number }) {
     if (!hasDocument) return
     const selection = document.getSelection()
     if (!selection) return
@@ -359,34 +369,50 @@
     selection.addRange(range)
   }
 
-
   let renderedSegments: Seg[] = $state([])
   let renderVersion = $state(0)
   let isEmpty = $state(true)
-  let lastSyncedValue: string | null = null
-  let lastSyncedModel: TreeModel | null = null
+  let lastSyncedValueSignature: string | null = null
   let lastSyncedRefreshToken: number | null = null
+  let lastSyncedRandomTagSignature: string | null = null
+  let lastSyncedModelSignature: string | null = null
+
+  function getValueText(v: unknown): string {
+    if (typeof v === 'string') return v
+    if (v == null) return ''
+    return String(v)
+  }
+
+  function getModelSignature(m: TreeModel | null): string {
+    if (!m) return ''
+    const nodeIds = Object.keys(m.nodes).sort()
+    return `${m.rootId}:${nodeIds.length}:${nodeIds.join(',')}`
+  }
 
   function syncDomFromValue() {
     if (!editableEl) return
     if (skipDomSync) return
 
-    const hasValue = value && value.length > 0
+    const textValue = getValueText(value)
+    const hasValue = textValue.length > 0
     isEmpty = !hasValue
 
     if (!hasValue) {
       renderedSegments = []
       renderVersion += 1
-      lastSyncedValue = value
-      lastSyncedModel = model
+      lastSyncedValueSignature = textValue
+      lastSyncedRefreshToken = refreshToken ?? null
+      lastSyncedRandomTagSignature = getResolutionSignature(currentRandomTagResolutions)
+      lastSyncedModelSignature = getModelSignature(model)
       return
     }
 
-    renderedSegments = getSegments(value)
+    renderedSegments = getSegments(textValue, currentRandomTagResolutions)
     renderVersion += 1
-    lastSyncedValue = value
-    lastSyncedModel = model
+    lastSyncedValueSignature = textValue
     lastSyncedRefreshToken = refreshToken ?? null
+    lastSyncedRandomTagSignature = getResolutionSignature(currentRandomTagResolutions)
+    lastSyncedModelSignature = getModelSignature(model)
   }
 
   function handleBeforeInput(event: InputEvent) {
@@ -428,23 +454,15 @@
     syncDomFromValue()
   }
 
-  function handleDoubleClick(event: MouseEvent) {
-    const target = event.target as HTMLElement | null
-    if (!target) return
-    const name = target.dataset?.placeholderName
-    if (!name) return
+  function handleChipDoubleClick(event: MouseEvent, name: string) {
+    event.preventDefault()
     event.stopPropagation()
     onChipDoubleClick(name)
   }
 
   onMount(() => {
     syncDomFromValue()
-    if (editableEl) {
-      editableEl.addEventListener('dblclick', handleDoubleClick)
-    }
-    return () => {
-      editableEl?.removeEventListener('dblclick', handleDoubleClick)
-    }
+    return () => {}
   })
 
   $effect(() => {
@@ -457,14 +475,18 @@
     if (skipDomSync) return
 
     const token = refreshToken ?? null
+    const currentValueSignature = getValueText(value)
+    const randomTagSignature = getResolutionSignature(currentRandomTagResolutions)
+    const currentModelSignature = getModelSignature(model)
 
-    if (value === lastSyncedValue && model === lastSyncedModel && token === lastSyncedRefreshToken) {
+    if (
+      currentValueSignature === lastSyncedValueSignature &&
+      token === lastSyncedRefreshToken &&
+      randomTagSignature === lastSyncedRandomTagSignature &&
+      currentModelSignature === lastSyncedModelSignature
+    ) {
       return
     }
-
-    lastSyncedValue = value
-    lastSyncedModel = model
-    lastSyncedRefreshToken = token
     syncDomFromValue()
   })
 </script>
@@ -481,7 +503,7 @@
   spellcheck="false"
 >
   {#key renderVersion}
-    {#each renderedSegments as segment}
+    {#each renderedSegments as segment, segIndex (segIndex)}
       {#if segment.kind === 'text'}
         <span class="text-segment">{segment.text}</span>
       {:else if segment.kind === 'choice'}
@@ -493,11 +515,18 @@
         </span>
       {:else if segment.kind === 'chip'}
         <span
-          class={`chip ${segment.type === 'random' ? 'random' : segment.type === 'consistent-random' ? 'consistent' : 'unknown'}`}
+          class={`chip placeholder-chip ${segment.type === 'random' ? 'random' : segment.type === 'consistent-random' ? 'consistent' : 'unknown'}`}
           data-placeholder-name={segment.name}
           contenteditable="false"
+          ondblclick={(event) => handleChipDoubleClick(event, segment.name)}
         >
-          {segment.name}
+          <span class="chip-label chip-label-visible">{segment.name}</span>
+          <span class="chip-body">
+            <span class="chip-label chip-label-placeholder" aria-hidden="true">{segment.name}</span>
+            {#if segment.resolution !== null}
+              <span class="chip-value">{segment.resolution}</span>
+            {/if}
+          </span>
         </span>
       {/if}
     {/each}
@@ -542,7 +571,7 @@
   }
 
   :global(.chip) {
-    display: inline-flex;
+    display: inline-block;
     align-items: center;
     gap: 0.25rem;
     padding: 0 0.35rem 0.0625rem 0.35rem;
@@ -551,6 +580,63 @@
     border: 1px dashed #d1d5db;
     white-space: nowrap;
     user-select: none;
+  }
+
+  :global(.placeholder-chip) {
+    position: relative;
+    display: inline-block;
+    padding: 0 0.35rem 0.075rem 0.25rem;
+    white-space: normal;
+  }
+
+  :global(.chip-body) {
+    display: inline-block;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  :global(.chip-label) {
+    font-weight: 600;
+    color: inherit;
+  }
+
+  :global(.chip-label-visible) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 0 0.25rem 0.1rem 0.25rem;
+    background-color: #e5e7eb;
+    pointer-events: none;
+    border-radius: 0.375rem 0 0 0.375rem;
+  }
+
+  :global(.chip.random .chip-label-visible) {
+    background-color: #e9d5ff;
+  }
+
+  :global(.chip.consistent .chip-label-visible) {
+    background-color: #fed7aa;
+  }
+
+  :global(.chip.unknown .chip-label-visible) {
+    background-color: #bae6fd;
+  }
+
+  :global(.chip-label-placeholder) {
+    visibility: hidden;
+    display: inline-block;
+    padding-right: 0.2rem;
+  }
+
+  :global(.chip-value) {
+    display: inline;
+    vertical-align: top;
+    min-width: 0;
+    color: inherit;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    max-width: 100%;
   }
 
   :global(.chip.random) {
