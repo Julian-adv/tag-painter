@@ -58,7 +58,7 @@
     bind:value
     placeholder={m['tagInput.quickPlaceholder']()}
     model={wildcardModel}
-    disabled={disabled}
+    {disabled}
     onValueChange={handleTextChange}
     onChipDoubleClick={(tagName) => onCustomTagDoubleClick?.(tagName)}
   />

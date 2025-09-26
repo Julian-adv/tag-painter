@@ -58,6 +58,13 @@
   }
   let editableEl: HTMLDivElement | null = null
   let skipDomSync = false
+  let saveCursorForDeletion: {
+    startContainer: Node
+    startOffset: number
+    endContainer: Node
+    endOffset: number
+    isCollapsed: boolean
+  } | null = null
 
   function getTagType(tagName: string): 'random' | 'consistent-random' | 'unknown' {
     if (!model) return 'unknown'
@@ -215,11 +222,65 @@
     return pieces.join('').replace(/\u200B/g, '')
   }
 
-  function convertTypedPlaceholders(root: HTMLElement) {
+  function convertSinglePlaceholder(root: HTMLElement, textNode: Text, match: RegExpMatchArray, cursorOffset: number) {
     if (!hasDocument) return
-    const selection = document.getSelection()
-    const anchorNode = selection?.anchorNode ?? null
-    const anchorOffset = selection?.anchorOffset ?? 0
+
+    const text = textNode.textContent || ''
+    const name = match[1]
+    const matchStart = cursorOffset - match[0].length
+    const matchEnd = cursorOffset
+
+    // Create fragments for before, chip, and after
+    const fragment = document.createDocumentFragment()
+
+    // Add text before the placeholder
+    if (matchStart > 0) {
+      fragment.appendChild(document.createTextNode(text.substring(0, matchStart)))
+    }
+
+    // Create and add the chip
+    const chip = createChipElement(name)
+    fragment.appendChild(chip)
+
+    // Add text after the placeholder
+    if (matchEnd < text.length) {
+      fragment.appendChild(document.createTextNode(text.substring(matchEnd)))
+    }
+
+    // Replace the text node with the fragment
+    const parent = textNode.parentNode
+    if (parent) {
+      parent.replaceChild(fragment, textNode)
+
+      // Position cursor right after the chip BEFORE updating the value
+      const selection = document.getSelection()
+      if (selection) {
+        const range = document.createRange()
+        range.setStartAfter(chip)
+        range.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(range)
+      }
+
+      // Set skipDomSync to prevent syncDomFromValue from overwriting our DOM changes
+      skipDomSync = true
+
+      // Update the value to reflect the change
+      const newValue = extractValueFromDom(root)
+      if (newValue !== value) {
+        value = newValue
+        onValueChange(newValue)
+      }
+
+      // Reset skipDomSync after a timeout to allow future sync operations
+      setTimeout(() => {
+        skipDomSync = false
+      }, 10)
+    }
+  }
+
+  function convertTypedPlaceholdersWithSavedCursor(root: HTMLElement) {
+    if (!hasDocument || !saveCursorForDeletion) return
 
     const nodeFilter: NodeFilter = {
       acceptNode(node) {
@@ -240,7 +301,8 @@
       if (current instanceof Text) textNodes.push(current)
     }
 
-    let caretHost: HTMLElement | null = null
+    let hasConversions = false
+    let cursorTarget: Node | null = null
 
     for (const textNode of textNodes) {
       const text = textNode.nodeValue ?? ''
@@ -249,26 +311,37 @@
       const matches = [...text.matchAll(localRe)]
       if (matches.length === 0) continue
 
+      hasConversions = true
       const fragment = document.createDocumentFragment()
       let lastIndex = 0
 
       for (const match of matches) {
         const matchIndex = match.index ?? 0
         if (matchIndex > lastIndex) {
-          fragment.append(text.slice(lastIndex, matchIndex))
+          const beforeText = document.createTextNode(text.slice(lastIndex, matchIndex))
+          fragment.append(beforeText)
         }
         const name = match[1]
         const chip = createChipElement(name)
         fragment.append(chip)
-        const endIndex = matchIndex + match[0].length
-        if (!caretHost && anchorNode === textNode && anchorOffset >= matchIndex && anchorOffset <= endIndex) {
-          caretHost = chip
+
+        // If this was near where the cursor was, target this chip
+        if (!cursorTarget && saveCursorForDeletion?.startContainer === textNode) {
+          const matchEnd = matchIndex + match[0].length
+          if (saveCursorForDeletion.startOffset >= matchIndex && saveCursorForDeletion.startOffset <= matchEnd) {
+            cursorTarget = chip
+          }
         }
-        lastIndex = endIndex
+
+        lastIndex = matchIndex + match[0].length
       }
 
       if (lastIndex < text.length) {
-        fragment.append(text.slice(lastIndex))
+        const remainingText = document.createTextNode(text.slice(lastIndex))
+        fragment.append(remainingText)
+        if (!cursorTarget && saveCursorForDeletion?.startContainer === textNode && saveCursorForDeletion.startOffset > lastIndex) {
+          cursorTarget = remainingText
+        }
       }
 
       const parent = textNode.parentNode
@@ -277,14 +350,25 @@
       }
     }
 
-    if (caretHost && selection) {
-      const range = document.createRange()
-      range.setStartAfter(caretHost)
-      range.collapse(true)
-      selection.removeAllRanges()
-      selection.addRange(range)
+    // Restore cursor position if we made conversions
+    if (hasConversions) {
+      const selection = document.getSelection()
+      if (selection && cursorTarget) {
+        const range = document.createRange()
+        if (cursorTarget instanceof Text) {
+          // Position within text node
+          range.setStart(cursorTarget, Math.min(saveCursorForDeletion?.startOffset || 0, cursorTarget.textContent?.length || 0))
+        } else {
+          // Position after chip
+          range.setStartAfter(cursorTarget)
+        }
+        range.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(range)
+      }
     }
   }
+
 
   function syncDomFromValue() {
     if (!editableEl) return
@@ -308,16 +392,74 @@
     }
   }
 
+  function handleBeforeInput(event: InputEvent) {
+    if (!editableEl || disabled) return
+
+    // Handle deletion operations (deleteContentBackward, deleteContentForward, etc.)
+    if (event.inputType.startsWith('delete')) {
+      const selection = document.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0)
+
+        // Save cursor position for restoration after potential chip conversion
+        saveCursorForDeletion = {
+          startContainer: range.startContainer,
+          startOffset: range.startOffset,
+          endContainer: range.endContainer,
+          endOffset: range.endOffset,
+          isCollapsed: range.collapsed
+        }
+      }
+      return // Let deletion proceed normally, we'll handle conversion in handleInput
+    }
+
+    // Check if this input would complete a placeholder pattern
+    if (event.data === '_') {
+      const selection = document.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0)
+        const anchorNode = range.startContainer
+
+        if (anchorNode instanceof Text) {
+          const text = anchorNode.textContent || ''
+          const offset = range.startOffset
+          const beforeCursor = text.substring(0, offset)
+
+          // Check if adding this '_' would complete a placeholder pattern
+          const willComplete = (beforeCursor + '_').match(/__([^_]+)__$/)
+
+          if (willComplete) {
+            // Prevent the default input
+            event.preventDefault()
+
+            // Add the underscore manually and then convert
+            const newText = text.substring(0, offset) + '_' + text.substring(offset)
+            anchorNode.textContent = newText
+
+            // Create a match object for the completed pattern
+            const match = willComplete
+            convertSinglePlaceholder(editableEl, anchorNode, match, offset + 1)
+            return
+          }
+        }
+      }
+    }
+  }
+
   function handleInput() {
     if (!editableEl) return
+
     skipDomSync = true
     const newValue = extractValueFromDom(editableEl)
     if (newValue !== value) {
       value = newValue
       onValueChange(newValue)
     }
-    if (!disabled) {
-      convertTypedPlaceholders(editableEl)
+
+    // Check if we need to convert any placeholder patterns (e.g., after deletion)
+    if (!disabled && saveCursorForDeletion) {
+      convertTypedPlaceholdersWithSavedCursor(editableEl)
+      saveCursorForDeletion = null
     }
 
     scheduleFrame(() => {
@@ -371,6 +513,7 @@
   class={`chip-editor ${disabled ? 'is-disabled' : ''}`}
   contenteditable={!disabled}
   bind:this={editableEl}
+  onbeforeinput={handleBeforeInput}
   oninput={handleInput}
   onblur={handleBlur}
   data-placeholder={placeholder}
