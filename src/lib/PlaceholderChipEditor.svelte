@@ -27,11 +27,11 @@
   type Seg =
     | { kind: 'text'; text: string }
     | { kind: 'chip'; name: string; type: 'random' | 'consistent-random' | 'unknown' }
-
-  type ChoiceSeg = { kind: 'text'; text: string } | { kind: 'choice'; options: string[] }
+    | { kind: 'choice'; options: string[] }
 
   const placeholderRe = createPlaceholderRegex()
   const hasDocument = typeof document !== 'undefined'
+
   function scheduleFrame(cb: FrameRequestCallback) {
     if (typeof requestAnimationFrame === 'function') {
       requestAnimationFrame(cb)
@@ -56,6 +56,7 @@
     span.textContent = name
     return span
   }
+
   let editableEl: HTMLDivElement | null = null
   let skipDomSync = false
   let saveCursorForDeletion: {
@@ -84,7 +85,10 @@
     for (const match of text.matchAll(placeholderRe)) {
       const idx = match.index ?? 0
       if (idx > last) {
-        segs.push({ kind: 'text', text: text.slice(last, idx) })
+        const textSegment = text.slice(last, idx)
+        // Split text segments by choice patterns and add them
+        const choiceParts = splitChoiceSegments(textSegment)
+        segs.push(...choiceParts)
       }
       const name = match[1]
       const t = getTagType(name)
@@ -92,13 +96,16 @@
       last = idx + match[0].length
     }
     if (last < text.length) {
-      segs.push({ kind: 'text', text: text.slice(last) })
+      const textSegment = text.slice(last)
+      // Split text segments by choice patterns and add them
+      const choiceParts = splitChoiceSegments(textSegment)
+      segs.push(...choiceParts)
     }
     return segs
   }
 
-  function splitChoiceSegments(text: string): ChoiceSeg[] {
-    const result: ChoiceSeg[] = []
+  function splitChoiceSegments(text: string): Seg[] {
+    const result: Seg[] = []
     const choiceRe = /\{([^{}]*\|[^{}]*)\}/g
     let lastIndex = 0
     let match: RegExpExecArray | null
@@ -128,59 +135,7 @@
     return result
   }
 
-  function escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;')
-      .replace(/\n/g, '<br>')
-  }
 
-  function escapeAttr(text: string): string {
-    return text.replace(/"/g, '&quot;')
-  }
-
-  function renderTextSegments(text: string): string {
-    const parts = splitChoiceSegments(text)
-    return parts
-      .map((part) => {
-        if (part.kind === 'text') {
-          if (!part.text) return ''
-          return `<span class="text-segment">${escapeHtml(part.text)}</span>`
-        }
-        const optionsHtml = part.options
-          .map((option, index) => {
-            const optionHtml = `<span class="choice-option">${
-              option === '' ? '&nbsp;' : escapeHtml(option)
-            }</span>`
-            if (index === 0) return optionHtml
-            return `<span class="choice-separator" aria-hidden="true"></span>${optionHtml}`
-          })
-          .join('')
-        return `<span class="chip choice" data-choice="true">${optionsHtml}</span>`
-      })
-      .join('')
-  }
-
-  function renderSegmentsToHtml(segs: Seg[]): string {
-    let html = ''
-    for (const seg of segs) {
-      if (seg.kind === 'text') {
-        html += renderTextSegments(seg.text)
-        continue
-      }
-      const cls =
-        seg.type === 'random'
-          ? 'random'
-          : seg.type === 'consistent-random'
-            ? 'consistent'
-            : 'unknown'
-      html += `<span class="chip ${cls}" data-placeholder-name="${escapeAttr(seg.name)}" contenteditable="false">${escapeHtml(seg.name)}</span>`
-    }
-    return html
-  }
 
   function extractValueFromDom(root: HTMLElement): string {
     const pieces: string[] = []
@@ -384,26 +339,22 @@
     }
   }
 
+  let renderedSegments: Seg[] = $state([])
+  let isEmpty = $state(true)
+
   function syncDomFromValue() {
     if (!editableEl) return
     if (skipDomSync) return
 
     const hasValue = value && value.length > 0
+    isEmpty = !hasValue
+
     if (!hasValue) {
-      editableEl.innerHTML = ''
-      editableEl.classList.add('is-empty')
+      renderedSegments = []
       return
     }
 
-    editableEl.classList.remove('is-empty')
-    const segs = getSegments(value)
-    const html = renderSegmentsToHtml(segs)
-    const anchor = '<span data-anchor="true">\u200B</span>'
-    const nextHtml = `${html}${anchor}`
-
-    if (editableEl.innerHTML !== nextHtml) {
-      editableEl.innerHTML = nextHtml
-    }
+    renderedSegments = getSegments(value)
   }
 
   function handleBeforeInput(event: InputEvent) {
@@ -524,7 +475,7 @@
 
 <div
   {id}
-  class={`chip-editor ${disabled ? 'is-disabled' : ''}`}
+  class={`chip-editor ${disabled ? 'is-disabled' : ''} ${isEmpty ? 'is-empty' : ''}`}
   contenteditable={!disabled}
   bind:this={editableEl}
   onbeforeinput={handleBeforeInput}
@@ -532,7 +483,29 @@
   onblur={handleBlur}
   data-placeholder={placeholder}
   spellcheck="false"
-></div>
+>
+  {#each renderedSegments as segment}
+    {#if segment.kind === 'text'}
+      <span class="text-segment">{segment.text}</span>
+    {:else if segment.kind === 'choice'}
+      <span class="chip choice" data-choice="true">
+        {#each segment.options as option, index}
+          {#if index > 0}<span class="choice-separator" aria-hidden="true"></span>{/if}
+          <span class="choice-option">{option === '' ? '\u00A0' : option}</span>
+        {/each}
+      </span>
+    {:else if segment.kind === 'chip'}
+      <span
+        class={`chip ${segment.type === 'random' ? 'random' : segment.type === 'consistent-random' ? 'consistent' : 'unknown'}`}
+        data-placeholder-name={segment.name}
+        contenteditable="false"
+      >
+        {segment.name}
+      </span>
+    {/if}
+  {/each}
+  <span data-anchor="true">&#8203;</span>
+</div>
 
 <style>
   .chip-editor {
