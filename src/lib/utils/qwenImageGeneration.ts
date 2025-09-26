@@ -18,10 +18,7 @@ import {
   applyPerModelOverrides,
   submitToComfyUI
 } from './generationCommon'
-import type {
-  ComfyUIWorkflow,
-  ModelSettings
-} from '$lib/types'
+import type { ComfyUIWorkflow, ModelSettings } from '$lib/types'
 import type { GenerationOptions } from './imageGeneration'
 
 function applyQwenLoraChain(workflow: ComfyUIWorkflow, loras: { name: string; weight: number }[]) {

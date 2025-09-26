@@ -116,11 +116,25 @@ background:
 
     // Test expansion of pose/action/shower to collect disables
     const disabledContext = { names: new Set<string>(), patterns: [] as string[] }
-    const poseResult = expandCustomTags('pose/action/shower', model2, new Set(), {}, prev, disabledContext)
+    const poseResult = expandCustomTags(
+      'pose/action/shower',
+      model2,
+      new Set(),
+      {},
+      prev,
+      disabledContext
+    )
     expect(poseResult.expandedText).toContain('wet')
 
     // Test that background expansion is suppressed by the collected disables
-    const backgroundResult = expandCustomTags('background', model2, new Set(), {}, {}, disabledContext)
+    const backgroundResult = expandCustomTags(
+      'background',
+      model2,
+      new Set(),
+      {},
+      {},
+      disabledContext
+    )
     expect(backgroundResult.expandedText).not.toContain('sky')
     expect(backgroundResult.expandedText).not.toContain('window')
   })

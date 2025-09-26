@@ -66,8 +66,6 @@
     }
   })
 
-
-
   // Note: We don't load on mount because settings might not be ready yet
   // Loading happens in $effect when isQwenModel is properly determined
 
@@ -81,7 +79,6 @@
     negativeTags = zones.negative
     inpaintingTags = zones.inpainting
   }
-
 
   // Debounced save - only saves after user stops typing for 2 seconds
   function debouncedSave() {
@@ -146,7 +143,6 @@
   ) {
     preselectTagName = tagName
     preselectTargetText = ''
-
 
     const tagType = wildcardTagType(tagName)
 

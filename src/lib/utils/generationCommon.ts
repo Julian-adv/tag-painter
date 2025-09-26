@@ -10,12 +10,7 @@ import {
   type WebSocketCallbacks
 } from './comfyui'
 import { FINAL_SAVE_NODE_ID } from './workflow'
-import type {
-  Settings,
-  ProgressData,
-  ComfyUIWorkflow,
-  ModelSettings
-} from '$lib/types'
+import type { Settings, ProgressData, ComfyUIWorkflow, ModelSettings } from '$lib/types'
 
 export function generateClientId(): string {
   const cryptoObj = typeof globalThis !== 'undefined' ? globalThis.crypto : undefined
@@ -178,12 +173,5 @@ export async function submitToComfyUI(
     onError: callbacks.onError
   }
 
-  connectWebSocket(
-    result.prompt_id,
-    clientId,
-    FINAL_SAVE_NODE_ID,
-    workflow,
-    wsCallbacks,
-    comfyBase
-  )
+  connectWebSocket(result.prompt_id, clientId, FINAL_SAVE_NODE_ID, workflow, wsCallbacks, comfyBase)
 }

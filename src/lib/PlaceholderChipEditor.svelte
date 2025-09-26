@@ -222,7 +222,12 @@
     return pieces.join('').replace(/\u200B/g, '')
   }
 
-  function convertSinglePlaceholder(root: HTMLElement, textNode: Text, match: RegExpMatchArray, cursorOffset: number) {
+  function convertSinglePlaceholder(
+    root: HTMLElement,
+    textNode: Text,
+    match: RegExpMatchArray,
+    cursorOffset: number
+  ) {
     if (!hasDocument) return
 
     const text = textNode.textContent || ''
@@ -328,7 +333,10 @@
         // If this was near where the cursor was, target this chip
         if (!cursorTarget && saveCursorForDeletion?.startContainer === textNode) {
           const matchEnd = matchIndex + match[0].length
-          if (saveCursorForDeletion.startOffset >= matchIndex && saveCursorForDeletion.startOffset <= matchEnd) {
+          if (
+            saveCursorForDeletion.startOffset >= matchIndex &&
+            saveCursorForDeletion.startOffset <= matchEnd
+          ) {
             cursorTarget = chip
           }
         }
@@ -339,7 +347,11 @@
       if (lastIndex < text.length) {
         const remainingText = document.createTextNode(text.slice(lastIndex))
         fragment.append(remainingText)
-        if (!cursorTarget && saveCursorForDeletion?.startContainer === textNode && saveCursorForDeletion.startOffset > lastIndex) {
+        if (
+          !cursorTarget &&
+          saveCursorForDeletion?.startContainer === textNode &&
+          saveCursorForDeletion.startOffset > lastIndex
+        ) {
           cursorTarget = remainingText
         }
       }
@@ -357,7 +369,10 @@
         const range = document.createRange()
         if (cursorTarget instanceof Text) {
           // Position within text node
-          range.setStart(cursorTarget, Math.min(saveCursorForDeletion?.startOffset || 0, cursorTarget.textContent?.length || 0))
+          range.setStart(
+            cursorTarget,
+            Math.min(saveCursorForDeletion?.startOffset || 0, cursorTarget.textContent?.length || 0)
+          )
         } else {
           // Position after chip
           range.setStartAfter(cursorTarget)
@@ -368,7 +383,6 @@
       }
     }
   }
-
 
   function syncDomFromValue() {
     if (!editableEl) return
@@ -509,7 +523,7 @@
 </script>
 
 <div
-  id={id}
+  {id}
   class={`chip-editor ${disabled ? 'is-disabled' : ''}`}
   contenteditable={!disabled}
   bind:this={editableEl}

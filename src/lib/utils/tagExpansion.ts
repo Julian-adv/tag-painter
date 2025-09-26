@@ -121,7 +121,11 @@ function processNodeExpansion(
   const result = expandFn(ctx, tag)
   // Pass ctx.randomTagResolutions by reference so nested placeholder
   // expansions contribute their resolutions to the shared map.
-  const finalized = expandPlaceholders(ctx, result.expandedTags.join(', '), ctx.randomTagResolutions)
+  const finalized = expandPlaceholders(
+    ctx,
+    result.expandedTags.join(', '),
+    ctx.randomTagResolutions
+  )
   // Extract disables info without removing directives
   extractDisablesInfo(ctx, finalized)
 

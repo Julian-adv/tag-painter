@@ -26,13 +26,7 @@ import {
 import { getWildcardModel } from '../stores/tagsStore'
 import { readWildcardZones } from './wildcardZones'
 import { updateComposition } from '../stores/promptsStore'
-import type {
-  PromptsData,
-  Settings,
-  ProgressData,
-  ComfyUIWorkflow
-} from '$lib/types'
-
+import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow } from '$lib/types'
 
 export interface GenerationOptions {
   promptsData: PromptsData
@@ -341,7 +335,6 @@ export async function generateImage(options: GenerationOptions): Promise<{
   }
 }
 
-
 function configureWorkflow(
   workflow: ComfyUIWorkflow,
   promptsData: PromptsData,
@@ -519,8 +512,3 @@ function addSaveImageWebsocketNode(
     _meta: { title: 'Final Save Image Websocket' }
   }
 }
-
-
-
-
-
