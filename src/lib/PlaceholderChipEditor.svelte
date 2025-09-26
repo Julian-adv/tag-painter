@@ -12,6 +12,7 @@
     disabled: boolean
     onValueChange: (value: string) => void
     onChipDoubleClick: (tagName: string) => void
+    refreshToken?: number
   }
 
   let {
@@ -21,7 +22,8 @@
     model = null,
     disabled = false,
     onValueChange = () => {},
-    onChipDoubleClick = () => {}
+    onChipDoubleClick = () => {},
+    refreshToken = 0
   }: Props = $props()
 
   type Seg =
@@ -363,6 +365,7 @@
   let isEmpty = $state(true)
   let lastSyncedValue: string | null = null
   let lastSyncedModel: TreeModel | null = null
+  let lastSyncedRefreshToken: number | null = null
 
   function syncDomFromValue() {
     if (!editableEl) return
@@ -383,6 +386,7 @@
     renderVersion += 1
     lastSyncedValue = value
     lastSyncedModel = model
+    lastSyncedRefreshToken = refreshToken ?? null
   }
 
   function handleBeforeInput(event: InputEvent) {
@@ -452,12 +456,15 @@
     if (!editableEl) return
     if (skipDomSync) return
 
-    if (value === lastSyncedValue && model === lastSyncedModel) {
+    const token = refreshToken ?? null
+
+    if (value === lastSyncedValue && model === lastSyncedModel && token === lastSyncedRefreshToken) {
       return
     }
 
     lastSyncedValue = value
     lastSyncedModel = model
+    lastSyncedRefreshToken = token
     syncDomFromValue()
   })
 </script>

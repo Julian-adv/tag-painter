@@ -16,6 +16,7 @@
     disabled?: boolean
     parentTagType?: string // Add parent tag type for context menu logic
     onPinToggle?: (tagName: string, targetTag: string, shouldPin: boolean) => void
+    wildcardsRefreshToken?: number
   }
 
   let {
@@ -28,7 +29,8 @@
     testOverrideTag = '',
     disabled = false,
     parentTagType = '',
-    onPinToggle
+    onPinToggle,
+    wildcardsRefreshToken = 0
   }: Props = $props()
 
   let wildcardModel: TreeModel = $state(getWildcardModel())
@@ -61,5 +63,6 @@
     {disabled}
     onValueChange={handleTextChange}
     onChipDoubleClick={(tagName) => onCustomTagDoubleClick?.(tagName)}
+    refreshToken={wildcardsRefreshToken}
   />
 </div>

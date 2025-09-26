@@ -41,6 +41,7 @@
   let showTreeEditDialog = $state(false)
   let preselectTagName = $state('')
   let preselectTargetText = $state('')
+  let wildcardsRefreshToken = $state(0)
 
   // Display-only prefixes from Settings per selected model
   let qualityPrefixText = $state('')
@@ -132,12 +133,13 @@
   async function handleWildcardsSaved() {
     try {
       await loadTagsFromWildcards()
+      wildcardsRefreshToken += 1
     } catch (error) {
       console.error('Failed to reload wildcard zones after save:', error)
     }
   }
 
-  function handleCustomTagDoubleClickForZone(
+  async function handleCustomTagDoubleClickForZone(
     zoneId: 'all' | 'zone1' | 'zone2' | 'negative' | 'inpainting',
     tagName: string
   ) {
@@ -154,7 +156,7 @@
       }
     }
 
-    showTreeEditDialog = true
+    await openTreeEditDialog()
   }
 
   // Check if there are any pinned tags across all zones
@@ -236,6 +238,7 @@
       onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('all', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.all}
+      wildcardsRefreshToken={wildcardsRefreshToken}
     />
 
     <LeafNodeEditor
@@ -246,6 +249,7 @@
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone1}
       disabled={isQwenModel}
+      wildcardsRefreshToken={wildcardsRefreshToken}
     />
 
     <LeafNodeEditor
@@ -256,6 +260,7 @@
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone2}
       disabled={isQwenModel || $promptsData.selectedComposition === 'all'}
+      wildcardsRefreshToken={wildcardsRefreshToken}
     />
 
     <LeafNodeEditor
@@ -265,6 +270,7 @@
       onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('negative', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.negative}
+      wildcardsRefreshToken={wildcardsRefreshToken}
     />
 
     <LeafNodeEditor
@@ -274,6 +280,7 @@
       onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('inpainting', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.inpainting}
+      wildcardsRefreshToken={wildcardsRefreshToken}
     />
   </div>
 
