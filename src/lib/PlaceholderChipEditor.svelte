@@ -40,32 +40,45 @@
     setTimeout(() => cb(Date.now()), 0)
   }
 
-  function createChipElement(name: string): HTMLSpanElement {
-    const span = document.createElement('span')
-    span.classList.add('chip')
-    const tagType = getTagType(name)
-    if (tagType === 'random') {
-      span.classList.add('random')
-    } else if (tagType === 'consistent-random') {
-      span.classList.add('consistent')
-    } else {
-      span.classList.add('unknown')
+  function serializeNode(node: Node): string {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return (node.textContent ?? '').replace(/\u200B/g, '')
     }
-    span.dataset.placeholderName = name
-    span.setAttribute('contenteditable', 'false')
-    span.textContent = name
-    return span
+
+    if (!(node instanceof HTMLElement)) {
+      return ''
+    }
+
+    if (node.dataset.anchor === 'true') {
+      return ''
+    }
+
+    const placeholderName = node.dataset.placeholderName
+    if (placeholderName) {
+      return `__${placeholderName}__`
+    }
+
+    if (node.tagName === 'BR') {
+      return '\n'
+    }
+
+    if (node.tagName === 'DIV') {
+      return serializeChildren(node) + '\n'
+    }
+
+    return serializeChildren(node)
+  }
+
+  function serializeChildren(node: Node): string {
+    let result = ''
+    node.childNodes.forEach((child) => {
+      result += serializeNode(child)
+    })
+    return result
   }
 
   let editableEl: HTMLDivElement | null = null
   let skipDomSync = false
-  let saveCursorForDeletion: {
-    startContainer: Node
-    startOffset: number
-    endContainer: Node
-    endOffset: number
-    isCollapsed: boolean
-  } | null = null
 
   function getTagType(tagName: string): 'random' | 'consistent-random' | 'unknown' {
     if (!model) return 'unknown'
@@ -138,209 +151,218 @@
 
 
   function extractValueFromDom(root: HTMLElement): string {
-    const pieces: string[] = []
+    return serializeChildren(root)
+  }
 
-    root.childNodes.forEach((node) => {
+  function getSelectionOffsets(root: HTMLElement): { start: number; end: number } | null {
+    if (!hasDocument) return null
+    const selection = document.getSelection()
+    if (!selection || selection.rangeCount === 0) return null
+    const range = selection.getRangeAt(0)
+    if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) {
+      return null
+    }
+
+    const startRange = range.cloneRange()
+    startRange.selectNodeContents(root)
+    startRange.setEnd(range.startContainer, range.startOffset)
+    const startText = serializeChildren(startRange.cloneContents())
+
+    const endRange = range.cloneRange()
+    endRange.selectNodeContents(root)
+    endRange.setEnd(range.endContainer, range.endOffset)
+    const endText = serializeChildren(endRange.cloneContents())
+
+    return {
+      start: startText.length,
+      end: endText.length
+    }
+  }
+
+  function getSanitizedLength(text: string): number {
+    return text.replace(/\u200B/g, '').length
+  }
+
+  function mapSanitizedOffsetToDomOffset(text: string, sanitizedOffset: number): number {
+    if (sanitizedOffset <= 0) return 0
+    let count = 0
+    for (let i = 0; i < text.length; i += 1) {
+      const char = text[i]
+      if (char === '\u200B') continue
+      count += 1
+      if (count === sanitizedOffset) {
+        return i + 1
+      }
+    }
+    return text.length
+  }
+
+  type Parent = Node & ParentNode
+
+  type ResolvedPosition =
+    | { kind: 'text'; node: Text; offset: number }
+    | { kind: 'after'; node: ChildNode }
+    | { kind: 'before'; parent: Parent; index: number }
+    | { kind: 'root-end' }
+
+  function resolveOffset(root: HTMLElement, targetOffset: number): ResolvedPosition {
+    let remaining = Math.max(0, targetOffset)
+
+    function visit(node: Node): ResolvedPosition | null {
       if (node.nodeType === Node.TEXT_NODE) {
-        pieces.push(node.textContent ?? '')
-        return
+        const text = node.textContent ?? ''
+        const length = getSanitizedLength(text)
+        if (remaining <= length) {
+          const domOffset = mapSanitizedOffsetToDomOffset(text, remaining)
+          return { kind: 'text', node: node as Text, offset: domOffset }
+        }
+        remaining -= length
+        return null
       }
 
       if (!(node instanceof HTMLElement)) {
-        return
+        return null
       }
 
       if (node.dataset.anchor === 'true') {
-        return
+        return null
       }
 
       const placeholderName = node.dataset.placeholderName
       if (placeholderName) {
-        pieces.push(`__${placeholderName}__`)
-        return
+        if (remaining === 0) {
+          const parent = (node.parentNode as Parent | null) ?? root
+          const siblings = Array.from(parent.childNodes) as ChildNode[]
+          const index = Math.max(0, siblings.indexOf(node as ChildNode))
+          return { kind: 'before', parent, index }
+        }
+        const length = placeholderName.length + 4
+        if (remaining <= length) {
+          return { kind: 'after', node }
+        }
+        remaining -= length
+        return null
       }
 
       if (node.tagName === 'BR') {
-        pieces.push('\n')
-        return
+        if (remaining === 0) {
+          const parent = (node.parentNode as Parent | null) ?? root
+          const siblings = Array.from(parent.childNodes) as ChildNode[]
+          const index = Math.max(0, siblings.indexOf(node as ChildNode))
+          return { kind: 'before', parent, index }
+        }
+        if (remaining <= 1) {
+          return { kind: 'after', node }
+        }
+        remaining -= 1
+        return null
+      }
+
+      const children = Array.from(node.childNodes)
+      for (const child of children) {
+        const result = visit(child)
+        if (result) return result
       }
 
       if (node.tagName === 'DIV') {
-        pieces.push(extractValueFromDom(node))
-        pieces.push('\n')
+        if (remaining <= 1) {
+          if (remaining === 0) {
+            const parent = (node.parentNode as Parent | null) ?? root
+            const siblings = Array.from(parent.childNodes) as ChildNode[]
+            const index = Math.max(0, siblings.indexOf(node as ChildNode))
+            return { kind: 'before', parent, index }
+          }
+          return { kind: 'after', node }
+        }
+        remaining -= 1
+      }
+
+      return null
+    }
+
+    const children = Array.from(root.childNodes)
+    for (const child of children) {
+      const result = visit(child)
+      if (result) return result
+    }
+
+    return { kind: 'root-end' }
+  }
+
+  function restoreSelectionFromOffsets(
+    root: HTMLElement,
+    offsets: { start: number; end: number }
+  ) {
+    if (!hasDocument) return
+    const selection = document.getSelection()
+    if (!selection) return
+
+    const startPos = resolveOffset(root, offsets.start)
+    const endPos = resolveOffset(root, offsets.end)
+
+    const range = document.createRange()
+
+    function applyPosition(position: ResolvedPosition, which: 'start' | 'end') {
+      if (position.kind === 'text') {
+        if (which === 'start') {
+          range.setStart(position.node, position.offset)
+        } else {
+          range.setEnd(position.node, position.offset)
+        }
         return
       }
 
-      pieces.push(extractValueFromDom(node))
-    })
-
-    return pieces.join('').replace(/\u200B/g, '')
-  }
-
-  function convertSinglePlaceholder(
-    root: HTMLElement,
-    textNode: Text,
-    match: RegExpMatchArray,
-    cursorOffset: number
-  ) {
-    if (!hasDocument) return
-
-    const text = textNode.textContent || ''
-    const name = match[1]
-    const matchStart = cursorOffset - match[0].length
-    const matchEnd = cursorOffset
-
-    // Create fragments for before, chip, and after
-    const fragment = document.createDocumentFragment()
-
-    // Add text before the placeholder
-    if (matchStart > 0) {
-      fragment.appendChild(document.createTextNode(text.substring(0, matchStart)))
-    }
-
-    // Create and add the chip
-    const chip = createChipElement(name)
-    fragment.appendChild(chip)
-
-    // Add text after the placeholder
-    if (matchEnd < text.length) {
-      fragment.appendChild(document.createTextNode(text.substring(matchEnd)))
-    }
-
-    // Replace the text node with the fragment
-    const parent = textNode.parentNode
-    if (parent) {
-      parent.replaceChild(fragment, textNode)
-
-      // Position cursor right after the chip BEFORE updating the value
-      const selection = document.getSelection()
-      if (selection) {
-        const range = document.createRange()
-        range.setStartAfter(chip)
-        range.collapse(true)
-        selection.removeAllRanges()
-        selection.addRange(range)
-      }
-
-      // Set skipDomSync to prevent syncDomFromValue from overwriting our DOM changes
-      skipDomSync = true
-
-      // Update the value to reflect the change
-      const newValue = extractValueFromDom(root)
-      if (newValue !== value) {
-        value = newValue
-        onValueChange(newValue)
-      }
-
-      // Reset skipDomSync after a timeout to allow future sync operations
-      setTimeout(() => {
-        skipDomSync = false
-      }, 10)
-    }
-  }
-
-  function convertTypedPlaceholdersWithSavedCursor(root: HTMLElement) {
-    if (!hasDocument || !saveCursorForDeletion) return
-
-    const nodeFilter: NodeFilter = {
-      acceptNode(node) {
-        if (!(node instanceof Text)) return NodeFilter.FILTER_REJECT
-        const parent = node.parentElement
-        if (!parent) return NodeFilter.FILTER_REJECT
-        if (parent.dataset.placeholderName) return NodeFilter.FILTER_REJECT
-        if (parent.dataset.choice === 'true') return NodeFilter.FILTER_REJECT
-        if (parent.dataset.anchor === 'true') return NodeFilter.FILTER_REJECT
-        return NodeFilter.FILTER_ACCEPT
-      }
-    }
-
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, nodeFilter)
-    const textNodes: Text[] = []
-    while (walker.nextNode()) {
-      const current = walker.currentNode
-      if (current instanceof Text) textNodes.push(current)
-    }
-
-    let hasConversions = false
-    let cursorTarget: Node | null = null
-
-    for (const textNode of textNodes) {
-      const text = textNode.nodeValue ?? ''
-      if (!text.includes('__')) continue
-      const localRe = createPlaceholderRegex()
-      const matches = [...text.matchAll(localRe)]
-      if (matches.length === 0) continue
-
-      hasConversions = true
-      const fragment = document.createDocumentFragment()
-      let lastIndex = 0
-
-      for (const match of matches) {
-        const matchIndex = match.index ?? 0
-        if (matchIndex > lastIndex) {
-          const beforeText = document.createTextNode(text.slice(lastIndex, matchIndex))
-          fragment.append(beforeText)
-        }
-        const name = match[1]
-        const chip = createChipElement(name)
-        fragment.append(chip)
-
-        // If this was near where the cursor was, target this chip
-        if (!cursorTarget && saveCursorForDeletion?.startContainer === textNode) {
-          const matchEnd = matchIndex + match[0].length
-          if (
-            saveCursorForDeletion.startOffset >= matchIndex &&
-            saveCursorForDeletion.startOffset <= matchEnd
-          ) {
-            cursorTarget = chip
-          }
-        }
-
-        lastIndex = matchIndex + match[0].length
-      }
-
-      if (lastIndex < text.length) {
-        const remainingText = document.createTextNode(text.slice(lastIndex))
-        fragment.append(remainingText)
-        if (
-          !cursorTarget &&
-          saveCursorForDeletion?.startContainer === textNode &&
-          saveCursorForDeletion.startOffset > lastIndex
-        ) {
-          cursorTarget = remainingText
-        }
-      }
-
-      const parent = textNode.parentNode
-      if (parent) {
-        parent.replaceChild(fragment, textNode)
-      }
-    }
-
-    // Restore cursor position if we made conversions
-    if (hasConversions) {
-      const selection = document.getSelection()
-      if (selection && cursorTarget) {
-        const range = document.createRange()
-        if (cursorTarget instanceof Text) {
-          // Position within text node
-          range.setStart(
-            cursorTarget,
-            Math.min(saveCursorForDeletion?.startOffset || 0, cursorTarget.textContent?.length || 0)
-          )
+      if (position.kind === 'before') {
+        const parent = position.parent
+        const index = Math.max(0, Math.min(parent.childNodes.length, position.index))
+        if (which === 'start') {
+          range.setStart(parent, index)
         } else {
-          // Position after chip
-          range.setStartAfter(cursorTarget)
+          range.setEnd(parent, index)
         }
-        range.collapse(true)
-        selection.removeAllRanges()
-        selection.addRange(range)
+        return
+      }
+
+      if (position.kind === 'root-end') {
+        const parent = root as Parent
+        const index = parent.childNodes.length
+        if (which === 'start') {
+          range.setStart(parent, index)
+        } else {
+          range.setEnd(parent, index)
+        }
+        return
+      }
+
+      const targetNode = position.node
+      const parent = (targetNode.parentNode as Parent | null) ?? root
+      const siblings = Array.from(parent.childNodes) as ChildNode[]
+      let index = siblings.indexOf(targetNode)
+      if (index < 0) {
+        index = siblings.length - 1
+      }
+      const offsetIndex = Math.max(0, index) + 1
+
+      if (which === 'start') {
+        range.setStart(parent, offsetIndex)
+      } else {
+        range.setEnd(parent, offsetIndex)
       }
     }
+
+    applyPosition(startPos, 'start')
+    applyPosition(endPos, 'end')
+
+    selection.removeAllRanges()
+    selection.addRange(range)
   }
+
 
   let renderedSegments: Seg[] = $state([])
+  let renderVersion = $state(0)
   let isEmpty = $state(true)
+  let lastSyncedValue: string | null = null
+  let lastSyncedModel: TreeModel | null = null
 
   function syncDomFromValue() {
     if (!editableEl) return
@@ -351,87 +373,48 @@
 
     if (!hasValue) {
       renderedSegments = []
+      renderVersion += 1
+      lastSyncedValue = value
+      lastSyncedModel = model
       return
     }
 
     renderedSegments = getSegments(value)
+    renderVersion += 1
+    lastSyncedValue = value
+    lastSyncedModel = model
   }
 
   function handleBeforeInput(event: InputEvent) {
     if (!editableEl || disabled) return
-
-    // Handle deletion operations (deleteContentBackward, deleteContentForward, etc.)
-    if (event.inputType.startsWith('delete')) {
-      const selection = document.getSelection()
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0)
-
-        // Save cursor position for restoration after potential chip conversion
-        saveCursorForDeletion = {
-          startContainer: range.startContainer,
-          startOffset: range.startOffset,
-          endContainer: range.endContainer,
-          endOffset: range.endOffset,
-          isCollapsed: range.collapsed
-        }
-      }
-      return // Let deletion proceed normally, we'll handle conversion in handleInput
-    }
-
-    // Check if this input would complete a placeholder pattern
-    if (event.data === '_') {
-      const selection = document.getSelection()
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0)
-        const anchorNode = range.startContainer
-
-        if (anchorNode instanceof Text) {
-          const text = anchorNode.textContent || ''
-          const offset = range.startOffset
-          const beforeCursor = text.substring(0, offset)
-
-          // Check if adding this '_' would complete a placeholder pattern
-          const willComplete = (beforeCursor + '_').match(/__([^_]+)__$/)
-
-          if (willComplete) {
-            // Prevent the default input
-            event.preventDefault()
-
-            // Add the underscore manually and then convert
-            const newText = text.substring(0, offset) + '_' + text.substring(offset)
-            anchorNode.textContent = newText
-
-            // Create a match object for the completed pattern
-            const match = willComplete
-            convertSinglePlaceholder(editableEl, anchorNode, match, offset + 1)
-            return
-          }
-        }
-      }
-    }
   }
 
   function handleInput() {
     if (!editableEl) return
 
     skipDomSync = true
+    const selectionOffsets = getSelectionOffsets(editableEl)
     const newValue = extractValueFromDom(editableEl)
     if (newValue !== value) {
       value = newValue
       onValueChange(newValue)
     }
 
-    // Check if we need to convert any placeholder patterns (e.g., after deletion)
-    if (!disabled && saveCursorForDeletion) {
-      convertTypedPlaceholdersWithSavedCursor(editableEl)
-      saveCursorForDeletion = null
-    }
-
     scheduleFrame(() => {
       skipDomSync = false
       if (!editableEl) return
-      if (!hasDocument || document.activeElement !== editableEl) {
+      if (!hasDocument) {
         syncDomFromValue()
+        return
+      }
+
+      syncDomFromValue()
+      if (selectionOffsets && document.activeElement === editableEl) {
+        const offsetsCopy = { start: selectionOffsets.start, end: selectionOffsets.end }
+        scheduleFrame(() => {
+          if (!editableEl) return
+          restoreSelectionFromOffsets(editableEl, offsetsCopy)
+        })
       }
     })
   }
@@ -466,9 +449,15 @@
   })
 
   $effect(() => {
-    // Reference value/model so Svelte reruns when either changes and chip styles stay in sync
-    void value
-    void model
+    if (!editableEl) return
+    if (skipDomSync) return
+
+    if (value === lastSyncedValue && model === lastSyncedModel) {
+      return
+    }
+
+    lastSyncedValue = value
+    lastSyncedModel = model
     syncDomFromValue()
   })
 </script>
@@ -484,26 +473,28 @@
   data-placeholder={placeholder}
   spellcheck="false"
 >
-  {#each renderedSegments as segment}
-    {#if segment.kind === 'text'}
-      <span class="text-segment">{segment.text}</span>
-    {:else if segment.kind === 'choice'}
-      <span class="chip choice" data-choice="true">
-        {#each segment.options as option, index}
-          {#if index > 0}<span class="choice-separator" aria-hidden="true"></span>{/if}
-          <span class="choice-option">{option === '' ? '\u00A0' : option}</span>
-        {/each}
-      </span>
-    {:else if segment.kind === 'chip'}
-      <span
-        class={`chip ${segment.type === 'random' ? 'random' : segment.type === 'consistent-random' ? 'consistent' : 'unknown'}`}
-        data-placeholder-name={segment.name}
-        contenteditable="false"
-      >
-        {segment.name}
-      </span>
-    {/if}
-  {/each}
+  {#key renderVersion}
+    {#each renderedSegments as segment}
+      {#if segment.kind === 'text'}
+        <span class="text-segment">{segment.text}</span>
+      {:else if segment.kind === 'choice'}
+        <span class="chip choice" data-choice="true">
+          {#each segment.options as option, index}
+            {#if index > 0}<span class="choice-separator" aria-hidden="true"></span>{/if}
+            <span class="choice-option">{option === '' ? '\u00A0' : option}</span>
+          {/each}
+        </span>
+      {:else if segment.kind === 'chip'}
+        <span
+          class={`chip ${segment.type === 'random' ? 'random' : segment.type === 'consistent-random' ? 'consistent' : 'unknown'}`}
+          data-placeholder-name={segment.name}
+          contenteditable="false"
+        >
+          {segment.name}
+        </span>
+      {/if}
+    {/each}
+  {/key}
   <span data-anchor="true">&#8203;</span>
 </div>
 
