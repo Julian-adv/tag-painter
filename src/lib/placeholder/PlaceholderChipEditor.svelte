@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { tick } from 'svelte'
   import { createPlaceholderRegex } from '$lib/constants'
   import { findNodeByName, isConsistentRandomArray } from '../TreeEdit/utils'
   import type { TreeModel } from '../TreeEdit/model'
+  import PlaceholderChipEditorAutocomplete from './PlaceholderChipEditorAutocomplete.svelte'
 
   interface Props {
     id: string
@@ -28,10 +29,10 @@
     refreshToken = 0
   }: Props = $props()
 
-  type Seg =
+  type Segment =
     | { kind: 'text'; text: string }
     | {
-        kind: 'chip'
+        kind: 'placeholder'
         name: string
         type: 'random' | 'consistent-random' | 'unknown'
         resolution: string | null
@@ -39,55 +40,9 @@
     | { kind: 'choice'; options: string[] }
 
   const placeholderRe = createPlaceholderRegex()
-  const hasDocument = typeof document !== 'undefined'
-
-  function scheduleFrame(cb: FrameRequestCallback) {
-    if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(cb)
-      return
-    }
-    setTimeout(() => cb(Date.now()), 0)
-  }
-
-  function serializeNode(node: Node): string {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return (node.textContent ?? '').replace(/\u200B/g, '')
-    }
-
-    if (!(node instanceof HTMLElement)) {
-      return ''
-    }
-
-    if (node.dataset.anchor === 'true') {
-      return ''
-    }
-
-    const placeholderName = node.dataset.placeholderName
-    if (placeholderName) {
-      return `__${placeholderName}__`
-    }
-
-    if (node.tagName === 'BR') {
-      return '\n'
-    }
-
-    if (node.tagName === 'DIV') {
-      return serializeChildren(node) + '\n'
-    }
-
-    return serializeChildren(node)
-  }
-
-  function serializeChildren(node: Node): string {
-    let result = ''
-    node.childNodes.forEach((child) => {
-      result += serializeNode(child)
-    })
-    return result
-  }
-
-  let editableEl: HTMLDivElement | null = null
-  let skipDomSync = false
+  let editorElement: HTMLDivElement | null = $state(null)
+  let autocompleteController: PlaceholderChipEditorAutocomplete | null = null
+  let isEditing = $state(false)
 
   function getTagType(tagName: string): 'random' | 'consistent-random' | 'unknown' {
     if (!model) return 'unknown'
@@ -100,444 +55,312 @@
     return 'unknown'
   }
 
-  function getResolutionSignature(map: Record<string, string>): string {
-    const keys = Object.keys(map).sort()
-    if (keys.length === 0) return ''
-    return keys.map((key) => `${key}=>${map[key]}`).join('|')
-  }
-
-  function getSegments(text: string, resolutions: Record<string, string>): Seg[] {
-    const segs: Seg[] = []
-    let last = 0
-    placeholderRe.lastIndex = 0
-    for (const match of text.matchAll(placeholderRe)) {
-      const idx = match.index ?? 0
-      if (idx > last) {
-        const textSegment = text.slice(last, idx)
-        // Split text segments by choice patterns and add them
-        const choiceParts = splitChoiceSegments(textSegment)
-        segs.push(...choiceParts)
-      }
-      const name = match[1]
-      const t = getTagType(name)
-      const hasResolution = Object.prototype.hasOwnProperty.call(resolutions, name)
-      const resolvedValue = hasResolution ? resolutions[name] : null
-      segs.push({ kind: 'chip', name, type: t, resolution: resolvedValue })
-      last = idx + match[0].length
-    }
-    if (last < text.length) {
-      const textSegment = text.slice(last)
-      // Split text segments by choice patterns and add them
-      const choiceParts = splitChoiceSegments(textSegment)
-      segs.push(...choiceParts)
-    }
-    return segs
-  }
-
-  function splitChoiceSegments(text: string): Seg[] {
-    const result: Seg[] = []
-    const choiceRe = /\{([^{}]*\|[^{}]*)\}/g
+  function parseTextIntoSegments(text: string): Segment[] {
+    const segments: Segment[] = []
     let lastIndex = 0
-    let match: RegExpExecArray | null
 
-    while ((match = choiceRe.exec(text)) !== null) {
-      const index = match.index ?? 0
-      if (index > lastIndex) {
-        result.push({ kind: 'text', text: text.slice(lastIndex, index) })
+    // First pass: handle placeholders
+    placeholderRe.lastIndex = 0
+    const matches = Array.from(text.matchAll(placeholderRe))
+
+    for (const match of matches) {
+      const matchIndex = match.index ?? 0
+
+      // Add text before placeholder
+      if (matchIndex > lastIndex) {
+        const textBefore = text.slice(lastIndex, matchIndex)
+        segments.push(...parseChoiceSegments(textBefore))
       }
 
-      const rawOptions = match[1]?.split('|') ?? []
-      const options = rawOptions.map((option) => option.trim())
+      // Add placeholder segment
+      const name = match[1]
+      const type = getTagType(name)
+      const resolution = currentRandomTagResolutions[name] || null
+      segments.push({ kind: 'placeholder', name, type, resolution })
 
-      if (options.length > 0) {
-        result.push({ kind: 'choice', options })
-      } else {
-        result.push({ kind: 'text', text: match[0] })
-      }
-
-      lastIndex = choiceRe.lastIndex
+      lastIndex = matchIndex + match[0].length
     }
 
+    // Add remaining text
     if (lastIndex < text.length) {
-      result.push({ kind: 'text', text: text.slice(lastIndex) })
+      const remainingText = text.slice(lastIndex)
+      segments.push(...parseChoiceSegments(remainingText))
     }
 
-    return result
+    return segments
   }
 
-  function extractValueFromDom(root: HTMLElement): string {
-    return serializeChildren(root)
-  }
+  function parseChoiceSegments(text: string): Segment[] {
+    const choiceRegex = /\{([^{}]*\|[^{}]*)\}/g
+    const segments: Segment[] = []
+    let lastIndex = 0
 
-  function getSelectionOffsets(root: HTMLElement): { start: number; end: number } | null {
-    if (!hasDocument) return null
-    const selection = document.getSelection()
-    if (!selection || selection.rangeCount === 0) return null
-    const range = selection.getRangeAt(0)
-    if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) {
-      return null
+    let match: RegExpExecArray | null
+    while ((match = choiceRegex.exec(text)) !== null) {
+      const matchIndex = match.index ?? 0
+
+      // Add text before choice
+      if (matchIndex > lastIndex) {
+        const textBefore = text.slice(lastIndex, matchIndex)
+        if (textBefore) {
+          segments.push({ kind: 'text', text: textBefore })
+        }
+      }
+
+      // Add choice segment
+      const optionsText = match[1] || ''
+      const options = optionsText.split('|').map((opt) => opt.trim())
+      segments.push({ kind: 'choice', options })
+
+      lastIndex = choiceRegex.lastIndex
     }
 
-    const startRange = range.cloneRange()
-    startRange.selectNodeContents(root)
-    startRange.setEnd(range.startContainer, range.startOffset)
-    const startText = serializeChildren(startRange.cloneContents())
-
-    const endRange = range.cloneRange()
-    endRange.selectNodeContents(root)
-    endRange.setEnd(range.endContainer, range.endOffset)
-    const endText = serializeChildren(endRange.cloneContents())
-
-    return {
-      start: startText.length,
-      end: endText.length
-    }
-  }
-
-  function getSanitizedLength(text: string): number {
-    return text.replace(/\u200B/g, '').length
-  }
-
-  function mapSanitizedOffsetToDomOffset(text: string, sanitizedOffset: number): number {
-    if (sanitizedOffset <= 0) return 0
-    let count = 0
-    for (let i = 0; i < text.length; i += 1) {
-      const char = text[i]
-      if (char === '\u200B') continue
-      count += 1
-      if (count === sanitizedOffset) {
-        return i + 1
-      }
-    }
-    return text.length
-  }
-
-  type Parent = Node & ParentNode
-
-  type ResolvedPosition =
-    | { kind: 'text'; node: Text; offset: number }
-    | { kind: 'after'; node: ChildNode }
-    | { kind: 'before'; parent: Parent; index: number }
-    | { kind: 'root-end' }
-
-  function resolveOffset(root: HTMLElement, targetOffset: number): ResolvedPosition {
-    let remaining = Math.max(0, targetOffset)
-
-    function visit(node: Node): ResolvedPosition | null {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent ?? ''
-        const length = getSanitizedLength(text)
-        if (remaining <= length) {
-          const domOffset = mapSanitizedOffsetToDomOffset(text, remaining)
-          return { kind: 'text', node: node as Text, offset: domOffset }
-        }
-        remaining -= length
-        return null
-      }
-
-      if (!(node instanceof HTMLElement)) {
-        return null
-      }
-
-      if (node.dataset.anchor === 'true') {
-        return null
-      }
-
-      const placeholderName = node.dataset.placeholderName
-      if (placeholderName) {
-        if (remaining === 0) {
-          const parent = (node.parentNode as Parent | null) ?? root
-          const siblings = Array.from(parent.childNodes) as ChildNode[]
-          const index = Math.max(0, siblings.indexOf(node as ChildNode))
-          return { kind: 'before', parent, index }
-        }
-        const length = placeholderName.length + 4
-        if (remaining <= length) {
-          return { kind: 'after', node }
-        }
-        remaining -= length
-        return null
-      }
-
-      if (node.tagName === 'BR') {
-        if (remaining === 0) {
-          const parent = (node.parentNode as Parent | null) ?? root
-          const siblings = Array.from(parent.childNodes) as ChildNode[]
-          const index = Math.max(0, siblings.indexOf(node as ChildNode))
-          return { kind: 'before', parent, index }
-        }
-        if (remaining <= 1) {
-          return { kind: 'after', node }
-        }
-        remaining -= 1
-        return null
-      }
-
-      const children = Array.from(node.childNodes)
-      for (const child of children) {
-        const result = visit(child)
-        if (result) return result
-      }
-
-      if (node.tagName === 'DIV') {
-        if (remaining <= 1) {
-          if (remaining === 0) {
-            const parent = (node.parentNode as Parent | null) ?? root
-            const siblings = Array.from(parent.childNodes) as ChildNode[]
-            const index = Math.max(0, siblings.indexOf(node as ChildNode))
-            return { kind: 'before', parent, index }
-          }
-          return { kind: 'after', node }
-        }
-        remaining -= 1
-      }
-
-      return null
-    }
-
-    const children = Array.from(root.childNodes)
-    for (const child of children) {
-      const result = visit(child)
-      if (result) return result
-    }
-
-    return { kind: 'root-end' }
-  }
-
-  function restoreSelectionFromOffsets(root: HTMLElement, offsets: { start: number; end: number }) {
-    if (!hasDocument) return
-    const selection = document.getSelection()
-    if (!selection) return
-
-    const startPos = resolveOffset(root, offsets.start)
-    const endPos = resolveOffset(root, offsets.end)
-
-    const range = document.createRange()
-
-    function applyPosition(position: ResolvedPosition, which: 'start' | 'end') {
-      if (position.kind === 'text') {
-        if (which === 'start') {
-          range.setStart(position.node, position.offset)
-        } else {
-          range.setEnd(position.node, position.offset)
-        }
-        return
-      }
-
-      if (position.kind === 'before') {
-        const parent = position.parent
-        const index = Math.max(0, Math.min(parent.childNodes.length, position.index))
-        if (which === 'start') {
-          range.setStart(parent, index)
-        } else {
-          range.setEnd(parent, index)
-        }
-        return
-      }
-
-      if (position.kind === 'root-end') {
-        const parent = root as Parent
-        const index = parent.childNodes.length
-        if (which === 'start') {
-          range.setStart(parent, index)
-        } else {
-          range.setEnd(parent, index)
-        }
-        return
-      }
-
-      const targetNode = position.node
-      const parent = (targetNode.parentNode as Parent | null) ?? root
-      const siblings = Array.from(parent.childNodes) as ChildNode[]
-      let index = siblings.indexOf(targetNode)
-      if (index < 0) {
-        index = siblings.length - 1
-      }
-      const offsetIndex = Math.max(0, index) + 1
-
-      if (which === 'start') {
-        range.setStart(parent, offsetIndex)
-      } else {
-        range.setEnd(parent, offsetIndex)
+    // Add remaining text
+    if (lastIndex < text.length) {
+      const remainingText = text.slice(lastIndex)
+      if (remainingText) {
+        segments.push({ kind: 'text', text: remainingText })
       }
     }
 
-    applyPosition(startPos, 'start')
-    applyPosition(endPos, 'end')
-
-    selection.removeAllRanges()
-    selection.addRange(range)
+    return segments
   }
 
-  let renderedSegments: Seg[] = $state([])
-  let renderVersion = $state(0)
-  let isEmpty = $state(true)
-  let lastSyncedValueSignature: string | null = null
-  let lastSyncedRefreshToken: number | null = null
-  let lastSyncedRandomTagSignature: string | null = null
-  let lastSyncedModelSignature: string | null = null
+  let segments = $derived(parseTextIntoSegments(value))
 
-  function getValueText(v: unknown): string {
-    if (typeof v === 'string') return v
-    if (v == null) return ''
-    return String(v)
-  }
+  function handleClick(event: MouseEvent) {
+    if (disabled) return
 
-  function getModelSignature(m: TreeModel | null): string {
-    if (!m) return ''
-    const nodeIds = Object.keys(m.nodes).sort()
-    return `${m.rootId}:${nodeIds.length}:${nodeIds.join(',')}`
-  }
-
-  function syncDomFromValue() {
-    if (!editableEl) return
-    if (skipDomSync) return
-
-    const textValue = getValueText(value)
-    const hasValue = textValue.length > 0
-    isEmpty = !hasValue
-
-    if (!hasValue) {
-      renderedSegments = []
-      renderVersion += 1
-      lastSyncedValueSignature = textValue
-      lastSyncedRefreshToken = refreshToken ?? null
-      lastSyncedRandomTagSignature = getResolutionSignature(currentRandomTagResolutions)
-      lastSyncedModelSignature = getModelSignature(model)
+    // If clicking on a chip-name, don't interfere
+    const target = event.target as HTMLElement
+    if (target.classList.contains('chip-name')) {
       return
     }
 
-    renderedSegments = getSegments(textValue, currentRandomTagResolutions)
-    renderVersion += 1
-    lastSyncedValueSignature = textValue
-    lastSyncedRefreshToken = refreshToken ?? null
-    lastSyncedRandomTagSignature = getResolutionSignature(currentRandomTagResolutions)
-    lastSyncedModelSignature = getModelSignature(model)
+    // If already editing, don't interfere with natural cursor positioning
+    if (isEditing) return
+
+    startEditing()
   }
 
-  function handleBeforeInput(event: InputEvent) {
-    if (!editableEl || disabled) return
+  function handlePlaceholderDoubleClick(event: MouseEvent, placeholderName: string) {
+    event.preventDefault()
+    event.stopPropagation()
+    onChipDoubleClick(placeholderName)
   }
 
-  function handleInput() {
-    if (!editableEl) return
+  async function startEditing() {
+    if (disabled) return
 
-    skipDomSync = true
-    const selectionOffsets = getSelectionOffsets(editableEl)
-    const newValue = extractValueFromDom(editableEl)
+    isEditing = true
+    await tick()
+
+    if (editorElement) {
+      editorElement.contentEditable = 'true'
+      editorElement.focus()
+    }
+  }
+
+  function finishEditing() {
+    if (!editorElement) return
+
+    isEditing = false
+    editorElement.contentEditable = 'false'
+    autocompleteController?.close()
+
+    // Extract and reconstruct text from the contenteditable div
+    const newValue = extractTextFromEditor(editorElement)
+
     if (newValue !== value) {
       value = newValue
       onValueChange(newValue)
     }
+  }
 
-    scheduleFrame(() => {
-      skipDomSync = false
-      if (!editableEl) return
-      if (!hasDocument) {
-        syncDomFromValue()
-        return
-      }
+  function extractTextFromEditor(element: HTMLElement): string {
+    let result = ''
 
-      syncDomFromValue()
-      if (selectionOffsets && document.activeElement === editableEl) {
-        const offsetsCopy = { start: selectionOffsets.start, end: selectionOffsets.end }
-        scheduleFrame(() => {
-          if (!editableEl) return
-          restoreSelectionFromOffsets(editableEl, offsetsCopy)
-        })
+    function processNode(node: Node): void {
+      if (node.nodeType === Node.TEXT_NODE) {
+        result += node.textContent || ''
+      } else if (node instanceof HTMLElement) {
+        if (node.classList.contains('placeholder-chip')) {
+          const chipName = node.dataset.placeholderName
+          if (chipName) {
+            result += `__${chipName}__`
+          }
+        } else if (node.classList.contains('choice-chip')) {
+          const options: string[] = []
+          const optionElements = node.querySelectorAll('.choice-option')
+          optionElements.forEach((el) => {
+            const text = el.textContent?.trim() || ''
+            if (text !== '\u00A0') options.push(text)
+          })
+          if (options.length > 0) {
+            result += `{${options.join('|')}}`
+          }
+        } else {
+          node.childNodes.forEach(processNode)
+        }
       }
-    })
+    }
+
+    element.childNodes.forEach(processNode)
+    return result
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (!isEditing) return
+
+    if (autocompleteController?.handleKeydown(event)) {
+      return
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      finishEditing()
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      // Restore original value
+      if (editorElement) {
+        editorElement.textContent = value
+      }
+      finishEditing()
+    }
   }
 
   function handleBlur() {
-    skipDomSync = false
-    syncDomFromValue()
-  }
-
-  function handleChipDoubleClick(event: MouseEvent, name: string) {
-    event.preventDefault()
-    event.stopPropagation()
-    onChipDoubleClick(name)
-  }
-
-  onMount(() => {
-    syncDomFromValue()
-    return () => {}
-  })
-
-  $effect(() => {
-    if (!editableEl) return
-    editableEl.dataset.placeholder = placeholder
-  })
-
-  $effect(() => {
-    if (!editableEl) return
-    if (skipDomSync) return
-
-    const token = refreshToken ?? null
-    const currentValueSignature = getValueText(value)
-    const randomTagSignature = getResolutionSignature(currentRandomTagResolutions)
-    const currentModelSignature = getModelSignature(model)
-
-    if (
-      currentValueSignature === lastSyncedValueSignature &&
-      token === lastSyncedRefreshToken &&
-      randomTagSignature === lastSyncedRandomTagSignature &&
-      currentModelSignature === lastSyncedModelSignature
-    ) {
-      return
+    if (isEditing) {
+      finishEditing()
     }
-    syncDomFromValue()
+  }
+
+  function handleChipNameEdit(event: FocusEvent, originalName: string) {
+    const target = event.target as HTMLElement
+    const newName = target.textContent?.trim() || ''
+
+    if (newName && newName !== originalName) {
+      // Replace the old placeholder with the new one in the value
+      const oldPlaceholder = `__${originalName}__`
+      const newPlaceholder = `__${newName}__`
+      const newValue = value.replace(oldPlaceholder, newPlaceholder)
+
+      if (newValue !== value) {
+        value = newValue
+        onValueChange(newValue)
+      }
+    } else if (!newName) {
+      // Restore original name if empty
+      target.textContent = originalName
+    }
+  }
+
+  function handleChipNameKeydown(event: KeyboardEvent) {
+    // Stop propagation to prevent parent editor from handling these events
+    event.stopPropagation()
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      const target = event.target as HTMLElement
+      target.blur() // This will trigger handleChipNameEdit
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      const target = event.target as HTMLElement
+      const originalName = target.dataset.originalName || ''
+      target.textContent = originalName
+      target.blur()
+    }
+  }
+
+  function handleChipNameClick(event: MouseEvent) {
+    // Stop propagation to prevent parent editor from interfering
+    event.stopPropagation()
+    // Don't set cursor position - let browser handle natural cursor placement
+  }
+
+  // Update segments when dependencies change
+  $effect(() => {
+    // React to changes in value, currentRandomTagResolutions, model, refreshToken
+    void value
+    void currentRandomTagResolutions
+    void model
+    void refreshToken
+    // segments will be recalculated via $derived
   })
 </script>
 
 <div
   {id}
-  class={`chip-editor ${disabled ? 'is-disabled' : ''} ${isEmpty ? 'is-empty' : ''}`}
-  contenteditable={!disabled}
-  bind:this={editableEl}
-  onbeforeinput={handleBeforeInput}
-  oninput={handleInput}
+  class="placeholder-chip-editor {disabled ? 'disabled' : ''} {isEditing ? 'editing' : ''} {!value
+    ? 'empty'
+    : ''}"
+  onclick={handleClick}
+  onkeydown={handleKeydown}
   onblur={handleBlur}
+  bind:this={editorElement}
   data-placeholder={placeholder}
-  spellcheck="false"
+  tabindex={disabled ? -1 : 0}
+  role="textbox"
+  aria-label="Text editor with placeholder chips"
 >
-  {#key renderVersion}
-    {#each renderedSegments as segment, segIndex (segIndex)}
+  {#if segments.length === 0}
+    <span class="placeholder-text">{placeholder}</span>
+  {:else}
+    {#each segments as segment, index (index)}
       {#if segment.kind === 'text'}
         <span class="text-segment">{segment.text}</span>
-      {:else if segment.kind === 'choice'}
-        <span class="chip choice" data-choice="true">
-          {#each segment.options as option, index}
-            {#if index > 0}<span class="choice-separator" aria-hidden="true"></span>{/if}
-            <span class="choice-option">{option === '' ? '\u00A0' : option}</span>
-          {/each}
-        </span>
-      {:else if segment.kind === 'chip'}
+      {:else if segment.kind === 'placeholder'}
         <span
-          class={`chip placeholder-chip ${segment.type === 'random' ? 'random' : segment.type === 'consistent-random' ? 'consistent' : 'unknown'}`}
+          class="chip placeholder-chip {segment.type}"
           data-placeholder-name={segment.name}
-          contenteditable="false"
+          ondblclick={(e) => handlePlaceholderDoubleClick(e, segment.name)}
           role="button"
           tabindex="0"
-          ondblclick={(event) => handleChipDoubleClick(event, segment.name)}
+          aria-label="Placeholder: {segment.name}"
+          contenteditable="false"
         >
-          <span class="chip-label chip-label-visible">{segment.name}</span>
+          <span
+            class="chip-name"
+            contenteditable="true"
+            data-original-name={segment.name}
+            onblur={(e) => handleChipNameEdit(e, segment.name)}
+            onkeydown={(e) => handleChipNameKeydown(e)}
+            onclick={(e) => handleChipNameClick(e)}
+            role="textbox"
+            aria-label="Edit placeholder name"
+            tabindex="0"
+          >{segment.name}</span>
           <span class="chip-body">
-            <span class="chip-label chip-label-placeholder" aria-hidden="true">{segment.name}</span>
-            {#if segment.resolution !== null}
-              <span class="chip-value">{segment.resolution}</span>
+            <span class="chip-name-hidden" aria-hidden="true">{segment.name}</span>
+            {#if segment.resolution}
+              <span class="chip-resolution">{segment.resolution}</span>
             {/if}
           </span>
         </span>
+      {:else if segment.kind === 'choice'}
+        <span class="chip choice-chip" aria-label="Choice options" contenteditable="false">
+          {#each segment.options as option, optIndex}
+            {#if optIndex > 0}
+              <span class="choice-separator"></span>
+            {/if}
+            <span class="choice-option">{option || '\u00A0'}</span>
+          {/each}
+        </span>
       {/if}
     {/each}
-  {/key}
-  <span data-anchor="true">&#8203;</span>
+  {/if}
 </div>
 
+<PlaceholderChipEditorAutocomplete
+  bind:this={autocompleteController}
+  {disabled}
+  target={editorElement}
+  active={isEditing}
+  specialTriggerPrefix="__"
+/>
+
 <style>
-  .chip-editor {
+  .placeholder-chip-editor {
     min-height: 3rem;
     padding: 0.5rem;
     border: 1px solid #e5e7eb;
@@ -549,124 +372,154 @@
     white-space: pre-wrap;
     word-break: break-word;
     outline: none;
+    line-height: 1.5;
   }
 
-  .chip-editor:focus {
+  .placeholder-chip-editor:focus {
     border-color: #38bdf8;
     box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
     background-color: #ffffff;
   }
 
-  .chip-editor.is-disabled {
+  .placeholder-chip-editor.disabled {
     cursor: default;
     background-color: #f3f4f6;
+    opacity: 0.6;
   }
 
-  .chip-editor.is-empty::before {
-    content: attr(data-placeholder);
+  .placeholder-chip-editor.editing {
+    background-color: #ffffff;
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+  }
+
+  .placeholder-chip-editor.empty .placeholder-text {
     color: #9ca3af;
+    font-style: italic;
   }
 
-  :global(.text-segment) {
+  .text-segment {
     display: inline;
     white-space: pre-wrap;
   }
 
-  :global(.chip) {
-    display: inline-block;
+  .chip {
+    display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0 0.35rem 0.0625rem 0.35rem;
-    margin: 0 0.1rem 0.2rem;
+    padding: 0.125rem 0.375rem;
+    margin: 0.0625rem 0.125rem;
     border-radius: 0.375rem;
-    border: 1px dashed #d1d5db;
-    white-space: nowrap;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
     user-select: none;
+    vertical-align: baseline;
   }
 
-  :global(.placeholder-chip) {
+  .placeholder-chip {
+    border: 1px dashed;
     position: relative;
-    display: inline-block;
-    padding: 0 0.35rem 0.075rem 0.25rem;
+    padding: 0 0.35rem 0rem 0.25rem;
     white-space: normal;
   }
 
-  :global(.chip-body) {
-    display: inline-block;
-    max-width: 100%;
-    min-width: 0;
+  .placeholder-chip.random {
+    background-color: #f3e8ff;
+    color: #6b21a8;
+    border-color: #c084fc;
   }
 
-  :global(.chip-label) {
-    font-weight: 600;
-    color: inherit;
-  }
-
-  :global(.chip-label-visible) {
-    position: absolute;
-    top: 0;
-    left: 0;
-    padding: 0 0.25rem 0.1rem 0.25rem;
-    background-color: #e5e7eb;
-    pointer-events: none;
-    border-radius: 0.375rem 0 0 0.375rem;
-  }
-
-  :global(.chip.random .chip-label-visible) {
+  .placeholder-chip.random:hover {
     background-color: #e9d5ff;
   }
 
-  :global(.chip.consistent .chip-label-visible) {
+  .placeholder-chip.random .chip-name {
+    background-color: #e9d5ff;
+  }
+
+  .placeholder-chip.consistent-random {
+    background-color: #ffedd5;
+    color: #9a3412;
+    border-color: #fb923c;
+  }
+
+  .placeholder-chip.consistent-random:hover {
     background-color: #fed7aa;
   }
 
-  :global(.chip.unknown .chip-label-visible) {
-    background-color: #bae6fd;
+  .placeholder-chip.consistent-random .chip-name {
+    background-color: #fed7aa;
   }
 
-  :global(.chip-label-placeholder) {
+  .placeholder-chip.unknown {
+    background-color: #e5e7eb;
+    color: #374151;
+    border-color: #d1d5db;
+  }
+
+  .placeholder-chip.unknown:hover {
+    background-color: #d1d5db;
+  }
+
+  .placeholder-chip.unknown .chip-name {
+    background-color: #e5e7eb;
+  }
+
+  .chip-name {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 0 0.25rem 0.0625rem 0.25rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    border-radius: 0.375rem 0 0 0.375rem;
+    cursor: text;
+    outline: none;
+  }
+
+  .chip-name:focus {
+    outline: 2px solid rgba(56, 189, 248, 0.5);
+    outline-offset: 1px;
+  }
+
+  .chip-body {
+    display: inline-block;
+    max-width: 100%;
+    min-width: 0;
+    padding: 0.0625rem 0 0 0;
+  }
+
+  .chip-name-hidden {
     visibility: hidden;
     display: inline-block;
     padding-right: 0.2rem;
+    font-weight: 600;
+    font-size: 0.875rem;
   }
 
-  :global(.chip-value) {
+  .chip-resolution {
     display: inline;
+    font-weight: 400;
+    opacity: 0.8;
+    font-style: italic;
     vertical-align: top;
     min-width: 0;
-    color: inherit;
     white-space: pre-wrap;
     word-break: break-word;
     overflow-wrap: anywhere;
     max-width: 100%;
   }
 
-  :global(.chip.random) {
-    background-color: #f3e8ff;
-    color: #6b21a8;
-    border-color: #c084fc;
-  }
-
-  :global(.chip.consistent) {
-    background-color: #ffedd5;
-    color: #9a3412;
-    border-color: #fb923c;
-  }
-
-  :global(.chip.unknown) {
-    background-color: #e5e7eb;
-    color: #374151;
-    border-color: #d1d5db;
-  }
-
-  :global(.chip.choice) {
+  .choice-chip {
     background-color: #ecfccb;
     color: #1f3c08;
-    border-color: #166534;
-    white-space: pre;
+    border: 1px dashed #166534;
+    white-space: nowrap;
+    font-size: 0.875rem;
+    padding: 0 0.375rem;
   }
 
-  :global(.choice-separator) {
+  .choice-separator {
     display: inline-flex;
     align-self: stretch;
     width: 0;
@@ -675,9 +528,8 @@
     margin: 0 0.2rem;
   }
 
-  :global(.choice-option) {
-    display: inline-flex;
-    align-items: center;
+  .choice-option {
     white-space: pre;
   }
+
 </style>
