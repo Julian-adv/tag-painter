@@ -17,6 +17,7 @@ export const combinedTags = writable<string[]>([])
 let initPromise: Promise<void> | null = null
 
 export async function initTags(modelType?: string): Promise<void> {
+  const effectiveModelType = modelType ?? currentWildcardModelType
   // Return cached tags if already loaded
   const currentCombinedTags = get(combinedTags)
   if (tags.length > 0 && currentCombinedTags.length > 0) {
@@ -34,7 +35,7 @@ export async function initTags(modelType?: string): Promise<void> {
       // Load both danbooru tags and wildcards.yaml
       const [tagsRes, wcRes] = await Promise.allSettled([
         fetch('/api/tags'),
-        fetchWildcardsText(modelType)
+        fetchWildcardsText(effectiveModelType)
       ])
 
       if (tagsRes.status === 'fulfilled' && tagsRes.value.ok) {
@@ -57,6 +58,7 @@ export async function initTags(modelType?: string): Promise<void> {
           const text = wcRes.value ?? ''
           wildcardModel = fromYAML(text)
           wildcardNameSet = computeWildcardNames(wildcardModel)
+          currentWildcardModelType = effectiveModelType
         } catch (e) {
           console.error('Failed to parse wildcards.yaml:', e)
           wildcardNameSet = new Set()
