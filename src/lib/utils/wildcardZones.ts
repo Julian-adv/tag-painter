@@ -64,6 +64,8 @@ export async function writeWildcardZones(
   modelType?: string
 ): Promise<void> {
   try {
+    // Always refresh from the correct file to ensure we have the right model
+    await refreshWildcardsFromServer(modelType)
     const wildcardModel = getWildcardModel()
 
     // Clone the current model to modify it

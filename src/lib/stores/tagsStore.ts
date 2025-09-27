@@ -11,6 +11,8 @@ let tags: string[] = []
 let wildcardNameSet: Set<string> = new Set()
 // Keep parsed TreeModel to query node kinds directly (for advanced features)
 let wildcardModel: TreeModel = fromYAML('')
+// Track the currently loaded wildcard model type
+let currentWildcardModelType: string | undefined = undefined
 export const combinedTags = writable<string[]>([])
 let initPromise: Promise<void> | null = null
 
@@ -140,11 +142,13 @@ export function updateWildcardsFromText(text: string) {
 export async function refreshWildcardsFromServer(modelType?: string) {
   try {
     const text = await fetchWildcardsText(modelType)
+    currentWildcardModelType = modelType
     updateWildcardsFromText(text)
   } catch (e) {
     console.error('refreshWildcardsFromServer failed:', e)
     wildcardNameSet = new Set()
     wildcardModel = fromYAML('')
+    currentWildcardModelType = undefined
     updateCombinedTags()
   }
 }
@@ -152,6 +156,11 @@ export async function refreshWildcardsFromServer(modelType?: string) {
 // Expose the parsed TreeModel for consumers that need structure-based logic
 export function getWildcardModel(): TreeModel {
   return wildcardModel
+}
+
+// Get the currently loaded wildcard model type
+export function getCurrentWildcardModelType(): string | undefined {
+  return currentWildcardModelType
 }
 
 // Public helper to check if a wildcard name corresponds to an array node

@@ -1,6 +1,6 @@
 <script lang="ts">
   import TreeEdit from './TreeEdit.svelte'
-  import { updateWildcardsFromText } from '../stores/tagsStore'
+  import { updateWildcardsFromText, getCurrentWildcardModelType } from '../stores/tagsStore'
   import { fetchWildcardsText, saveWildcardsText } from '../api/wildcards'
   import { m } from '$lib/paraglide/messages'
 
@@ -145,11 +145,16 @@
   async function onSave() {
     if (!tree) return
     const body = tree.getYaml()
-    // Immediately reflect changes in combinedTags using the text we save
-    // (avoids waiting for a subsequent fetch)
-    updateWildcardsFromText(body)
     try {
+      // Save first to avoid overwriting wrong file
       await saveWildcardsText(body, modelType)
+
+      // Only update the global model if we're saving the same model type that's currently loaded
+      const currentlyLoadedModelType = getCurrentWildcardModelType()
+      if (currentlyLoadedModelType === modelType) {
+        updateWildcardsFromText(body)
+      }
+
       tree?.markSaved()
       onSaved()
     } catch (err) {

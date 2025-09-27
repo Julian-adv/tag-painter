@@ -48,13 +48,13 @@
   let negativePrefixText = $state('')
   let lastModelSignature = $state('')
 
-  let currentModelType = $derived(() => {
+  let currentModelType = $derived.by(() => {
     const key = $promptsData.selectedCheckpoint || 'Default'
     const effectiveModel = getEffectiveModelSettings(settings, key)
     return effectiveModel?.modelType === 'qwen' ? 'qwen' : undefined
   })
 
-  let isQwenModel = $derived(() => currentModelType === 'qwen')
+  let isQwenModel = $derived(currentModelType === 'qwen')
 
   let hasLoadedTags = $state(false)
   let saveTimeout: ReturnType<typeof setTimeout> | null = null

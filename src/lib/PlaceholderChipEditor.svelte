@@ -518,6 +518,8 @@
           class={`chip placeholder-chip ${segment.type === 'random' ? 'random' : segment.type === 'consistent-random' ? 'consistent' : 'unknown'}`}
           data-placeholder-name={segment.name}
           contenteditable="false"
+          role="button"
+          tabindex="0"
           ondblclick={(event) => handleChipDoubleClick(event, segment.name)}
         >
           <span class="chip-label chip-label-visible">{segment.name}</span>
