@@ -12,7 +12,7 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
       model: ['66', 0],
       positive: ['6', 0],
       negative: ['7', 0],
-      latent_image: ['58', 0]
+      latent_image: ['70', 0]
     },
     class_type: 'KSampler',
     _meta: {
@@ -79,7 +79,7 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
       title: 'Load Qwen VAE'
     }
   },
-  '58': {
+  '70': {
     inputs: {
       width: 832,
       height: 1216,
@@ -98,6 +98,79 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
     class_type: 'ModelSamplingAuraFlow',
     _meta: {
       title: 'Model Sampling Aura Flow'
+    }
+  },
+  '56': {
+    inputs: {
+      guide_size: 1024,
+      guide_size_for: true,
+      max_size: 1536,
+      seed: 0,
+      steps: 8,
+      cfg: 1.5,
+      sampler_name: 'euler_ancestral',
+      scheduler: 'simple',
+      denoise: 0.1,
+      feather: 5,
+      noise_mask: true,
+      force_inpaint: true,
+      bbox_threshold: 0.5,
+      bbox_dilation: 10,
+      bbox_crop_factor: 3,
+      sam_detection_hint: 'center-1',
+      sam_dilation: 0,
+      sam_threshold: 0.93,
+      sam_bbox_expansion: 0,
+      sam_mask_hint_threshold: 0.7,
+      sam_mask_hint_use_negative: 'False',
+      drop_size: 10,
+      wildcard: '',
+      cycle: 1,
+      inpaint_model: false,
+      noise_mask_feather: 20,
+      tiled_encode: false,
+      tiled_decode: false,
+      image: ['8', 0],
+      model: ['66', 0],
+      clip: ['38', 0],
+      vae: ['39', 0],
+      positive: ['6', 0],
+      negative: ['7', 0],
+      bbox_detector: ['57', 0],
+      sam_model_opt: ['58', 0],
+      segm_detector_opt: ['59', 1]
+    },
+    class_type: 'FaceDetailer',
+    _meta: {
+      title: 'FaceDetailer'
+    }
+  },
+  '57': {
+    inputs: {
+      model_name: 'bbox/face_yolov8m.pt'
+    },
+    class_type: 'UltralyticsDetectorProvider',
+    _meta: {
+      title: 'UltralyticsDetectorProvider'
+    }
+  },
+  '58': {
+    inputs: {
+      model_name: 'sam_vit_b_01ec64.pth',
+      device_mode: 'AUTO'
+    },
+    class_type: 'SAMLoader',
+    _meta: {
+      title: 'SAMLoader'
+    }
+  },
+  '59': {
+    inputs: {
+      model_name: 'segm/person_yolov8m-seg.pt'
+    },
+    class_type: 'UltralyticsDetectorProvider',
+    _meta: {
+      title: 'UltralyticsDetectorProvider'
     }
   }
 }

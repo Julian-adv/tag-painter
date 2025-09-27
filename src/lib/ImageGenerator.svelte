@@ -205,9 +205,6 @@
         if ($promptsData.selectedComposition !== 'all') {
           updateComposition('all')
         }
-        if ($promptsData.useFaceDetailer) {
-          updateFaceDetailer(false)
-        }
       }
     } else if (wasQwenModel) {
       wasQwenModel = false
@@ -547,7 +544,6 @@
                 class="m-0 cursor-pointer accent-sky-600"
                 checked={$promptsData.useFaceDetailer}
                 onchange={(e) => updateFaceDetailer((e.target as HTMLInputElement).checked)}
-                disabled={isQwenModel}
               />
               {m['imageGenerator.useFaceDetailer']()}
             </label>

@@ -155,9 +155,9 @@ export async function generateQwenImage(
     workflow['3'].inputs.sampler_name = appliedSettings.sampler
     workflow['3'].inputs.scheduler = scheduler
 
-    if (workflow['58']) {
-      workflow['58'].inputs.width = appliedSettings.imageWidth
-      workflow['58'].inputs.height = appliedSettings.imageHeight
+    if (workflow['70']) {
+      workflow['70'].inputs.width = appliedSettings.imageWidth
+      workflow['70'].inputs.height = appliedSettings.imageHeight
     }
 
     if (promptsData.selectedCheckpoint) {
@@ -178,8 +178,19 @@ export async function generateQwenImage(
     const appliedSeed = seed ?? Math.floor(Math.random() * 1000000000000000)
     workflow['3'].inputs.seed = appliedSeed
 
+    // Configure FaceDetailer if enabled
+    if (promptsData.useFaceDetailer && workflow['56']) {
+      workflow['56'].inputs.seed = appliedSeed + 1
+      workflow['56'].inputs.steps = appliedSettings.steps
+      workflow['56'].inputs.cfg = appliedSettings.cfgScale
+      workflow['56'].inputs.sampler_name = appliedSettings.sampler
+      workflow['56'].inputs.scheduler = scheduler
+    }
+
+    // Configure final save node based on FaceDetailer usage
+    const imageSourceNodeId = promptsData.useFaceDetailer ? '56' : '8'
     workflow[FINAL_SAVE_NODE_ID] = {
-      inputs: { images: ['8', 0] },
+      inputs: { images: [imageSourceNodeId, 0] },
       class_type: 'SaveImageWebsocket',
       _meta: { title: 'Final Save Image Websocket' }
     }
