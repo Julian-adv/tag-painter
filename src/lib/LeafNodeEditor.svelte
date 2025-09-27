@@ -1,6 +1,6 @@
 <!-- Component for leaf node style tag editing (like TreeEdit) -->
 <script lang="ts">
-  import PlaceholderChipEditor from './PlaceholderChipEditor.svelte'
+  import PlaceholderChipEditor from './NewPlaceholderChipEditor.svelte'
   import { combinedTags, getWildcardModel } from './stores/tagsStore'
   import type { TreeModel } from './TreeEdit/model'
   import { m } from '$lib/paraglide/messages'
