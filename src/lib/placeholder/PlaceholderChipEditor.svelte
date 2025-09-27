@@ -36,6 +36,10 @@
         name: string
         type: 'random' | 'consistent-random' | 'unknown'
         resolution: string | null
+        weight: number
+        weightText: string | null
+        start: number
+        end: number
       }
     | { kind: 'choice'; options: string[] }
 
@@ -43,6 +47,29 @@
   let editorElement: HTMLDivElement | null = $state(null)
   let autocompleteController: PlaceholderChipEditorAutocomplete | null = null
   let isEditing = $state(false)
+
+  type PlaceholderSegment = Extract<Segment, { kind: 'placeholder' }>
+
+  const MIN_WEIGHT = 0.1
+  const MAX_WEIGHT = 2.0
+  const WEIGHT_STEP = 0.1
+
+  function clampWeight(weight: number): number {
+    return Math.min(MAX_WEIGHT, Math.max(MIN_WEIGHT, weight))
+  }
+
+  function roundToStep(weight: number): number {
+    const steps = Math.round(weight / WEIGHT_STEP)
+    return steps * WEIGHT_STEP
+  }
+
+  function formatWeightValue(weight: number): string {
+    return weight.toFixed(1)
+  }
+
+  function getWeightDisplayText(weight: number, weightText: string | null): string {
+    return weightText ?? formatWeightValue(weight)
+  }
 
   function getTagType(tagName: string): 'random' | 'consistent-random' | 'unknown' {
     if (!model) return 'unknown'
@@ -53,6 +80,12 @@
     }
     if (node.kind === 'object') return 'random'
     return 'unknown'
+  }
+
+  const WEIGHT_SUFFIX_RE = /^:(\d+(?:\.\d+)?)\)/
+
+  function isDefaultWeight(weight: number): boolean {
+    return Math.abs(weight - 1) < 0.0001
   }
 
   function parseTextIntoSegments(text: string): Segment[] {
@@ -66,9 +99,25 @@
     for (const match of matches) {
       const matchIndex = match.index ?? 0
 
-      // Add text before placeholder
-      if (matchIndex > lastIndex) {
-        const textBefore = text.slice(lastIndex, matchIndex)
+      let textBefore = text.slice(lastIndex, matchIndex)
+      let weight = 1
+      let weightText: string | null = null
+      let suffixLength = 0
+      let extraPrefixLength = 0
+
+      if (textBefore.endsWith('(')) {
+        const remainingText = text.slice(matchIndex + match[0].length)
+        const weightMatch = remainingText.match(WEIGHT_SUFFIX_RE)
+        if (weightMatch) {
+          textBefore = textBefore.slice(0, -1)
+          weightText = weightMatch[1]
+          weight = parseFloat(weightText)
+          suffixLength = weightMatch[0].length
+          extraPrefixLength = 1
+        }
+      }
+
+      if (textBefore) {
         segments.push(...parseChoiceSegments(textBefore))
       }
 
@@ -76,9 +125,20 @@
       const name = match[1]
       const type = getTagType(name)
       const resolution = currentRandomTagResolutions[name] || null
-      segments.push({ kind: 'placeholder', name, type, resolution })
+      const placeholderStart = matchIndex - extraPrefixLength
+      const placeholderEnd = placeholderStart + match[0].length + suffixLength + extraPrefixLength
+      segments.push({
+        kind: 'placeholder',
+        name,
+        type,
+        resolution,
+        weight,
+        weightText,
+        start: placeholderStart,
+        end: placeholderEnd
+      })
 
-      lastIndex = matchIndex + match[0].length
+      lastIndex = matchIndex + match[0].length + suffixLength
     }
 
     // Add remaining text
@@ -187,7 +247,16 @@
         if (node.classList.contains('placeholder-chip')) {
           const chipName = node.dataset.placeholderName
           if (chipName) {
-            result += `__${chipName}__`
+            const weightAttr = node.dataset.placeholderWeight
+            const weightValue = weightAttr ? parseFloat(weightAttr) : 1
+            const weightString = node.dataset.placeholderWeightText || weightAttr || ''
+
+            if (weightAttr && !Number.isNaN(weightValue) && !isDefaultWeight(weightValue)) {
+              const formattedWeight = weightString || formatWeightValue(weightValue)
+              result += `(__${chipName}__:${formattedWeight})`
+            } else {
+              result += `__${chipName}__`
+            }
           }
         } else if (node.classList.contains('choice-chip')) {
           const options: string[] = []
@@ -278,15 +347,47 @@
     // Don't set cursor position - let browser handle natural cursor placement
   }
 
-  // Update segments when dependencies change
-  $effect(() => {
-    // React to changes in value, currentRandomTagResolutions, model, refreshToken
-    void value
-    void currentRandomTagResolutions
-    void model
-    void refreshToken
-    // segments will be recalculated via $derived
-  })
+  function handlePlaceholderWheel(event: WheelEvent, segment: PlaceholderSegment) {
+    if (disabled) return
+    if (!event.ctrlKey) return
+
+    const target = event.currentTarget as HTMLElement | null
+    if (!target) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const deltaDirection = event.deltaY > 0 ? -1 : 1
+    const currentAttr = target.dataset.placeholderWeight
+    const currentWeight = currentAttr ? parseFloat(currentAttr) : segment.weight
+    const normalizedCurrent = Number.isNaN(currentWeight) ? segment.weight : currentWeight
+
+    const nextWeightRaw = normalizedCurrent + deltaDirection * WEIGHT_STEP
+    const nextWeightClamped = clampWeight(roundToStep(nextWeightRaw))
+    const normalizedNext = parseFloat(nextWeightClamped.toFixed(1))
+
+    if (isDefaultWeight(normalizedNext) && isDefaultWeight(normalizedCurrent)) {
+      return
+    }
+
+    if (!isDefaultWeight(normalizedNext) && Math.abs(normalizedNext - normalizedCurrent) < 0.0001) {
+      return
+    }
+
+    const basePlaceholder = `__${segment.name}__`
+    const replacement = isDefaultWeight(normalizedNext)
+      ? basePlaceholder
+      : `(${basePlaceholder}:${formatWeightValue(normalizedNext)})`
+
+    const prefix = value.slice(0, segment.start)
+    const suffix = value.slice(segment.end)
+    const newValue = `${prefix}${replacement}${suffix}`
+
+    if (newValue !== value) {
+      value = newValue
+      onValueChange(newValue)
+    }
+  }
 </script>
 
 <div
@@ -313,10 +414,17 @@
         <span
           class="chip placeholder-chip {segment.type}"
           data-placeholder-name={segment.name}
+          data-placeholder-weight={segment.weightText ?? formatWeightValue(segment.weight)}
+          data-placeholder-weight-text={segment.weightText ?? ''}
           ondblclick={(e) => handlePlaceholderDoubleClick(e, segment.name)}
+          onwheel={(e) => handlePlaceholderWheel(e, segment)}
           role="button"
           tabindex="0"
-          aria-label="Placeholder: {segment.name}"
+          aria-label={`Placeholder: ${segment.name}${
+            !isDefaultWeight(segment.weight)
+              ? `, weight ${getWeightDisplayText(segment.weight, segment.weightText)}`
+              : ''
+          }`}
           contenteditable="false"
         >
           <span
@@ -328,12 +436,17 @@
             onclick={(e) => handleChipNameClick(e)}
             role="textbox"
             aria-label="Edit placeholder name"
-            tabindex="0"
-          >{segment.name}</span>
+            tabindex="0">{segment.name}</span
+          >
           <span class="chip-body">
             <span class="chip-name-hidden" aria-hidden="true">{segment.name}</span>
             {#if segment.resolution}
               <span class="chip-resolution">{segment.resolution}</span>
+            {/if}
+            {#if !isDefaultWeight(segment.weight)}
+              <span class="chip-weight"
+                >{getWeightDisplayText(segment.weight, segment.weightText)}</span
+              >
             {/if}
           </span>
         </span>
@@ -510,6 +623,12 @@
     max-width: 100%;
   }
 
+  .chip-weight {
+    display: inline;
+    font-weight: 700;
+    margin-left: 0.25rem;
+  }
+
   .choice-chip {
     background-color: #ecfccb;
     color: #1f3c08;
@@ -531,5 +650,4 @@
   .choice-option {
     white-space: pre;
   }
-
 </style>
