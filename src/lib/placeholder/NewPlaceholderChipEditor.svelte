@@ -3,6 +3,7 @@
   import { createPlaceholderRegex } from '$lib/constants'
   import { findNodeByName, isConsistentRandomArray } from '../TreeEdit/utils'
   import type { TreeModel } from '../TreeEdit/model'
+  import PlaceholderChipEditorAutocomplete from './PlaceholderChipEditorAutocomplete.svelte'
 
   interface Props {
     id: string
@@ -39,7 +40,8 @@
     | { kind: 'choice'; options: string[] }
 
   const placeholderRe = createPlaceholderRegex()
-  let editorElement: HTMLDivElement | null = null
+  let editorElement: HTMLDivElement | null = $state(null)
+  let autocompleteController: PlaceholderChipEditorAutocomplete | null = null
   let isEditing = $state(false)
 
   function getTagType(tagName: string): 'random' | 'consistent-random' | 'unknown' {
@@ -164,6 +166,7 @@
 
     isEditing = false
     editorElement.contentEditable = 'false'
+    autocompleteController?.close()
 
     // Extract and reconstruct text from the contenteditable div
     const newValue = extractTextFromEditor(editorElement)
@@ -208,6 +211,10 @@
 
   function handleKeydown(event: KeyboardEvent) {
     if (!isEditing) return
+
+    if (autocompleteController?.handleKeydown(event)) {
+      return
+    }
 
     if (event.key === 'Enter') {
       event.preventDefault()
@@ -343,6 +350,14 @@
     {/each}
   {/if}
 </div>
+
+<PlaceholderChipEditorAutocomplete
+  bind:this={autocompleteController}
+  {disabled}
+  target={editorElement}
+  active={isEditing}
+  specialTriggerPrefix="__"
+/>
 
 <style>
   .placeholder-chip-editor {
