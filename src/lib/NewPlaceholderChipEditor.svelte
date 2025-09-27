@@ -275,7 +275,7 @@
         <span class="chip choice-chip" aria-label="Choice options" contenteditable="false">
           {#each segment.options as option, optIndex}
             {#if optIndex > 0}
-              <span class="choice-separator">|</span>
+              <span class="choice-separator"></span>
             {/if}
             <span class="choice-option">{option || '\u00A0'}</span>
           {/each}
@@ -435,12 +435,17 @@
     color: #1f3c08;
     border: 1px dashed #166534;
     white-space: nowrap;
+    font-size: 0.875rem;
+    padding: 0 0.375rem;
   }
 
   .choice-separator {
-    margin: 0 0.25rem;
-    color: #166534;
-    font-weight: bold;
+    display: inline-flex;
+    align-self: stretch;
+    width: 0;
+    border-left: 1px dashed #166534;
+    box-sizing: border-box;
+    margin: 0 0.2rem;
   }
 
   .choice-option {
