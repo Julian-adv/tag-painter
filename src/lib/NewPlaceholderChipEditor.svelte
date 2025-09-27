@@ -129,6 +129,12 @@
   function handleClick(event: MouseEvent) {
     if (disabled) return
 
+    // If clicking on a chip-name, don't interfere
+    const target = event.target as HTMLElement
+    if (target.classList.contains('chip-name')) {
+      return
+    }
+
     // If already editing, don't interfere with natural cursor positioning
     if (isEditing) return
 
@@ -222,6 +228,49 @@
     }
   }
 
+  function handleChipNameEdit(event: FocusEvent, originalName: string) {
+    const target = event.target as HTMLElement
+    const newName = target.textContent?.trim() || ''
+
+    if (newName && newName !== originalName) {
+      // Replace the old placeholder with the new one in the value
+      const oldPlaceholder = `__${originalName}__`
+      const newPlaceholder = `__${newName}__`
+      const newValue = value.replace(oldPlaceholder, newPlaceholder)
+
+      if (newValue !== value) {
+        value = newValue
+        onValueChange(newValue)
+      }
+    } else if (!newName) {
+      // Restore original name if empty
+      target.textContent = originalName
+    }
+  }
+
+  function handleChipNameKeydown(event: KeyboardEvent) {
+    // Stop propagation to prevent parent editor from handling these events
+    event.stopPropagation()
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      const target = event.target as HTMLElement
+      target.blur() // This will trigger handleChipNameEdit
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      const target = event.target as HTMLElement
+      const originalName = target.dataset.originalName || ''
+      target.textContent = originalName
+      target.blur()
+    }
+  }
+
+  function handleChipNameClick(event: MouseEvent) {
+    // Stop propagation to prevent parent editor from interfering
+    event.stopPropagation()
+    // Don't set cursor position - let browser handle natural cursor placement
+  }
+
   // Update segments when dependencies change
   $effect(() => {
     // React to changes in value, currentRandomTagResolutions, model, refreshToken
@@ -263,7 +312,17 @@
           aria-label="Placeholder: {segment.name}"
           contenteditable="false"
         >
-          <span class="chip-name">{segment.name}</span>
+          <span
+            class="chip-name"
+            contenteditable="true"
+            data-original-name={segment.name}
+            onblur={(e) => handleChipNameEdit(e, segment.name)}
+            onkeydown={(e) => handleChipNameKeydown(e)}
+            onclick={(e) => handleChipNameClick(e)}
+            role="textbox"
+            aria-label="Edit placeholder name"
+            tabindex="0"
+          >{segment.name}</span>
           <span class="chip-body">
             <span class="chip-name-hidden" aria-hidden="true">{segment.name}</span>
             {#if segment.resolution}
@@ -398,8 +457,14 @@
     padding: 0 0.25rem 0.0625rem 0.25rem;
     font-weight: 600;
     font-size: 0.875rem;
-    pointer-events: none;
     border-radius: 0.375rem 0 0 0.375rem;
+    cursor: text;
+    outline: none;
+  }
+
+  .chip-name:focus {
+    outline: 2px solid rgba(56, 189, 248, 0.5);
+    outline-offset: 1px;
   }
 
   .chip-body {
@@ -452,11 +517,4 @@
     white-space: pre;
   }
 
-  /* Hide placeholder text when editor is focused and empty */
-  .placeholder-chip-editor[contenteditable='true']:empty::before {
-    content: attr(data-placeholder);
-    color: #9ca3af;
-    font-style: italic;
-    pointer-events: none;
-  }
 </style>
