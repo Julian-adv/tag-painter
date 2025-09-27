@@ -1,8 +1,8 @@
 <script lang="ts">
   import { tick } from 'svelte'
   import { createPlaceholderRegex } from '$lib/constants'
-  import { findNodeByName, isConsistentRandomArray } from './TreeEdit/utils'
-  import type { TreeModel } from './TreeEdit/model'
+  import { findNodeByName, isConsistentRandomArray } from '../TreeEdit/utils'
+  import type { TreeModel } from '../TreeEdit/model'
 
   interface Props {
     id: string

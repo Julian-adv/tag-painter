@@ -1,6 +1,6 @@
 <!-- Component for tag input zones -->
 <script lang="ts">
-  import LeafNodeEditor from './LeafNodeEditor.svelte'
+  import LeafNodeEditor from './placeholder/LeafNodeEditor.svelte'
   import WildcardsEditorDialog from './TreeEdit/WildcardsEditorDialog.svelte'
   import { promptsData } from './stores/promptsStore'
   import { wildcardTagType } from './stores/tagsStore'
