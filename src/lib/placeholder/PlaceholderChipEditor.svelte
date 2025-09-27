@@ -298,6 +298,94 @@
     }
   }
 
+  function handlePaste(_event: ClipboardEvent) {
+    if (!isEditing) return
+
+    // Store the original range before paste
+    const selection = window.getSelection()
+    let originalRange: Range | null = null
+    if (selection && selection.rangeCount > 0) {
+      originalRange = selection.getRangeAt(0).cloneRange()
+    }
+
+    // Let the default paste happen first
+    setTimeout(() => {
+      if (!editorElement) return
+
+      // Remove formatting from pasted content
+      const walker = document.createTreeWalker(editorElement, NodeFilter.SHOW_ELEMENT, null)
+
+      const elementsToReplace: HTMLElement[] = []
+      let element: HTMLElement | null
+
+      while ((element = walker.nextNode() as HTMLElement)) {
+        // Skip our own chip elements and their children
+        if (
+          element.classList.contains('chip') ||
+          element.classList.contains('placeholder-chip') ||
+          element.classList.contains('choice-chip') ||
+          element.classList.contains('chip-name') ||
+          element.classList.contains('chip-body') ||
+          element.classList.contains('chip-name-hidden') ||
+          element.classList.contains('chip-resolution') ||
+          element.classList.contains('chip-weight') ||
+          element.classList.contains('choice-separator') ||
+          element.classList.contains('choice-option') ||
+          element.classList.contains('text-segment') ||
+          element.classList.contains('placeholder-text') ||
+          element.closest('.chip')
+        ) {
+          continue
+        }
+
+        // Remove formatting attributes but keep content
+        if (
+          element.style.length > 0 ||
+          element.hasAttribute('style') ||
+          element.hasAttribute('color') ||
+          element.hasAttribute('bgcolor') ||
+          element.tagName === 'SPAN' ||
+          element.tagName === 'FONT' ||
+          element.tagName === 'B' ||
+          element.tagName === 'I' ||
+          element.tagName === 'STRONG' ||
+          element.tagName === 'EM' ||
+          element.tagName === 'BR'
+        ) {
+          elementsToReplace.push(element)
+        }
+      }
+
+      // Replace formatted elements with text nodes and trim whitespace
+      for (const el of elementsToReplace) {
+        if (el.tagName === 'BR') {
+          // Remove <br> tags completely
+          el.parentNode?.removeChild(el)
+        } else {
+          const textContent = el.textContent || ''
+          const textNode = document.createTextNode(textContent)
+          el.parentNode?.replaceChild(textNode, el)
+        }
+      }
+
+      // Restore cursor position and move to end of original range
+      if (originalRange) {
+        try {
+          const newSelection = window.getSelection()
+          if (newSelection) {
+            // Move cursor to the end of the original range (after pasted text)
+            originalRange.collapse(false)
+            newSelection.removeAllRanges()
+            newSelection.addRange(originalRange)
+          }
+        } catch (e) {
+          // If original range is no longer valid, don't set cursor
+          console.debug('Could not restore cursor position after paste')
+        }
+      }
+    }, 0)
+  }
+
   function handleBlur() {
     if (isEditing) {
       finishEditing()
@@ -397,6 +485,7 @@
     : ''}"
   onclick={handleClick}
   onkeydown={handleKeydown}
+  onpaste={handlePaste}
   onblur={handleBlur}
   bind:this={editorElement}
   data-placeholder={placeholder}
