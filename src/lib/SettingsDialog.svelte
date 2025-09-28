@@ -613,6 +613,18 @@
               step="0.05"
               class="two-col-input"
             />
+
+            <label for="us-vae" class="two-col-label">{m['settingsDialog.upscaleVae']()}</label>
+            <select
+              id="us-vae"
+              bind:value={localSettings.perModel[selectedModelKey].upscale.selectedVae}
+              class="two-col-input-wide"
+            >
+              <option value="__embedded__">{m['settingsDialog.useEmbeddedVae']()}</option>
+              {#each availableVaes as vae}
+                <option value={vae}>{vae}</option>
+              {/each}
+            </select>
           {/if}
         {/if}
       </div>

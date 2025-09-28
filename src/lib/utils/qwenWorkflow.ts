@@ -130,7 +130,7 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
       noise_mask_feather: 20,
       tiled_encode: false,
       tiled_decode: false,
-      image: ['8', 0],
+      image: ['126', 0],
       model: ['71', 0],
       clip: ['71', 1],
       vae: ['71', 2],
@@ -200,6 +200,95 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
     class_type: 'CLIPTextEncode',
     _meta: {
       title: 'FaceDetailer CLIP Text Encode (Negative)'
+    }
+  },
+  '120': {
+    inputs: {
+      pixels: ['8', 0],
+      vae: ['127', 0]
+    },
+    class_type: 'VAEEncode',
+    _meta: {
+      title: 'SDXL VAE Encode'
+    }
+  },
+  '121': {
+    inputs: {
+      upscale_method: 'nearest-exact',
+      width: 1248,
+      height: 1824,
+      crop: 'disabled',
+      samples: ['120', 0]
+    },
+    class_type: 'LatentUpscale',
+    _meta: {
+      title: 'Latent Upscale'
+    }
+  },
+  '122': {
+    inputs: {
+      seed: 12345,
+      steps: 15,
+      cfg: 4.5,
+      sampler_name: 'euler_ancestral',
+      scheduler: 'simple',
+      denoise: 0.5,
+      model: ['123', 0],
+      positive: ['124', 0],
+      negative: ['125', 0],
+      latent_image: ['121', 0]
+    },
+    class_type: 'KSampler',
+    _meta: {
+      title: 'KSampler (Upscale)'
+    }
+  },
+  '123': {
+    inputs: {
+      ckpt_name: 'model.safetensors'
+    },
+    class_type: 'CheckpointLoaderSimple',
+    _meta: {
+      title: 'Upscale Checkpoint Loader'
+    }
+  },
+  '124': {
+    inputs: {
+      clip: ['123', 1],
+      text: ''
+    },
+    class_type: 'CLIPTextEncode',
+    _meta: {
+      title: 'Upscale CLIP Text Encode (Positive)'
+    }
+  },
+  '125': {
+    inputs: {
+      clip: ['123', 1],
+      text: ''
+    },
+    class_type: 'CLIPTextEncode',
+    _meta: {
+      title: 'Upscale CLIP Text Encode (Negative)'
+    }
+  },
+  '126': {
+    inputs: {
+      samples: ['122', 0],
+      vae: ['123', 2]
+    },
+    class_type: 'VAEDecode',
+    _meta: {
+      title: 'Upscale VAE Decode'
+    }
+  },
+  '127': {
+    inputs: {
+      vae_name: 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
+    },
+    class_type: 'VAELoader',
+    _meta: {
+      title: 'SDXL VAE Loader'
     }
   }
 }

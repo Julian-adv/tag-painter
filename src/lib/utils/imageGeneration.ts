@@ -444,6 +444,12 @@ function configureWorkflow(
         // Configure upscale checkpoint
         workflow['122'].inputs.ckpt_name = upscaleSettings.checkpoint
 
+        // Configure upscale VAE (if not using embedded)
+        if (upscaleSettings.selectedVae && upscaleSettings.selectedVae !== '__embedded__') {
+          // For regular workflow, we don't have separate VAE loader for upscale yet
+          // This would need additional implementation
+        }
+
         // Configure upscale KSampler
         workflow['121'].inputs.steps = upscaleSettings.steps
         workflow['121'].inputs.cfg = upscaleSettings.cfgScale

@@ -99,6 +99,7 @@
   "settingsDialog.upscaleSampler": "Sampler:",
   "settingsDialog.upscaleScheduler": "Scheduler:",
   "settingsDialog.upscaleDenoise": "Denoise:",
+  "settingsDialog.upscaleVae": "VAE:",
   "wildcardsEditor.title": "Wildcards Editor",
   "wildcardsEditor.closeAria": "Close dialog",
   "wildcardsEditor.loading": "Loading wildcards...",

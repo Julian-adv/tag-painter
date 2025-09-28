@@ -99,6 +99,7 @@
   "settingsDialog.upscaleSampler": "샘플러:",
   "settingsDialog.upscaleScheduler": "스케줄러:",
   "settingsDialog.upscaleDenoise": "디노이즈:",
+  "settingsDialog.upscaleVae": "VAE:",
   "wildcardsEditor.title": "와일드카드 편집기",
   "wildcardsEditor.closeAria": "대화 상자 닫기",
   "wildcardsEditor.loading": "와일드카드를 불러오는 중...",

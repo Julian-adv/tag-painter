@@ -47,6 +47,7 @@ export interface UpscaleSettings {
   sampler: string
   scheduler: string
   denoise: number
+  selectedVae: string
 }
 
 export interface ModelSettings {
