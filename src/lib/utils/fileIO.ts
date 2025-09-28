@@ -7,6 +7,7 @@
 // - Image list retrieval
 
 import type { Settings, PromptsData } from '$lib/types'
+import { DEFAULT_FACE_DETAILER_SETTINGS } from '$lib/constants'
 
 export async function savePrompts(data: PromptsData): Promise<void> {
   try {
@@ -139,7 +140,21 @@ export async function loadSettings(): Promise<Settings | null> {
 
     if (response.ok) {
       const result = await response.json()
-      return result.settings
+      const settings = result.settings as Settings
+
+      // Ensure all per-model entries have faceDetailer settings
+      if (settings.perModel) {
+        for (const [key, modelSettings] of Object.entries(settings.perModel)) {
+          if (!modelSettings.faceDetailer) {
+            settings.perModel[key] = {
+              ...modelSettings,
+              faceDetailer: { ...DEFAULT_FACE_DETAILER_SETTINGS }
+            }
+          }
+        }
+      }
+
+      return settings
     } else {
       console.error('Failed to fetch settings')
       return null

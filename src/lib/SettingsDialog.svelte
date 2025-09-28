@@ -6,6 +6,7 @@
   import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
   import { m } from '$lib/paraglide/messages'
   import { locales, baseLocale } from '$lib/paraglide/runtime.js'
+  import { DEFAULT_FACE_DETAILER_SETTINGS } from '$lib/constants'
 
   interface Props {
     show: boolean
@@ -125,7 +126,8 @@
           scheduler: 'simple',
           selectedVae: localSettings.selectedVae,
           clipSkip: localSettings.clipSkip,
-          modelType: 'sdxl'
+          modelType: 'sdxl',
+          faceDetailer: { ...DEFAULT_FACE_DETAILER_SETTINGS }
         }
       }
     }
@@ -452,6 +454,117 @@
               onLoraChange={(loras) => (localSettings.perModel[selectedModelKey].loras = loras)}
             />
           </div>
+
+          <!-- FaceDetailer Settings -->
+          <div
+            class="section-title"
+            style="grid-column: 1 / 4; font-weight: 600; color: #333; text-align: left; justify-self: start; margin-top: 16px; border-top: 1px solid #e0e0e0; padding-top: 16px;"
+          >
+            FaceDetailer Settings
+          </div>
+
+          {#if localSettings.perModel[selectedModelKey]}
+            <label for="fd-checkpoint" class="two-col-label">Checkpoint</label>
+            <select
+              id="fd-checkpoint"
+              class="two-col-input-wide"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.checkpoint}
+            >
+              {#each availableCheckpoints as checkpoint}
+                <option value={checkpoint}>{checkpoint}</option>
+              {/each}
+            </select>
+
+            <label for="fd-steps" class="two-col-label">Steps</label>
+            <input
+              id="fd-steps"
+              type="number"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.steps}
+              min="1"
+              max="100"
+              step="1"
+              class="two-col-input"
+            />
+
+            <label for="fd-cfg" class="two-col-label">CFG Scale</label>
+            <input
+              id="fd-cfg"
+              type="number"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.cfgScale}
+              min="1"
+              max="20"
+              step="0.5"
+              class="two-col-input"
+            />
+
+            <label for="fd-sampler" class="two-col-label">Sampler</label>
+            <select
+              id="fd-sampler"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.sampler}
+              class="two-col-input"
+            >
+              <option value="euler">Euler</option>
+              <option value="euler_ancestral">Euler Ancestral</option>
+              <option value="heun">Heun</option>
+              <option value="heunpp2">Heun++2</option>
+              <option value="dpm_2">DPM 2</option>
+              <option value="dpm_2_ancestral">DPM 2 Ancestral</option>
+              <option value="lms">LMS</option>
+              <option value="dpm_fast">DPM Fast</option>
+              <option value="dpm_adaptive">DPM Adaptive</option>
+              <option value="dpmpp_2s_ancestral">DPM++ 2S Ancestral</option>
+              <option value="dpmpp_sde">DPM++ SDE</option>
+              <option value="dpmpp_sde_gpu">DPM++ SDE GPU</option>
+              <option value="dpmpp_2m">DPM++ 2M</option>
+              <option value="dpmpp_2m_sde">DPM++ 2M SDE</option>
+              <option value="dpmpp_2m_sde_gpu">DPM++ 2M SDE GPU</option>
+              <option value="dpmpp_3m_sde">DPM++ 3M SDE</option>
+              <option value="dpmpp_3m_sde_gpu">DPM++ 3M SDE GPU</option>
+              <option value="ddpm">DDPM</option>
+              <option value="lcm">LCM</option>
+              <option value="ddim">DDIM</option>
+              <option value="uni_pc">UniPC</option>
+              <option value="uni_pc_bh2">UniPC BH2</option>
+            </select>
+
+            <label for="fd-scheduler" class="two-col-label">Scheduler</label>
+            <select
+              id="fd-scheduler"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.scheduler}
+              class="two-col-input"
+            >
+              <option value="simple">Simple</option>
+              <option value="normal">Normal</option>
+              <option value="karras">Karras</option>
+              <option value="exponential">Exponential</option>
+              <option value="sgm_uniform">SGM Uniform</option>
+              <option value="ddim_uniform">DDIM Uniform</option>
+              <option value="beta">Beta</option>
+            </select>
+
+            <label for="fd-denoise" class="two-col-label">Denoise</label>
+            <input
+              id="fd-denoise"
+              type="number"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.denoise}
+              min="0"
+              max="1"
+              step="0.05"
+              class="two-col-input"
+            />
+
+            <label for="fd-vae" class="two-col-label">VAE</label>
+            <select
+              id="fd-vae"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.selectedVae}
+              class="two-col-input-wide"
+            >
+              <option value="__embedded__">{m['settingsDialog.useEmbeddedVae']()}</option>
+              {#each availableVaes as vae}
+                <option value={vae}>{vae}</option>
+              {/each}
+            </select>
+          {/if}
         {/if}
       </div>
 

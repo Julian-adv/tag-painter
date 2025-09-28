@@ -4,6 +4,7 @@
 
 import { qwenWorkflowPrompt } from './qwenWorkflow'
 import { FINAL_SAVE_NODE_ID } from './workflow'
+import { DEFAULT_FACE_DETAILER_SETTINGS } from '$lib/constants'
 import {
   expandCustomTags,
   cleanDirectivesFromTags,
@@ -180,9 +181,12 @@ export async function generateQwenImage(
 
     // Configure FaceDetailer if enabled
     if (promptsData.useFaceDetailer && workflow['56']) {
+      // Get FaceDetailer settings from per-model configuration
+      const faceDetailerSettings = modelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
+
       // Set FaceDetailer checkpoint model
       if (workflow['71']) {
-        workflow['71'].inputs.ckpt_name = 'zenijiMixKIllust_v10.safetensors'
+        workflow['71'].inputs.ckpt_name = faceDetailerSettings.checkpoint
       }
 
       // Configure FaceDetailer text prompts (use same prompts as main generation)
@@ -195,10 +199,11 @@ export async function generateQwenImage(
 
       // Configure FaceDetailer generation settings
       workflow['56'].inputs.seed = appliedSeed + 1
-      workflow['56'].inputs.steps = appliedSettings.steps + 20
-      workflow['56'].inputs.cfg = appliedSettings.cfgScale
-      workflow['56'].inputs.sampler_name = appliedSettings.sampler
-      workflow['56'].inputs.scheduler = scheduler
+      workflow['56'].inputs.steps = faceDetailerSettings.steps
+      workflow['56'].inputs.cfg = faceDetailerSettings.cfgScale
+      workflow['56'].inputs.sampler_name = faceDetailerSettings.sampler
+      workflow['56'].inputs.scheduler = faceDetailerSettings.scheduler
+      workflow['56'].inputs.denoise = faceDetailerSettings.denoise
     }
 
     // Configure final save node based on FaceDetailer usage

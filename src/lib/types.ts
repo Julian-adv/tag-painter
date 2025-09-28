@@ -29,6 +29,16 @@ export interface LoraWithWeight {
 
 export type ModelType = 'sdxl' | 'qwen'
 
+export interface FaceDetailerSettings {
+  checkpoint: string
+  steps: number
+  cfgScale: number
+  sampler: string
+  scheduler: string
+  denoise: number
+  selectedVae: string
+}
+
 export interface ModelSettings {
   qualityPrefix: string
   negativePrefix: string
@@ -40,6 +50,7 @@ export interface ModelSettings {
   selectedVae: string
   clipSkip: number
   modelType: ModelType
+  faceDetailer: FaceDetailerSettings
 }
 
 export interface Settings {
