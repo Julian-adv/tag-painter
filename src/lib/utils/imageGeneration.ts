@@ -9,6 +9,7 @@ import {
   generateLoraChain,
   configureClipSkip
 } from './workflow'
+import { DEFAULT_FACE_DETAILER_SETTINGS } from '$lib/constants'
 import { generateQwenImage } from './qwenImageGeneration'
 import {
   generateClientId,
@@ -236,13 +237,8 @@ export async function generateImage(options: GenerationOptions): Promise<{
       if (isAll) {
         zone2TagsText = ''
       }
-      // Set face detailer wildcard with appropriate prompts
-      const combinedZonePrompt = isAll
-        ? zone1TagsText
-        : zone1TagsText && zone2TagsText
-          ? `[ASC] ${zone1TagsText} [SEP] ${zone2TagsText}`
-          : zone1TagsText || zone2TagsText
-      workflow['56'].inputs.wildcard = combinedZonePrompt
+      // Clear face detailer wildcard since we use separate conditioning
+      workflow['56'].inputs.wildcard = ''
 
       // Assign prompts to different nodes
       workflow['12'].inputs.text = allTagsText // All tags
@@ -293,6 +289,35 @@ export async function generateImage(options: GenerationOptions): Promise<{
 
     // Add SaveImageWebsocket node for output
     addSaveImageWebsocketNode(workflow, promptsData, isInpainting)
+
+    // Configure FaceDetailer text prompts and wildcard if enabled
+    if (promptsData.useFaceDetailer) {
+      // Set face detailer wildcard with appropriate prompts
+      const isAllComposition = promptsData.selectedComposition === 'all'
+      const combinedZonePrompt = isAllComposition
+        ? zone1TagsText
+        : zone1TagsText && zone2TagsText
+          ? `[ASC] ${zone1TagsText} [SEP] ${zone2TagsText}`
+          : zone1TagsText || zone2TagsText
+
+      // Set wildcard for all FaceDetailer nodes
+      if (workflow['56']) {
+        workflow['56'].inputs.wildcard = combinedZonePrompt
+      }
+      if (workflow['69']) {
+        workflow['69'].inputs.wildcard = combinedZonePrompt
+      }
+
+      // Configure FaceDetailer text prompts for separate conditioning
+      const combinedPrompt = isAllComposition
+        ? allTagsText
+        : allTagsText && (zone1TagsText || zone2TagsText)
+          ? `${allTagsText}, ${zone1TagsText || ''}${zone2TagsText ? (zone1TagsText ? ', ' : '') + zone2TagsText : ''}`
+          : allTagsText || zone1TagsText || zone2TagsText
+
+      workflow['101'].inputs.text = combinedPrompt // Positive prompt for FaceDetailer
+      workflow['103'].inputs.text = negativeTagsText // Negative prompt for FaceDetailer
+    }
 
     // Update mask file in workflow if provided
     if (maskFilePath) {
@@ -396,8 +421,44 @@ function configureWorkflow(
     }
 
     if (promptsData.useFaceDetailer) {
-      // Face detailer nodes are already in the workflow (56, 69)
-      // They are enabled by default in this workflow
+      // Configure FaceDetailer with per-model settings
+      const effectiveModel = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
+      const faceDetailerSettings = effectiveModel?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
+
+      // Set FaceDetailer checkpoint model
+      if (workflow['100']) {
+        workflow['100'].inputs.ckpt_name = faceDetailerSettings.checkpoint
+      }
+
+      // Configure FaceDetailer generation settings for all FaceDetailer nodes
+      if (workflow['56']) {
+        workflow['56'].inputs.steps = faceDetailerSettings.steps
+        workflow['56'].inputs.cfg = faceDetailerSettings.cfgScale
+        workflow['56'].inputs.sampler_name = faceDetailerSettings.sampler
+        workflow['56'].inputs.scheduler = faceDetailerSettings.scheduler
+        workflow['56'].inputs.denoise = faceDetailerSettings.denoise
+
+        // Configure VAE
+        if (faceDetailerSettings.selectedVae === '__embedded__') {
+          workflow['56'].inputs.vae = ['100', 2] // Use embedded VAE from FaceDetailer checkpoint
+        } else {
+          workflow['56'].inputs.vae = ['5', 0] // Use main VAE
+        }
+      }
+      if (workflow['69']) {
+        workflow['69'].inputs.steps = faceDetailerSettings.steps
+        workflow['69'].inputs.cfg = faceDetailerSettings.cfgScale
+        workflow['69'].inputs.sampler_name = faceDetailerSettings.sampler
+        workflow['69'].inputs.scheduler = faceDetailerSettings.scheduler
+        workflow['69'].inputs.denoise = faceDetailerSettings.denoise
+
+        // Configure VAE
+        if (faceDetailerSettings.selectedVae === '__embedded__') {
+          workflow['69'].inputs.vae = ['100', 2] // Use embedded VAE from FaceDetailer checkpoint
+        } else {
+          workflow['69'].inputs.vae = ['5', 0] // Use main VAE
+        }
+      }
     }
   }
 }

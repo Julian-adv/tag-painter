@@ -102,7 +102,8 @@ function updateLoraReferences(
   clipSkipNodeId?: string
 ) {
   // Update all nodes that were referencing '85' to use the target node
-  const nodesToUpdate = ['10', '12', '13', '18', '51', '56', '69']
+  // Note: FaceDetailer nodes (56, 69) are excluded as they use separate checkpoint
+  const nodesToUpdate = ['10', '12', '13', '18', '51']
 
   nodesToUpdate.forEach((nodeId) => {
     if (workflow[nodeId] && workflow[nodeId].inputs) {
@@ -279,11 +280,11 @@ export const inpaintingWorkflowPrompt = {
       tiled_encode: false,
       tiled_decode: false,
       image: ['102', 0],
-      model: ['11', 0],
-      clip: ['11', 1],
-      vae: ['11', 2],
-      positive: ['12', 0],
-      negative: ['18', 0],
+      model: ['100', 0],
+      clip: ['100', 1],
+      vae: ['100', 2],
+      positive: ['101', 0],
+      negative: ['103', 0],
       bbox_detector: ['57', 0],
       sam_model_opt: ['58', 0],
       segm_detector_opt: ['59', 1]
@@ -561,11 +562,11 @@ export const defaultWorkflowPrompt = {
       tiled_encode: false,
       tiled_decode: false,
       image: ['19', 0],
-      model: ['85', 0],
-      clip: ['85', 1],
-      vae: ['11', 2],
-      positive: ['12', 0],
-      negative: ['18', 0],
+      model: ['100', 0],
+      clip: ['100', 1],
+      vae: ['100', 2],
+      positive: ['101', 0],
+      negative: ['103', 0],
       bbox_detector: ['57', 0],
       sam_model_opt: ['58', 0],
       segm_detector_opt: ['59', 1]
@@ -653,11 +654,11 @@ export const defaultWorkflowPrompt = {
       tiled_encode: false,
       tiled_decode: false,
       image: ['64', 0],
-      model: ['85', 0],
-      clip: ['85', 1],
-      vae: ['11', 2],
-      positive: ['12', 0],
-      negative: ['18', 0],
+      model: ['100', 0],
+      clip: ['100', 1],
+      vae: ['100', 2],
+      positive: ['101', 0],
+      negative: ['103', 0],
       bbox_detector: ['57', 0],
       sam_model_opt: ['58', 0],
       segm_detector_opt: ['59', 1]
@@ -693,6 +694,35 @@ export const defaultWorkflowPrompt = {
     class_type: 'InvertMask',
     _meta: {
       title: 'InvertMask'
+    }
+  },
+  '100': {
+    inputs: {
+      ckpt_name: 'zenijiMixKIllust_v10.safetensors'
+    },
+    class_type: 'CheckpointLoaderSimple',
+    _meta: {
+      title: 'FaceDetailer Checkpoint Loader'
+    }
+  },
+  '101': {
+    inputs: {
+      clip: ['100', 1],
+      text: ''
+    },
+    class_type: 'CLIPTextEncode',
+    _meta: {
+      title: 'FaceDetailer CLIP Text Encode (Positive)'
+    }
+  },
+  '103': {
+    inputs: {
+      clip: ['100', 1],
+      text: ''
+    },
+    class_type: 'CLIPTextEncode',
+    _meta: {
+      title: 'FaceDetailer CLIP Text Encode (Negative)'
     }
   }
 }
