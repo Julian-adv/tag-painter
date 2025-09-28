@@ -7,7 +7,7 @@
 // - Image list retrieval
 
 import type { Settings, PromptsData } from '$lib/types'
-import { DEFAULT_FACE_DETAILER_SETTINGS } from '$lib/constants'
+import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
 
 export async function savePrompts(data: PromptsData): Promise<void> {
   try {
@@ -149,6 +149,12 @@ export async function loadSettings(): Promise<Settings | null> {
             settings.perModel[key] = {
               ...modelSettings,
               faceDetailer: { ...DEFAULT_FACE_DETAILER_SETTINGS }
+            }
+          }
+          if (!modelSettings.upscale) {
+            settings.perModel[key] = {
+              ...modelSettings,
+              upscale: { ...DEFAULT_UPSCALE_SETTINGS }
             }
           }
         }

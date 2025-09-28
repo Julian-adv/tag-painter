@@ -14,6 +14,16 @@ export const DEFAULT_FACE_DETAILER_SETTINGS = {
   selectedVae: '__embedded__'
 } as const
 
+export const DEFAULT_UPSCALE_SETTINGS = {
+  checkpoint: 'model.safetensors',
+  scale: 1.5,
+  steps: 15,
+  cfgScale: 4.5,
+  sampler: 'euler_ancestral',
+  scheduler: 'simple',
+  denoise: 0.5
+} as const
+
 // Placeholder pattern used for __name__ style tags (non-greedy to avoid merging adjacent placeholders)
 // Whitespace is intentionally excluded so markers like "__ __" are treated as plain text.
 export const PLACEHOLDER_RE_SOURCE = '__([\\p{L}\\p{N}_\\-/]+?)__'

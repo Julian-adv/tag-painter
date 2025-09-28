@@ -4,9 +4,11 @@
   import LoraSelector from './LoraSelector.svelte'
   import { promptsData } from './stores/promptsStore'
   import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
+  import SamplerSelector from './SamplerSelector.svelte'
+  import SchedulerSelector from './SchedulerSelector.svelte'
   import { m } from '$lib/paraglide/messages'
   import { locales, baseLocale } from '$lib/paraglide/runtime.js'
-  import { DEFAULT_FACE_DETAILER_SETTINGS } from '$lib/constants'
+  import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
 
   interface Props {
     show: boolean
@@ -108,6 +110,7 @@
   let availableCheckpoints: string[] = $state([])
   let selectedModelKey: string = $state('Default')
 
+
   function ensureModelEntry(key: string) {
     if (localSettings.perModel[key]) {
       return
@@ -127,7 +130,8 @@
           selectedVae: localSettings.selectedVae,
           clipSkip: localSettings.clipSkip,
           modelType: 'sdxl',
-          faceDetailer: { ...DEFAULT_FACE_DETAILER_SETTINGS }
+          faceDetailer: { ...DEFAULT_FACE_DETAILER_SETTINGS },
+          upscale: { ...DEFAULT_UPSCALE_SETTINGS }
         }
       }
     }
@@ -498,49 +502,18 @@
             />
 
             <label for="fd-sampler" class="two-col-label">{m['settingsDialog.faceDetailerSampler']()}</label>
-            <select
+            <SamplerSelector
               id="fd-sampler"
               bind:value={localSettings.perModel[selectedModelKey].faceDetailer.sampler}
               class="two-col-input"
-            >
-              <option value="euler">Euler</option>
-              <option value="euler_ancestral">Euler Ancestral</option>
-              <option value="heun">Heun</option>
-              <option value="heunpp2">Heun++2</option>
-              <option value="dpm_2">DPM 2</option>
-              <option value="dpm_2_ancestral">DPM 2 Ancestral</option>
-              <option value="lms">LMS</option>
-              <option value="dpm_fast">DPM Fast</option>
-              <option value="dpm_adaptive">DPM Adaptive</option>
-              <option value="dpmpp_2s_ancestral">DPM++ 2S Ancestral</option>
-              <option value="dpmpp_sde">DPM++ SDE</option>
-              <option value="dpmpp_sde_gpu">DPM++ SDE GPU</option>
-              <option value="dpmpp_2m">DPM++ 2M</option>
-              <option value="dpmpp_2m_sde">DPM++ 2M SDE</option>
-              <option value="dpmpp_2m_sde_gpu">DPM++ 2M SDE GPU</option>
-              <option value="dpmpp_3m_sde">DPM++ 3M SDE</option>
-              <option value="dpmpp_3m_sde_gpu">DPM++ 3M SDE GPU</option>
-              <option value="ddpm">DDPM</option>
-              <option value="lcm">LCM</option>
-              <option value="ddim">DDIM</option>
-              <option value="uni_pc">UniPC</option>
-              <option value="uni_pc_bh2">UniPC BH2</option>
-            </select>
+            />
 
             <label for="fd-scheduler" class="two-col-label">{m['settingsDialog.faceDetailerScheduler']()}</label>
-            <select
+            <SchedulerSelector
               id="fd-scheduler"
               bind:value={localSettings.perModel[selectedModelKey].faceDetailer.scheduler}
               class="two-col-input"
-            >
-              <option value="simple">Simple</option>
-              <option value="normal">Normal</option>
-              <option value="karras">Karras</option>
-              <option value="exponential">Exponential</option>
-              <option value="sgm_uniform">SGM Uniform</option>
-              <option value="ddim_uniform">DDIM Uniform</option>
-              <option value="beta">Beta</option>
-            </select>
+            />
 
             <label for="fd-denoise" class="two-col-label">{m['settingsDialog.faceDetailerDenoise']()}</label>
             <input
@@ -564,6 +537,82 @@
                 <option value={vae}>{vae}</option>
               {/each}
             </select>
+
+            <!-- Upscale Settings -->
+            <div
+              class="section-title"
+              style="grid-column: 1 / 4; font-weight: 600; color: #333; text-align: left; justify-self: start; margin-top: 16px;"
+            >
+              {m['settingsDialog.upscaleTitle']()}
+            </div>
+
+            <label for="us-checkpoint" class="two-col-label">{m['settingsDialog.upscaleCheckpoint']()}</label>
+            <select
+              id="us-checkpoint"
+              class="two-col-input-wide"
+              bind:value={localSettings.perModel[selectedModelKey].upscale.checkpoint}
+            >
+              {#each availableCheckpoints as checkpoint}
+                <option value={checkpoint}>{checkpoint}</option>
+              {/each}
+            </select>
+
+            <label for="us-scale" class="two-col-label">{m['settingsDialog.upscaleScale']()}</label>
+            <input
+              id="us-scale"
+              type="number"
+              bind:value={localSettings.perModel[selectedModelKey].upscale.scale}
+              min="1.0"
+              max="4.0"
+              step="0.1"
+              class="two-col-input"
+            />
+
+            <label for="us-steps" class="two-col-label">{m['settingsDialog.upscaleSteps']()}</label>
+            <input
+              id="us-steps"
+              type="number"
+              bind:value={localSettings.perModel[selectedModelKey].upscale.steps}
+              min="1"
+              max="150"
+              class="two-col-input"
+            />
+
+            <label for="us-cfg" class="two-col-label">{m['settingsDialog.upscaleCfgScale']()}</label>
+            <input
+              id="us-cfg"
+              type="number"
+              bind:value={localSettings.perModel[selectedModelKey].upscale.cfgScale}
+              min="1"
+              max="20"
+              step="0.1"
+              class="two-col-input"
+            />
+
+            <label for="us-sampler" class="two-col-label">{m['settingsDialog.upscaleSampler']()}</label>
+            <SamplerSelector
+              id="us-sampler"
+              bind:value={localSettings.perModel[selectedModelKey].upscale.sampler}
+              class="two-col-input-wide"
+            />
+
+            <label for="us-scheduler" class="two-col-label">{m['settingsDialog.upscaleScheduler']()}</label>
+            <SchedulerSelector
+              id="us-scheduler"
+              bind:value={localSettings.perModel[selectedModelKey].upscale.scheduler}
+              class="two-col-input-wide"
+            />
+
+            <label for="us-denoise" class="two-col-label">{m['settingsDialog.upscaleDenoise']()}</label>
+            <input
+              id="us-denoise"
+              type="number"
+              bind:value={localSettings.perModel[selectedModelKey].upscale.denoise}
+              min="0"
+              max="1"
+              step="0.05"
+              class="two-col-input"
+            />
           {/if}
         {/if}
       </div>

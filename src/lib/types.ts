@@ -39,6 +39,16 @@ export interface FaceDetailerSettings {
   selectedVae: string
 }
 
+export interface UpscaleSettings {
+  checkpoint: string
+  scale: number
+  steps: number
+  cfgScale: number
+  sampler: string
+  scheduler: string
+  denoise: number
+}
+
 export interface ModelSettings {
   qualityPrefix: string
   negativePrefix: string
@@ -51,6 +61,7 @@ export interface ModelSettings {
   clipSkip: number
   modelType: ModelType
   faceDetailer: FaceDetailerSettings
+  upscale: UpscaleSettings
 }
 
 export interface Settings {

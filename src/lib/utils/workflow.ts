@@ -102,7 +102,7 @@ function updateLoraReferences(
   clipSkipNodeId?: string
 ) {
   // Update all nodes that were referencing '85' to use the target node
-  // Note: FaceDetailer nodes (56, 69) are excluded as they use separate checkpoint
+  // Note: FaceDetailer nodes (56, 69) and upscale nodes (121) are excluded as they use separate checkpoints
   const nodesToUpdate = ['10', '12', '13', '18', '51']
 
   nodesToUpdate.forEach((nodeId) => {
@@ -604,23 +604,64 @@ export const defaultWorkflowPrompt = {
       title: 'UltralyticsDetectorProvider'
     }
   },
-  '64': {
+  '120': {
     inputs: {
-      upscale_model: ['65', 0],
-      image: ['19', 0]
+      upscale_method: 'nearest-exact',
+      width: 1248,
+      height: 1824,
+      crop: 'disabled',
+      samples: ['14', 1]
     },
-    class_type: 'ImageUpscaleWithModel',
+    class_type: 'LatentUpscale',
     _meta: {
-      title: 'Upscale Image (using Model)'
+      title: 'Latent Upscale'
     }
   },
-  '65': {
+  '121': {
     inputs: {
-      model_name: '4x_foolhardy_Remacri.pt'
+      seed: 12345,
+      steps: 20,
+      cfg: 4.5,
+      sampler_name: 'euler_ancestral',
+      scheduler: 'simple',
+      denoise: 0.5,
+      model: ['122', 0],
+      positive: ['123', 0],
+      negative: ['124', 0],
+      latent_image: ['120', 0]
     },
-    class_type: 'UpscaleModelLoader',
+    class_type: 'KSampler',
     _meta: {
-      title: 'Load Upscale Model'
+      title: 'KSampler (Upscale)'
+    }
+  },
+  '122': {
+    inputs: {
+      ckpt_name: 'model.safetensors'
+    },
+    class_type: 'CheckpointLoaderSimple',
+    _meta: {
+      title: 'Upscale Checkpoint Loader'
+    }
+  },
+  '123': {
+    inputs: {
+      clip: ['122', 1],
+      text: ''
+    },
+    class_type: 'CLIPTextEncode',
+    _meta: {
+      title: 'Upscale CLIP Text Encode (Positive)'
+    }
+  },
+  '124': {
+    inputs: {
+      clip: ['122', 1],
+      text: ''
+    },
+    class_type: 'CLIPTextEncode',
+    _meta: {
+      title: 'Upscale CLIP Text Encode (Negative)'
     }
   },
   '69': {
@@ -653,7 +694,7 @@ export const defaultWorkflowPrompt = {
       noise_mask_feather: 20,
       tiled_encode: false,
       tiled_decode: false,
-      image: ['64', 0],
+      image: ['19', 0],
       model: ['100', 0],
       clip: ['100', 1],
       vae: ['100', 2],

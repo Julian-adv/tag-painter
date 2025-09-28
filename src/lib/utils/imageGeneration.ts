@@ -9,7 +9,7 @@ import {
   generateLoraChain,
   configureClipSkip
 } from './workflow'
-import { DEFAULT_FACE_DETAILER_SETTINGS } from '$lib/constants'
+import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
 import { generateQwenImage } from './qwenImageGeneration'
 import {
   generateClientId,
@@ -290,6 +290,23 @@ export async function generateImage(options: GenerationOptions): Promise<{
     // Add SaveImageWebsocket node for output
     addSaveImageWebsocketNode(workflow, promptsData, isInpainting)
 
+    // Configure upscale text prompts if enabled
+    if (promptsData.useUpscale) {
+      const isAllComposition = promptsData.selectedComposition === 'all'
+      const combinedPrompt = isAllComposition
+        ? allTagsText
+        : allTagsText && (zone1TagsText || zone2TagsText)
+          ? `${allTagsText}, ${zone1TagsText || ''}${zone2TagsText ? (zone1TagsText ? ', ' : '') + zone2TagsText : ''}`
+          : allTagsText || zone1TagsText || zone2TagsText
+
+      if (workflow['123']) {
+        workflow['123'].inputs.text = combinedPrompt // Positive prompt for upscale
+      }
+      if (workflow['124']) {
+        workflow['124'].inputs.text = negativeTagsText // Negative prompt for upscale
+      }
+    }
+
     // Configure FaceDetailer text prompts and wildcard if enabled
     if (promptsData.useFaceDetailer) {
       // Set face detailer wildcard with appropriate prompts
@@ -414,9 +431,28 @@ function configureWorkflow(
 
     // Configure optional features
     if (promptsData.useUpscale) {
-      // Enable upscale nodes if they exist
-      if (workflow['64']) {
-        // Upscale is handled by ImageUpscaleWithModel node
+      // Configure latent upscale workflow
+      if (workflow['120'] && workflow['121'] && workflow['122']) {
+        // Get upscale settings
+        const effectiveModel = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
+        const upscaleSettings = effectiveModel?.upscale || DEFAULT_UPSCALE_SETTINGS
+
+        // Configure LatentUpscale dimensions (use scale from settings)
+        workflow['120'].inputs.width = Math.round(settings.imageWidth * upscaleSettings.scale)
+        workflow['120'].inputs.height = Math.round(settings.imageHeight * upscaleSettings.scale)
+
+        // Configure upscale checkpoint
+        workflow['122'].inputs.ckpt_name = upscaleSettings.checkpoint
+
+        // Configure upscale KSampler
+        workflow['121'].inputs.steps = upscaleSettings.steps
+        workflow['121'].inputs.cfg = upscaleSettings.cfgScale
+        workflow['121'].inputs.sampler_name = upscaleSettings.sampler
+        workflow['121'].inputs.scheduler = upscaleSettings.scheduler
+        workflow['121'].inputs.denoise = upscaleSettings.denoise
+
+        // Change VAEDecode to use upscale KSampler output
+        workflow['19'].inputs.samples = ['121', 0]
       }
     }
 
@@ -553,7 +589,7 @@ function addSaveImageWebsocketNode(
       imageSourceNodeId = '69' // Output of second FaceDetailer after upscale
     } else {
       // Upscale=true, FaceDetailer=false
-      imageSourceNodeId = '64' // Output of ImageUpscaleWithModel
+      imageSourceNodeId = '19' // Output of VAE Decode (from upscale KSampler)
     }
   } else {
     // Upscale=false
