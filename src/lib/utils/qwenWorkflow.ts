@@ -106,11 +106,11 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
       guide_size_for: true,
       max_size: 1536,
       seed: 0,
-      steps: 8,
-      cfg: 1.5,
+      steps: 28,
+      cfg: 4.5,
       sampler_name: 'euler_ancestral',
       scheduler: 'simple',
-      denoise: 0.1,
+      denoise: 0.75,
       feather: 5,
       noise_mask: true,
       force_inpaint: true,
@@ -131,11 +131,11 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
       tiled_encode: false,
       tiled_decode: false,
       image: ['8', 0],
-      model: ['66', 0],
-      clip: ['38', 0],
-      vae: ['39', 0],
-      positive: ['6', 0],
-      negative: ['7', 0],
+      model: ['71', 0],
+      clip: ['71', 1],
+      vae: ['71', 2],
+      positive: ['73', 0],
+      negative: ['74', 0],
       bbox_detector: ['57', 0],
       sam_model_opt: ['58', 0],
       segm_detector_opt: ['59', 1]
@@ -171,6 +171,35 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
     class_type: 'UltralyticsDetectorProvider',
     _meta: {
       title: 'UltralyticsDetectorProvider'
+    }
+  },
+  '71': {
+    inputs: {
+      ckpt_name: 'zenijiMixKIllust_v10.safetensors'
+    },
+    class_type: 'CheckpointLoaderSimple',
+    _meta: {
+      title: 'FaceDetailer Checkpoint Loader'
+    }
+  },
+  '73': {
+    inputs: {
+      clip: ['71', 1],
+      text: ''
+    },
+    class_type: 'CLIPTextEncode',
+    _meta: {
+      title: 'FaceDetailer CLIP Text Encode (Positive)'
+    }
+  },
+  '74': {
+    inputs: {
+      clip: ['71', 1],
+      text: ''
+    },
+    class_type: 'CLIPTextEncode',
+    _meta: {
+      title: 'FaceDetailer CLIP Text Encode (Negative)'
     }
   }
 }

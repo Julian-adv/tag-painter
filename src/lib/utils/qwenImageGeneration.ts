@@ -180,8 +180,22 @@ export async function generateQwenImage(
 
     // Configure FaceDetailer if enabled
     if (promptsData.useFaceDetailer && workflow['56']) {
+      // Set FaceDetailer checkpoint model
+      if (workflow['71']) {
+        workflow['71'].inputs.ckpt_name = 'zenijiMixKIllust_v10.safetensors'
+      }
+
+      // Configure FaceDetailer text prompts (use same prompts as main generation)
+      if (workflow['73']) {
+        workflow['73'].inputs.text = allTagsText
+      }
+      if (workflow['74']) {
+        workflow['74'].inputs.text = negativeTagsText
+      }
+
+      // Configure FaceDetailer generation settings
       workflow['56'].inputs.seed = appliedSeed + 1
-      workflow['56'].inputs.steps = appliedSettings.steps
+      workflow['56'].inputs.steps = appliedSettings.steps + 20
       workflow['56'].inputs.cfg = appliedSettings.cfgScale
       workflow['56'].inputs.sampler_name = appliedSettings.sampler
       workflow['56'].inputs.scheduler = scheduler
