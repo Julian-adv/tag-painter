@@ -15,13 +15,14 @@ export const DEFAULT_FACE_DETAILER_SETTINGS = {
 } as const
 
 export const DEFAULT_UPSCALE_SETTINGS = {
-  checkpoint: 'model.safetensors',
+  checkpoint: 'zenijiMixKIllust_v10.safetensors',
   scale: 1.5,
   steps: 15,
   cfgScale: 4.5,
   sampler: 'euler_ancestral',
   scheduler: 'simple',
-  denoise: 0.5
+  denoise: 0.5,
+  selectedVae: '__embedded__'
 } as const
 
 // Placeholder pattern used for __name__ style tags (non-greedy to avoid merging adjacent placeholders)

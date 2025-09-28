@@ -4,7 +4,7 @@
 
 import { qwenWorkflowPrompt } from './qwenWorkflow'
 import { FINAL_SAVE_NODE_ID } from './workflow'
-import { DEFAULT_FACE_DETAILER_SETTINGS } from '$lib/constants'
+import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
 import {
   expandCustomTags,
   cleanDirectivesFromTags,
@@ -204,10 +204,72 @@ export async function generateQwenImage(
       workflow['56'].inputs.sampler_name = faceDetailerSettings.sampler
       workflow['56'].inputs.scheduler = faceDetailerSettings.scheduler
       workflow['56'].inputs.denoise = faceDetailerSettings.denoise
+
+      // Set FaceDetailer input image based on upscale usage
+      if (promptsData.useUpscale) {
+        // Use upscaled image from Node 126
+        workflow['56'].inputs.image = ['126', 0]
+      } else {
+        // Use original Qwen image from Node 8
+        workflow['56'].inputs.image = ['8', 0]
+      }
     }
 
-    // Configure final save node based on FaceDetailer usage
-    const imageSourceNodeId = promptsData.useFaceDetailer ? '56' : '8'
+    // Configure upscale if enabled
+    if (promptsData.useUpscale) {
+      // Get upscale settings from per-model configuration
+      const upscaleSettings = modelSettings?.upscale || DEFAULT_UPSCALE_SETTINGS
+
+      // Configure SDXL VAE Encode (convert Qwen image to SDXL latent)
+      // Node 120: VAEEncode uses Node 8 (Qwen VAEDecode) and Node 127 (SDXL VAE)
+
+      // Configure LatentUpscale dimensions (use scale from settings)
+      workflow['121'].inputs.width = Math.round(appliedSettings.imageWidth * upscaleSettings.scale)
+      workflow['121'].inputs.height = Math.round(appliedSettings.imageHeight * upscaleSettings.scale)
+
+      // Configure upscale checkpoint
+      workflow['123'].inputs.ckpt_name = upscaleSettings.checkpoint
+
+      // Configure Node 120 VAE input based on selectedVae setting
+      if (upscaleSettings.selectedVae === '__embedded__') {
+        // Use embedded VAE from checkpoint (Node 123)
+        workflow['120'].inputs.vae = ['123', 2]
+      } else {
+        // Use separate VAE loader (Node 127)
+        workflow['120'].inputs.vae = ['127', 0]
+
+        // Configure upscale VAE name only when using separate VAE loader
+        const upscaleVaeName = upscaleSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
+        workflow['127'].inputs.vae_name = upscaleVaeName
+      }
+
+      // Configure upscale KSampler
+      workflow['122'].inputs.steps = upscaleSettings.steps
+      workflow['122'].inputs.cfg = upscaleSettings.cfgScale
+      workflow['122'].inputs.sampler_name = upscaleSettings.sampler
+      workflow['122'].inputs.scheduler = upscaleSettings.scheduler
+      workflow['122'].inputs.denoise = upscaleSettings.denoise
+
+      // Configure upscale text prompts
+      workflow['124'].inputs.text = allTagsText // Positive prompt for upscale
+      workflow['125'].inputs.text = negativeTagsText // Negative prompt for upscale
+    }
+
+    // Configure final save node based on upscale and FaceDetailer usage
+    let imageSourceNodeId: string
+    if (promptsData.useUpscale) {
+      if (promptsData.useFaceDetailer) {
+        // Upscale=true, FaceDetailer=true
+        imageSourceNodeId = '56' // Output of FaceDetailer (receives upscaled image from Node 126)
+      } else {
+        // Upscale=true, FaceDetailer=false
+        imageSourceNodeId = '126' // Output of upscale VAEDecode
+      }
+    } else {
+      // Upscale=false
+      imageSourceNodeId = promptsData.useFaceDetailer ? '56' : '8'
+    }
+
     workflow[FINAL_SAVE_NODE_ID] = {
       inputs: { images: [imageSourceNodeId, 0] },
       class_type: 'SaveImageWebsocket',
