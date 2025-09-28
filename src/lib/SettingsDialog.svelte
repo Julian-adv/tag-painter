@@ -458,13 +458,13 @@
           <!-- FaceDetailer Settings -->
           <div
             class="section-title"
-            style="grid-column: 1 / 4; font-weight: 600; color: #333; text-align: left; justify-self: start; margin-top: 16px; border-top: 1px solid #e0e0e0; padding-top: 16px;"
+            style="grid-column: 1 / 4; font-weight: 600; color: #333; text-align: left; justify-self: start; margin-top: 16px;"
           >
-            FaceDetailer Settings
+            {m['settingsDialog.faceDetailerTitle']()}
           </div>
 
           {#if localSettings.perModel[selectedModelKey]}
-            <label for="fd-checkpoint" class="two-col-label">Checkpoint</label>
+            <label for="fd-checkpoint" class="two-col-label">{m['settingsDialog.faceDetailerCheckpoint']()}</label>
             <select
               id="fd-checkpoint"
               class="two-col-input-wide"
@@ -475,7 +475,7 @@
               {/each}
             </select>
 
-            <label for="fd-steps" class="two-col-label">Steps</label>
+            <label for="fd-steps" class="two-col-label">{m['settingsDialog.faceDetailerSteps']()}</label>
             <input
               id="fd-steps"
               type="number"
@@ -486,7 +486,7 @@
               class="two-col-input"
             />
 
-            <label for="fd-cfg" class="two-col-label">CFG Scale</label>
+            <label for="fd-cfg" class="two-col-label">{m['settingsDialog.faceDetailerCfgScale']()}</label>
             <input
               id="fd-cfg"
               type="number"
@@ -497,7 +497,7 @@
               class="two-col-input"
             />
 
-            <label for="fd-sampler" class="two-col-label">Sampler</label>
+            <label for="fd-sampler" class="two-col-label">{m['settingsDialog.faceDetailerSampler']()}</label>
             <select
               id="fd-sampler"
               bind:value={localSettings.perModel[selectedModelKey].faceDetailer.sampler}
@@ -527,7 +527,7 @@
               <option value="uni_pc_bh2">UniPC BH2</option>
             </select>
 
-            <label for="fd-scheduler" class="two-col-label">Scheduler</label>
+            <label for="fd-scheduler" class="two-col-label">{m['settingsDialog.faceDetailerScheduler']()}</label>
             <select
               id="fd-scheduler"
               bind:value={localSettings.perModel[selectedModelKey].faceDetailer.scheduler}
@@ -542,7 +542,7 @@
               <option value="beta">Beta</option>
             </select>
 
-            <label for="fd-denoise" class="two-col-label">Denoise</label>
+            <label for="fd-denoise" class="two-col-label">{m['settingsDialog.faceDetailerDenoise']()}</label>
             <input
               id="fd-denoise"
               type="number"
@@ -553,7 +553,7 @@
               class="two-col-input"
             />
 
-            <label for="fd-vae" class="two-col-label">VAE</label>
+            <label for="fd-vae" class="two-col-label">{m['settingsDialog.faceDetailerVae']()}</label>
             <select
               id="fd-vae"
               bind:value={localSettings.perModel[selectedModelKey].faceDetailer.selectedVae}
