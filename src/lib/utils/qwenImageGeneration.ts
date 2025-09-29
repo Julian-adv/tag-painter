@@ -7,6 +7,7 @@ import { FINAL_SAVE_NODE_ID } from './workflow'
 import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
 import {
   expandCustomTags,
+  detectCompositionFromTags,
   cleanDirectivesFromTags,
   prefetchWildcardFilesFromTexts
 } from './tagExpansion'
@@ -119,6 +120,15 @@ export async function generateQwenImage(
     ])
 
     const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll)
+
+    // Detect composition from expanded 'all' tags and propagate to store/UI
+    const detectedComposition = detectCompositionFromTags([allResult.expandedText])
+    if (detectedComposition) {
+      console.log(`Auto-selecting composition: ${detectedComposition}`)
+      updateComposition(detectedComposition)
+      // Keep promptsData in sync for this generation
+      promptsData.selectedComposition = detectedComposition
+    }
 
     const zone1Result = expandCustomTags(
       wildcardZones.zone1,
