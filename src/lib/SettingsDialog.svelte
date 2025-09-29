@@ -110,7 +110,6 @@
   let availableCheckpoints: string[] = $state([])
   let selectedModelKey: string = $state('Default')
 
-
   function ensureModelEntry(key: string) {
     if (localSettings.perModel[key]) {
       return
@@ -468,7 +467,9 @@
           </div>
 
           {#if localSettings.perModel[selectedModelKey]}
-            <label for="fd-checkpoint" class="two-col-label">{m['settingsDialog.faceDetailerCheckpoint']()}</label>
+            <label for="fd-checkpoint" class="two-col-label"
+              >{m['settingsDialog.faceDetailerCheckpoint']()}</label
+            >
             <select
               id="fd-checkpoint"
               class="two-col-input-wide"
@@ -479,7 +480,9 @@
               {/each}
             </select>
 
-            <label for="fd-steps" class="two-col-label">{m['settingsDialog.faceDetailerSteps']()}</label>
+            <label for="fd-steps" class="two-col-label"
+              >{m['settingsDialog.faceDetailerSteps']()}</label
+            >
             <input
               id="fd-steps"
               type="number"
@@ -490,7 +493,9 @@
               class="two-col-input"
             />
 
-            <label for="fd-cfg" class="two-col-label">{m['settingsDialog.faceDetailerCfgScale']()}</label>
+            <label for="fd-cfg" class="two-col-label"
+              >{m['settingsDialog.faceDetailerCfgScale']()}</label
+            >
             <input
               id="fd-cfg"
               type="number"
@@ -501,21 +506,27 @@
               class="two-col-input"
             />
 
-            <label for="fd-sampler" class="two-col-label">{m['settingsDialog.faceDetailerSampler']()}</label>
+            <label for="fd-sampler" class="two-col-label"
+              >{m['settingsDialog.faceDetailerSampler']()}</label
+            >
             <SamplerSelector
               id="fd-sampler"
               bind:value={localSettings.perModel[selectedModelKey].faceDetailer.sampler}
               class="two-col-input"
             />
 
-            <label for="fd-scheduler" class="two-col-label">{m['settingsDialog.faceDetailerScheduler']()}</label>
+            <label for="fd-scheduler" class="two-col-label"
+              >{m['settingsDialog.faceDetailerScheduler']()}</label
+            >
             <SchedulerSelector
               id="fd-scheduler"
               bind:value={localSettings.perModel[selectedModelKey].faceDetailer.scheduler}
               class="two-col-input"
             />
 
-            <label for="fd-denoise" class="two-col-label">{m['settingsDialog.faceDetailerDenoise']()}</label>
+            <label for="fd-denoise" class="two-col-label"
+              >{m['settingsDialog.faceDetailerDenoise']()}</label
+            >
             <input
               id="fd-denoise"
               type="number"
@@ -526,7 +537,8 @@
               class="two-col-input"
             />
 
-            <label for="fd-vae" class="two-col-label">{m['settingsDialog.faceDetailerVae']()}</label>
+            <label for="fd-vae" class="two-col-label">{m['settingsDialog.faceDetailerVae']()}</label
+            >
             <select
               id="fd-vae"
               bind:value={localSettings.perModel[selectedModelKey].faceDetailer.selectedVae}
@@ -546,7 +558,9 @@
               {m['settingsDialog.upscaleTitle']()}
             </div>
 
-            <label for="us-checkpoint" class="two-col-label">{m['settingsDialog.upscaleCheckpoint']()}</label>
+            <label for="us-checkpoint" class="two-col-label"
+              >{m['settingsDialog.upscaleCheckpoint']()}</label
+            >
             <select
               id="us-checkpoint"
               class="two-col-input-wide"
@@ -578,7 +592,8 @@
               class="two-col-input"
             />
 
-            <label for="us-cfg" class="two-col-label">{m['settingsDialog.upscaleCfgScale']()}</label>
+            <label for="us-cfg" class="two-col-label">{m['settingsDialog.upscaleCfgScale']()}</label
+            >
             <input
               id="us-cfg"
               type="number"
@@ -589,21 +604,27 @@
               class="two-col-input"
             />
 
-            <label for="us-sampler" class="two-col-label">{m['settingsDialog.upscaleSampler']()}</label>
+            <label for="us-sampler" class="two-col-label"
+              >{m['settingsDialog.upscaleSampler']()}</label
+            >
             <SamplerSelector
               id="us-sampler"
               bind:value={localSettings.perModel[selectedModelKey].upscale.sampler}
               class="two-col-input-wide"
             />
 
-            <label for="us-scheduler" class="two-col-label">{m['settingsDialog.upscaleScheduler']()}</label>
+            <label for="us-scheduler" class="two-col-label"
+              >{m['settingsDialog.upscaleScheduler']()}</label
+            >
             <SchedulerSelector
               id="us-scheduler"
               bind:value={localSettings.perModel[selectedModelKey].upscale.scheduler}
               class="two-col-input-wide"
             />
 
-            <label for="us-denoise" class="two-col-label">{m['settingsDialog.upscaleDenoise']()}</label>
+            <label for="us-denoise" class="two-col-label"
+              >{m['settingsDialog.upscaleDenoise']()}</label
+            >
             <input
               id="us-denoise"
               type="number"

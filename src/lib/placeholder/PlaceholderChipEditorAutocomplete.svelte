@@ -65,7 +65,13 @@
     const handleInput = () => updateSuggestions()
     const handleClick = () => updateSuggestions()
     const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Tab' || event.key === 'Enter' || event.key === 'Escape') {
+      if (
+        event.key === 'ArrowDown' ||
+        event.key === 'ArrowUp' ||
+        event.key === 'Tab' ||
+        event.key === 'Enter' ||
+        event.key === 'Escape'
+      ) {
         return
       }
       updateSuggestions()
@@ -177,7 +183,8 @@
     if (start === end) return null
 
     const word = textContent.slice(start, end)
-    const usingSpecial = !isChipName && specialTriggerPrefix !== '' && word.startsWith(specialTriggerPrefix)
+    const usingSpecial =
+      !isChipName && specialTriggerPrefix !== '' && word.startsWith(specialTriggerPrefix)
     const hasSpecialSuffix = usingSpecial && word.endsWith(specialTriggerPrefix)
 
     const context: SelectionContext = {
@@ -230,7 +237,11 @@
     if (node.nodeType === Node.TEXT_NODE) {
       const textNode = node as Text
       const parent = textNode.parentElement
-      if (parent && parent.closest('.placeholder-chip') && parent.classList.contains('chip-name') === false) {
+      if (
+        parent &&
+        parent.closest('.placeholder-chip') &&
+        parent.classList.contains('chip-name') === false
+      ) {
         return null
       }
       return { node: textNode }
@@ -247,7 +258,11 @@
     if (node.nodeType === Node.TEXT_NODE) {
       const textNode = node as Text
       const parent = textNode.parentElement
-      if (parent && parent.closest('.placeholder-chip') && parent.classList.contains('chip-name') === false) {
+      if (
+        parent &&
+        parent.closest('.placeholder-chip') &&
+        parent.classList.contains('chip-name') === false
+      ) {
         return null
       }
       return { node: textNode, length: textNode.textContent?.length ?? 0 }
@@ -284,7 +299,10 @@
       if (usingSpecial && specialTriggerPrefix) {
         searchTerm = searchTerm.slice(specialTriggerPrefix.length)
         if (hasClosing) {
-          searchTerm = searchTerm.slice(0, Math.max(0, searchTerm.length - specialTriggerPrefix.length))
+          searchTerm = searchTerm.slice(
+            0,
+            Math.max(0, searchTerm.length - specialTriggerPrefix.length)
+          )
         }
       }
 

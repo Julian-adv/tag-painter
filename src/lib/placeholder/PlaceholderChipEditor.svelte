@@ -282,75 +282,7 @@
   function handleKeydown(event: KeyboardEvent) {
     if (!isEditing) return
 
-    // For Backspace/Delete, diagnose and handle chip deletion first
-    if (event.key === 'Backspace' || event.key === 'Delete') {
-      const sel = window.getSelection()
-      if (sel && sel.rangeCount > 0) {
-        const range = sel.getRangeAt(0)
-        const node = range.startContainer
-        const offset = range.startOffset
-        const host =
-          node.nodeType === Node.ELEMENT_NODE
-            ? (node as HTMLElement)
-            : (node.parentElement as HTMLElement | null)
-        const insideChip = host ? (host.closest('.placeholder-chip') as HTMLElement | null) : null
-
-        // Probe neighbors once so we can log
-        const beforeChip = findAdjacentChipAtCaret('before')
-        const afterChip = findAdjacentChipAtCaret('after')
-
-        console.debug('keydown', {
-          key: event.key,
-          collapsed: range.collapsed,
-          container: describeNode(node),
-          offset,
-          insideChip: !!insideChip,
-          beforeChip: !!beforeChip,
-          afterChip: !!afterChip
-        })
-
-        if (insideChip) {
-          event.preventDefault()
-          let node = range.startContainer
-          let offset = range.startOffset
-          if (event.key === 'Backspace' && editorElement) {
-            const pos = getPrecedingTextPositionForChip(insideChip, editorElement)
-            if (pos) {
-              node = pos.node
-              offset = pos.offset
-            }
-          }
-          deleteChipElement(insideChip, event.key === 'Delete' ? 'after' : 'before', node, offset)
-          return
-        }
-
-        if (event.key === 'Backspace') {
-          const target = beforeChip || afterChip
-          if (target) {
-            event.preventDefault()
-            let node = range.startContainer
-            let offset = range.startOffset
-            if (editorElement) {
-              const pos = getPrecedingTextPositionForChip(target, editorElement)
-              console.log('Backspace target pos', pos)
-              if (pos) {
-                node = pos.node
-                offset = pos.offset
-              }
-            }
-            deleteChipElement(target, 'before', node, offset)
-            return
-          }
-        } else if (event.key === 'Delete') {
-          const target = afterChip || beforeChip
-          if (target) {
-            event.preventDefault()
-            deleteChipElement(target, 'after', range.startContainer, range.startOffset)
-            return
-          }
-        }
-      }
-    }
+    // Deletion is handled in beforeinput for reliability (direction + prevention)
 
     if (autocompleteController?.handleKeydown(event)) {
       return
@@ -369,17 +301,7 @@
     }
   }
 
-  function describeNode(n: Node | null): string {
-    if (!n) return 'null'
-    if (n.nodeType === Node.TEXT_NODE) {
-      const s = n.textContent || ''
-      return `#text(len=${s.length})`
-    }
-    if (n instanceof HTMLElement) {
-      return `<${n.tagName.toLowerCase()}>.${Array.from(n.classList).join('.')}`
-    }
-    return `nodeType=${n.nodeType}`
-  }
+  
 
   function previousSiblingDeep(node: Node, root: HTMLElement): Node | null {
     let n: Node | null = node
@@ -446,17 +368,7 @@
     return null
   }
 
-  function debugFollowingNodesFrom(node: Node, root: HTMLElement, max: number): string[] {
-    const out: string[] = []
-    let cur: Node | null = nextSiblingDeep(node, root)
-    let steps = 0
-    while (cur && steps < max) {
-      out.push(describeNode(cur))
-      steps += 1
-      cur = nextSiblingDeep(cur, root)
-    }
-    return out
-  }
+  
 
   function isWhitespaceOnlyNode(node: Node): boolean {
     // Treat comment nodes as ignorable (Svelte inserts them around keyed blocks)
@@ -551,12 +463,6 @@
     caretNode: Node,
     caretOffset: number
   ): void {
-    console.debug('deleteChip', {
-      name: chipEl.dataset.placeholderName || '',
-      weight: chipEl.dataset.placeholderWeight || '',
-      _direction
-    })
-
     if (!editorElement) return
     const root = editorElement
 
@@ -658,10 +564,7 @@
             newSelection.removeAllRanges()
             newSelection.addRange(originalRange)
           }
-        } catch (e) {
-          // If original range is no longer valid, don't set cursor
-          console.debug('Could not restore cursor position after paste')
-        }
+        } catch (e) {}
       }
     }, 0)
   }
@@ -700,31 +603,10 @@
         : (hostNode.parentElement as HTMLElement | null)
     const insideChip = hostEl ? (hostEl.closest('.placeholder-chip') as HTMLElement | null) : null
 
-    // Log for diagnosis
-    const debugList = editorElement ? debugFollowingNodesFrom(hostNode, editorElement, 6) : []
-    console.log('beforeinput', {
-      type,
-      insideChip: !!insideChip,
-      adjacentChip: !!chip,
-      container: describeNode(hostNode),
-      afterChain: debugList
-    })
+    //
 
-    if (insideChip) {
-      event.preventDefault()
-      const r = sel.getRangeAt(0)
-      let node = r.startContainer
-      let offset = r.startOffset
-      if (backward && editorElement) {
-        const pos = getPrecedingTextPositionForChip(insideChip, editorElement)
-        if (pos) {
-          node = pos.node
-          offset = pos.offset
-        }
-      }
-      deleteChipElement(insideChip, backward ? 'before' : 'after', node, offset)
-      return
-    }
+    // If caret is inside a chip (e.g., editing chip-name), allow native editing
+    if (insideChip) return
     if (chip) {
       event.preventDefault()
       const r = sel.getRangeAt(0)

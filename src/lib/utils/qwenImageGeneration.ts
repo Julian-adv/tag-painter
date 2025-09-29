@@ -225,7 +225,9 @@ export async function generateQwenImage(
 
       // Configure LatentUpscale dimensions (use scale from settings)
       workflow['121'].inputs.width = Math.round(appliedSettings.imageWidth * upscaleSettings.scale)
-      workflow['121'].inputs.height = Math.round(appliedSettings.imageHeight * upscaleSettings.scale)
+      workflow['121'].inputs.height = Math.round(
+        appliedSettings.imageHeight * upscaleSettings.scale
+      )
 
       // Configure upscale checkpoint
       workflow['123'].inputs.ckpt_name = upscaleSettings.checkpoint
@@ -239,7 +241,8 @@ export async function generateQwenImage(
         workflow['120'].inputs.vae = ['127', 0]
 
         // Configure upscale VAE name only when using separate VAE loader
-        const upscaleVaeName = upscaleSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
+        const upscaleVaeName =
+          upscaleSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
         workflow['127'].inputs.vae_name = upscaleVaeName
       }
 
