@@ -54,7 +54,6 @@
     return effectiveModel?.modelType === 'qwen' ? 'qwen' : undefined
   })
 
-  let isQwenModel = $derived(currentModelType === 'qwen')
 
   let hasLoadedTags = $state(false)
   let saveTimeout: ReturnType<typeof setTimeout> | null = null
@@ -254,7 +253,7 @@
       onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone1}
-      disabled={isQwenModel}
+      disabled={false}
       {wildcardsRefreshToken}
     />
 
@@ -265,7 +264,7 @@
       onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone2}
-      disabled={isQwenModel || $promptsData.selectedComposition === 'all'}
+      disabled={$promptsData.selectedComposition === 'all'}
       {wildcardsRefreshToken}
     />
 

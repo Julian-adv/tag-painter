@@ -96,25 +96,68 @@ export async function generateQwenImage(
     const wildcardZones = await readWildcardZones('qwen')
 
     const previousAll = previousRandomTagResolutions?.all || {}
+    const previousZone1 = previousRandomTagResolutions?.zone1 || {}
+    const previousZone2 = previousRandomTagResolutions?.zone2 || {}
     const previousNegative = previousRandomTagResolutions?.negative || {}
 
-    await prefetchWildcardFilesFromTexts([wildcardZones.all, wildcardZones.negative])
+    await prefetchWildcardFilesFromTexts([
+      wildcardZones.all,
+      wildcardZones.zone1,
+      wildcardZones.zone2,
+      wildcardZones.negative
+    ])
 
     const prevTextsAll: string[] = Object.values(previousAll)
+    const prevTextsZone1: string[] = Object.values(previousZone1)
+    const prevTextsZone2: string[] = Object.values(previousZone2)
     const prevTextsNegative: string[] = Object.values(previousNegative)
-    await prefetchWildcardFilesFromTexts([...prevTextsAll, ...prevTextsNegative])
+    await prefetchWildcardFilesFromTexts([
+      ...prevTextsAll,
+      ...prevTextsZone1,
+      ...prevTextsZone2,
+      ...prevTextsNegative
+    ])
 
     const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll)
+
+    const zone1Result = expandCustomTags(
+      wildcardZones.zone1,
+      model,
+      new Set(),
+      { ...allResult.randomTagResolutions },
+      previousZone1
+    )
+
+    const zone2Result = expandCustomTags(
+      wildcardZones.zone2,
+      model,
+      new Set(),
+      { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions },
+      previousZone2
+    )
+
     const negativeResult = expandCustomTags(
       wildcardZones.negative,
       model,
       new Set(),
-      { ...allResult.randomTagResolutions },
+      {
+        ...allResult.randomTagResolutions,
+        ...zone1Result.randomTagResolutions,
+        ...zone2Result.randomTagResolutions
+      },
       previousNegative
     )
 
     let allTagsText = cleanDirectivesFromTags(allResult.expandedText)
+    let zone1TagsText = cleanDirectivesFromTags(zone1Result.expandedText)
+    let zone2TagsText = cleanDirectivesFromTags(zone2Result.expandedText)
     let negativeTagsText = cleanDirectivesFromTags(negativeResult.expandedText)
+
+    // Apply composition-based zone filtering
+    const isAll = promptsData.selectedComposition === 'all'
+    if (isAll) {
+      zone2TagsText = '' // Disable zone2 for 'all' composition
+    }
 
     const qualityPrefix = modelSettings?.qualityPrefix ?? ''
     if (qualityPrefix.trim().length > 0) {
@@ -128,15 +171,10 @@ export async function generateQwenImage(
         .join(', ')
     }
 
-    if (promptsData.selectedComposition !== 'all') {
-      updateComposition('all')
-      promptsData.selectedComposition = 'all'
-    }
-
     const allRandomResolutions = {
       all: { ...allResult.randomTagResolutions },
-      zone1: {},
-      zone2: {},
+      zone1: { ...zone1Result.randomTagResolutions },
+      zone2: { ...zone2Result.randomTagResolutions },
       negative: { ...negativeResult.randomTagResolutions },
       inpainting: {}
     }
@@ -173,7 +211,12 @@ export async function generateQwenImage(
       workflow['39'].inputs.vae_name = vaeName
     }
 
-    workflow['6'].inputs.text = allTagsText
+    // Combine all enabled zones for Qwen's single prompt input
+    const combinedPrompt = [allTagsText, zone1TagsText, zone2TagsText]
+      .filter(text => text && text.trim().length > 0)
+      .join(' ')
+
+    workflow['6'].inputs.text = combinedPrompt
     workflow['7'].inputs.text = negativeTagsText
 
     const appliedSeed = seed ?? Math.floor(Math.random() * 1000000000000000)
@@ -189,9 +232,9 @@ export async function generateQwenImage(
         workflow['71'].inputs.ckpt_name = faceDetailerSettings.checkpoint
       }
 
-      // Configure FaceDetailer text prompts (use same prompts as main generation)
+      // Configure FaceDetailer text prompts (use combined prompts as main generation)
       if (workflow['73']) {
-        workflow['73'].inputs.text = allTagsText
+        workflow['73'].inputs.text = combinedPrompt
       }
       if (workflow['74']) {
         workflow['74'].inputs.text = negativeTagsText
@@ -254,7 +297,7 @@ export async function generateQwenImage(
       workflow['122'].inputs.denoise = upscaleSettings.denoise
 
       // Configure upscale text prompts
-      workflow['124'].inputs.text = allTagsText // Positive prompt for upscale
+      workflow['124'].inputs.text = combinedPrompt // Positive prompt for upscale
       workflow['125'].inputs.text = negativeTagsText // Negative prompt for upscale
     }
 
@@ -285,8 +328,8 @@ export async function generateQwenImage(
       clientId,
       {
         all: allTagsText,
-        zone1: '',
-        zone2: '',
+        zone1: zone1TagsText,
+        zone2: zone2TagsText,
         negative: negativeTagsText,
         inpainting: ''
       },
