@@ -386,6 +386,93 @@
     }, 0)
   }
 
+  async function handleInput(_event: InputEvent) {
+    if (!isEditing || !editorElement) return
+
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return
+
+    const anchor = selection.anchorNode
+
+    // Only react when typing inside a plain text node (not inside a chip)
+    if (!anchor || anchor.nodeType !== Node.TEXT_NODE) return
+    const textNode = anchor as Text
+    const parentEl = textNode.parentElement
+    if (!parentEl || parentEl.closest('.chip')) return
+
+    // Detect if a complete placeholder exists anywhere in this text node
+    const text = textNode.data
+    placeholderRe.lastIndex = 0
+    const hasFullMatch = placeholderRe.test(text)
+    if (!hasFullMatch) return
+
+    // Mirror blur behavior: derive value from DOM and emit immediately
+    const newValue = extractTextFromEditor(editorElement)
+    if (newValue !== value) {
+      value = newValue
+      onValueChange(newValue)
+      // Wait for Svelte to render chips, then move caret after the next chip
+      await tick()
+      moveCaretAfterNextChip()
+    }
+  }
+
+  function moveCaretAfterNextChip() {
+    if (!editorElement) return
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0) return
+
+    const range = sel.getRangeAt(0)
+    let node: Node = range.endContainer
+    if (!editorElement.contains(node)) {
+      node = editorElement
+    }
+
+    // Case 1: caret is inside a chip; move after that chip
+    let chipAncestor: HTMLElement | null = null
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      chipAncestor = (node as HTMLElement).closest('.placeholder-chip')
+    } else if ((node as ChildNode).parentElement) {
+      chipAncestor = (node as ChildNode).parentElement!.closest('.placeholder-chip')
+    }
+    if (chipAncestor) {
+      const r = document.createRange()
+      r.setStartAfter(chipAncestor)
+      r.collapse(true)
+      sel.removeAllRanges()
+      sel.addRange(r)
+      return
+    }
+
+    // Case 2: find the first chip element after the caret position
+    const walker = document.createTreeWalker(editorElement, NodeFilter.SHOW_ELEMENT)
+    try {
+      walker.currentNode = node
+    } catch {
+      walker.currentNode = editorElement
+    }
+
+    let n: Node | null
+    while ((n = walker.nextNode())) {
+      const el = n as HTMLElement
+      if (el.classList && el.classList.contains('placeholder-chip')) {
+        const r = document.createRange()
+        r.setStartAfter(el)
+        r.collapse(true)
+        sel.removeAllRanges()
+        sel.addRange(r)
+        return
+      }
+    }
+
+    // Fallback: place caret at end of editor
+    const r = document.createRange()
+    r.selectNodeContents(editorElement)
+    r.collapse(false)
+    sel.removeAllRanges()
+    sel.addRange(r)
+  }
+
   function handleBlur() {
     if (isEditing) {
       finishEditing()
@@ -485,6 +572,7 @@
     : ''}"
   onclick={handleClick}
   onkeydown={handleKeydown}
+  oninput={handleInput}
   onpaste={handlePaste}
   onblur={handleBlur}
   bind:this={editorElement}
