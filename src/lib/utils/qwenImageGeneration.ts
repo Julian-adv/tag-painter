@@ -224,7 +224,7 @@ export async function generateQwenImage(
     // Combine all enabled zones for Qwen's single prompt input
     const combinedPrompt = [allTagsText, zone1TagsText, zone2TagsText]
       .filter(text => text && text.trim().length > 0)
-      .join(' ')
+      .join(' BREAK ')
 
     workflow['6'].inputs.text = combinedPrompt
     workflow['7'].inputs.text = negativeTagsText
