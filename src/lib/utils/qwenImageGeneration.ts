@@ -246,6 +246,22 @@ export async function generateQwenImage(
         workflow['71'].inputs.ckpt_name = resolvedFdCkpt
       }
 
+      // Configure FaceDetailer VAE based on selectedVae setting
+      if (faceDetailerSettings.selectedVae === '__embedded__') {
+        // Use embedded VAE from checkpoint (Node 71)
+        workflow['56'].inputs.vae = ['71', 2]
+      } else {
+        // Use separate VAE loader (Node 72)
+        workflow['56'].inputs.vae = ['72', 0]
+
+        // Configure FaceDetailer VAE name only when using separate VAE loader
+        const faceDetailerVaeName =
+          faceDetailerSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
+        if (workflow['72']) {
+          workflow['72'].inputs.vae_name = faceDetailerVaeName
+        }
+      }
+
       // Configure FaceDetailer text prompts (use combined prompts as main generation)
       if (workflow['73']) {
         workflow['73'].inputs.text = combinedPrompt

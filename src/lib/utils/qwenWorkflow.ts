@@ -133,7 +133,7 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
       image: ['126', 0],
       model: ['71', 0],
       clip: ['71', 1],
-      vae: ['71', 2],
+      vae: ['72', 0],
       positive: ['73', 0],
       negative: ['74', 0],
       bbox_detector: ['57', 0],
@@ -180,6 +180,15 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
     class_type: 'CheckpointLoaderSimple',
     _meta: {
       title: 'FaceDetailer Checkpoint Loader'
+    }
+  },
+  '72': {
+    inputs: {
+      vae_name: 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
+    },
+    class_type: 'VAELoader',
+    _meta: {
+      title: 'FaceDetailer VAE Loader'
     }
   },
   '73': {
