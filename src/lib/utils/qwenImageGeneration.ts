@@ -223,7 +223,7 @@ export async function generateQwenImage(
 
     // Combine all enabled zones for Qwen's single prompt input
     const combinedPrompt = [allTagsText, zone1TagsText, zone2TagsText]
-      .filter(text => text && text.trim().length > 0)
+      .filter((text) => text && text.trim().length > 0)
       .join(' BREAK ')
 
     workflow['6'].inputs.text = combinedPrompt
@@ -236,41 +236,80 @@ export async function generateQwenImage(
     if (promptsData.useFaceDetailer && workflow['56']) {
       // Get FaceDetailer settings from per-model configuration
       const faceDetailerSettings = modelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
+      const fdModelType = faceDetailerSettings.modelType || 'sdxl'
 
-      // Set FaceDetailer checkpoint model
-      if (workflow['71']) {
+      if (fdModelType === 'qwen') {
+        // Configure Qwen FaceDetailer path
+        const resolvedFdUnet =
+          faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
+            ? faceDetailerSettings.checkpoint
+            : promptsData.selectedCheckpoint || 'qwen_image_fp8_e4m3fn.safetensors'
+
+        if (workflow['75']) workflow['75'].inputs.unet_name = resolvedFdUnet
+
+        // Set model input to use Qwen model sampling node (77)
+        workflow['56'].inputs.model = ['77', 0]
+        // Set CLIP input to use Qwen CLIP loader (76)
+        workflow['56'].inputs.clip = ['76', 0]
+
+        // Configure FaceDetailer VAE
+        if (faceDetailerSettings.selectedVae === '__embedded__') {
+          // For Qwen, no embedded VAE - use separate VAE loader (Node 78)
+          workflow['56'].inputs.vae = ['78', 0]
+          const fdVaeName = faceDetailerSettings.selectedVae || 'qwen_image_vae.safetensors'
+          if (workflow['78']) workflow['78'].inputs.vae_name = fdVaeName
+        } else {
+          // Use separate VAE loader (Node 78)
+          workflow['56'].inputs.vae = ['78', 0]
+          const fdVaeName = faceDetailerSettings.selectedVae || 'qwen_image_vae.safetensors'
+          if (workflow['78']) workflow['78'].inputs.vae_name = fdVaeName
+        }
+
+        // Configure FaceDetailer text prompts with Qwen CLIP
+        if (workflow['73']) {
+          workflow['73'].inputs.clip = ['76', 0]
+          workflow['73'].inputs.text = combinedPrompt
+        }
+        if (workflow['74']) {
+          workflow['74'].inputs.clip = ['76', 0]
+          workflow['74'].inputs.text = negativeTagsText
+        }
+      } else {
+        // Configure SDXL FaceDetailer path
         const resolvedFdCkpt =
           faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
             ? faceDetailerSettings.checkpoint
             : promptsData.selectedCheckpoint || faceDetailerSettings.checkpoint
-        workflow['71'].inputs.ckpt_name = resolvedFdCkpt
-      }
+        if (workflow['71']) workflow['71'].inputs.ckpt_name = resolvedFdCkpt
 
-      // Configure FaceDetailer VAE based on selectedVae setting
-      if (faceDetailerSettings.selectedVae === '__embedded__') {
-        // Use embedded VAE from checkpoint (Node 71)
-        workflow['56'].inputs.vae = ['71', 2]
-      } else {
-        // Use separate VAE loader (Node 72)
-        workflow['56'].inputs.vae = ['72', 0]
+        // Set model and CLIP to use SDXL checkpoint (71)
+        workflow['56'].inputs.model = ['71', 0]
+        workflow['56'].inputs.clip = ['71', 1]
 
-        // Configure FaceDetailer VAE name only when using separate VAE loader
-        const faceDetailerVaeName =
-          faceDetailerSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
-        if (workflow['72']) {
-          workflow['72'].inputs.vae_name = faceDetailerVaeName
+        // Configure FaceDetailer VAE
+        if (faceDetailerSettings.selectedVae === '__embedded__') {
+          // Use embedded VAE from checkpoint (Node 71)
+          workflow['56'].inputs.vae = ['71', 2]
+        } else {
+          // Use separate VAE loader (Node 72)
+          workflow['56'].inputs.vae = ['72', 0]
+          const fdVaeName =
+            faceDetailerSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
+          if (workflow['72']) workflow['72'].inputs.vae_name = fdVaeName
+        }
+
+        // Configure FaceDetailer text prompts with SDXL CLIP
+        if (workflow['73']) {
+          workflow['73'].inputs.clip = ['71', 1]
+          workflow['73'].inputs.text = combinedPrompt
+        }
+        if (workflow['74']) {
+          workflow['74'].inputs.clip = ['71', 1]
+          workflow['74'].inputs.text = negativeTagsText
         }
       }
 
-      // Configure FaceDetailer text prompts (use combined prompts as main generation)
-      if (workflow['73']) {
-        workflow['73'].inputs.text = combinedPrompt
-      }
-      if (workflow['74']) {
-        workflow['74'].inputs.text = negativeTagsText
-      }
-
-      // Configure FaceDetailer generation settings
+      // Configure FaceDetailer generation settings (common for both model types)
       workflow['56'].inputs.seed = appliedSeed + 1
       workflow['56'].inputs.steps = faceDetailerSettings.steps
       workflow['56'].inputs.cfg = faceDetailerSettings.cfgScale
@@ -292,9 +331,7 @@ export async function generateQwenImage(
     if (promptsData.useUpscale) {
       // Get upscale settings from per-model configuration
       const upscaleSettings = modelSettings?.upscale || DEFAULT_UPSCALE_SETTINGS
-
-      // Configure SDXL VAE Encode (convert Qwen image to SDXL latent)
-      // Node 120: VAEEncode uses Node 8 (Qwen VAEDecode) and Node 127 (SDXL VAE)
+      const usModelType = upscaleSettings.modelType || 'sdxl'
 
       // Configure LatentUpscale dimensions (use scale from settings)
       workflow['121'].inputs.width = Math.round(appliedSettings.imageWidth * upscaleSettings.scale)
@@ -302,37 +339,86 @@ export async function generateQwenImage(
         appliedSettings.imageHeight * upscaleSettings.scale
       )
 
-      // Configure upscale checkpoint (default to selected base model if unset/placeholder)
-      const resolvedUpscaleCkpt =
-        upscaleSettings.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors'
-          ? upscaleSettings.checkpoint
-          : promptsData.selectedCheckpoint || upscaleSettings.checkpoint
-      workflow['123'].inputs.ckpt_name = resolvedUpscaleCkpt
+      if (usModelType === 'qwen') {
+        // Configure Qwen upscale path
+        const resolvedUsUnet =
+          upscaleSettings.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors'
+            ? upscaleSettings.checkpoint
+            : promptsData.selectedCheckpoint || 'qwen_image_fp8_e4m3fn.safetensors'
 
-      // Configure Node 120 VAE input based on selectedVae setting
-      if (upscaleSettings.selectedVae === '__embedded__') {
-        // Use embedded VAE from checkpoint (Node 123)
-        workflow['120'].inputs.vae = ['123', 2]
+        if (workflow['128']) workflow['128'].inputs.unet_name = resolvedUsUnet
+
+        // Set KSampler to use Qwen model sampling node (130)
+        workflow['122'].inputs.model = ['130', 0]
+
+        // Configure Upscale VAE for encoding (Node 120)
+        if (upscaleSettings.selectedVae === '__embedded__') {
+          // For Qwen, no embedded VAE - use separate VAE loader (Node 131)
+          workflow['120'].inputs.vae = ['131', 0]
+          const usVaeName = upscaleSettings.selectedVae || 'qwen_image_vae.safetensors'
+          if (workflow['131']) workflow['131'].inputs.vae_name = usVaeName
+        } else {
+          // Use separate VAE loader (Node 131)
+          workflow['120'].inputs.vae = ['131', 0]
+          const usVaeName = upscaleSettings.selectedVae || 'qwen_image_vae.safetensors'
+          if (workflow['131']) workflow['131'].inputs.vae_name = usVaeName
+        }
+
+        // Configure Upscale VAE for decoding (Node 126) - same as encoding VAE
+        workflow['126'].inputs.vae = ['131', 0]
+
+        // Configure upscale text prompts with Qwen CLIP
+        if (workflow['124']) {
+          workflow['124'].inputs.clip = ['129', 0]
+          workflow['124'].inputs.text = combinedPrompt
+        }
+        if (workflow['125']) {
+          workflow['125'].inputs.clip = ['129', 0]
+          workflow['125'].inputs.text = negativeTagsText
+        }
       } else {
-        // Use separate VAE loader (Node 127)
-        workflow['120'].inputs.vae = ['127', 0]
+        // Configure SDXL upscale path
+        const resolvedUpscaleCkpt =
+          upscaleSettings.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors'
+            ? upscaleSettings.checkpoint
+            : promptsData.selectedCheckpoint || upscaleSettings.checkpoint
+        if (workflow['123']) workflow['123'].inputs.ckpt_name = resolvedUpscaleCkpt
 
-        // Configure upscale VAE name only when using separate VAE loader
-        const upscaleVaeName =
-          upscaleSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
-        workflow['127'].inputs.vae_name = upscaleVaeName
+        // Set KSampler to use SDXL checkpoint (123)
+        workflow['122'].inputs.model = ['123', 0]
+
+        // Configure Node 120 VAE input
+        if (upscaleSettings.selectedVae === '__embedded__') {
+          // Use embedded VAE from checkpoint (Node 123)
+          workflow['120'].inputs.vae = ['123', 2]
+        } else {
+          // Use separate VAE loader (Node 127)
+          workflow['120'].inputs.vae = ['127', 0]
+          const usVaeName =
+            upscaleSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
+          if (workflow['127']) workflow['127'].inputs.vae_name = usVaeName
+        }
+
+        // Configure Upscale VAE for decoding (Node 126)
+        workflow['126'].inputs.vae = ['123', 2]
+
+        // Configure upscale text prompts with SDXL CLIP
+        if (workflow['124']) {
+          workflow['124'].inputs.clip = ['123', 1]
+          workflow['124'].inputs.text = combinedPrompt
+        }
+        if (workflow['125']) {
+          workflow['125'].inputs.clip = ['123', 1]
+          workflow['125'].inputs.text = negativeTagsText
+        }
       }
 
-      // Configure upscale KSampler
+      // Configure upscale KSampler (common for both model types)
       workflow['122'].inputs.steps = upscaleSettings.steps
       workflow['122'].inputs.cfg = upscaleSettings.cfgScale
       workflow['122'].inputs.sampler_name = upscaleSettings.sampler
       workflow['122'].inputs.scheduler = upscaleSettings.scheduler
       workflow['122'].inputs.denoise = upscaleSettings.denoise
-
-      // Configure upscale text prompts
-      workflow['124'].inputs.text = combinedPrompt // Positive prompt for upscale
-      workflow['125'].inputs.text = negativeTagsText // Negative prompt for upscale
     }
 
     // Configure final save node based on upscale and FaceDetailer usage

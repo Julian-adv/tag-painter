@@ -31,6 +31,7 @@ export type ModelType = 'sdxl' | 'qwen'
 
 export interface FaceDetailerSettings {
   checkpoint: string
+  modelType: ModelType
   steps: number
   cfgScale: number
   sampler: string
@@ -41,6 +42,7 @@ export interface FaceDetailerSettings {
 
 export interface UpscaleSettings {
   checkpoint: string
+  modelType: ModelType
   scale: number
   steps: number
   cfgScale: number

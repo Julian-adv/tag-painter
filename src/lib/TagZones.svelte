@@ -54,7 +54,6 @@
     return effectiveModel?.modelType === 'qwen' ? 'qwen' : undefined
   })
 
-
   let hasLoadedTags = $state(false)
   let saveTimeout: ReturnType<typeof setTimeout> | null = null
 

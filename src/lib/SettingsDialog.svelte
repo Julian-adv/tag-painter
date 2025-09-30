@@ -480,6 +480,18 @@
               {/each}
             </select>
 
+            <label for="fd-model-type" class="two-col-label"
+              >{m['settingsDialog.faceDetailerModelType']()}</label
+            >
+            <select
+              id="fd-model-type"
+              class="two-col-input"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.modelType}
+            >
+              <option value="sdxl">SDXL</option>
+              <option value="qwen">Qwen</option>
+            </select>
+
             <label for="fd-steps" class="two-col-label"
               >{m['settingsDialog.faceDetailerSteps']()}</label
             >
@@ -569,6 +581,18 @@
               {#each availableCheckpoints as checkpoint}
                 <option value={checkpoint}>{checkpoint}</option>
               {/each}
+            </select>
+
+            <label for="us-model-type" class="two-col-label"
+              >{m['settingsDialog.upscaleModelType']()}</label
+            >
+            <select
+              id="us-model-type"
+              class="two-col-input"
+              bind:value={localSettings.perModel[selectedModelKey].upscale.modelType}
+            >
+              <option value="sdxl">SDXL</option>
+              <option value="qwen">Qwen</option>
             </select>
 
             <label for="us-scale" class="two-col-label">{m['settingsDialog.upscaleScale']()}</label>

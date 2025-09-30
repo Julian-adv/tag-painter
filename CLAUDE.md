@@ -102,6 +102,7 @@ Located in `src/lib/TreeEdit/`:
 Visual tree editor for managing hierarchical wildcard structures:
 
 **Components:**
+
 - **TreeEdit.svelte**: Main tree editor component with keyboard navigation and drag & drop support
 - **TreeNode.svelte**: Individual tree node renderer for arrays, objects, and leaf values
 - **TreeEditControlPanel.svelte**: Control panel with add/delete/expand buttons and filtering
@@ -113,6 +114,7 @@ Visual tree editor for managing hierarchical wildcard structures:
 - **WildcardsEditorDialog.svelte**: Full-screen dialog for editing wildcard trees
 
 **Utilities:**
+
 - **model.ts**: Core tree model types and data structures (TreeModel, AnyNode, array/object/leaf nodes)
 - **operations.ts**: Tree manipulation operations (add, delete, move, rename, set value)
 - **selection.ts**: Selection state management for tree nodes

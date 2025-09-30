@@ -301,8 +301,6 @@
     }
   }
 
-  
-
   function previousSiblingDeep(node: Node, root: HTMLElement): Node | null {
     let n: Node | null = node
     while (n && n !== root) {
@@ -367,8 +365,6 @@
     }
     return null
   }
-
-  
 
   function isWhitespaceOnlyNode(node: Node): boolean {
     // Treat comment nodes as ignorable (Svelte inserts them around keyed blocks)

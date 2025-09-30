@@ -6,6 +6,7 @@ export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8188'
 // Default FaceDetailer settings
 export const DEFAULT_FACE_DETAILER_SETTINGS = {
   checkpoint: 'zenijiMixKIllust_v10.safetensors',
+  modelType: 'sdxl' as const,
   steps: 28,
   cfgScale: 4.5,
   sampler: 'euler_ancestral',
@@ -16,6 +17,7 @@ export const DEFAULT_FACE_DETAILER_SETTINGS = {
 
 export const DEFAULT_UPSCALE_SETTINGS = {
   checkpoint: 'zenijiMixKIllust_v10.safetensors',
+  modelType: 'sdxl' as const,
   scale: 1.5,
   steps: 15,
   cfgScale: 4.5,

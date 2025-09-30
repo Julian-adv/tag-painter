@@ -179,7 +179,38 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
     },
     class_type: 'CheckpointLoaderSimple',
     _meta: {
-      title: 'FaceDetailer Checkpoint Loader'
+      title: 'FaceDetailer Checkpoint Loader (SDXL)'
+    }
+  },
+  '75': {
+    inputs: {
+      unet_name: 'qwen_image_fp8_e4m3fn.safetensors',
+      weight_dtype: 'fp8_e4m3fn'
+    },
+    class_type: 'UNETLoader',
+    _meta: {
+      title: 'FaceDetailer UNet Loader (Qwen)'
+    }
+  },
+  '76': {
+    inputs: {
+      clip_name: 'qwen_2.5_vl_7b_fp8_scaled.safetensors',
+      type: 'qwen_image',
+      device: 'default'
+    },
+    class_type: 'CLIPLoader',
+    _meta: {
+      title: 'FaceDetailer CLIP Loader (Qwen)'
+    }
+  },
+  '77': {
+    inputs: {
+      model: ['75', 0],
+      shift: 3.1
+    },
+    class_type: 'ModelSamplingAuraFlow',
+    _meta: {
+      title: 'FaceDetailer Model Sampling Aura Flow (Qwen)'
     }
   },
   '72': {
@@ -188,7 +219,16 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
     },
     class_type: 'VAELoader',
     _meta: {
-      title: 'FaceDetailer VAE Loader'
+      title: 'FaceDetailer VAE Loader (SDXL)'
+    }
+  },
+  '78': {
+    inputs: {
+      vae_name: 'qwen_image_vae.safetensors'
+    },
+    class_type: 'VAELoader',
+    _meta: {
+      title: 'FaceDetailer VAE Loader (Qwen)'
     }
   },
   '73': {
@@ -258,7 +298,38 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
     },
     class_type: 'CheckpointLoaderSimple',
     _meta: {
-      title: 'Upscale Checkpoint Loader'
+      title: 'Upscale Checkpoint Loader (SDXL)'
+    }
+  },
+  '128': {
+    inputs: {
+      unet_name: 'qwen_image_fp8_e4m3fn.safetensors',
+      weight_dtype: 'fp8_e4m3fn'
+    },
+    class_type: 'UNETLoader',
+    _meta: {
+      title: 'Upscale UNet Loader (Qwen)'
+    }
+  },
+  '129': {
+    inputs: {
+      clip_name: 'qwen_2.5_vl_7b_fp8_scaled.safetensors',
+      type: 'qwen_image',
+      device: 'default'
+    },
+    class_type: 'CLIPLoader',
+    _meta: {
+      title: 'Upscale CLIP Loader (Qwen)'
+    }
+  },
+  '130': {
+    inputs: {
+      model: ['128', 0],
+      shift: 3.1
+    },
+    class_type: 'ModelSamplingAuraFlow',
+    _meta: {
+      title: 'Upscale Model Sampling Aura Flow (Qwen)'
     }
   },
   '124': {
@@ -297,7 +368,16 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
     },
     class_type: 'VAELoader',
     _meta: {
-      title: 'SDXL VAE Loader'
+      title: 'Upscale VAE Loader (SDXL)'
+    }
+  },
+  '131': {
+    inputs: {
+      vae_name: 'qwen_image_vae.safetensors'
+    },
+    class_type: 'VAELoader',
+    _meta: {
+      title: 'Upscale VAE Loader (Qwen)'
     }
   }
 }
