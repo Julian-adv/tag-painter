@@ -309,11 +309,19 @@ export async function prefetchWildcardFilesForTags(
   await Promise.all(toLoad.map((f) => loadWildcardLines(f)))
 }
 
-export async function prefetchWildcardFilesFromTexts(texts: string[]): Promise<void> {
+export async function prefetchWildcardFilesFromTexts(
+  model: TreeModel,
+  texts?: string[]
+): Promise<void> {
   const files = new Set<string>()
   for (const t of texts || []) {
     extractWildcardFilesFromText(String(t), files)
   }
+
+  // Collect wildcard files from the entire tree
+  const seen = new Set<string>()
+  collectWildcardFilesFromNode(model, model.nodes[model.rootId], files, seen)
+
   const toLoad = Array.from(files)
   await Promise.all(toLoad.map((f) => loadWildcardLines(f)))
 }

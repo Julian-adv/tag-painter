@@ -91,33 +91,17 @@ export async function generateQwenImage(
     onProgressUpdate({ value: 0, max: 100, currentNode: '' })
 
     const clientId = generateClientId()
-    const model = getWildcardModel()
 
-    // Read wildcard zones for Qwen model
+    // Read wildcard zones for Qwen model (this also loads the Qwen wildcard model)
     const wildcardZones = await readWildcardZones('qwen')
+    const model = getWildcardModel()
 
     const previousAll = previousRandomTagResolutions?.all || {}
     const previousZone1 = previousRandomTagResolutions?.zone1 || {}
     const previousZone2 = previousRandomTagResolutions?.zone2 || {}
     const previousNegative = previousRandomTagResolutions?.negative || {}
 
-    await prefetchWildcardFilesFromTexts([
-      wildcardZones.all,
-      wildcardZones.zone1,
-      wildcardZones.zone2,
-      wildcardZones.negative
-    ])
-
-    const prevTextsAll: string[] = Object.values(previousAll)
-    const prevTextsZone1: string[] = Object.values(previousZone1)
-    const prevTextsZone2: string[] = Object.values(previousZone2)
-    const prevTextsNegative: string[] = Object.values(previousNegative)
-    await prefetchWildcardFilesFromTexts([
-      ...prevTextsAll,
-      ...prevTextsZone1,
-      ...prevTextsZone2,
-      ...prevTextsNegative
-    ])
+    await prefetchWildcardFilesFromTexts(model)
 
     const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll)
 

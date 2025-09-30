@@ -104,16 +104,8 @@ export async function generateImage(options: GenerationOptions): Promise<{
     // Expand custom tags and create prompt parts, using previous resolutions if regenerating
     const previousAll = previousRandomTagResolutions?.all || {}
     const model = getWildcardModel()
-    // Prefetch wildcard files for all zones to allow synchronous replacement during expansion
-    await prefetchWildcardFilesFromTexts([
-      wildcardZones.all,
-      wildcardZones.zone1,
-      wildcardZones.zone2,
-      wildcardZones.negative,
-      wildcardZones.inpainting
-    ])
-    // Also prefetch from previous resolutions to support overrides that contain wildcards
-    const prevTextsAll: string[] = Object.values(previousAll || {})
+    // Prefetch wildcard files referenced in model tree
+    await prefetchWildcardFilesFromTexts(model)
     const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll)
 
     // Check for composition detection
@@ -126,7 +118,6 @@ export async function generateImage(options: GenerationOptions): Promise<{
     }
 
     const previousZone1 = previousRandomTagResolutions?.zone1 || {}
-    const prevTextsZone1: string[] = Object.values(previousZone1 || {})
     const zone1Result = expandCustomTags(
       wildcardZones.zone1,
       model,
@@ -136,7 +127,6 @@ export async function generateImage(options: GenerationOptions): Promise<{
     )
 
     const previousZone2 = previousRandomTagResolutions?.zone2 || {}
-    const prevTextsZone2: string[] = Object.values(previousZone2 || {})
     const zone2Result = expandCustomTags(
       wildcardZones.zone2,
       model,
@@ -146,7 +136,6 @@ export async function generateImage(options: GenerationOptions): Promise<{
     )
 
     const previousNegative = previousRandomTagResolutions?.negative || {}
-    const prevTextsNeg: string[] = Object.values(previousNegative || {})
     const negativeResult = expandCustomTags(
       wildcardZones.negative,
       model,
@@ -160,15 +149,6 @@ export async function generateImage(options: GenerationOptions): Promise<{
     )
 
     const previousInpainting = previousRandomTagResolutions?.inpainting || {}
-    const prevTextsInpaint: string[] = Object.values(previousInpainting || {})
-    const prevTexts: string[] = [
-      ...prevTextsAll,
-      ...prevTextsZone1,
-      ...prevTextsZone2,
-      ...prevTextsNeg,
-      ...prevTextsInpaint
-    ]
-    await prefetchWildcardFilesFromTexts(prevTexts)
     const inpaintingResult = expandCustomTags(
       wildcardZones.inpainting,
       model,
