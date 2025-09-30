@@ -441,8 +441,12 @@ function configureWorkflow(
         workflow['120'].inputs.width = Math.round(settings.imageWidth * upscaleSettings.scale)
         workflow['120'].inputs.height = Math.round(settings.imageHeight * upscaleSettings.scale)
 
-        // Configure upscale checkpoint
-        workflow['122'].inputs.ckpt_name = upscaleSettings.checkpoint
+        // Configure upscale checkpoint (default to selected base model if unset/placeholder)
+        const resolvedUpscaleCkpt =
+          upscaleSettings.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors'
+            ? upscaleSettings.checkpoint
+            : promptsData.selectedCheckpoint || upscaleSettings.checkpoint
+        workflow['122'].inputs.ckpt_name = resolvedUpscaleCkpt
 
         // Configure upscale VAE (if not using embedded)
         if (upscaleSettings.selectedVae && upscaleSettings.selectedVae !== '__embedded__') {
@@ -467,9 +471,13 @@ function configureWorkflow(
       const effectiveModel = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
       const faceDetailerSettings = effectiveModel?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
 
-      // Set FaceDetailer checkpoint model
+      // Set FaceDetailer checkpoint model (default to selected base model if unset/placeholder)
       if (workflow['100']) {
-        workflow['100'].inputs.ckpt_name = faceDetailerSettings.checkpoint
+        const resolvedFdCkpt =
+          faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
+            ? faceDetailerSettings.checkpoint
+            : promptsData.selectedCheckpoint || faceDetailerSettings.checkpoint
+        workflow['100'].inputs.ckpt_name = resolvedFdCkpt
       }
 
       // Configure FaceDetailer generation settings for all FaceDetailer nodes

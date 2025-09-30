@@ -239,7 +239,11 @@ export async function generateQwenImage(
 
       // Set FaceDetailer checkpoint model
       if (workflow['71']) {
-        workflow['71'].inputs.ckpt_name = faceDetailerSettings.checkpoint
+        const resolvedFdCkpt =
+          faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
+            ? faceDetailerSettings.checkpoint
+            : promptsData.selectedCheckpoint || faceDetailerSettings.checkpoint
+        workflow['71'].inputs.ckpt_name = resolvedFdCkpt
       }
 
       // Configure FaceDetailer text prompts (use combined prompts as main generation)
@@ -282,8 +286,12 @@ export async function generateQwenImage(
         appliedSettings.imageHeight * upscaleSettings.scale
       )
 
-      // Configure upscale checkpoint
-      workflow['123'].inputs.ckpt_name = upscaleSettings.checkpoint
+      // Configure upscale checkpoint (default to selected base model if unset/placeholder)
+      const resolvedUpscaleCkpt =
+        upscaleSettings.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors'
+          ? upscaleSettings.checkpoint
+          : promptsData.selectedCheckpoint || upscaleSettings.checkpoint
+      workflow['123'].inputs.ckpt_name = resolvedUpscaleCkpt
 
       // Configure Node 120 VAE input based on selectedVae setting
       if (upscaleSettings.selectedVae === '__embedded__') {
