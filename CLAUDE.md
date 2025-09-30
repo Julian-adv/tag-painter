@@ -12,8 +12,8 @@ Tag Painter is a SvelteKit-based web application that interfaces with ComfyUI fo
 # Start development server
 npm run dev
 
-# Build for production
-npm run build
+# Build for release
+npm run release
 
 # Preview production build
 npm run preview
@@ -45,64 +45,124 @@ The application follows a modular component architecture located in `src/lib/`:
 - **TagZones.svelte**: Container component for managing different tag input zones with persistent storage
 - **TagInput.svelte**: Individual tag zone input component with quick tag entry and autocomplete
 - **TagDisplay.svelte**: Component for displaying tags as removable boxes with delete functionality
+- **TagItem.svelte**: Individual tag box component with styling and delete functionality
+- **TagManageDialog.svelte**: Dialog for managing tag collections and categories
 - **ImageViewer.svelte**: Handles image display, navigation controls, and integrates mask drawing components
 - **DrawingControls.svelte**: Dedicated component for mask drawing controls with radio-style tool selection
 - **DrawingCanvas.svelte**: Canvas component for interactive mask drawing with brush and flood fill tools
 - **GenerationControls.svelte**: Contains generation button, progress tracking, and settings dialog
 - **LoraSelector.svelte**: Component for selecting and configuring LoRA models with weight adjustment
+- **LoraItem.svelte**: Individual LoRA item display component
+- **LoraSelectionModal.svelte**: Modal for browsing and selecting LoRA models
 - **SettingsDialog.svelte**: Modal for configuring generation parameters
-- **OptionsEditDialog.svelte**: Unified dialog for editing category options and settings with drag & drop support
+- **SamplerSelector.svelte**: Dropdown selector for sampling methods
+- **SchedulerSelector.svelte**: Dropdown selector for scheduler algorithms
+- **CategoryManagerDialog.svelte**: Dialog for managing tag categories and options
 - **AutoCompleteTextarea.svelte**: Enhanced textarea component with auto-completion from tag database
-- **ComboBox.svelte**: Filtering and selection component for category management
+- **ComboBox.svelte**: Filtering and selection component with dropdown
+- **WheelAdjustableInput.svelte**: Numeric input with mouse wheel adjustment support
+- **ActionButton.svelte**: Reusable button component with consistent styling
+- **NoCheckpointsDialog.svelte**: Warning dialog when no checkpoint models are detected
 
 ### Utility Modules
 
-Located in `src/lib/utils/` and `src/lib/stores/`:
+Located in `src/lib/utils/`:
 
-- **imageGeneration.ts**: Extracted image generation logic and ComfyUI workflow management
+- **imageGeneration.ts**: Main image generation logic and ComfyUI workflow management for Stable Diffusion models
+- **qwenImageGeneration.ts**: Qwen-specific image generation logic with specialized workflow handling
+- **generationCommon.ts**: Shared utilities for both SD and Qwen generation paths
 - **comfyui.ts**: WebSocket communication and API interaction utilities
 - **fileIO.ts**: File system operations for saving/loading prompts and images
-- **promptProcessing.ts**: Tag processing and prompt generation utilities
-- **workflow.ts**: ComfyUI workflow configuration constants and node definitions
+- **workflow.ts**: ComfyUI workflow configuration constants and node definitions for Stable Diffusion
+- **qwenWorkflow.ts**: ComfyUI workflow configuration for Qwen models
+- **tagExpansion.ts**: Advanced tag expansion with wildcard support, random selection, and directive processing
+- **wildcards.ts**: Wildcard file handling and path resolution
+- **wildcardZones.ts**: Zone-based wildcard data reading and writing
+- **compositionDetection.ts**: Auto-detection of composition from tags (e.g., composition=all)
 - **date.ts**: Date and time formatting utilities for timestamps
-- **types.ts**: Centralized TypeScript type definitions with tag zone support
-- **constants.ts**: Application-wide constants and default values
+- **tagStyling.ts**: Tag styling and highlighting utilities
+- **textFormatting.ts**: Text formatting and manipulation utilities
+- **stringSimilarity.ts**: String similarity calculation for autocomplete
+- **treeBuilder.ts**: Tree model construction for hierarchical data
+- **treeSearch.ts**: Tree model search and traversal utilities
 
 ### Store Modules
 
-- **stores/promptsStore.ts**: Central Svelte store for tag zones data management and persistence
-- **stores/tagsStore.ts**: Shared store for auto-completion tags and filtering
-- **stores/testModeStore.ts**: Store for testing mode state management
+Located in `src/lib/stores/`:
+
+- **promptsStore.ts**: Central Svelte store for tag zones data management and persistence
+- **tagsStore.ts**: Shared store for wildcard tree model, auto-completion tags, and tag filtering
+- **testModeStore.svelte.ts**: Svelte 5 runes-based store for testing mode state management
+- **maskOverlayStore.ts**: Store for mask overlay visibility state
+
+### TreeEdit Module
+
+Located in `src/lib/TreeEdit/`:
+
+Visual tree editor for managing hierarchical wildcard structures:
+
+**Components:**
+- **TreeEdit.svelte**: Main tree editor component with keyboard navigation and drag & drop support
+- **TreeNode.svelte**: Individual tree node renderer for arrays, objects, and leaf values
+- **TreeEditControlPanel.svelte**: Control panel with add/delete/expand buttons and filtering
+- **TreeFilter.svelte**: Filter input for searching tree nodes by name or value
+- **TreeNodePath.svelte**: Breadcrumb-style path display for current node location
+- **InlineEditor.svelte**: Inline editing component for node names and values
+- **PlaceholderChipDisplay.svelte**: Display component for placeholder chips in text
+- **DisablesEditor.svelte**: Editor for managing tag disable directives
+- **WildcardsEditorDialog.svelte**: Full-screen dialog for editing wildcard trees
+
+**Utilities:**
+- **model.ts**: Core tree model types and data structures (TreeModel, AnyNode, array/object/leaf nodes)
+- **operations.ts**: Tree manipulation operations (add, delete, move, rename, set value)
+- **selection.ts**: Selection state management for tree nodes
+- **nav.ts**: Keyboard navigation logic for tree traversal
+- **dnd.ts**: Drag-and-drop operations for reordering nodes
+- **treeKeyboard.ts**: Keyboard shortcut handling for tree operations
+- **yaml-io.ts**: YAML import/export for tree models (toYAML, fromYAML)
+- **utils.ts**: Helper functions for tree operations and validation
+- **addBySelection.ts**: Smart node addition based on current selection
 
 ### API Routes
+
+Located in `src/routes/api/`:
 
 - **`/api/prompts`**: Handles saving and loading tag zone data to/from `data/prompts.json`
 - **`/api/settings`**: Handles saving and loading user settings to/from `data/settings.json`
 - **`/api/image`**: Serves generated images from the output directory
 - **`/api/image-list`**: Returns list of generated images in the output directory
-- **`/api/tags`**: Provides autocomplete tags for prompt suggestions
-- **`/api/loras`**: Handles LoRA model information and selection
+- **`/api/tags`**: Provides autocomplete tags for prompt suggestions from Danbooru tag database
+- **`/api/loras`**: Handles LoRA model information and selection from ComfyUI
 - **`/api/mask-path`**: Provides composition mask file paths (handles temp-mask special case)
 - **`/api/mask`**: Handles saving of user-drawn mask data to temporary file
+- **`/api/wildcards`**: Handles reading and writing wildcard YAML files (model-type specific)
+- **`/api/wildcard-file`**: Serves individual wildcard files by name
+- **`/api/open-folder`**: Opens output folder in system file explorer (Windows/Linux/Mac)
 
 ### ComfyUI Integration
 
 The application connects to a local ComfyUI instance at `http://127.0.0.1:8188` and uses:
 
-- REST API for submitting workflows and fetching available checkpoints
+- REST API for submitting workflows and fetching available checkpoints, VAEs, and LoRAs
 - WebSocket connection for real-time progress updates and image delivery
 - Dynamic workflow configuration based on user settings (upscale, face detailer, checkpoint selection)
 - Automatic node injection for SaveImageWebsocket based on selected options
+- Dual workflow support: Stable Diffusion (with regional prompting) and Qwen models
+- Per-model settings and overrides (checkpoints, VAEs, schedulers, quality/negative prefixes)
+- Inpainting workflow with mask-based image editing
 
 ### Data Management
 
-- **Tag Zone Storage**: User inputs are saved to `data/prompts.json` with tags organized by zones (All, First Zone, Second Zone, Negative Tags)
+- **Wildcard Storage**: User wildcards stored in YAML format at `data/wildcards.yaml` (Stable Diffusion) and `data/wildcards_qwen.yaml` (Qwen models)
+- **Zone-based Wildcards**: Wildcards organized by zones (all, zone1, zone2, negative, inpainting) with hierarchical tree structure
+- **Tag Expansion**: Advanced wildcard processing with random selection, pinning, disabling, and nested expansion
 - **Image Storage**: Generated images are saved to `data/output/` with timestamp-based filenames
-- **Mask Storage**: User-drawn masks are stored as `static/temp_mask.png` for web accessibility and reuse
-- **Metadata Storage**: PNG images include embedded metadata with tag zone information for automatic restoration
+- **Mask Storage**: User-drawn masks stored as `static/temp_mask.png` for web accessibility and reuse
+- **Metadata Storage**: PNG images include embedded metadata with expanded prompts and settings for restoration
 - **Tag Database**: Comprehensive tag suggestions from `data/danbooru_tags.txt` (20,000+ tags)
 - **State Management**: Uses Svelte 5's `$state`, stores, and callback patterns to avoid prop mutation warnings
-- **Settings Persistence**: User preferences saved to `data/settings.json` with validation
+- **Settings Persistence**: User preferences saved to `data/settings.json` with per-model overrides and validation
+- **Prompts Persistence**: Tag zone data saved to `data/prompts.json` (legacy, now uses wildcards.yaml)
 
 ### UI/UX Features
 
@@ -123,22 +183,26 @@ The application connects to a local ComfyUI instance at `http://127.0.0.1:8188` 
 
 ### Key Features
 
-- **Multi-zone tag system** with separate areas for different tag categories (All, First Zone, Second Zone, Negative Tags)
+- **Advanced Wildcard System** with YAML-based hierarchical tree structure for organizing prompts
+- **TreeEdit Interface** with visual tree editor for managing wildcard hierarchies (arrays, objects, leaves)
+- **Zone-based Organization** with separate wildcard zones (All, Zone1, Zone2, Negative, Inpainting)
+- **Intelligent Tag Expansion** with random selection from arrays, consistent randomization, pinning, disabling directives, and inline options `{a|b|c}`
+- **Composition Auto-detection** automatically selects layout from tags (e.g., `composition=all`, `composition=2h`)
+- **Dual Model Support** with separate workflows for Stable Diffusion and Qwen image models
 - **Visual composition selection** with clickable layout previews for image generation
-- **Tag-based input** with individual tag boxes that can be removed independently
-- **Quick tag entry** with autocomplete suggestions for rapid tag addition
 - **Real-time progress tracking** during image generation with WebSocket communication
 - **Dynamic checkpoint selection** from ComfyUI with automatic detection
 - **LoRA model integration** with weight adjustment and visual selection interface
-- **Optional upscaling and face detailing** with configurable settings
-- **Automatic image saving** with embedded PNG metadata for tag restoration
-- **Comprehensive tag autocomplete** with 20,000+ Danbooru tags and filtering
-- **Persistent tag storage** with automatic saving and loading of tag zones
+- **Per-model Settings** with checkpoint-specific overrides for samplers, schedulers, VAEs, and prompt prefixes
+- **Optional upscaling and face detailing** with configurable per-model settings
+- **Inpainting Support** with mask drawing, image-to-image workflow, and adjustable denoise strength
+- **Automatic image saving** with embedded PNG metadata including expanded prompts and settings
+- **Comprehensive tag autocomplete** with 20,000+ Danbooru tags and similarity-based filtering
+- **Persistent wildcard storage** with automatic saving and loading of YAML trees
 - **Image navigation** with position tracking and metadata loading control
-- **Settings persistence** with validation and user preference management
-- **Custom scrollbars** for improved UI aesthetics in tag zones
-- **Interactive mask drawing** with brush and flood fill tools, custom cursors matching brush size, and black background for inpainting compatibility
-- **Temporary mask storage** using single reusable file instead of timestamped files for simplified workflow
+- **Custom scrollbars** for improved UI aesthetics
+- **Interactive mask drawing** with brush and flood fill tools, custom cursors, and black background for inpainting
+- **Cross-platform folder opening** for Windows/Linux/Mac output directory access
 
 ## Component Communication
 
@@ -157,8 +221,12 @@ The application connects to a local ComfyUI instance at `http://127.0.0.1:8188` 
 - The workflow structure dynamically configures nodes based on user settings
 - WebSocket communication tracks the `final_save_output` node for image delivery
 - All generated images are automatically saved with timestamp-based filenames and embedded PNG metadata
-- **PNG metadata handling** uses chunk manipulation libraries for tag restoration and zone information
-- **Tag zone system** organizes tags into All, First Zone, Second Zone, and Negative Tags categories
+- **PNG metadata handling** uses chunk manipulation libraries (png-chunks-extract, png-chunks-encode, png-chunk-text) for storing expanded prompts and settings
+- **Wildcard system** organizes prompts into hierarchical YAML trees with zone-based structure (all, zone1, zone2, negative, inpainting)
+- **TreeEdit interface** provides visual editing of wildcard trees with drag & drop, keyboard shortcuts, and filtering
+- **Tag expansion** supports advanced directives: `@random`, `@pin`, `@disable`, `disables=[tag1, tag2]`, wildcards (`__filename__`), and placeholder syntax (`{option1|option2}`)
+- **Composition auto-detection** from tags (composition=all, composition=2h, composition=2v) with automatic UI updates
+- **Dual model support** with separate workflows and settings for Stable Diffusion and Qwen models
 - **Composition selection** allows users to choose image layouts with visual previews, including custom temp-mask
 - **Interactive mask drawing** uses black background for better inpainting compatibility and stores single reusable mask file
 - Component architecture follows separation of concerns with focused, reusable components
@@ -185,9 +253,18 @@ The application uses **Vitest** as the testing framework with the following setu
 
 1. **Unit Tests**: Testing individual utility functions and stores
    - `src/lib/utils/date.test.ts`: Date formatting utilities
-   - `src/lib/utils/tagExpansion.test.ts`: Tag expansion logic
+   - `src/lib/utils/tagExpansion.test.ts`: Tag expansion core logic with wildcards and directives
+   - `src/lib/utils/tagExpansion.pins.test.ts`: Tag expansion pinning behavior
+   - `src/lib/utils/tagExpansion.disables.test.ts`: Tag expansion disable directives
    - `src/lib/utils/tagStyling.test.ts`: Tag styling utilities
+   - `src/lib/utils/textFormatting.test.ts`: Text formatting utilities
+   - `src/lib/utils/compositionDetection.test.ts`: Composition auto-detection from tags
+   - `src/lib/utils/treeBuilder.test.ts`: Tree model construction
+   - `src/lib/utils/fileIO.test.ts`: File I/O operations
+   - `src/lib/utils/comfyui.test.ts`: ComfyUI API interactions
    - `src/lib/stores/testModeStore.test.ts`: Test mode store functionality
+   - `src/lib/stores/promptsStore.test.ts`: Prompts store behavior
+   - `src/lib/TreeEdit/utils.test.ts`: TreeEdit utility functions
 
 2. **Component Tests**: Testing Svelte components in isolation
    - `src/lib/TagDisplay.test.ts`: Tag display component functionality
@@ -216,29 +293,31 @@ npm run test:ui
 
 ## TODO / Future Features
 
+### Completed Features ✓
+
+- ✓ **Mask-based Inpainting**: Full inpainting workflow with user-drawn masks (completed)
+- ✓ **Advanced Wildcard System**: YAML-based hierarchical wildcards with TreeEdit interface (completed)
+- ✓ **Tag Expansion Directives**: @random, @pin, @disable, wildcards, placeholders (completed)
+- ✓ **Tag Exclusion Rules**: `disables=[xxx, yyy]` syntax to prevent specific tags when selected (completed)
+- ✓ **Tag Group Selection**: Array nodes automatically select one child randomly; inline syntax `{a|b|c}` for options (completed)
+- ✓ **Composition Auto-detection**: Auto-select composition from tags (completed)
+- ✓ **Dual Model Support**: Separate workflows for SD and Qwen (completed)
+- ✓ **Per-model Settings**: Checkpoint-specific overrides and prefixes (completed)
+- ✓ **ComfyUI Portable Auto-Installation**: Automatic download and installation of ComfyUI environment (completed)
+
 ### High Priority
 
-- **Mask-based Inpainting**: Implement full inpainting workflow using user-drawn masks
-  - Integrate mask data with ComfyUI inpainting nodes
-  - Add inpainting-specific workflow configuration
-  - Support different inpainting models and settings
-  - Implement mask refinement and preprocessing options
+- **Advanced Tag Constraints**: Extended tag relationship management
+  - Add tag dependency relationships (tag A requires tag B)
+  - Provide enhanced UI for managing complex tag relationships
 
 ### Medium Priority
 
-- **ComfyUI Portable Auto-Installation**: Automatic setup of ComfyUI environment
-  - Download and install ComfyUI Portable automatically
-  - Configure required nodes and extensions
-  - Handle different operating systems (Windows/Linux/Mac)
-  - Provide installation progress feedback and error handling
-
-### Enhancement Features
-
-- **Smart Random Tag Constraints**: Advanced random tag relationship management
-  - Implement tag exclusion rules (when tag A is selected, prevent tag B/C/D)
-  - Add tag dependency relationships (tag A requires tag B)
-  - Create tag group conflicts (only one from group X can be selected)
-  - Provide UI for managing tag relationships and constraints
+- **Batch Processing**: Generate multiple images with variations
+  - Queue multiple generations with different settings
+  - Batch apply random tag variations
+  - Export batch results with metadata
+  - Progress tracking for batch operations
 
 ### Low Priority
 
@@ -247,12 +326,6 @@ npm run test:ui
   - Implement selection tools (rectangle, lasso)
   - Add mask blur/feather options
   - Support multiple mask layers
-
-- **Batch Processing**: Generate multiple images with variations
-  - Queue multiple generations with different settings
-  - Batch apply random tag variations
-  - Export batch results with metadata
-  - Progress tracking for batch operations
 
 - **Advanced Workflow Support**: Extended ComfyUI integration
   - Support custom workflow loading
