@@ -100,7 +100,7 @@ export const qwenWorkflowPrompt: ComfyUIWorkflow = {
       title: 'Model Sampling Aura Flow'
     }
   },
-  '56': {
+  '69': {
     inputs: {
       guide_size: 1024,
       guide_size_for: true,
