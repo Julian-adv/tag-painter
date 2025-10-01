@@ -108,6 +108,7 @@
 
   let availableVaes: string[] = $state([])
   let availableCheckpoints: string[] = $state([])
+  let availableWorkflows: string[] = $state([])
   let selectedModelKey: string = $state('Default')
 
   function ensureModelEntry(key: string) {
@@ -153,6 +154,15 @@
         })
         .catch(() => {
           availableCheckpoints = ['Default']
+        })
+      // Fetch available workflow files
+      fetch('/api/workflow')
+        .then((res) => res.json())
+        .then((data) => {
+          availableWorkflows = data.workflows || []
+        })
+        .catch(() => {
+          availableWorkflows = []
         })
       // Initialize selected model key
       if (!selectedModelKey) selectedModelKey = 'Default'
@@ -278,6 +288,18 @@
           placeholder={m['settingsDialog.comfyUrlPlaceholder']()}
           class="output-dir-input"
         />
+
+        <label for="global-workflow" class="output-dir-label">Global Workflow</label>
+        <select
+          id="global-workflow"
+          bind:value={localSettings.customWorkflowPath}
+          class="output-dir-input"
+        >
+          <option value="">None (Use built-in workflow)</option>
+          {#each availableWorkflows as workflow (workflow)}
+            <option value={workflow}>{workflow}</option>
+          {/each}
+        </select>
 
         <!-- Per-model overrides -->
         <div class="section-spacer" style="grid-column: 1 / 4; height: 10px;"></div>
@@ -422,6 +444,18 @@
             step="1"
             class="two-col-input"
           />
+
+          <label for="pm-workflow" class="two-col-label">Workflow</label>
+          <select
+            id="pm-workflow"
+            bind:value={localSettings.perModel[selectedModelKey].customWorkflowPath}
+            class="two-col-input-wide"
+          >
+            <option value="">None (Use global or default)</option>
+            {#each availableWorkflows as workflow (workflow)}
+              <option value={workflow}>{workflow}</option>
+            {/each}
+          </select>
 
           <label for="pm-quality" class="two-col-label">{m['settingsDialog.qualityPrefix']()}</label
           >

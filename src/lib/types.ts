@@ -65,6 +65,8 @@ export interface ModelSettings {
   modelType: ModelType
   faceDetailer: FaceDetailerSettings
   upscale: UpscaleSettings
+  // Custom workflow file path (optional, relative to data folder)
+  customWorkflowPath?: string
 }
 
 export interface Settings {
@@ -82,6 +84,8 @@ export interface Settings {
   locale: string
   // Per-model overrides including Default pseudo-model
   perModel: Record<string, ModelSettings>
+  // Custom workflow file path (optional, relative to data folder)
+  customWorkflowPath?: string
 }
 
 export interface PromptCategory {

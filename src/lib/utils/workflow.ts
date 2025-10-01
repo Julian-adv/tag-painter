@@ -664,6 +664,16 @@ export const defaultWorkflowPrompt = {
       title: 'Upscale CLIP Text Encode (Negative)'
     }
   },
+  '126': {
+    inputs: {
+      samples: ['121', 0],
+      vae: ['122', 2]
+    },
+    class_type: 'VAEDecode',
+    _meta: {
+      title: 'VAE Decode (Upscale)'
+    }
+  },
   '69': {
     inputs: {
       guide_size: 1024,
@@ -694,7 +704,7 @@ export const defaultWorkflowPrompt = {
       noise_mask_feather: 20,
       tiled_encode: false,
       tiled_decode: false,
-      image: ['19', 0],
+      image: ['126', 0],
       model: ['100', 0],
       clip: ['100', 1],
       vae: ['100', 2],

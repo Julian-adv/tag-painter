@@ -89,9 +89,25 @@ export async function generateImage(options: GenerationOptions): Promise<{
   }
 
   try {
-    const workflow = JSON.parse(
-      JSON.stringify(isInpainting ? inpaintingWorkflowPrompt : defaultWorkflowPrompt)
-    )
+    // Load custom workflow if specified, otherwise use default
+    let workflow: ComfyUIWorkflow
+    const customWorkflowPath = modelSettings?.customWorkflowPath
+    if (customWorkflowPath) {
+      try {
+        const { loadCustomWorkflow } = await import('./workflowMapping')
+        workflow = await loadCustomWorkflow(customWorkflowPath)
+        console.log('Loaded custom workflow from:', customWorkflowPath)
+      } catch (error) {
+        console.error('Failed to load custom workflow, using default:', error)
+        workflow = JSON.parse(
+          JSON.stringify(isInpainting ? inpaintingWorkflowPrompt : defaultWorkflowPrompt)
+        )
+      }
+    } else {
+      workflow = JSON.parse(
+        JSON.stringify(isInpainting ? inpaintingWorkflowPrompt : defaultWorkflowPrompt)
+      )
+    }
 
     onLoadingChange(true)
     onProgressUpdate({ value: 0, max: 100, currentNode: '' })
@@ -226,8 +242,6 @@ export async function generateImage(options: GenerationOptions): Promise<{
       if (isAll) {
         zone2TagsText = ''
       }
-      // Clear face detailer wildcard since we use separate conditioning
-      workflow['56'].inputs.wildcard = ''
 
       // Assign prompts to different nodes
       workflow['12'].inputs.text = allTagsText // All tags
@@ -306,10 +320,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
           ? `[ASC] ${zone1TagsText} [SEP] ${zone2TagsText}`
           : zone1TagsText || zone2TagsText
 
-      // Set wildcard for all FaceDetailer nodes
-      if (workflow['56']) {
-        workflow['56'].inputs.wildcard = combinedZonePrompt
-      }
+      // Set wildcard for FaceDetailer node
       if (workflow['69']) {
         workflow['69'].inputs.wildcard = combinedZonePrompt
       }
@@ -398,11 +409,6 @@ function configureWorkflow(
       workflow['10'].inputs.denoise = inpaintDenoiseStrength
     }
 
-    // Configure FaceDetailer scheduler for inpainting
-    if (workflow['56']) {
-      workflow['56'].inputs.scheduler = scheduler
-    }
-
     // For inpainting, image size is determined by input image, not by EmptyLatentImage
   } else {
     // Regular workflow configuration
@@ -414,10 +420,7 @@ function configureWorkflow(
     workflow['16'].inputs.width = settings.imageWidth
     workflow['16'].inputs.height = settings.imageHeight
 
-    // Configure FaceDetailer schedulers
-    if (workflow['56']) {
-      workflow['56'].inputs.scheduler = scheduler
-    }
+    // Configure FaceDetailer scheduler
     if (workflow['69']) {
       workflow['69'].inputs.scheduler = scheduler
     }
@@ -473,21 +476,7 @@ function configureWorkflow(
         workflow['100'].inputs.ckpt_name = resolvedFdCkpt
       }
 
-      // Configure FaceDetailer generation settings for all FaceDetailer nodes
-      if (workflow['56']) {
-        workflow['56'].inputs.steps = faceDetailerSettings.steps
-        workflow['56'].inputs.cfg = faceDetailerSettings.cfgScale
-        workflow['56'].inputs.sampler_name = faceDetailerSettings.sampler
-        workflow['56'].inputs.scheduler = faceDetailerSettings.scheduler
-        workflow['56'].inputs.denoise = faceDetailerSettings.denoise
-
-        // Configure VAE
-        if (faceDetailerSettings.selectedVae === '__embedded__') {
-          workflow['56'].inputs.vae = ['100', 2] // Use embedded VAE from FaceDetailer checkpoint
-        } else {
-          workflow['56'].inputs.vae = ['5', 0] // Use main VAE
-        }
-      }
+      // Configure FaceDetailer generation settings
       if (workflow['69']) {
         workflow['69'].inputs.steps = faceDetailerSettings.steps
         workflow['69'].inputs.cfg = faceDetailerSettings.cfgScale
@@ -500,6 +489,13 @@ function configureWorkflow(
           workflow['69'].inputs.vae = ['100', 2] // Use embedded VAE from FaceDetailer checkpoint
         } else {
           workflow['69'].inputs.vae = ['5', 0] // Use main VAE
+        }
+
+        // Set FaceDetailer input image based on upscale usage
+        if (promptsData.useUpscale) {
+          workflow['69'].inputs.image = ['126', 0] // Use upscaled image
+        } else {
+          workflow['69'].inputs.image = ['19', 0] // Use base VAE Decode output
         }
       }
     }
@@ -540,23 +536,15 @@ function applySeedsToWorkflow(
     // Inpainting workflow - set seed for KSampler node
     workflow['10'].inputs.seed = seed
 
-    // Set seed for FaceDetailer if it exists
-    if (workflow['56']) {
-      workflow['56'].inputs.seed = seed + 1
-    }
   } else {
     // Regular workflow - set seed for SamplerCustom node
     if (workflow['14']) {
       workflow['14'].inputs.noise_seed = seed
     }
 
-    // Set seed for FaceDetailer nodes
-    if (workflow['56']) {
-      workflow['56'].inputs.seed = seed + 1
-    }
-
+    // Set seed for FaceDetailer node
     if (workflow['69']) {
-      workflow['69'].inputs.seed = seed + 2
+      workflow['69'].inputs.seed = seed + 1
     }
   }
 
@@ -592,21 +580,12 @@ function addSaveImageWebsocketNode(
 
   if (promptsData.useUpscale) {
     if (promptsData.useFaceDetailer) {
-      // Upscale=true, FaceDetailer=true
-      imageSourceNodeId = '69' // Output of second FaceDetailer after upscale
+      imageSourceNodeId = '69' // FaceDetailer after upscale
     } else {
-      // Upscale=true, FaceDetailer=false
-      imageSourceNodeId = '19' // Output of VAE Decode (from upscale KSampler)
+      imageSourceNodeId = '126' // VAE Decode from upscale
     }
   } else {
-    // Upscale=false
-    if (promptsData.useFaceDetailer) {
-      // Upscale=false, FaceDetailer=true
-      imageSourceNodeId = '56' // Output of first FaceDetailer
-    } else {
-      // Upscale=false, FaceDetailer=false
-      imageSourceNodeId = '19' // Output of VAE Decode
-    }
+    imageSourceNodeId = promptsData.useFaceDetailer ? '69' : '19'
   }
 
   // Add the single, dynamically configured SaveImageWebsocket node

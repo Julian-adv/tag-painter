@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit'
 import fs from 'fs/promises'
 import path from 'path'
-import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
+import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY, DEFAULT_WORKFLOW } from '$lib/constants'
 import { baseLocale } from '$lib/paraglide/runtime.js'
 
 const SETTINGS_FILE = path.resolve(process.cwd(), 'data', 'settings.json')
@@ -31,6 +31,7 @@ export async function GET() {
           selectedVae: '__embedded__',
           clipSkip: 2,
           locale: baseLocale,
+          customWorkflowPath: DEFAULT_WORKFLOW,
           perModel: {}
         }
       })
@@ -51,6 +52,10 @@ export async function GET() {
 
     if (!settings.locale) {
       settings.locale = baseLocale
+    }
+
+    if (settings.customWorkflowPath == null) {
+      settings.customWorkflowPath = DEFAULT_WORKFLOW
     }
 
     return json({

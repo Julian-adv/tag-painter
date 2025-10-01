@@ -85,7 +85,21 @@ export async function generateQwenImage(
     onError
   } = options
 
-  const workflow = JSON.parse(JSON.stringify(qwenWorkflowPrompt))
+  // Load custom workflow if specified, otherwise use default Qwen workflow
+  let workflow: ComfyUIWorkflow
+  const customWorkflowPath = modelSettings?.customWorkflowPath
+  if (customWorkflowPath) {
+    try {
+      const { loadCustomWorkflow } = await import('./workflowMapping')
+      workflow = await loadCustomWorkflow(customWorkflowPath)
+      console.log('Loaded custom Qwen workflow from:', customWorkflowPath)
+    } catch (error) {
+      console.error('Failed to load custom workflow, using default Qwen workflow:', error)
+      workflow = JSON.parse(JSON.stringify(qwenWorkflowPrompt))
+    }
+  } else {
+    workflow = JSON.parse(JSON.stringify(qwenWorkflowPrompt))
+  }
 
   try {
     onLoadingChange(true)
@@ -224,7 +238,7 @@ export async function generateQwenImage(
     workflow['3'].inputs.seed = appliedSeed
 
     // Configure FaceDetailer if enabled
-    if (promptsData.useFaceDetailer && workflow['56']) {
+    if (promptsData.useFaceDetailer && workflow['69']) {
       // Get FaceDetailer settings from per-model configuration
       const faceDetailerSettings = modelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
       const fdModelType = faceDetailerSettings.modelType || 'sdxl'
@@ -239,19 +253,19 @@ export async function generateQwenImage(
         if (workflow['75']) workflow['75'].inputs.unet_name = resolvedFdUnet
 
         // Set model input to use Qwen model sampling node (77)
-        workflow['56'].inputs.model = ['77', 0]
+        workflow['69'].inputs.model = ['77', 0]
         // Set CLIP input to use Qwen CLIP loader (76)
-        workflow['56'].inputs.clip = ['76', 0]
+        workflow['69'].inputs.clip = ['76', 0]
 
         // Configure FaceDetailer VAE
         if (faceDetailerSettings.selectedVae === '__embedded__') {
           // For Qwen, no embedded VAE - use separate VAE loader (Node 78)
-          workflow['56'].inputs.vae = ['78', 0]
+          workflow['69'].inputs.vae = ['78', 0]
           const fdVaeName = faceDetailerSettings.selectedVae || 'qwen_image_vae.safetensors'
           if (workflow['78']) workflow['78'].inputs.vae_name = fdVaeName
         } else {
           // Use separate VAE loader (Node 78)
-          workflow['56'].inputs.vae = ['78', 0]
+          workflow['69'].inputs.vae = ['78', 0]
           const fdVaeName = faceDetailerSettings.selectedVae || 'qwen_image_vae.safetensors'
           if (workflow['78']) workflow['78'].inputs.vae_name = fdVaeName
         }
@@ -274,16 +288,16 @@ export async function generateQwenImage(
         if (workflow['71']) workflow['71'].inputs.ckpt_name = resolvedFdCkpt
 
         // Set model and CLIP to use SDXL checkpoint (71)
-        workflow['56'].inputs.model = ['71', 0]
-        workflow['56'].inputs.clip = ['71', 1]
+        workflow['69'].inputs.model = ['71', 0]
+        workflow['69'].inputs.clip = ['71', 1]
 
         // Configure FaceDetailer VAE
         if (faceDetailerSettings.selectedVae === '__embedded__') {
           // Use embedded VAE from checkpoint (Node 71)
-          workflow['56'].inputs.vae = ['71', 2]
+          workflow['69'].inputs.vae = ['71', 2]
         } else {
           // Use separate VAE loader (Node 72)
-          workflow['56'].inputs.vae = ['72', 0]
+          workflow['69'].inputs.vae = ['72', 0]
           const fdVaeName =
             faceDetailerSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
           if (workflow['72']) workflow['72'].inputs.vae_name = fdVaeName
@@ -301,20 +315,20 @@ export async function generateQwenImage(
       }
 
       // Configure FaceDetailer generation settings (common for both model types)
-      workflow['56'].inputs.seed = appliedSeed + 1
-      workflow['56'].inputs.steps = faceDetailerSettings.steps
-      workflow['56'].inputs.cfg = faceDetailerSettings.cfgScale
-      workflow['56'].inputs.sampler_name = faceDetailerSettings.sampler
-      workflow['56'].inputs.scheduler = faceDetailerSettings.scheduler
-      workflow['56'].inputs.denoise = faceDetailerSettings.denoise
+      workflow['69'].inputs.seed = appliedSeed + 1
+      workflow['69'].inputs.steps = faceDetailerSettings.steps
+      workflow['69'].inputs.cfg = faceDetailerSettings.cfgScale
+      workflow['69'].inputs.sampler_name = faceDetailerSettings.sampler
+      workflow['69'].inputs.scheduler = faceDetailerSettings.scheduler
+      workflow['69'].inputs.denoise = faceDetailerSettings.denoise
 
       // Set FaceDetailer input image based on upscale usage
       if (promptsData.useUpscale) {
         // Use upscaled image from Node 126
-        workflow['56'].inputs.image = ['126', 0]
+        workflow['69'].inputs.image = ['126', 0]
       } else {
         // Use original Qwen image from Node 8
-        workflow['56'].inputs.image = ['8', 0]
+        workflow['69'].inputs.image = ['8', 0]
       }
     }
 
@@ -416,15 +430,12 @@ export async function generateQwenImage(
     let imageSourceNodeId: string
     if (promptsData.useUpscale) {
       if (promptsData.useFaceDetailer) {
-        // Upscale=true, FaceDetailer=true
-        imageSourceNodeId = '56' // Output of FaceDetailer (receives upscaled image from Node 126)
+        imageSourceNodeId = '69' // FaceDetailer after upscale
       } else {
-        // Upscale=true, FaceDetailer=false
-        imageSourceNodeId = '126' // Output of upscale VAEDecode
+        imageSourceNodeId = '126' // VAE Decode from upscale
       }
     } else {
-      // Upscale=false
-      imageSourceNodeId = promptsData.useFaceDetailer ? '56' : '8'
+      imageSourceNodeId = promptsData.useFaceDetailer ? '69' : '8'
     }
 
     workflow[FINAL_SAVE_NODE_ID] = {
