@@ -10,6 +10,12 @@ import {
 } from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
 import { findNodeByName, extractDisablesDirective } from '$lib/TreeEdit/utils'
+import {
+  loadWildcardLines,
+  loadWildcardYamlTree,
+  getCachedWildcardLines,
+  getCachedWildcardYamlTree
+} from './wildcards'
 
 // Core context and helpers extracted for clarity
 type DisabledContext = { names: Set<string>; patterns: string[] }
@@ -211,41 +217,126 @@ export function cleanDirectivesFromTags(tagsText: string): string {
   return cleaned.trim()
 }
 
-// --- Wildcard file lines caching (module-level) ---
-const wildcardFileLinesCache = new Map<string, string[]>()
-const wildcardFileLinesInFlight = new Map<string, Promise<string[]>>()
 
-async function loadWildcardLines(name: string): Promise<string[]> {
-  const cached = wildcardFileLinesCache.get(name)
-  if (cached) return cached
-  const inflight = wildcardFileLinesInFlight.get(name)
-  if (inflight) return inflight
-  const p = (async () => {
-    try {
-      const res = await fetch(`/api/wildcard-file?name=${encodeURIComponent(name)}`)
-      if (!res.ok) return []
-      const body = await res.text()
-      const lines = body
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0 && !l.startsWith('#'))
-      wildcardFileLinesCache.set(name, lines)
-      return lines
-    } catch {
-      return []
-    } finally {
-      wildcardFileLinesInFlight.delete(name)
+function getRandomChildFromNode(model: TreeModel, node: AnyNode): string {
+  if (node.kind === 'array') {
+    const children = node.children || []
+    if (children.length === 0) return ''
+
+    // Skip CONSISTENT_RANDOM_MARKER if present
+    let startIndex = 0
+    if (children.length > 0) {
+      const first = model.nodes[children[0]]
+      if (first && first.kind === 'leaf') {
+        const v = String(first.value)
+        if (v === CONSISTENT_RANDOM_MARKER || v === '__CONSISTENT_RANDOM_MARKER__') {
+          startIndex = 1
+        }
+      }
     }
-  })()
-  wildcardFileLinesInFlight.set(name, p)
-  return p
+
+    const validChildren = children.slice(startIndex)
+    if (validChildren.length === 0) return ''
+
+    const idx = getSecureRandomIndex(validChildren.length)
+    const childNode = model.nodes[validChildren[idx]]
+    if (!childNode) return ''
+
+    if (childNode.kind === 'leaf') {
+      return String(childNode.value)
+    }
+    return childNode.name
+  }
+
+  if (node.kind === 'object') {
+    const children = node.children || []
+    if (children.length === 0) return ''
+
+    // Collect all array children
+    const arrays: string[] = []
+    for (const childId of children) {
+      const child = model.nodes[childId]
+      if (child && child.kind === 'array') {
+        arrays.push(childId)
+      }
+    }
+
+    if (arrays.length === 0) return ''
+
+    const idx = getSecureRandomIndex(arrays.length)
+    const arrayNode = model.nodes[arrays[idx]]
+    if (!arrayNode) return ''
+
+    return getRandomChildFromNode(model, arrayNode)
+  }
+
+  return ''
+}
+
+function navigateToNodeByPath(tree: TreeModel, nodePath: string): AnyNode | null {
+  const parts = nodePath.split('/')
+  let currentNode = tree.nodes[tree.rootId]
+
+  // Try to match progressively longer path segments
+  // This handles cases where node names contain slashes (e.g., "Vision/Female-Appearance")
+  let i = 0
+  while (i < parts.length) {
+    if (!currentNode || (currentNode.kind !== 'array' && currentNode.kind !== 'object')) {
+      return null
+    }
+
+    const children = currentNode.children || []
+    let foundChildId: string | null = null
+    let matchedParts = 0
+
+    // Try matching with progressively more parts joined
+    for (let j = parts.length; j > i; j--) {
+      const candidateKey = parts.slice(i, j).join('/')
+
+      for (const childId of children) {
+        const childNode = tree.nodes[childId]
+        if (childNode && childNode.name === candidateKey) {
+          foundChildId = childId
+          matchedParts = j - i
+          break
+        }
+      }
+
+      if (foundChildId) break
+    }
+
+    if (!foundChildId) {
+      return null
+    }
+
+    currentNode = tree.nodes[foundChildId]
+    i += matchedParts
+  }
+
+  return currentNode
 }
 
 function replaceWildcardsFromCache(text: string): string {
   if (!text || !/wildcards=/i.test(text)) return text
   const re = /wildcards=([^,\s]+)/gi
-  return text.replace(re, (_full, name: string) => {
-    const lines = wildcardFileLinesCache.get(name) || []
+  return text.replace(re, (_full, spec: string) => {
+    // Check if it's a YAML path pattern (filename.yaml:path/to/node)
+    const yamlPathMatch = spec.match(/^(.+\.yaml):(.+)$/)
+    if (yamlPathMatch) {
+      const [, filename, nodePath] = yamlPathMatch
+      const tree = getCachedWildcardYamlTree(filename)
+      if (!tree) return ''
+
+      // Navigate to the node
+      const node = navigateToNodeByPath(tree, nodePath)
+      if (!node) return ''
+
+      // Select random child from the found node
+      return getRandomChildFromNode(tree, node)
+    }
+
+    // Original text file handling
+    const lines = getCachedWildcardLines(spec)
     if (lines.length === 0) return ''
     const idx = getSecureRandomIndex(lines.length)
     return lines[idx]
@@ -256,7 +347,16 @@ function extractWildcardFilesFromText(text: string, out: Set<string>) {
   const re = /wildcards=([^,\s]+)/gi
   let m: RegExpExecArray | null
   while ((m = re.exec(text)) !== null) {
-    if (m[1]) out.add(m[1])
+    if (m[1]) {
+      const spec = m[1]
+      // Check if it's a YAML path pattern
+      const yamlPathMatch = spec.match(/^(.+\.yaml):(.+)$/)
+      if (yamlPathMatch) {
+        out.add(yamlPathMatch[1]) // Add only the filename part
+      } else {
+        out.add(spec)
+      }
+    }
   }
 }
 
@@ -306,7 +406,15 @@ export async function prefetchWildcardFilesForTags(
     collectWildcardFilesFromNode(model, node, files, seen)
   }
   const toLoad = Array.from(files)
-  await Promise.all(toLoad.map((f) => loadWildcardLines(f)))
+  await Promise.all(
+    toLoad.map((f) => {
+      if (f.endsWith('.yaml')) {
+        return loadWildcardYamlTree(f)
+      } else {
+        return loadWildcardLines(f)
+      }
+    })
+  )
 }
 
 export async function prefetchWildcardFilesFromTexts(
@@ -323,12 +431,20 @@ export async function prefetchWildcardFilesFromTexts(
   collectWildcardFilesFromNode(model, model.nodes[model.rootId], files, seen)
 
   const toLoad = Array.from(files)
-  await Promise.all(toLoad.map((f) => loadWildcardLines(f)))
+  await Promise.all(
+    toLoad.map((f) => {
+      if (f.endsWith('.yaml')) {
+        return loadWildcardYamlTree(f)
+      } else {
+        return loadWildcardLines(f)
+      }
+    })
+  )
 }
 
 /**
- * Resolve occurrences of "wildcards=filename.txt" by fetching data/filename.txt
- * and replacing each directive with a random non-empty, non-comment line.
+ * Resolve occurrences of "wildcards=filename.txt" or "wildcards=filename.yaml:path/to/node"
+ * by fetching the file and replacing each directive with a random line or node child.
  */
 export async function resolveWildcardDirectives(
   text: string,
@@ -349,10 +465,13 @@ export async function resolveWildcardDirectives(
     const seen = new Set<string>()
     let m: RegExpExecArray | null
     while ((m = re.exec(text)) !== null) {
-      const name = m[1]
-      if (name && !seen.has(name)) {
-        seen.add(name)
-        files.push(name)
+      const spec = m[1]
+      if (spec && !seen.has(spec)) {
+        seen.add(spec)
+        // Extract filename (either spec itself or part before colon)
+        const yamlPathMatch = spec.match(/^(.+\.yaml):(.+)$/)
+        const filename = yamlPathMatch ? yamlPathMatch[1] : spec
+        files.push(filename)
       }
     }
   }
@@ -360,20 +479,41 @@ export async function resolveWildcardDirectives(
 
   // Fetch and cache file contents (trimmed, comments removed)
   await Promise.all(
-    files.map(async (name) => {
-      const lines = await loadWildcardLines(name)
-      if (lines.length > 0) linesCache[name] = lines
+    files.map(async (filename) => {
+      if (filename.endsWith('.yaml')) {
+        await loadWildcardYamlTree(filename)
+      } else {
+        const lines = await loadWildcardLines(filename)
+        if (lines.length > 0) linesCache[filename] = lines
+      }
     })
   )
 
   // Replace each occurrence independently:
-  // - If presetChoices has a value for this file, use it.
+  // - If presetChoices has a value for this spec, use it.
   // - Otherwise, choose a random line per occurrence.
   re.lastIndex = 0
-  return text.replace(re, (_full, name: string) => {
-    const preset = presetChoices[name]
+  return text.replace(re, (_full, spec: string) => {
+    const preset = presetChoices[spec]
     if (preset) return preset
-    const lines = linesCache[name] || []
+
+    // Check if it's a YAML path pattern
+    const yamlPathMatch = spec.match(/^(.+\.yaml):(.+)$/)
+    if (yamlPathMatch) {
+      const [, filename, nodePath] = yamlPathMatch
+      const tree = getCachedWildcardYamlTree(filename)
+      if (!tree) return ''
+
+      // Navigate to the node
+      const node = navigateToNodeByPath(tree, nodePath)
+      if (!node) return ''
+
+      // Select random child from the found node
+      return getRandomChildFromNode(tree, node)
+    }
+
+    // Original text file handling
+    const lines = linesCache[spec] || []
     if (lines.length === 0) return ''
     const idx = getSecureRandomIndex(lines.length)
     return lines[idx]
