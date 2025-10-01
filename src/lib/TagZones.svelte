@@ -20,12 +20,14 @@
       negative: Record<string, string>
       inpainting: Record<string, string>
     }
+    disabledZones?: Set<string>
     settings: Settings
     onOpenSettings?: (focusField: 'quality' | 'negative') => void
   }
 
   let {
     currentRandomTagResolutions = { all: {}, zone1: {}, zone2: {}, negative: {}, inpainting: {} },
+    disabledZones = new Set(),
     settings,
     onOpenSettings
   }: Props = $props()
@@ -252,7 +254,7 @@
       onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone1}
-      disabled={false}
+      disabled={disabledZones.has('zone1')}
       {wildcardsRefreshToken}
     />
 
@@ -263,7 +265,7 @@
       onValueChange={debouncedSave}
       onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone2}
-      disabled={$promptsData.selectedComposition === 'all'}
+      disabled={$promptsData.selectedComposition === 'all' || disabledZones.has('zone2')}
       {wildcardsRefreshToken}
     />
 

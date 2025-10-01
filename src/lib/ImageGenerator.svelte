@@ -67,6 +67,7 @@
     negative: {},
     inpainting: {}
   })
+  let disabledZones = $state<Set<string>>(new Set())
   let tagZonesRef: { saveTagsImmediately: () => Promise<void> } | undefined = $state()
 
   // Show dialog when no checkpoints are found
@@ -294,6 +295,7 @@
     // Store the results
     lastSeed = result.seed
     currentRandomTagResolutions = result.randomTagResolutions
+    disabledZones = result.disabledZones
   }
 
   async function handleInpaint(denoiseStrength: number) {
@@ -399,6 +401,7 @@
     // Store the results
     lastSeed = result.seed
     currentRandomTagResolutions = result.randomTagResolutions
+    disabledZones = result.disabledZones
   }
 
   async function handleGenerateForever() {
@@ -483,6 +486,7 @@
           <TagZones
             bind:this={tagZonesRef}
             {currentRandomTagResolutions}
+            {disabledZones}
             {settings}
             onOpenSettings={openSettingsFromTagZones}
           />

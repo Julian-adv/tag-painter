@@ -59,6 +59,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     negative: Record<string, string>
     inpainting: Record<string, string>
   }
+  disabledZones: Set<string>
 }> {
   const {
     promptsData,
@@ -106,7 +107,11 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const model = getWildcardModel()
     // Prefetch wildcard files referenced in model tree
     await prefetchWildcardFilesFromTexts(model)
-    const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll)
+
+    // Create shared disabled context to propagate disables across zones
+    const sharedDisabledContext = { names: new Set<string>(), patterns: [] as string[] }
+
+    const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll, sharedDisabledContext)
 
     // Check for composition detection
     const detectedComposition = detectCompositionFromTags([allResult.expandedText])
@@ -123,7 +128,8 @@ export async function generateImage(options: GenerationOptions): Promise<{
       model,
       new Set(),
       { ...allResult.randomTagResolutions },
-      previousZone1
+      previousZone1,
+      sharedDisabledContext
     )
 
     const previousZone2 = previousRandomTagResolutions?.zone2 || {}
@@ -132,7 +138,8 @@ export async function generateImage(options: GenerationOptions): Promise<{
       model,
       new Set(),
       { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions },
-      previousZone2
+      previousZone2,
+      sharedDisabledContext
     )
 
     const previousNegative = previousRandomTagResolutions?.negative || {}
@@ -145,7 +152,8 @@ export async function generateImage(options: GenerationOptions): Promise<{
         ...zone1Result.randomTagResolutions,
         ...zone2Result.randomTagResolutions
       },
-      previousNegative
+      previousNegative,
+      sharedDisabledContext
     )
 
     const previousInpainting = previousRandomTagResolutions?.inpainting || {}
@@ -159,7 +167,8 @@ export async function generateImage(options: GenerationOptions): Promise<{
         ...zone2Result.randomTagResolutions,
         ...negativeResult.randomTagResolutions
       },
-      previousInpainting
+      previousInpainting,
+      sharedDisabledContext
     )
 
     // Resolve wildcard directives inside leaf expansion already; now just clean directives
@@ -347,7 +356,11 @@ export async function generateImage(options: GenerationOptions): Promise<{
       }
     )
 
-    return { seed: appliedSeed, randomTagResolutions: allRandomResolutions }
+    return {
+      seed: appliedSeed,
+      randomTagResolutions: allRandomResolutions,
+      disabledZones: sharedDisabledContext.names
+    }
   } catch (error) {
     console.error('Failed to generate image:', error)
 

@@ -138,4 +138,44 @@ background:
     expect(backgroundResult.expandedText).not.toContain('sky')
     expect(backgroundResult.expandedText).not.toContain('window')
   })
+
+  it('extracts disables from wildcard placeholder expansion results', () => {
+    const yaml = `
+all:
+  - __template__
+zone1:
+  - zone1content
+template:
+  - xxx, yyy, zzz, disables=[zone1]
+`
+    const model3 = fromYAML(yaml)
+
+    // Test expansion of 'all' which references __template__
+    const disabledContext = { names: new Set<string>(), patterns: [] as string[] }
+    const allResult = expandCustomTags(
+      'all',
+      model3,
+      new Set(),
+      {},
+      {},
+      disabledContext
+    )
+
+    // Check that the template expanded and disables was extracted
+    expect(allResult.expandedText).toContain('xxx')
+    expect(allResult.expandedText).toContain('yyy')
+    expect(allResult.expandedText).toContain('zzz')
+    expect(disabledContext.names.has('zone1')).toBe(true)
+
+    // Test that zone1 expansion is suppressed by the collected disables
+    const zone1Result = expandCustomTags(
+      'zone1',
+      model3,
+      new Set(),
+      {},
+      {},
+      disabledContext
+    )
+    expect(zone1Result.expandedText).not.toContain('zone1content')
+  })
 })

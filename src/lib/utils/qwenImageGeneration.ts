@@ -72,6 +72,7 @@ export async function generateQwenImage(
     negative: Record<string, string>
     inpainting: Record<string, string>
   }
+  disabledZones: Set<string>
 }> {
   const {
     promptsData,
@@ -103,7 +104,10 @@ export async function generateQwenImage(
 
     await prefetchWildcardFilesFromTexts(model)
 
-    const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll)
+    // Create shared disabled context to propagate disables across zones
+    const sharedDisabledContext = { names: new Set<string>(), patterns: [] as string[] }
+
+    const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll, sharedDisabledContext)
 
     // Detect composition from expanded 'all' tags and propagate to store/UI
     const detectedComposition = detectCompositionFromTags([allResult.expandedText])
@@ -119,7 +123,8 @@ export async function generateQwenImage(
       model,
       new Set(),
       { ...allResult.randomTagResolutions },
-      previousZone1
+      previousZone1,
+      sharedDisabledContext
     )
 
     const zone2Result = expandCustomTags(
@@ -127,7 +132,8 @@ export async function generateQwenImage(
       model,
       new Set(),
       { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions },
-      previousZone2
+      previousZone2,
+      sharedDisabledContext
     )
 
     const negativeResult = expandCustomTags(
@@ -139,7 +145,8 @@ export async function generateQwenImage(
         ...zone1Result.randomTagResolutions,
         ...zone2Result.randomTagResolutions
       },
-      previousNegative
+      previousNegative,
+      sharedDisabledContext
     )
 
     let allTagsText = cleanDirectivesFromTags(allResult.expandedText)
@@ -447,7 +454,11 @@ export async function generateQwenImage(
       }
     )
 
-    return { seed: appliedSeed, randomTagResolutions: allRandomResolutions }
+    return {
+      seed: appliedSeed,
+      randomTagResolutions: allRandomResolutions,
+      disabledZones: sharedDisabledContext.names
+    }
   } catch (error) {
     console.error('Failed to generate Qwen image:', error)
     onError(error instanceof Error ? error.message : 'Failed to generate image')
