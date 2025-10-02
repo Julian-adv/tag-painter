@@ -125,3 +125,21 @@ If auto-download of `OpenPoseXL2.safetensors` fails, download it manually and pl
 ## License
 
 This project is open source. See the LICENSE file for details.
+
+## Chroma Workflow Titles
+
+When using checkpoint models of type `chroma`, Tag Painter sets prompts into your ComfyUI workflow by matching the node titles. To avoid ambiguity, Chroma support uses exactly one title for each prompt:
+
+- Main positive: `CLIP Text Encode (Positive Prompt)`
+- Main negative: `CLIP Text Encode (Negative Prompt)`
+- Upscale/FD positive: `Upscale CLIP Text Encode (Positive)`
+- Upscale/FD negative: `Upscale CLIP Text Encode (Negative)`
+
+How to prepare your workflow:
+- Open your ComfyUI workflow JSON and ensure the `_meta.title` of the CLIP text nodes match the exact strings above.
+- Only one node per title should exist.
+- Save the workflow to `data/workflow/chroma.workflow.json`, or select a custom workflow file in Settings (Per‑model → Workflow).
+
+Notes:
+- Image size is applied to `EmptySD3LatentImage` automatically (by class type, not title).
+- Sampler configuration is applied to `RandomNoise` (seed), `BasicScheduler` (steps/scheduler), `CFGGuider` (cfg), and `KSamplerSelect` (sampler) when present in the workflow.

@@ -53,7 +53,8 @@
   let currentModelType = $derived.by(() => {
     const key = $promptsData.selectedCheckpoint || 'Default'
     const effectiveModel = getEffectiveModelSettings(settings, key)
-    return effectiveModel?.modelType === 'qwen' ? 'qwen' : undefined
+    const mt = effectiveModel?.modelType
+    return mt === 'qwen' || mt === 'chroma' ? mt : undefined
   })
 
   let hasLoadedTags = $state(false)
@@ -64,7 +65,7 @@
     const effectiveModel = getEffectiveModelSettings(settings, key)
     qualityPrefixText = effectiveModel?.qualityPrefix || ''
     negativePrefixText = effectiveModel?.negativePrefix || ''
-    const signature = `${currentModelType === 'qwen' ? 'qwen' : 'default'}|${key}`
+    const signature = `${currentModelType === 'qwen' || currentModelType === 'chroma' ? 'qwen' : 'default'}|${key}`
     if (signature !== lastModelSignature || !hasLoadedTags) {
       lastModelSignature = signature
       hasLoadedTags = true
@@ -77,7 +78,8 @@
 
   // Load tags from wildcard zones
   async function loadTagsFromWildcards(modelTypeOverride?: string) {
-    const targetModelType = (modelTypeOverride ?? currentModelType) === 'qwen' ? 'qwen' : undefined
+    const mt = modelTypeOverride ?? currentModelType
+    const targetModelType = mt === 'qwen' || mt === 'chroma' ? mt : undefined
     const zones = await readWildcardZones(targetModelType)
     allTags = zones.all
     firstZoneTags = zones.zone1
@@ -109,7 +111,7 @@
         inpainting: inpaintingTags
       }
 
-      const targetModelType = currentModelType === 'qwen' ? 'qwen' : undefined
+      const targetModelType = currentModelType === 'qwen' || currentModelType === 'chroma' ? currentModelType : undefined
       await writeWildcardZones(zones, targetModelType)
 
       if (saveTimeout) {

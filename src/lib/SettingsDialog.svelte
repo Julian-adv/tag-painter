@@ -331,6 +331,7 @@
           >
             <option value="sdxl">SDXL</option>
             <option value="qwen">Qwen</option>
+            <option value="chroma">Chroma</option>
           </select>
 
           <label for="pm-cfg" class="two-col-label">{m['settingsDialog.cfgScale']()}</label>
@@ -524,6 +525,7 @@
             >
               <option value="sdxl">SDXL</option>
               <option value="qwen">Qwen</option>
+              <option value="chroma">Chroma</option>
             </select>
 
             <label for="fd-steps" class="two-col-label"
@@ -627,6 +629,7 @@
             >
               <option value="sdxl">SDXL</option>
               <option value="qwen">Qwen</option>
+              <option value="chroma">Chroma</option>
             </select>
 
             <label for="us-scale" class="two-col-label">{m['settingsDialog.upscaleScale']()}</label>

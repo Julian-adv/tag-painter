@@ -27,7 +27,7 @@ export interface LoraWithWeight {
   weight: number
 }
 
-export type ModelType = 'sdxl' | 'qwen'
+export type ModelType = 'sdxl' | 'qwen' | 'chroma'
 
 export interface FaceDetailerSettings {
   checkpoint: string

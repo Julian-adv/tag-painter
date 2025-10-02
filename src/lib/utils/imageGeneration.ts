@@ -11,6 +11,7 @@ import {
 } from './workflow'
 import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
 import { generateQwenImage } from './qwenImageGeneration'
+import { generateChromaImage } from './chromaImageGeneration'
 import {
   generateClientId,
   getEffectiveModelSettings,
@@ -86,6 +87,15 @@ export async function generateImage(options: GenerationOptions): Promise<{
     console.warn(message)
     onError(message)
     throw new Error(message)
+  }
+
+  if (!isInpainting && modelSettings?.modelType === 'chroma') {
+    return generateChromaImage(options, modelSettings)
+  }
+
+  if (isInpainting && modelSettings?.modelType === 'chroma') {
+    // Conservatively treat like SDXL inpainting unless specified otherwise
+    // If Chroma does not support inpainting in your workflow, set a custom workflow per model.
   }
 
   try {
