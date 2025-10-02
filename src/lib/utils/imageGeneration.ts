@@ -29,6 +29,16 @@ import { getWildcardModel } from '../stores/tagsStore'
 import { readWildcardZones } from './wildcardZones'
 import { updateComposition } from '../stores/promptsStore'
 import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow } from '$lib/types'
+import {
+  findNodeByTitle,
+  setNodeTextInput,
+  setNodeCheckpoint,
+  setNodeSampler,
+  setNodeImageSize,
+  setNodeImagePath,
+  setNodeVae,
+  setNodeClipSkip
+} from './workflowMapping'
 
 export interface GenerationOptions {
   promptsData: PromptsData
@@ -230,19 +240,19 @@ export async function generateImage(options: GenerationOptions): Promise<{
     }
 
     if (isInpainting) {
-      // Configure inpainting workflow
-      workflow['12'].inputs.text = inpaintingTagsText // Inpainting prompt
-      workflow['18'].inputs.text = negativeTagsText // Negative prompt
+      // Configure inpainting workflow (title-based)
+      setNodeTextInput(workflow, 'CLIP Text Encode (Prompt)', inpaintingTagsText)
+      setNodeTextInput(workflow, 'CLIP Text Encode (Negative)', negativeTagsText)
 
       // Set the current image as input
       if (currentImagePath) {
-        workflow['89'].inputs.image = currentImagePath
+        setNodeImagePath(workflow, 'Load Input Image', currentImagePath)
         console.log('Using image path:', currentImagePath)
       }
 
       // Set the mask image (already has full path)
       if (maskFilePath) {
-        workflow['90'].inputs.image = maskFilePath
+        setNodeImagePath(workflow, 'Load Mask Image', maskFilePath)
         console.log('Using mask path:', maskFilePath)
       }
     } else {
@@ -253,17 +263,24 @@ export async function generateImage(options: GenerationOptions): Promise<{
         zone2TagsText = ''
       }
 
-      // Assign prompts to different nodes
-      workflow['12'].inputs.text = allTagsText // All tags
-      workflow['13'].inputs.text = zone1TagsText // Zone1 tags
-      workflow['51'].inputs.text = zone2TagsText // Zone2 tags
+      // Assign prompts to different nodes (title-based)
+      setNodeTextInput(workflow, 'CLIP Text Encode (All)', allTagsText)
+      setNodeTextInput(workflow, 'CLIP Text Encode (Zone1)', zone1TagsText)
+      setNodeTextInput(workflow, 'CLIP Text Encode (Zone2)', zone2TagsText)
 
-      // Set mask configuration for regional separation
-      workflow['10'].inputs.mask_1 = ['87', 0] // Left mask
-      workflow['10'].inputs.mask_2 = ['88', 0] // Inverted mask
+      // Set mask configuration for regional separation (title-based)
+      const coupleNode = findNodeByTitle(workflow, 'Attention Couple 🍌')?.nodeId
+      const leftMask = findNodeByTitle(workflow, 'Convert Image to Mask')?.nodeId
+      const invertedMask = findNodeByTitle(workflow, 'InvertMask')?.nodeId
+      if (coupleNode && leftMask && workflow[coupleNode]) {
+        workflow[coupleNode].inputs.mask_1 = [leftMask, 0]
+      }
+      if (coupleNode && invertedMask && workflow[coupleNode]) {
+        workflow[coupleNode].inputs.mask_2 = [invertedMask, 0]
+      }
 
       // Set negative prompt from negative tags
-      workflow['18'].inputs.text = negativeTagsText
+      setNodeTextInput(workflow, 'CLIP Text Encode (Negative)', negativeTagsText)
 
       // Get mask image path from server-side API with selected composition
       const maskResponse = await fetch(
@@ -273,7 +290,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
         throw new Error(`Failed to get mask path: ${maskResponse.statusText}`)
       }
       const { maskImagePath } = await maskResponse.json()
-      workflow['86'].inputs.image = maskImagePath
+      setNodeImagePath(workflow, 'Load Image', maskImagePath)
     }
 
     // Configure workflow based on settings merged with per-model overrides
@@ -289,7 +306,9 @@ export async function generateImage(options: GenerationOptions): Promise<{
 
     configureWorkflow(workflow, promptsData, appliedSettings, isInpainting, inpaintDenoiseStrength)
 
-    // Configure CLIP skip
+    // Configure CLIP skip (title-based and legacy numeric for compatibility)
+    setNodeClipSkip(workflow, 'CLIP Set Last Layer', appliedSettings.clipSkip)
+    if (isInpainting) setNodeClipSkip(workflow, 'CLIP Set Last Layer (Inpainting)', appliedSettings.clipSkip)
     configureClipSkip(workflow, appliedSettings.clipSkip)
 
     // If a custom VAE is selected, inject VAELoader and rewire all VAE inputs
@@ -312,12 +331,8 @@ export async function generateImage(options: GenerationOptions): Promise<{
           ? `${allTagsText}, ${zone1TagsText || ''}${zone2TagsText ? (zone1TagsText ? ', ' : '') + zone2TagsText : ''}`
           : allTagsText || zone1TagsText || zone2TagsText
 
-      if (workflow['123']) {
-        workflow['123'].inputs.text = combinedPrompt // Positive prompt for upscale
-      }
-      if (workflow['124']) {
-        workflow['124'].inputs.text = negativeTagsText // Negative prompt for upscale
-      }
+      setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Positive)', combinedPrompt)
+      setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Negative)', negativeTagsText)
     }
 
     // Configure FaceDetailer text prompts and wildcard if enabled
@@ -331,8 +346,9 @@ export async function generateImage(options: GenerationOptions): Promise<{
           : zone1TagsText || zone2TagsText
 
       // Set wildcard for FaceDetailer node
-      if (workflow['69']) {
-        workflow['69'].inputs.wildcard = combinedZonePrompt
+      const fdNode = findNodeByTitle(workflow, 'FaceDetailer')?.nodeId
+      if (fdNode && workflow[fdNode] && 'wildcard' in workflow[fdNode].inputs) {
+        workflow[fdNode].inputs.wildcard = combinedZonePrompt
       }
 
       // Configure FaceDetailer text prompts for separate conditioning
@@ -342,17 +358,15 @@ export async function generateImage(options: GenerationOptions): Promise<{
           ? `${allTagsText}, ${zone1TagsText || ''}${zone2TagsText ? (zone1TagsText ? ', ' : '') + zone2TagsText : ''}`
           : allTagsText || zone1TagsText || zone2TagsText
 
-      workflow['101'].inputs.text = combinedPrompt // Positive prompt for FaceDetailer
-      workflow['103'].inputs.text = negativeTagsText // Negative prompt for FaceDetailer
+      setNodeTextInput(workflow, 'FaceDetailer CLIP Text Encode (Positive)', combinedPrompt)
+      setNodeTextInput(workflow, 'FaceDetailer CLIP Text Encode (Negative)', negativeTagsText)
     }
 
     // Update mask file in workflow if provided
     if (maskFilePath) {
       console.log('Using mask file:', maskFilePath)
-      // Update node 86 to use the generated mask
-      if (workflow['86']) {
-        workflow['86'].inputs.image = maskFilePath
-      }
+      // Update composition mask image node
+      setNodeImagePath(workflow, 'Load Image', maskFilePath)
     }
 
     console.log('workflow', workflow)
@@ -398,9 +412,9 @@ function configureWorkflow(
   isInpainting: boolean = false,
   inpaintDenoiseStrength?: number
 ) {
-  // Set checkpoint
+  // Set checkpoint by title
   if (promptsData.selectedCheckpoint) {
-    workflow['11'].inputs.ckpt_name = promptsData.selectedCheckpoint
+    setNodeCheckpoint(workflow, 'Load Checkpoint', promptsData.selectedCheckpoint)
   }
 
   // Get effective model settings (includes scheduler)
@@ -408,51 +422,62 @@ function configureWorkflow(
   const scheduler = effectiveModel?.scheduler || 'simple'
 
   if (isInpainting) {
-    // Inpainting workflow configuration
-    workflow['10'].inputs.steps = settings.steps
-    workflow['10'].inputs.cfg = settings.cfgScale
-    workflow['10'].inputs.sampler_name = settings.sampler
-    workflow['10'].inputs.scheduler = scheduler
-
-    // Apply custom denoise strength if provided, otherwise use default
-    if (inpaintDenoiseStrength !== undefined) {
-      workflow['10'].inputs.denoise = inpaintDenoiseStrength
-    }
+    // Inpainting workflow configuration (title-based)
+    setNodeSampler(workflow, 'KSampler (inpainting)', {
+      steps: settings.steps,
+      cfg: settings.cfgScale,
+      sampler_name: settings.sampler,
+      scheduler,
+      denoise: inpaintDenoiseStrength
+    })
 
     // For inpainting, image size is determined by input image, not by EmptyLatentImage
   } else {
     // Regular workflow configuration
     // Apply settings values to workflow
-    workflow['45'].inputs.steps = settings.steps
-    workflow['45'].inputs.scheduler = scheduler
-    workflow['14'].inputs.cfg = settings.cfgScale
-    workflow['15'].inputs.sampler_name = settings.sampler
-    workflow['16'].inputs.width = settings.imageWidth
-    workflow['16'].inputs.height = settings.imageHeight
+    setNodeSampler(workflow, 'BasicScheduler', { steps: settings.steps, scheduler })
+    setNodeSampler(workflow, 'SamplerCustom', { cfg: settings.cfgScale })
+    setNodeSampler(workflow, 'KSamplerSelect', { sampler_name: settings.sampler })
+    setNodeImageSize(workflow, 'Empty Latent Image', settings.imageWidth, settings.imageHeight)
 
-    // Configure FaceDetailer scheduler
-    if (workflow['69']) {
-      workflow['69'].inputs.scheduler = scheduler
-    }
+    // Ensure Upscale Checkpoint Loader has a valid checkpoint even if upscale is disabled
+    const effectiveModel2 = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
+    const upscaleSettings2 = effectiveModel2?.upscale || DEFAULT_UPSCALE_SETTINGS
+    const baseCkptNodeId = findNodeByTitle(workflow, 'Load Checkpoint')?.nodeId
+    const baseCkptName =
+      baseCkptNodeId && typeof workflow[baseCkptNodeId]?.inputs?.ckpt_name === 'string'
+        ? (workflow[baseCkptNodeId].inputs.ckpt_name as string)
+        : null
+    const resolvedUpscaleCkptAlways =
+      (upscaleSettings2.checkpoint && upscaleSettings2.checkpoint !== 'model.safetensors'
+        ? upscaleSettings2.checkpoint
+        : null) || promptsData.selectedCheckpoint || baseCkptName || upscaleSettings2.checkpoint
+    setNodeCheckpoint(workflow, 'Upscale Checkpoint Loader', resolvedUpscaleCkptAlways)
+
+    // Configure FaceDetailer scheduler (title-based)
+    setNodeSampler(workflow, 'FaceDetailer', { scheduler })
 
     // Configure optional features
     if (promptsData.useUpscale) {
-      // Configure latent upscale workflow
-      if (workflow['120'] && workflow['121'] && workflow['122']) {
+      // Configure latent upscale workflow when upscale nodes exist
+      {
         // Get upscale settings
         const effectiveModel = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
         const upscaleSettings = effectiveModel?.upscale || DEFAULT_UPSCALE_SETTINGS
 
         // Configure LatentUpscale dimensions (use scale from settings)
-        workflow['120'].inputs.width = Math.round(settings.imageWidth * upscaleSettings.scale)
-        workflow['120'].inputs.height = Math.round(settings.imageHeight * upscaleSettings.scale)
+        const latentUpscale = findNodeByTitle(workflow, 'Latent Upscale')?.nodeId
+        if (latentUpscale && workflow[latentUpscale]) {
+          workflow[latentUpscale].inputs.width = Math.round(settings.imageWidth * upscaleSettings.scale)
+          workflow[latentUpscale].inputs.height = Math.round(settings.imageHeight * upscaleSettings.scale)
+        }
 
         // Configure upscale checkpoint (default to selected base model if unset/placeholder)
         const resolvedUpscaleCkpt =
           upscaleSettings.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors'
             ? upscaleSettings.checkpoint
             : promptsData.selectedCheckpoint || upscaleSettings.checkpoint
-        workflow['122'].inputs.ckpt_name = resolvedUpscaleCkpt
+        setNodeCheckpoint(workflow, 'Upscale Checkpoint Loader', resolvedUpscaleCkpt)
 
         // Configure upscale VAE (if not using embedded)
         if (upscaleSettings.selectedVae && upscaleSettings.selectedVae !== '__embedded__') {
@@ -461,14 +486,20 @@ function configureWorkflow(
         }
 
         // Configure upscale KSampler
-        workflow['121'].inputs.steps = upscaleSettings.steps
-        workflow['121'].inputs.cfg = upscaleSettings.cfgScale
-        workflow['121'].inputs.sampler_name = upscaleSettings.sampler
-        workflow['121'].inputs.scheduler = upscaleSettings.scheduler
-        workflow['121'].inputs.denoise = upscaleSettings.denoise
+        setNodeSampler(workflow, 'KSampler (Upscale)', {
+          steps: upscaleSettings.steps,
+          cfg: upscaleSettings.cfgScale,
+          sampler_name: upscaleSettings.sampler,
+          scheduler: upscaleSettings.scheduler,
+          denoise: upscaleSettings.denoise
+        })
 
         // Change VAEDecode to use upscale KSampler output
-        workflow['19'].inputs.samples = ['121', 0]
+        const upscaleSampler = findNodeByTitle(workflow, 'KSampler (Upscale)')?.nodeId
+        const baseDecode = findNodeByTitle(workflow, 'VAE Decode')?.nodeId
+        if (upscaleSampler && baseDecode && workflow[baseDecode]) {
+          workflow[baseDecode].inputs.samples = [upscaleSampler, 0]
+        }
       }
     }
 
@@ -478,34 +509,38 @@ function configureWorkflow(
       const faceDetailerSettings = effectiveModel?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
 
       // Set FaceDetailer checkpoint model (default to selected base model if unset/placeholder)
-      if (workflow['100']) {
+      if (findNodeByTitle(workflow, 'FaceDetailer Checkpoint Loader')?.nodeId) {
         const resolvedFdCkpt =
           faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
             ? faceDetailerSettings.checkpoint
             : promptsData.selectedCheckpoint || faceDetailerSettings.checkpoint
-        workflow['100'].inputs.ckpt_name = resolvedFdCkpt
+        setNodeCheckpoint(workflow, 'FaceDetailer Checkpoint Loader', resolvedFdCkpt)
       }
 
       // Configure FaceDetailer generation settings
-      if (workflow['69']) {
-        workflow['69'].inputs.steps = faceDetailerSettings.steps
-        workflow['69'].inputs.cfg = faceDetailerSettings.cfgScale
-        workflow['69'].inputs.sampler_name = faceDetailerSettings.sampler
-        workflow['69'].inputs.scheduler = faceDetailerSettings.scheduler
-        workflow['69'].inputs.denoise = faceDetailerSettings.denoise
+      if (findNodeByTitle(workflow, 'FaceDetailer')?.nodeId) {
+        setNodeSampler(workflow, 'FaceDetailer', {
+          steps: faceDetailerSettings.steps,
+          cfg: faceDetailerSettings.cfgScale,
+          sampler_name: faceDetailerSettings.sampler,
+          scheduler: faceDetailerSettings.scheduler,
+          denoise: faceDetailerSettings.denoise
+        })
 
         // Configure VAE
         if (faceDetailerSettings.selectedVae === '__embedded__') {
-          workflow['69'].inputs.vae = ['100', 2] // Use embedded VAE from FaceDetailer checkpoint
-        } else {
-          workflow['69'].inputs.vae = ['5', 0] // Use main VAE
+          const fdCkpt = findNodeByTitle(workflow, 'FaceDetailer Checkpoint Loader')?.nodeId
+          const fdNode = findNodeByTitle(workflow, 'FaceDetailer')?.nodeId
+          if (fdCkpt && fdNode && workflow[fdNode]) workflow[fdNode].inputs.vae = [fdCkpt, 2]
         }
 
         // Set FaceDetailer input image based on upscale usage
-        if (promptsData.useUpscale) {
-          workflow['69'].inputs.image = ['126', 0] // Use upscaled image
-        } else {
-          workflow['69'].inputs.image = ['19', 0] // Use base VAE Decode output
+        const fdNode = findNodeByTitle(workflow, 'FaceDetailer')?.nodeId
+        const upDecode = findNodeByTitle(workflow, 'VAE Decode (Upscale)')?.nodeId
+        const baseDecode = findNodeByTitle(workflow, 'VAE Decode')?.nodeId
+        if (fdNode && workflow[fdNode]) {
+          if (promptsData.useUpscale && upDecode) workflow[fdNode].inputs.image = [upDecode, 0]
+          else if (!promptsData.useUpscale && baseDecode) workflow[fdNode].inputs.image = [baseDecode, 0]
         }
       }
     }
@@ -513,7 +548,15 @@ function configureWorkflow(
 }
 
 function applyCustomVae(workflow: ComfyUIWorkflow, vaeName: string) {
-  const vaeNodeId = '901'
+  // Pick a unique node id for the injected VAELoader
+  const baseId = 'custom_vae_loader'
+  let vaeNodeId = baseId
+  if (workflow[vaeNodeId]) {
+    let i = 1
+    while (workflow[`${baseId}_${i}`]) i++
+    vaeNodeId = `${baseId}_${i}`
+  }
+
   // Add VAELoader node
   workflow[vaeNodeId] = {
     inputs: {
@@ -542,21 +585,17 @@ function applySeedsToWorkflow(
   // Use provided seed or generate a new random seed
   const seed = providedSeed ?? Math.floor(Math.random() * 1000000000000000)
 
-  if (isInpainting) {
-    // Inpainting workflow - set seed for KSampler node
-    workflow['10'].inputs.seed = seed
+    if (isInpainting) {
+      // Inpainting workflow - set seed for KSampler node by title
+      setNodeSampler(workflow, 'KSampler (inpainting)', { seed })
 
-  } else {
-    // Regular workflow - set seed for SamplerCustom node
-    if (workflow['14']) {
-      workflow['14'].inputs.noise_seed = seed
-    }
+    } else {
+      // Regular workflow - set seed for SamplerCustom node (noise_seed)
+      setNodeSampler(workflow, 'SamplerCustom', { seed })
 
-    // Set seed for FaceDetailer node
-    if (workflow['69']) {
-      workflow['69'].inputs.seed = seed + 1
+      // Set seed for FaceDetailer node
+      setNodeSampler(workflow, 'FaceDetailer', { seed: seed + 1 })
     }
-  }
 
   return seed
 }
@@ -570,11 +609,11 @@ function addSaveImageWebsocketNode(
     // Inpainting workflow - check if FaceDetailer should be used
     let imageSourceNodeId: string
     if (promptsData.useFaceDetailer) {
-      // Use ImageCompositeMasked output (FaceDetailer result composited with original)
-      imageSourceNodeId = '106'
+      // Composite FaceDetailer result with original
+      imageSourceNodeId = findNodeByTitle(workflow, 'Composite FaceDetailer Result with Original')?.nodeId || '106'
     } else {
-      // Use VAE Decode output directly from LatentCompositeMasked
-      imageSourceNodeId = '102'
+      // Use VAE Decode output directly from LatentCompositeMasked path
+      imageSourceNodeId = findNodeByTitle(workflow, 'VAE Decode for FaceDetailer')?.nodeId || '102'
     }
 
     workflow[FINAL_SAVE_NODE_ID] = {
@@ -590,12 +629,14 @@ function addSaveImageWebsocketNode(
 
   if (promptsData.useUpscale) {
     if (promptsData.useFaceDetailer) {
-      imageSourceNodeId = '69' // FaceDetailer after upscale
+      imageSourceNodeId = findNodeByTitle(workflow, 'FaceDetailer')?.nodeId || '69'
     } else {
-      imageSourceNodeId = '126' // VAE Decode from upscale
+      imageSourceNodeId = findNodeByTitle(workflow, 'VAE Decode (Upscale)')?.nodeId || '126'
     }
   } else {
-    imageSourceNodeId = promptsData.useFaceDetailer ? '69' : '19'
+    imageSourceNodeId = (promptsData.useFaceDetailer
+      ? findNodeByTitle(workflow, 'FaceDetailer')?.nodeId
+      : findNodeByTitle(workflow, 'VAE Decode')?.nodeId) || (promptsData.useFaceDetailer ? '69' : '19')
   }
 
   // Add the single, dynamically configured SaveImageWebsocket node

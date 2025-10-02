@@ -439,7 +439,7 @@ export const defaultWorkflowPrompt = {
     },
     class_type: 'CLIPTextEncode',
     _meta: {
-      title: 'CLIP Text Encode (Prompt)'
+      title: 'CLIP Text Encode (All)'
     }
   },
   '13': {
@@ -449,7 +449,7 @@ export const defaultWorkflowPrompt = {
     },
     class_type: 'CLIPTextEncode',
     _meta: {
-      title: 'CLIP Text Encode (Prompt)'
+      title: 'CLIP Text Encode (Zone1)'
     }
   },
   '14': {
@@ -496,7 +496,7 @@ export const defaultWorkflowPrompt = {
     },
     class_type: 'CLIPTextEncode',
     _meta: {
-      title: 'CLIP Text Encode (Prompt)'
+      title: 'CLIP Text Encode (Negative)'
     }
   },
   '19': {
@@ -528,7 +528,7 @@ export const defaultWorkflowPrompt = {
     },
     class_type: 'CLIPTextEncode',
     _meta: {
-      title: 'CLIP Text Encode (Prompt)'
+      title: 'CLIP Text Encode (Zone2)'
     }
   },
   '56': {
