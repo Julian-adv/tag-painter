@@ -4,6 +4,14 @@
 
 import { qwenWorkflowPrompt } from './qwenWorkflow'
 import { FINAL_SAVE_NODE_ID } from './workflow'
+import {
+  findNodeByTitle,
+  setNodeTextInput,
+  setNodeSampler,
+  setNodeImageSize,
+  setNodeVae,
+  loadCustomWorkflow
+} from './workflowMapping'
 import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
 import {
   expandCustomTags,
@@ -24,18 +32,21 @@ import type { ComfyUIWorkflow, ModelSettings } from '$lib/types'
 import type { GenerationOptions } from './imageGeneration'
 
 function applyQwenLoraChain(workflow: ComfyUIWorkflow, loras: { name: string; weight: number }[]) {
-  const baseNodeId = '37'
-  const samplerNodeId = '66'
+  const baseUnet = findNodeByTitle(workflow, 'Load Qwen UNet')?.nodeId || '37'
+  const modelSampling = findNodeByTitle(workflow, 'Model Sampling Aura Flow')?.nodeId || '66'
+  const mainSampler = findNodeByTitle(workflow, 'KSampler')?.nodeId || '3'
 
   if (!Array.isArray(loras) || loras.length === 0) {
-    if (workflow[samplerNodeId]) {
-      workflow[samplerNodeId].inputs.model = [baseNodeId, 0]
+    if (workflow[modelSampling]) {
+      workflow[modelSampling].inputs.model = [baseUnet, 0]
     }
-    workflow['3'].inputs.model = [samplerNodeId, 0]
+    if (workflow[mainSampler]) {
+      workflow[mainSampler].inputs.model = [modelSampling, 0]
+    }
     return
   }
 
-  let previousNodeId = baseNodeId
+  let previousNodeId = baseUnet
 
   loras.forEach((lora, index) => {
     const nodeId = (200 + index).toString()
@@ -54,10 +65,12 @@ function applyQwenLoraChain(workflow: ComfyUIWorkflow, loras: { name: string; we
     previousNodeId = nodeId
   })
 
-  if (workflow[samplerNodeId]) {
-    workflow[samplerNodeId].inputs.model = [previousNodeId, 0]
+  if (workflow[modelSampling]) {
+    workflow[modelSampling].inputs.model = [previousNodeId, 0]
   }
-  workflow['3'].inputs.model = [samplerNodeId, 0]
+  if (workflow[mainSampler]) {
+    workflow[mainSampler].inputs.model = [modelSampling, 0]
+  }
 }
 
 export async function generateQwenImage(
@@ -90,7 +103,6 @@ export async function generateQwenImage(
   const customWorkflowPath = modelSettings?.customWorkflowPath
   if (customWorkflowPath) {
     try {
-      const { loadCustomWorkflow } = await import('./workflowMapping')
       workflow = await loadCustomWorkflow(customWorkflowPath)
       console.log('Loaded custom Qwen workflow from:', customWorkflowPath)
     } catch (error) {
@@ -204,131 +216,148 @@ export async function generateQwenImage(
     )
     applyQwenLoraChain(workflow, effectiveLoras)
 
-    workflow['3'].inputs.steps = appliedSettings.steps
-    workflow['3'].inputs.cfg = appliedSettings.cfgScale
-    workflow['3'].inputs.sampler_name = appliedSettings.sampler
-    workflow['3'].inputs.scheduler = scheduler
+    // Main sampler settings
+    setNodeSampler(workflow, 'KSampler', {
+      steps: appliedSettings.steps,
+      cfg: appliedSettings.cfgScale,
+      sampler_name: appliedSettings.sampler,
+      scheduler
+    })
 
-    if (workflow['70']) {
-      workflow['70'].inputs.width = appliedSettings.imageWidth
-      workflow['70'].inputs.height = appliedSettings.imageHeight
-    }
+    // Canvas size
+    setNodeImageSize(workflow, 'Empty Latent Image', appliedSettings.imageWidth, appliedSettings.imageHeight)
 
+    // UNet checkpoint (Qwen)
     if (promptsData.selectedCheckpoint) {
-      workflow['37'].inputs.unet_name = promptsData.selectedCheckpoint
+      const unetNodeId = findNodeByTitle(workflow, 'Load Qwen UNet')?.nodeId
+      if (unetNodeId && workflow[unetNodeId]) {
+        workflow[unetNodeId].inputs.unet_name = promptsData.selectedCheckpoint
+      }
     }
 
+    // VAE selection (use explicit selection or keep existing/default)
+    const vaeDefaultFromWorkflow = (() => {
+      const nodeId = findNodeByTitle(workflow, 'Load Qwen VAE')?.nodeId
+      if (nodeId && workflow[nodeId] && typeof workflow[nodeId].inputs.vae_name === 'string') {
+        return workflow[nodeId].inputs.vae_name as string
+      }
+      return 'qwen_image_vae.safetensors'
+    })()
     const vaeName =
       appliedSettings.selectedVae && appliedSettings.selectedVae !== '__embedded__'
         ? appliedSettings.selectedVae
-        : (workflow['39']?.inputs?.vae_name as string) || 'qwen_image_vae.safetensors'
-    if (workflow['39']) {
-      workflow['39'].inputs.vae_name = vaeName
-    }
+        : vaeDefaultFromWorkflow
+    setNodeVae(workflow, 'Load Qwen VAE', vaeName)
 
     // Combine all enabled zones for Qwen's single prompt input
     const combinedPrompt = [allTagsText, zone1TagsText, zone2TagsText]
       .filter((text) => text && text.trim().length > 0)
       .join(' BREAK ')
 
-    workflow['6'].inputs.text = combinedPrompt
-    workflow['7'].inputs.text = negativeTagsText
+    setNodeTextInput(workflow, 'CLIP Text Encode (Positive)', combinedPrompt)
+    setNodeTextInput(workflow, 'CLIP Text Encode (Negative)', negativeTagsText)
 
     const appliedSeed = seed ?? Math.floor(Math.random() * 1000000000000000)
-    workflow['3'].inputs.seed = appliedSeed
+    setNodeSampler(workflow, 'KSampler', { seed: appliedSeed })
 
     // Configure FaceDetailer if enabled
-    if (promptsData.useFaceDetailer && workflow['69']) {
-      // Get FaceDetailer settings from per-model configuration
-      const faceDetailerSettings = modelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
-      const fdModelType = faceDetailerSettings.modelType || 'sdxl'
+    if (promptsData.useFaceDetailer) {
+      const fdNodeId = findNodeByTitle(workflow, 'FaceDetailer')?.nodeId
+      if (fdNodeId) {
+        const faceDetailerSettings = modelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
+        const fdModelType = faceDetailerSettings.modelType || 'sdxl'
 
-      if (fdModelType === 'qwen') {
-        // Configure Qwen FaceDetailer path
-        const resolvedFdUnet =
-          faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
-            ? faceDetailerSettings.checkpoint
-            : promptsData.selectedCheckpoint || 'qwen_image_fp8_e4m3fn.safetensors'
+        if (fdModelType === 'qwen') {
+          const resolvedFdUnet =
+            faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
+              ? faceDetailerSettings.checkpoint
+              : promptsData.selectedCheckpoint || 'qwen_image_fp8_e4m3fn.safetensors'
 
-        if (workflow['75']) workflow['75'].inputs.unet_name = resolvedFdUnet
+          const fdUnet = findNodeByTitle(workflow, 'FaceDetailer UNet Loader (Qwen)')?.nodeId
+          if (fdUnet && workflow[fdUnet]) workflow[fdUnet].inputs.unet_name = resolvedFdUnet
 
-        // Set model input to use Qwen model sampling node (77)
-        workflow['69'].inputs.model = ['77', 0]
-        // Set CLIP input to use Qwen CLIP loader (76)
-        workflow['69'].inputs.clip = ['76', 0]
+          const fdModelSampling = findNodeByTitle(
+            workflow,
+            'FaceDetailer Model Sampling Aura Flow (Qwen)'
+          )?.nodeId
+          const fdClipLoader = findNodeByTitle(workflow, 'FaceDetailer CLIP Loader (Qwen)')?.nodeId
+          if (workflow[fdNodeId]) {
+            if (fdModelSampling) workflow[fdNodeId].inputs.model = [fdModelSampling, 0]
+            if (fdClipLoader) workflow[fdNodeId].inputs.clip = [fdClipLoader, 0]
+          }
 
-        // Configure FaceDetailer VAE
-        if (faceDetailerSettings.selectedVae === '__embedded__') {
-          // For Qwen, no embedded VAE - use separate VAE loader (Node 78)
-          workflow['69'].inputs.vae = ['78', 0]
-          const fdVaeName = faceDetailerSettings.selectedVae || 'qwen_image_vae.safetensors'
-          if (workflow['78']) workflow['78'].inputs.vae_name = fdVaeName
+          const fdVaeLoaderQwen = findNodeByTitle(workflow, 'FaceDetailer VAE Loader (Qwen)')?.nodeId
+          if (fdVaeLoaderQwen) {
+            const fdVaeName = faceDetailerSettings.selectedVae || 'qwen_image_vae.safetensors'
+            if (workflow[fdNodeId]) workflow[fdNodeId].inputs.vae = [fdVaeLoaderQwen, 0]
+            if (workflow[fdVaeLoaderQwen]) workflow[fdVaeLoaderQwen].inputs.vae_name = fdVaeName
+          }
+
+          const fdPos = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Positive)')?.nodeId
+          const fdNeg = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Negative)')?.nodeId
+          if (fdPos && fdClipLoader && workflow[fdPos]) {
+            workflow[fdPos].inputs.clip = [fdClipLoader, 0]
+            workflow[fdPos].inputs.text = combinedPrompt
+          }
+          if (fdNeg && fdClipLoader && workflow[fdNeg]) {
+            workflow[fdNeg].inputs.clip = [fdClipLoader, 0]
+            workflow[fdNeg].inputs.text = negativeTagsText
+          }
         } else {
-          // Use separate VAE loader (Node 78)
-          workflow['69'].inputs.vae = ['78', 0]
-          const fdVaeName = faceDetailerSettings.selectedVae || 'qwen_image_vae.safetensors'
-          if (workflow['78']) workflow['78'].inputs.vae_name = fdVaeName
+          const resolvedFdCkpt =
+            faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
+              ? faceDetailerSettings.checkpoint
+              : promptsData.selectedCheckpoint || faceDetailerSettings.checkpoint
+          const fdCkpt = findNodeByTitle(workflow, 'FaceDetailer Checkpoint Loader (SDXL)')?.nodeId
+          if (fdCkpt && workflow[fdCkpt]) workflow[fdCkpt].inputs.ckpt_name = resolvedFdCkpt
+
+          if (workflow[fdNodeId] && fdCkpt) {
+            workflow[fdNodeId].inputs.model = [fdCkpt, 0]
+            workflow[fdNodeId].inputs.clip = [fdCkpt, 1]
+          }
+
+          if (faceDetailerSettings.selectedVae === '__embedded__') {
+            if (workflow[fdNodeId] && fdCkpt) workflow[fdNodeId].inputs.vae = [fdCkpt, 2]
+          } else {
+            const fdVaeLoader = findNodeByTitle(workflow, 'FaceDetailer VAE Loader (SDXL)')?.nodeId
+            if (workflow[fdNodeId] && fdVaeLoader) workflow[fdNodeId].inputs.vae = [fdVaeLoader, 0]
+            const fdVaeName =
+              faceDetailerSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
+            if (fdVaeLoader && workflow[fdVaeLoader]) workflow[fdVaeLoader].inputs.vae_name = fdVaeName
+          }
+
+          const fdPos = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Positive)')?.nodeId
+          const fdNeg = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Negative)')?.nodeId
+          if (fdPos && fdCkpt && workflow[fdPos]) {
+            workflow[fdPos].inputs.clip = [fdCkpt, 1]
+            workflow[fdPos].inputs.text = combinedPrompt
+          }
+          if (fdNeg && fdCkpt && workflow[fdNeg]) {
+            workflow[fdNeg].inputs.clip = [fdCkpt, 1]
+            workflow[fdNeg].inputs.text = negativeTagsText
+          }
         }
 
-        // Configure FaceDetailer text prompts with Qwen CLIP
-        if (workflow['73']) {
-          workflow['73'].inputs.clip = ['76', 0]
-          workflow['73'].inputs.text = combinedPrompt
-        }
-        if (workflow['74']) {
-          workflow['74'].inputs.clip = ['76', 0]
-          workflow['74'].inputs.text = negativeTagsText
-        }
-      } else {
-        // Configure SDXL FaceDetailer path
-        const resolvedFdCkpt =
-          faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
-            ? faceDetailerSettings.checkpoint
-            : promptsData.selectedCheckpoint || faceDetailerSettings.checkpoint
-        if (workflow['71']) workflow['71'].inputs.ckpt_name = resolvedFdCkpt
-
-        // Set model and CLIP to use SDXL checkpoint (71)
-        workflow['69'].inputs.model = ['71', 0]
-        workflow['69'].inputs.clip = ['71', 1]
-
-        // Configure FaceDetailer VAE
-        if (faceDetailerSettings.selectedVae === '__embedded__') {
-          // Use embedded VAE from checkpoint (Node 71)
-          workflow['69'].inputs.vae = ['71', 2]
-        } else {
-          // Use separate VAE loader (Node 72)
-          workflow['69'].inputs.vae = ['72', 0]
-          const fdVaeName =
-            faceDetailerSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
-          if (workflow['72']) workflow['72'].inputs.vae_name = fdVaeName
+        // Common FaceDetailer settings
+        if (workflow[fdNodeId]) {
+          workflow[fdNodeId].inputs.seed = appliedSeed + 1
+          workflow[fdNodeId].inputs.steps = faceDetailerSettings.steps
+          workflow[fdNodeId].inputs.cfg = faceDetailerSettings.cfgScale
+          workflow[fdNodeId].inputs.sampler_name = faceDetailerSettings.sampler
+          workflow[fdNodeId].inputs.scheduler = faceDetailerSettings.scheduler
+          workflow[fdNodeId].inputs.denoise = faceDetailerSettings.denoise
         }
 
-        // Configure FaceDetailer text prompts with SDXL CLIP
-        if (workflow['73']) {
-          workflow['73'].inputs.clip = ['71', 1]
-          workflow['73'].inputs.text = combinedPrompt
+        // FD input image: upscale decode output or base decode output
+        const upscaleDecode = findNodeByTitle(workflow, 'Upscale VAE Decode')?.nodeId
+        const baseDecode = findNodeByTitle(workflow, 'VAE Decode')?.nodeId
+        if (workflow[fdNodeId]) {
+          if (promptsData.useUpscale && upscaleDecode) {
+            workflow[fdNodeId].inputs.image = [upscaleDecode, 0]
+          } else if (!promptsData.useUpscale && baseDecode) {
+            workflow[fdNodeId].inputs.image = [baseDecode, 0]
+          }
         }
-        if (workflow['74']) {
-          workflow['74'].inputs.clip = ['71', 1]
-          workflow['74'].inputs.text = negativeTagsText
-        }
-      }
-
-      // Configure FaceDetailer generation settings (common for both model types)
-      workflow['69'].inputs.seed = appliedSeed + 1
-      workflow['69'].inputs.steps = faceDetailerSettings.steps
-      workflow['69'].inputs.cfg = faceDetailerSettings.cfgScale
-      workflow['69'].inputs.sampler_name = faceDetailerSettings.sampler
-      workflow['69'].inputs.scheduler = faceDetailerSettings.scheduler
-      workflow['69'].inputs.denoise = faceDetailerSettings.denoise
-
-      // Set FaceDetailer input image based on upscale usage
-      if (promptsData.useUpscale) {
-        // Use upscaled image from Node 126
-        workflow['69'].inputs.image = ['126', 0]
-      } else {
-        // Use original Qwen image from Node 8
-        workflow['69'].inputs.image = ['8', 0]
       }
     }
 
@@ -339,10 +368,15 @@ export async function generateQwenImage(
       const usModelType = upscaleSettings.modelType || 'sdxl'
 
       // Configure LatentUpscale dimensions (use scale from settings)
-      workflow['121'].inputs.width = Math.round(appliedSettings.imageWidth * upscaleSettings.scale)
-      workflow['121'].inputs.height = Math.round(
-        appliedSettings.imageHeight * upscaleSettings.scale
-      )
+      const latentUpscaleId = findNodeByTitle(workflow, 'Latent Upscale')?.nodeId
+      if (latentUpscaleId && workflow[latentUpscaleId]) {
+        workflow[latentUpscaleId].inputs.width = Math.round(
+          appliedSettings.imageWidth * upscaleSettings.scale
+        )
+        workflow[latentUpscaleId].inputs.height = Math.round(
+          appliedSettings.imageHeight * upscaleSettings.scale
+        )
+      }
 
       if (usModelType === 'qwen') {
         // Configure Qwen upscale path
@@ -351,35 +385,42 @@ export async function generateQwenImage(
             ? upscaleSettings.checkpoint
             : promptsData.selectedCheckpoint || 'qwen_image_fp8_e4m3fn.safetensors'
 
-        if (workflow['128']) workflow['128'].inputs.unet_name = resolvedUsUnet
+        const usUnet = findNodeByTitle(workflow, 'Upscale UNet Loader (Qwen)')?.nodeId
+        if (usUnet && workflow[usUnet]) workflow[usUnet].inputs.unet_name = resolvedUsUnet
 
-        // Set KSampler to use Qwen model sampling node (130)
-        workflow['122'].inputs.model = ['130', 0]
-
-        // Configure Upscale VAE for encoding (Node 120)
-        if (upscaleSettings.selectedVae === '__embedded__') {
-          // For Qwen, no embedded VAE - use separate VAE loader (Node 131)
-          workflow['120'].inputs.vae = ['131', 0]
-          const usVaeName = upscaleSettings.selectedVae || 'qwen_image_vae.safetensors'
-          if (workflow['131']) workflow['131'].inputs.vae_name = usVaeName
-        } else {
-          // Use separate VAE loader (Node 131)
-          workflow['120'].inputs.vae = ['131', 0]
-          const usVaeName = upscaleSettings.selectedVae || 'qwen_image_vae.safetensors'
-          if (workflow['131']) workflow['131'].inputs.vae_name = usVaeName
+        // Set KSampler to use Qwen model sampling node
+        const upscaleSampler = findNodeByTitle(workflow, 'KSampler (Upscale)')?.nodeId
+        const upscaleModelSampling = findNodeByTitle(workflow, 'Upscale Model Sampling Aura Flow (Qwen)')?.nodeId
+        if (upscaleSampler && upscaleModelSampling && workflow[upscaleSampler]) {
+          workflow[upscaleSampler].inputs.model = [upscaleModelSampling, 0]
         }
 
-        // Configure Upscale VAE for decoding (Node 126) - same as encoding VAE
-        workflow['126'].inputs.vae = ['131', 0]
+        // Configure Upscale VAE for encoding
+        const upscaleEncode = findNodeByTitle(workflow, 'SDXL VAE Encode')?.nodeId
+        const upscaleVaeQwen = findNodeByTitle(workflow, 'Upscale VAE Loader (Qwen)')?.nodeId
+        if (upscaleEncode && upscaleVaeQwen && workflow[upscaleEncode]) {
+          workflow[upscaleEncode].inputs.vae = [upscaleVaeQwen, 0]
+          const usVaeName = upscaleSettings.selectedVae || 'qwen_image_vae.safetensors'
+          if (upscaleVaeQwen && workflow[upscaleVaeQwen]) workflow[upscaleVaeQwen].inputs.vae_name = usVaeName
+        }
+
+        // Configure Upscale VAE for decoding - same loader
+        const upscaleDecodeNode = findNodeByTitle(workflow, 'Upscale VAE Decode')?.nodeId
+        if (upscaleDecodeNode && upscaleVaeQwen && workflow[upscaleDecodeNode]) {
+          workflow[upscaleDecodeNode].inputs.vae = [upscaleVaeQwen, 0]
+        }
 
         // Configure upscale text prompts with Qwen CLIP
-        if (workflow['124']) {
-          workflow['124'].inputs.clip = ['129', 0]
-          workflow['124'].inputs.text = combinedPrompt
+        const upscalePos = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Positive)')?.nodeId
+        const upscaleNeg = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Negative)')?.nodeId
+        const upscaleClipQwen = findNodeByTitle(workflow, 'Upscale CLIP Loader (Qwen)')?.nodeId
+        if (upscalePos && upscaleClipQwen && workflow[upscalePos]) {
+          workflow[upscalePos].inputs.clip = [upscaleClipQwen, 0]
+          workflow[upscalePos].inputs.text = combinedPrompt
         }
-        if (workflow['125']) {
-          workflow['125'].inputs.clip = ['129', 0]
-          workflow['125'].inputs.text = negativeTagsText
+        if (upscaleNeg && upscaleClipQwen && workflow[upscaleNeg]) {
+          workflow[upscaleNeg].inputs.clip = [upscaleClipQwen, 0]
+          workflow[upscaleNeg].inputs.text = negativeTagsText
         }
       } else {
         // Configure SDXL upscale path
@@ -387,55 +428,72 @@ export async function generateQwenImage(
           upscaleSettings.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors'
             ? upscaleSettings.checkpoint
             : promptsData.selectedCheckpoint || upscaleSettings.checkpoint
-        if (workflow['123']) workflow['123'].inputs.ckpt_name = resolvedUpscaleCkpt
+        const upCkpt = findNodeByTitle(workflow, 'Upscale Checkpoint Loader (SDXL)')?.nodeId
+        if (upCkpt && workflow[upCkpt]) workflow[upCkpt].inputs.ckpt_name = resolvedUpscaleCkpt
 
-        // Set KSampler to use SDXL checkpoint (123)
-        workflow['122'].inputs.model = ['123', 0]
-
-        // Configure Node 120 VAE input
-        if (upscaleSettings.selectedVae === '__embedded__') {
-          // Use embedded VAE from checkpoint (Node 123)
-          workflow['120'].inputs.vae = ['123', 2]
-        } else {
-          // Use separate VAE loader (Node 127)
-          workflow['120'].inputs.vae = ['127', 0]
-          const usVaeName =
-            upscaleSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
-          if (workflow['127']) workflow['127'].inputs.vae_name = usVaeName
+        // Set KSampler to use SDXL checkpoint
+        const upscaleSampler = findNodeByTitle(workflow, 'KSampler (Upscale)')?.nodeId
+        if (upscaleSampler && upCkpt && workflow[upscaleSampler]) {
+          workflow[upscaleSampler].inputs.model = [upCkpt, 0]
         }
 
-        // Configure Upscale VAE for decoding (Node 126)
-        workflow['126'].inputs.vae = ['123', 2]
+        // Configure VAE input for encode
+        const upscaleEncode = findNodeByTitle(workflow, 'SDXL VAE Encode')?.nodeId
+        if (upscaleEncode && upCkpt && workflow[upscaleEncode]) {
+          if (upscaleSettings.selectedVae === '__embedded__') {
+            workflow[upscaleEncode].inputs.vae = [upCkpt, 2]
+          } else {
+            const upVae = findNodeByTitle(workflow, 'Upscale VAE Loader (SDXL)')?.nodeId
+            if (upVae) {
+              workflow[upscaleEncode].inputs.vae = [upVae, 0]
+              const usVaeName =
+                upscaleSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
+              if (workflow[upVae]) workflow[upVae].inputs.vae_name = usVaeName
+            }
+          }
+        }
+
+        // Configure Upscale VAE for decoding
+        const upscaleDecodeNode = findNodeByTitle(workflow, 'Upscale VAE Decode')?.nodeId
+        if (upscaleDecodeNode && upCkpt && workflow[upscaleDecodeNode]) {
+          workflow[upscaleDecodeNode].inputs.vae = [upCkpt, 2]
+        }
 
         // Configure upscale text prompts with SDXL CLIP
-        if (workflow['124']) {
-          workflow['124'].inputs.clip = ['123', 1]
-          workflow['124'].inputs.text = combinedPrompt
+        const upscalePos = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Positive)')?.nodeId
+        const upscaleNeg = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Negative)')?.nodeId
+        if (upscalePos && upCkpt && workflow[upscalePos]) {
+          workflow[upscalePos].inputs.clip = [upCkpt, 1]
+          workflow[upscalePos].inputs.text = combinedPrompt
         }
-        if (workflow['125']) {
-          workflow['125'].inputs.clip = ['123', 1]
-          workflow['125'].inputs.text = negativeTagsText
+        if (upscaleNeg && upCkpt && workflow[upscaleNeg]) {
+          workflow[upscaleNeg].inputs.clip = [upCkpt, 1]
+          workflow[upscaleNeg].inputs.text = negativeTagsText
         }
       }
 
       // Configure upscale KSampler (common for both model types)
-      workflow['122'].inputs.steps = upscaleSettings.steps
-      workflow['122'].inputs.cfg = upscaleSettings.cfgScale
-      workflow['122'].inputs.sampler_name = upscaleSettings.sampler
-      workflow['122'].inputs.scheduler = upscaleSettings.scheduler
-      workflow['122'].inputs.denoise = upscaleSettings.denoise
+      setNodeSampler(workflow, 'KSampler (Upscale)', {
+        steps: upscaleSettings.steps,
+        cfg: upscaleSettings.cfgScale,
+        sampler_name: upscaleSettings.sampler,
+        scheduler: upscaleSettings.scheduler,
+        denoise: upscaleSettings.denoise
+      })
     }
 
     // Configure final save node based on upscale and FaceDetailer usage
     let imageSourceNodeId: string
     if (promptsData.useUpscale) {
       if (promptsData.useFaceDetailer) {
-        imageSourceNodeId = '69' // FaceDetailer after upscale
+        imageSourceNodeId = findNodeByTitle(workflow, 'FaceDetailer')?.nodeId || '69'
       } else {
-        imageSourceNodeId = '126' // VAE Decode from upscale
+        imageSourceNodeId = findNodeByTitle(workflow, 'Upscale VAE Decode')?.nodeId || '126'
       }
     } else {
-      imageSourceNodeId = promptsData.useFaceDetailer ? '69' : '8'
+      imageSourceNodeId = promptsData.useFaceDetailer
+        ? findNodeByTitle(workflow, 'FaceDetailer')?.nodeId || '69'
+        : findNodeByTitle(workflow, 'VAE Decode')?.nodeId || '8'
     }
 
     workflow[FINAL_SAVE_NODE_ID] = {

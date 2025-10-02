@@ -122,6 +122,95 @@ Tag Painter는 ComfyUI와 연동되는 SvelteKit 기반 웹 애플리케이션�
 - `-NoComfy`: 사용자가 이미 설치/실행 중인 ComfyUI를 그대로 사용합니다. ComfyUI 설치/시작을 건너뜁니다.
 - `-ComfyOnly`: Tag Painter는 실행하지 않고 ComfyUI만 실행합니다.
 
+## Chroma 워크플로 타이틀
+
+Tag Painter는 Chroma 워크플로를 구성할 때 노드의 `_meta.title`(대소문자 구분, 부분 일치)과 일부 클래스 타입을 기준으로 값을 주입합니다. 아래 타이틀을 워크플로에 1개씩 포함하는 것을 권장합니다.
+
+- 필수(메인 경로)
+  - `CLIP Text Encode (Positive Prompt)` — 메인 긍정 프롬프트 텍스트.
+  - `CLIP Text Encode (Negative Prompt)` — 메인 부정 프롬프트 텍스트.
+  - `Empty Latent Image` — 캔버스 역할의 잠복(latent) 이미지. 가로/세로 크기를 설정에서 적용합니다.
+  - `KSampler (Main)` 또는 `KSampler` — 메인 샘플러. 스텝/CFG/샘플러/스케줄러/시드를 적용합니다.
+  - `CLIP Set Last Layer` — 선택 사항. CLIP 스킵 레이어를 설정에서 적용합니다.
+  - `VAE Decode (Base)` — 업스케일/FaceDetailer를 사용하지 않을 때의 최종 디코드 노드.
+  - 메인 모델 로더 — 메인 경로에 `UNETLoader` 노드가 있어야 합니다. 첫 번째 `UNETLoader`의 `unet_name`을 선택한 체크포인트로 설정합니다.
+
+- 선택(페이스 디테일러)
+  - `FaceDetailer` — FD 본체 노드. 시드/스텝/CFG/샘플러/스케줄러/디노이즈를 적용합니다. 입력 이미지(`image`)는 업스케일 사용 시 `VAE Decode (Upscale)`에서, 아니면 `VAE Decode (Base)`에서 가져옵니다. 또한 `wildcard` 입력에는 존 1/존 2 프롬프트를 결합해 전달합니다.
+  - `Load Checkpoint` — FD용 체크포인트 로더. 모델(0)/CLIP(1)/VAE(2)를 `FaceDetailer`에 제공합니다.
+  - `Load VAE` — FD에서 임베디드 VAE를 사용하지 않을 때 쓰는 VAELoader. `vae_name`을 설정에서 적용합니다.
+  - `Upscale CLIP Text Encode (Positive)` — FD/업스케일 분기에서 사용하는 긍정 텍스트 인코더.
+  - `Upscale CLIP Text Encode (Negative)` — FD/업스케일 분기에서 사용하는 부정 텍스트 인코더.
+
+- 선택(업스케일)
+  - `Latent Upscale` — 타깃 잠복 이미지 크기(기본 크기 × 배율)를 설정합니다.
+  - `SDXL VAE Encode` — 업스케일 경로의 인코드 노드. 임베디드 또는 외부 `Load VAE`를 설정에 맞게 연결합니다.
+  - `KSampler (Upscale)` — 스텝/CFG/샘플러/스케줄러/디노이즈를 적용합니다.
+  - `Upscale CLIP Text Encode (Positive)` — 업스케일 분기의 긍정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
+  - `Upscale CLIP Text Encode (Negative)` — 업스케일 분기의 부정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
+  - `VAE Decode (Upscale)` — 업스케일 분기의 최종 디코드(업스케일 사용 시 출력 소스로 사용됨).
+
+동작 및 참고 사항:
+- 타이틀 매칭은 부분 포함, 대소문자 구분입니다. 같은 타이틀을 가진 노드는 하나만 두세요.
+- 타이틀이 일부 누락되어도 가능한 경우 클래스 타입으로 보완 설정합니다: `RandomNoise`(시드), `BasicScheduler`(스텝/스케줄러), `CFGGuider`(CFG), `KSamplerSelect`(샘플러), 첫 `UNETLoader`(체크포인트), 첫 `VAELoader`(VAE).
+- Chroma 워크플로에서 메인 모델은 `UNETLoader`를 사용합니다. `Load Checkpoint` 타이틀은 FaceDetailer용 하나만 두는 것을 권장합니다.
+- 워크플로가 `SamplerCustom` 노드를 사용할 경우(타이틀 `SamplerCustom`), 메인 `KSampler`가 없으면 `cfg` 및 `noise_seed`를 여기에 설정합니다.
+- 최종 저장은 고정 ID(`final_save_output`)를 갖는 `SaveImageWebsocket` 노드를 자동 추가합니다. 워크플로에 저장 노드를 포함할 필요가 없습니다.
+
+## Qwen 워크플로 타이틀
+
+Qwen 모델용 워크플로도 노드의 `_meta.title`(부분 일치, 대소문자 구분)을 기준으로 값을 주입합니다. 아래 타이틀을 포함해 고정된 노드 ID에 의존하지 않도록 구성하세요.
+
+- 필수(메인 경로)
+  - `KSampler` — 메인 샘플러. 스텝/CFG/샘플러/스케줄러/시드를 적용합니다.
+  - `Model Sampling Aura Flow` — UNet/LoRA 체인 뒤의 모델 출력을 받아 `KSampler.model`로 연결됩니다.
+  - `Load Qwen UNet` — 기본 UNETLoader. 선택한 체크포인트를 `unet_name`에 반영합니다.
+  - `Load Qwen VAE` — VAELoader. VAE를 선택했다면(`__embedded__`가 아닌 경우) 해당 이름을 설정합니다.
+  - `CLIP Text Encode (Positive)` — 긍정 프롬프트 텍스트. Qwen CLIP 로더에 연결되어야 합니다.
+  - `CLIP Text Encode (Negative)` — 부정 프롬프트 텍스트. Qwen CLIP 로더에 연결되어야 합니다.
+  - `Empty Latent Image` — 잠복 캔버스. 가로/세로 크기를 설정합니다.
+  - `VAE Decode` — 업스케일/FaceDetailer를 사용하지 않을 때 사용하는 베이스 디코드 노드.
+
+- 선택(페이스 디테일러)
+  - 항상:
+    - `FaceDetailer` — FD 본체 노드. 시드/스텝/CFG/샘플러/스케줄러/디노이즈를 적용합니다.
+    - `FaceDetailer CLIP Text Encode (Positive)` — FD 긍정 프롬프트(텍스트와 CLIP 입력 연결).
+    - `FaceDetailer CLIP Text Encode (Negative)` — FD 부정 프롬프트(텍스트와 CLIP 입력 연결).
+    - 입력 이미지 연결: 업스케일 사용 시 `Upscale VAE Decode`, 아니면 베이스 `VAE Decode`.
+  - Qwen FD 경로:
+    - `FaceDetailer UNet Loader (Qwen)` — FD용 UNETLoader. 체크포인트를 설정합니다.
+    - `FaceDetailer Model Sampling Aura Flow (Qwen)` — FD용 모델 샘플링 래퍼. `FaceDetailer`의 model 입력에 연결됩니다.
+    - `FaceDetailer CLIP Loader (Qwen)` — FD용 CLIP 로더. `FaceDetailer`와 FD 텍스트 인코더에 연결됩니다.
+    - `FaceDetailer VAE Loader (Qwen)` — FD용 VAE 로더. `FaceDetailer`의 VAE 입력과 이름을 설정합니다.
+  - SDXL FD 경로:
+    - `FaceDetailer Checkpoint Loader (SDXL)` — 체크포인트 로더. model(0)/clip(1)/vae(2)를 `FaceDetailer`에 제공합니다.
+    - `FaceDetailer VAE Loader (SDXL)` — 체크포인트 임베디드 VAE를 쓰지 않을 때 사용하는 외부 VAE 로더.
+
+- 선택(업스케일)
+  - `Latent Upscale` — 기본 크기 × 배율로 잠복 이미지 크기를 설정합니다.
+  - `SDXL VAE Encode` — 업스케일 경로의 인코드 노드. 설정에 맞게 VAE 입력을 연결합니다.
+  - `KSampler (Upscale)` — 스텝/CFG/샘플러/스케줄러/디노이즈를 적용하고, 모델 입력을 업스케일 경로에 맞게 연결합니다.
+  - Qwen 업스케일 경로:
+    - `Upscale UNet Loader (Qwen)` — 업스케일용 UNETLoader. 체크포인트를 설정합니다.
+    - `Upscale Model Sampling Aura Flow (Qwen)` — 업스케일용 모델 샘플링 래퍼. `KSampler (Upscale)`의 model 입력에 연결됩니다.
+    - `Upscale CLIP Loader (Qwen)` — 업스케일용 CLIP 로더.
+    - `Upscale VAE Loader (Qwen)` — 업스케일용 VAE 로더. 이름을 설정하며 인코드/디코드 모두에서 사용합니다.
+    - `Upscale CLIP Text Encode (Positive)` — 업스케일 긍정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
+    - `Upscale CLIP Text Encode (Negative)` — 업스케일 부정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
+    - `Upscale VAE Decode` — 업스케일 분기의 최종 디코드 노드.
+  - SDXL 업스케일 경로:
+    - `Upscale Checkpoint Loader (SDXL)` — 업스케일 경로에 model(0)/clip(1)/vae(2)를 제공합니다.
+    - `Upscale VAE Loader (SDXL)` — 체크포인트 임베디드 VAE를 사용하지 않을 때 쓰는 외부 VAE 로더.
+    - `Upscale CLIP Text Encode (Positive)` — 업스케일 긍정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
+    - `Upscale CLIP Text Encode (Negative)` — 업스케일 부정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
+    - `Upscale VAE Decode` — 업스케일 분기의 최종 디코드 노드.
+
+동작 및 참고 사항:
+- LoRA 체인: Tag Painter가 `Load Qwen UNet`과 `Model Sampling Aura Flow` 사이에 `LoraLoaderModelOnly` 노드(타이틀 `Load Qwen LoRA N`)를 자동 삽입/연결합니다.
+- 타이틀 매칭은 부분 포함, 대소문자 구분입니다. 각 타이틀별로 한 개의 노드만 두세요.
+- 타이틀이 누락되면 일부 경로에서 기본 ID로 동작할 수 있으나, 안정적인 동작을 위해 위 타이틀 구성을 권장합니다.
+- 최종 저장 노드는 고정 ID(`final_save_output`)로 `SaveImageWebsocket`을 자동 추가합니다. 워크플로에 저장 노드를 포함할 필요가 없습니다.
+
 ## 라이선스
 
 이 프로젝트는 오픈 소스입니다. 자세한 내용은 LICENSE 파일을 참조하세요.

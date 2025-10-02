@@ -128,18 +128,89 @@ This project is open source. See the LICENSE file for details.
 
 ## Chroma Workflow Titles
 
-When using checkpoint models of type `chroma`, Tag Painter sets prompts into your ComfyUI workflow by matching the node titles. To avoid ambiguity, Chroma support uses exactly one title for each prompt:
+Tag Painter applies parameters to Chroma workflows by matching node `_meta.title` (substring match, case‑sensitive) and some class types. To avoid ambiguity, include one node per title below.
 
-- Main positive: `CLIP Text Encode (Positive Prompt)`
-- Main negative: `CLIP Text Encode (Negative Prompt)`
-- Upscale/FD positive: `Upscale CLIP Text Encode (Positive)`
-- Upscale/FD negative: `Upscale CLIP Text Encode (Negative)`
+- Required (Main path)
+  - `CLIP Text Encode (Positive Prompt)` — main positive prompt text.
+  - `CLIP Text Encode (Negative Prompt)` — main negative prompt text.
+  - `Empty Latent Image` — latent canvas; width/height are applied from Settings.
+  - `KSampler (Main)` or `KSampler` — main sampler. Steps/CFG/sampler/scheduler/seed are applied.
+  - `CLIP Set Last Layer` — optional CLIP skip node; last layer is set from Settings.
+  - `VAE Decode (Base)` — base decode used when not upscaling and not using FaceDetailer.
+  - Main model loader — have a `UNETLoader` in the main path. Tag Painter sets `unet_name` on the first `UNETLoader` (by class type).
 
-How to prepare your workflow:
-- Open your ComfyUI workflow JSON and ensure the `_meta.title` of the CLIP text nodes match the exact strings above.
-- Only one node per title should exist.
-- Save the workflow to `data/workflow/chroma.workflow.json`, or select a custom workflow file in Settings (Per‑model → Workflow).
+- Optional (FaceDetailer)
+  - `FaceDetailer` — main FD node. Seed/steps/CFG/sampler/scheduler/denoise are applied. Its `image` input is wired from `VAE Decode (Upscale)` when upscaling, otherwise from `VAE Decode (Base)`. The `wildcard` input receives a combined Zone 1/Zone 2 prompt.
+  - `Load Checkpoint` — checkpoint loader used by FaceDetailer. Provides model(0), clip(1), vae(2) to FD when you use an SDXL path for FD.
+  - `Load VAE` — VAELoader used when not using embedded VAE for FD; its `vae_name` is applied from settings.
+  - `Upscale CLIP Text Encode (Positive)` — positive text encoder used by FD/upscale branches.
+  - `Upscale CLIP Text Encode (Negative)` — negative text encoder used by FD/upscale branches.
 
-Notes:
-- Image size is applied to `EmptySD3LatentImage` automatically (by class type, not title).
-- Sampler configuration is applied to `RandomNoise` (seed), `BasicScheduler` (steps/scheduler), `CFGGuider` (cfg), and `KSamplerSelect` (sampler) when present in the workflow.
+- Optional (Upscale)
+  - `Latent Upscale` — target latent width/height are set to base size × scale.
+  - `SDXL VAE Encode` — VAE encode node for the upscale path; VAE input is set per settings (embedded or external `Load VAE`).
+  - `KSampler (Upscale)` — steps/CFG/sampler/scheduler/denoise are applied; the model input remains as defined in your workflow.
+  - `Upscale CLIP Text Encode (Positive)` — upscale positive prompt; text and CLIP input are set.
+  - `Upscale CLIP Text Encode (Negative)` — upscale negative prompt; text and CLIP input are set.
+  - `VAE Decode (Upscale)` — final decode for the upscale branch (used as the image source when upscaling is enabled).
+
+Behavior and notes:
+- Title matching uses substring includes and is case‑sensitive. Keep exactly one node per title.
+- If a title is missing, Tag Painter still configures by class type where possible: `RandomNoise` (seed), `BasicScheduler` (steps/scheduler), `CFGGuider` (cfg), `KSamplerSelect` (sampler), first `UNETLoader` (checkpoint), first `VAELoader` (VAE).
+- The FaceDetailer checkpoint loader should be the only node titled `Load Checkpoint` in a Chroma workflow. The main model uses `UNETLoader`; Tag Painter does not override any main `CheckpointLoaderSimple`.
+- If your pipeline uses a `SamplerCustom` node (titled `SamplerCustom`), Tag Painter will set `cfg` and `noise_seed` on it when main `KSampler` nodes are not present.
+- A final `SaveImageWebsocket` node is injected automatically with a fixed ID (`final_save_output`). You do not need to include a save node.
+
+## Qwen Workflow Titles
+
+Tag Painter resolves Qwen workflows by matching the `_meta.title` of nodes (substring match, case‑sensitive). Make sure your workflow includes the following titles so parameters can be applied without relying on fixed node IDs.
+
+- Required (Main path)
+  - `KSampler` — main sampler. Steps/CFG/sampler/scheduler/seed are applied here.
+  - `Model Sampling Aura Flow` — receives the model after UNet/LoRA chain; feeds `KSampler.model`.
+  - `Load Qwen UNet` — base UNETLoader. The selected checkpoint overrides `unet_name` here.
+  - `Load Qwen VAE` — VAELoader. If a VAE is selected (not `__embedded__`), its name is set here.
+  - `CLIP Text Encode (Positive)` — positive prompt text; should be wired to your Qwen CLIP loader.
+  - `CLIP Text Encode (Negative)` — negative prompt text; should be wired to your Qwen CLIP loader.
+  - `Empty Latent Image` — latent canvas; width/height are applied.
+  - `VAE Decode` — base decode used when not upscaling and not using FaceDetailer.
+
+- Optional (FaceDetailer)
+  - Always:
+    - `FaceDetailer` — main FD node. Seed/steps/CFG/sampler/scheduler/denoise are applied.
+    - `FaceDetailer CLIP Text Encode (Positive)` — FD positive prompt (text and CLIP input are set).
+    - `FaceDetailer CLIP Text Encode (Negative)` — FD negative prompt (text and CLIP input are set).
+    - Input image is wired from `Upscale VAE Decode` if upscaling is enabled, otherwise from base `VAE Decode`.
+  - Qwen FD path:
+    - `FaceDetailer UNet Loader (Qwen)` — UNETLoader for FD; checkpoint set from settings/selection.
+    - `FaceDetailer Model Sampling Aura Flow (Qwen)` — model sampling wrapper for FD (wired to FD model).
+    - `FaceDetailer CLIP Loader (Qwen)` — CLIP loader for FD (wired to FD CLIP and FD text encoders).
+    - `FaceDetailer VAE Loader (Qwen)` — VAELoader for FD (wired to FD VAE and name set).
+  - SDXL FD path:
+    - `FaceDetailer Checkpoint Loader (SDXL)` — provides model(0), clip(1), vae(2) to `FaceDetailer`.
+    - `FaceDetailer VAE Loader (SDXL)` — used when not using embedded VAE from the checkpoint.
+
+- Optional (Upscale)
+  - `Latent Upscale` — target latent width/height are set using base size × scale.
+  - `SDXL VAE Encode` — VAE encode node for the upscale path; VAE input is set per settings.
+  - `KSampler (Upscale)` — steps/CFG/sampler/scheduler/denoise are applied; model input is wired.
+  - Qwen upscale path:
+    - `Upscale UNet Loader (Qwen)` — UNETLoader; checkpoint set from settings/selection.
+    - `Upscale Model Sampling Aura Flow (Qwen)` — model sampling wrapper for upscale (wired to KSampler (Upscale)).
+    - `Upscale CLIP Loader (Qwen)` — CLIP loader for upscale encoders.
+    - `Upscale VAE Loader (Qwen)` — VAELoader; name set and used for both encode/decode.
+    - `Upscale CLIP Text Encode (Positive)` — upscale positive text; CLIP input is set.
+    - `Upscale CLIP Text Encode (Negative)` — upscale negative text; CLIP input is set.
+    - `Upscale VAE Decode` — final decode for the upscale branch.
+  - SDXL upscale path:
+    - `Upscale Checkpoint Loader (SDXL)` — provides model(0), clip(1), vae(2) to the upscale branch.
+    - `Upscale VAE Loader (SDXL)` — used when not using embedded VAE from the checkpoint.
+    - `Upscale CLIP Text Encode (Positive)` — upscale positive text; CLIP set from checkpoint.
+    - `Upscale CLIP Text Encode (Negative)` — upscale negative text; CLIP set from checkpoint.
+    - `Upscale VAE Decode` — final decode for the upscale branch.
+
+Behavior and notes:
+- LoRA chain: Tag Painter inserts `LoraLoaderModelOnly` nodes titled `Load Qwen LoRA N` and wires them between `Load Qwen UNet` and `Model Sampling Aura Flow` automatically.
+- Title matching uses substring includes and is case‑sensitive. Keep one node per title to avoid ambiguity.
+- If a title is missing, Tag Painter may fall back to default IDs only in some cases; use the titles above for reliable behavior.
+- Final save is added automatically as a `SaveImageWebsocket` node with a fixed ID (`final_save_output`). You do not need to include a save node in your workflow.
