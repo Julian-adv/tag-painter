@@ -10,7 +10,8 @@ import {
   setNodeSampler,
   setNodeImageSize,
   setNodeVae,
-  loadCustomWorkflow
+  loadCustomWorkflow,
+  findMissingNodeTitles
 } from './workflowMapping'
 import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
 import {
@@ -31,6 +32,94 @@ import {
 import type { ComfyUIWorkflow, ModelSettings } from '$lib/types'
 import type { GenerationOptions } from './imageGeneration'
 
+function validateQwenWorkflow(
+  workflow: ComfyUIWorkflow,
+  opts: {
+    useFaceDetailer: boolean
+    fdModelType: string
+    fdSelectedVae: string
+    useUpscale: boolean
+    usModelType: string
+    usSelectedVae: string
+  }
+): string[] {
+  const missing: string[] = []
+
+  // Base required nodes
+  missing.push(
+    ...findMissingNodeTitles(workflow, [
+      'KSampler',
+      'Model Sampling Aura Flow',
+      'Load Qwen UNet',
+      'Load Qwen VAE',
+      'CLIP Text Encode (Positive)',
+      'CLIP Text Encode (Negative)',
+      'Empty Latent Image',
+      'VAE Decode'
+    ])
+  )
+
+  // FaceDetailer (optional)
+  if (opts.useFaceDetailer) {
+    missing.push(
+      ...findMissingNodeTitles(workflow, [
+        'FaceDetailer',
+        'FaceDetailer CLIP Text Encode (Positive)',
+        'FaceDetailer CLIP Text Encode (Negative)'
+      ])
+    )
+
+    if (opts.fdModelType === 'qwen') {
+      missing.push(
+        ...findMissingNodeTitles(workflow, [
+          'FaceDetailer UNet Loader (Qwen)',
+          'FaceDetailer Model Sampling Aura Flow (Qwen)',
+          'FaceDetailer CLIP Loader (Qwen)',
+          'FaceDetailer VAE Loader (Qwen)'
+        ])
+      )
+    } else {
+      // SDXL FD path
+      missing.push(...findMissingNodeTitles(workflow, ['FaceDetailer Checkpoint Loader (SDXL)']))
+      if (opts.fdSelectedVae && opts.fdSelectedVae !== '__embedded__') {
+        missing.push(...findMissingNodeTitles(workflow, ['FaceDetailer VAE Loader (SDXL)']))
+      }
+    }
+  }
+
+  // Upscale (optional)
+  if (opts.useUpscale) {
+    missing.push(
+      ...findMissingNodeTitles(workflow, [
+        'Latent Upscale',
+        'KSampler (Upscale)',
+        'Upscale CLIP Text Encode (Positive)',
+        'Upscale CLIP Text Encode (Negative)',
+        'Upscale VAE Decode',
+        'SDXL VAE Encode'
+      ])
+    )
+
+    if (opts.usModelType === 'qwen') {
+      missing.push(
+        ...findMissingNodeTitles(workflow, [
+          'Upscale UNet Loader (Qwen)',
+          'Upscale Model Sampling Aura Flow (Qwen)',
+          'Upscale CLIP Loader (Qwen)',
+          'Upscale VAE Loader (Qwen)'
+        ])
+      )
+    } else {
+      // SDXL upscale path
+      missing.push(...findMissingNodeTitles(workflow, ['Upscale Checkpoint Loader (SDXL)']))
+      if (opts.usSelectedVae && opts.usSelectedVae !== '__embedded__') {
+        missing.push(...findMissingNodeTitles(workflow, ['Upscale VAE Loader (SDXL)']))
+      }
+    }
+  }
+
+  return missing
+}
 function applyQwenLoraChain(workflow: ComfyUIWorkflow, loras: { name: string; weight: number }[]) {
   const baseUnet = findNodeByTitle(workflow, 'Load Qwen UNet')?.nodeId || '37'
   const modelSampling = findNodeByTitle(workflow, 'Model Sampling Aura Flow')?.nodeId || '66'
@@ -118,6 +207,25 @@ export async function generateQwenImage(
     onProgressUpdate({ value: 0, max: 100, currentNode: '' })
 
     const clientId = generateClientId()
+
+    // Validate required workflow nodes by title
+    const fdSettings = (modelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS)
+    const usSettings = (modelSettings?.upscale || DEFAULT_UPSCALE_SETTINGS)
+    const missingTitles = validateQwenWorkflow(workflow, {
+      useFaceDetailer: !!options.promptsData.useFaceDetailer,
+      fdModelType: fdSettings.modelType || 'sdxl',
+      fdSelectedVae: fdSettings.selectedVae,
+      useUpscale: !!options.promptsData.useUpscale,
+      usModelType: usSettings.modelType || 'sdxl',
+      usSelectedVae: usSettings.selectedVae
+    })
+    if (missingTitles.length > 0) {
+      const msg = `Missing required nodes in Qwen workflow: ${missingTitles.join(', ')}`
+      console.error(msg)
+      onError(msg)
+      onLoadingChange(false)
+      throw new Error(msg)
+    }
 
     // Read wildcard zones for Qwen model (this also loads the Qwen wildcard model)
     const wildcardZones = await readWildcardZones('qwen')

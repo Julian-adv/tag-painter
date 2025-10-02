@@ -15,6 +15,7 @@
   import { ArrowPath } from 'svelte-heros-v2'
   import { generateImage } from './utils/imageGeneration'
   import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
+  import Toasts from './Toasts.svelte'
   import { baseLocale, setLocale, getLocale, isLocale } from '$lib/paraglide/runtime.js'
   import {
     promptsData,
@@ -69,6 +70,9 @@
   })
   let disabledZones = $state<Set<string>>(new Set())
   let tagZonesRef: { saveTagsImmediately: () => Promise<void> } | undefined = $state()
+
+  // Toasts component ref for showing messages
+  let toastsRef = $state<any>()
 
   // Show dialog when no checkpoints are found
   function openNoCheckpointsDialog() {
@@ -288,6 +292,7 @@
       },
       onError: (error) => {
         console.error('Generation error:', error)
+        toastsRef?.error(typeof error === 'string' ? error : 'Failed to generate image')
         isLoading = false
       }
     })
@@ -394,6 +399,7 @@
       },
       onError: (error) => {
         console.error('Generation error:', error)
+        toastsRef?.error(typeof error === 'string' ? error : 'Failed to generate image')
         isLoading = false
       }
     })
@@ -595,6 +601,8 @@
     </section>
   </div>
 </main>
+
+<Toasts bind:this={toastsRef} />
 
 <!-- No Checkpoints Dialog -->
 <NoCheckpointsDialog bind:isOpen={showNoCheckpointsDialog} />

@@ -71,8 +71,12 @@ export function findNodesByTitle(workflow: ComfyUIWorkflow, titlePattern: string
  * Find first node matching a title pattern
  */
 export function findNodeByTitle(workflow: ComfyUIWorkflow, titlePattern: string): NodeMapping | undefined {
-  const results = findNodesByTitle(workflow, titlePattern)
-  return results[0]
+  // Exact title match only; no substring fallback to avoid collisions
+  for (const [nodeId, node] of Object.entries(workflow)) {
+    const title = node._meta?.title || ''
+    if (title === titlePattern) return { nodeId, title }
+  }
+  return undefined
 }
 
 /**
@@ -217,4 +221,16 @@ export async function loadCustomWorkflow(workflowPath: string): Promise<ComfyUIW
   }
   const { workflow } = await response.json()
   return workflow
+}
+
+/**
+ * Return a list of titles that are missing from the workflow (exact match).
+ */
+export function findMissingNodeTitles(workflow: ComfyUIWorkflow, titles: string[]): string[] {
+  const missing: string[] = []
+  for (const t of titles) {
+    const id = findNodeByTitle(workflow, t)?.nodeId
+    if (!id) missing.push(t)
+  }
+  return missing
 }

@@ -127,3 +127,10 @@ export interface ProgressData {
   max: number
   currentNode: string
 }
+
+// UI toast message type
+export interface Toast {
+  id: number
+  message: string
+  type: 'error' | 'info' | 'success'
+}
