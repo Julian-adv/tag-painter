@@ -151,6 +151,7 @@ Tag Painter는 Chroma 워크플로를 구성할 때 노드의 `_meta.title`(대�
   - `VAE Decode (Upscale)` — 업스케일 분기의 최종 디코드(업스케일 사용 시 출력 소스로 사용됨).
 
 동작 및 참고 사항:
+
 - 타이틀 매칭은 부분 포함, 대소문자 구분입니다. 같은 타이틀을 가진 노드는 하나만 두세요.
 - 타이틀이 일부 누락되어도 가능한 경우 클래스 타입으로 보완 설정합니다: `RandomNoise`(시드), `BasicScheduler`(스텝/스케줄러), `CFGGuider`(CFG), `KSamplerSelect`(샘플러), 첫 `UNETLoader`(체크포인트), 첫 `VAELoader`(VAE).
 - Chroma 워크플로에서 메인 모델은 `UNETLoader`를 사용합니다. `Load Checkpoint` 타이틀은 FaceDetailer용 하나만 두는 것을 권장합니다.
@@ -206,6 +207,7 @@ Qwen 모델용 워크플로도 노드의 `_meta.title`(부분 일치, 대소문�
     - `Upscale VAE Decode` — 업스케일 분기의 최종 디코드 노드.
 
 동작 및 참고 사항:
+
 - LoRA 체인: Tag Painter가 `Load Qwen UNet`과 `Model Sampling Aura Flow` 사이에 `LoraLoaderModelOnly` 노드(타이틀 `Load Qwen LoRA N`)를 자동 삽입/연결합니다.
 - 타이틀 매칭은 부분 포함, 대소문자 구분입니다. 각 타이틀별로 한 개의 노드만 두세요.
 - 타이틀이 누락되면 일부 경로에서 기본 ID로 동작할 수 있으나, 안정적인 동작을 위해 위 타이틀 구성을 권장합니다.

@@ -24,7 +24,7 @@ export async function GET({ url }: RequestEvent) {
       const files = await fs.readdir(workflowDir)
 
       // Filter for JSON files only
-      const jsonFiles = files.filter(file => file.endsWith('.json'))
+      const jsonFiles = files.filter((file) => file.endsWith('.json'))
 
       return json({ workflows: jsonFiles })
     } catch (error) {

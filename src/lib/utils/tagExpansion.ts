@@ -217,7 +217,6 @@ export function cleanDirectivesFromTags(tagsText: string): string {
   return cleaned.trim()
 }
 
-
 function getRandomChildFromNode(model: TreeModel, node: AnyNode): string {
   if (node.kind === 'array') {
     const children = node.children || []

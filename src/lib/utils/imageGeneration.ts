@@ -147,7 +147,14 @@ export async function generateImage(options: GenerationOptions): Promise<{
     // Create shared disabled context to propagate disables across zones
     const sharedDisabledContext = { names: new Set<string>(), patterns: [] as string[] }
 
-    const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll, sharedDisabledContext)
+    const allResult = expandCustomTags(
+      wildcardZones.all,
+      model,
+      new Set(),
+      {},
+      previousAll,
+      sharedDisabledContext
+    )
 
     // Check for composition detection
     const detectedComposition = detectCompositionFromTags([allResult.expandedText])
@@ -308,7 +315,8 @@ export async function generateImage(options: GenerationOptions): Promise<{
 
     // Configure CLIP skip (title-based and legacy numeric for compatibility)
     setNodeClipSkip(workflow, 'CLIP Set Last Layer', appliedSettings.clipSkip)
-    if (isInpainting) setNodeClipSkip(workflow, 'CLIP Set Last Layer (Inpainting)', appliedSettings.clipSkip)
+    if (isInpainting)
+      setNodeClipSkip(workflow, 'CLIP Set Last Layer (Inpainting)', appliedSettings.clipSkip)
     configureClipSkip(workflow, appliedSettings.clipSkip)
 
     // If a custom VAE is selected, inject VAELoader and rewire all VAE inputs
@@ -451,7 +459,10 @@ function configureWorkflow(
     const resolvedUpscaleCkptAlways =
       (upscaleSettings2.checkpoint && upscaleSettings2.checkpoint !== 'model.safetensors'
         ? upscaleSettings2.checkpoint
-        : null) || promptsData.selectedCheckpoint || baseCkptName || upscaleSettings2.checkpoint
+        : null) ||
+      promptsData.selectedCheckpoint ||
+      baseCkptName ||
+      upscaleSettings2.checkpoint
     setNodeCheckpoint(workflow, 'Upscale Checkpoint Loader', resolvedUpscaleCkptAlways)
 
     // Configure FaceDetailer scheduler (title-based)
@@ -468,8 +479,12 @@ function configureWorkflow(
         // Configure LatentUpscale dimensions (use scale from settings)
         const latentUpscale = findNodeByTitle(workflow, 'Latent Upscale')?.nodeId
         if (latentUpscale && workflow[latentUpscale]) {
-          workflow[latentUpscale].inputs.width = Math.round(settings.imageWidth * upscaleSettings.scale)
-          workflow[latentUpscale].inputs.height = Math.round(settings.imageHeight * upscaleSettings.scale)
+          workflow[latentUpscale].inputs.width = Math.round(
+            settings.imageWidth * upscaleSettings.scale
+          )
+          workflow[latentUpscale].inputs.height = Math.round(
+            settings.imageHeight * upscaleSettings.scale
+          )
         }
 
         // Configure upscale checkpoint (default to selected base model if unset/placeholder)
@@ -540,7 +555,8 @@ function configureWorkflow(
         const baseDecode = findNodeByTitle(workflow, 'VAE Decode')?.nodeId
         if (fdNode && workflow[fdNode]) {
           if (promptsData.useUpscale && upDecode) workflow[fdNode].inputs.image = [upDecode, 0]
-          else if (!promptsData.useUpscale && baseDecode) workflow[fdNode].inputs.image = [baseDecode, 0]
+          else if (!promptsData.useUpscale && baseDecode)
+            workflow[fdNode].inputs.image = [baseDecode, 0]
         }
       }
     }
@@ -585,17 +601,16 @@ function applySeedsToWorkflow(
   // Use provided seed or generate a new random seed
   const seed = providedSeed ?? Math.floor(Math.random() * 1000000000000000)
 
-    if (isInpainting) {
-      // Inpainting workflow - set seed for KSampler node by title
-      setNodeSampler(workflow, 'KSampler (inpainting)', { seed })
+  if (isInpainting) {
+    // Inpainting workflow - set seed for KSampler node by title
+    setNodeSampler(workflow, 'KSampler (inpainting)', { seed })
+  } else {
+    // Regular workflow - set seed for SamplerCustom node (noise_seed)
+    setNodeSampler(workflow, 'SamplerCustom', { seed })
 
-    } else {
-      // Regular workflow - set seed for SamplerCustom node (noise_seed)
-      setNodeSampler(workflow, 'SamplerCustom', { seed })
-
-      // Set seed for FaceDetailer node
-      setNodeSampler(workflow, 'FaceDetailer', { seed: seed + 1 })
-    }
+    // Set seed for FaceDetailer node
+    setNodeSampler(workflow, 'FaceDetailer', { seed: seed + 1 })
+  }
 
   return seed
 }
@@ -610,7 +625,8 @@ function addSaveImageWebsocketNode(
     let imageSourceNodeId: string
     if (promptsData.useFaceDetailer) {
       // Composite FaceDetailer result with original
-      imageSourceNodeId = findNodeByTitle(workflow, 'Composite FaceDetailer Result with Original')?.nodeId || '106'
+      imageSourceNodeId =
+        findNodeByTitle(workflow, 'Composite FaceDetailer Result with Original')?.nodeId || '106'
     } else {
       // Use VAE Decode output directly from LatentCompositeMasked path
       imageSourceNodeId = findNodeByTitle(workflow, 'VAE Decode for FaceDetailer')?.nodeId || '102'
@@ -634,9 +650,11 @@ function addSaveImageWebsocketNode(
       imageSourceNodeId = findNodeByTitle(workflow, 'VAE Decode (Upscale)')?.nodeId || '126'
     }
   } else {
-    imageSourceNodeId = (promptsData.useFaceDetailer
-      ? findNodeByTitle(workflow, 'FaceDetailer')?.nodeId
-      : findNodeByTitle(workflow, 'VAE Decode')?.nodeId) || (promptsData.useFaceDetailer ? '69' : '19')
+    imageSourceNodeId =
+      (promptsData.useFaceDetailer
+        ? findNodeByTitle(workflow, 'FaceDetailer')?.nodeId
+        : findNodeByTitle(workflow, 'VAE Decode')?.nodeId) ||
+      (promptsData.useFaceDetailer ? '69' : '19')
   }
 
   // Add the single, dynamically configured SaveImageWebsocket node

@@ -34,16 +34,18 @@
   }
 </script>
 
-<div class="pointer-events-none fixed right-3 top-3 z-[100] flex flex-col gap-2">
+<div class="pointer-events-none fixed top-3 right-3 z-[100] flex flex-col gap-2">
   {#each toasts as t (t.id)}
-    <div class={`pointer-events-auto relative max-w-[28rem] rounded-md px-3 py-2 text-sm text-white shadow-md shadow-black/20 ${bgClass(t.type)}`}>
+    <div
+      class={`pointer-events-auto relative max-w-[28rem] rounded-md px-3 py-2 text-sm text-white shadow-md shadow-black/20 ${bgClass(t.type)}`}
+    >
       <div class="flex items-start gap-2">
         <div class="flex-1">
           {t.message}
         </div>
         <button
           type="button"
-          class="self-center -mr-1 inline-flex h-5 w-5 items-center justify-center rounded text-white/80 hover:text-white focus:outline-none"
+          class="-mr-1 inline-flex h-5 w-5 items-center justify-center self-center rounded text-white/80 hover:text-white focus:outline-none"
           aria-label="Close"
           onclick={() => dismiss(t.id)}
         >

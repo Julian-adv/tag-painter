@@ -155,6 +155,7 @@ Tag Painter applies parameters to Chroma workflows by matching node `_meta.title
   - `VAE Decode (Upscale)` — final decode for the upscale branch (used as the image source when upscaling is enabled).
 
 Behavior and notes:
+
 - Title matching uses substring includes and is case‑sensitive. Keep exactly one node per title.
 - If a title is missing, Tag Painter still configures by class type where possible: `RandomNoise` (seed), `BasicScheduler` (steps/scheduler), `CFGGuider` (cfg), `KSamplerSelect` (sampler), first `UNETLoader` (checkpoint), first `VAELoader` (VAE).
 - The FaceDetailer checkpoint loader should be the only node titled `Load Checkpoint` in a Chroma workflow. The main model uses `UNETLoader`; Tag Painter does not override any main `CheckpointLoaderSimple`.
@@ -210,6 +211,7 @@ Tag Painter resolves Qwen workflows by matching the `_meta.title` of nodes (subs
     - `Upscale VAE Decode` — final decode for the upscale branch.
 
 Behavior and notes:
+
 - LoRA chain: Tag Painter inserts `LoraLoaderModelOnly` nodes titled `Load Qwen LoRA N` and wires them between `Load Qwen UNet` and `Model Sampling Aura Flow` automatically.
 - Title matching uses substring includes and is case‑sensitive. Keep one node per title to avoid ambiguity.
 - If a title is missing, Tag Painter may fall back to default IDs only in some cases; use the titles above for reliable behavior.

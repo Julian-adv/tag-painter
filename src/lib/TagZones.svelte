@@ -111,7 +111,8 @@
         inpainting: inpaintingTags
       }
 
-      const targetModelType = currentModelType === 'qwen' || currentModelType === 'chroma' ? currentModelType : undefined
+      const targetModelType =
+        currentModelType === 'qwen' || currentModelType === 'chroma' ? currentModelType : undefined
       await writeWildcardZones(zones, targetModelType)
 
       if (saveTimeout) {

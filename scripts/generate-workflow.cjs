@@ -1,52 +1,52 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require('fs')
+const path = require('path')
 
-const workflowPath = path.join(__dirname, '../data/workflow/default.workflow.json');
-const outputPath = path.join(__dirname, '../data/workflow/reference.sdxl.workflow.json');
+const workflowPath = path.join(__dirname, '../data/workflow/default.workflow.json')
+const outputPath = path.join(__dirname, '../data/workflow/reference.sdxl.workflow.json')
 
-const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf-8'));
+const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf-8'))
 
-const nodesMap = new Map();
-const links = [];
-let linkId = 1;
+const nodesMap = new Map()
+const links = []
+let linkId = 1
 
 // First pass: collect all output requirements
-const nodeOutputRequirements = new Map();
+const nodeOutputRequirements = new Map()
 
 Object.entries(workflow).forEach(([nodeId, node]) => {
   if (!nodeOutputRequirements.has(nodeId)) {
-    nodeOutputRequirements.set(nodeId, new Set());
+    nodeOutputRequirements.set(nodeId, new Set())
   }
 
   if (node.inputs) {
-    Object.values(node.inputs).forEach(val => {
+    Object.values(node.inputs).forEach((val) => {
       if (Array.isArray(val)) {
-        const [sourceNodeId, sourceSlot] = val;
+        const [sourceNodeId, sourceSlot] = val
         if (!nodeOutputRequirements.has(sourceNodeId)) {
-          nodeOutputRequirements.set(sourceNodeId, new Set());
+          nodeOutputRequirements.set(sourceNodeId, new Set())
         }
-        nodeOutputRequirements.get(sourceNodeId).add(sourceSlot);
+        nodeOutputRequirements.get(sourceNodeId).add(sourceSlot)
       }
-    });
+    })
   }
-});
+})
 
 // Second pass: create all nodes with empty outputs
 Object.entries(workflow).forEach(([nodeId, node], index) => {
-  const outputs = [];
+  const outputs = []
 
   // Create outputs based on requirements
-  const outputSlots = nodeOutputRequirements.get(nodeId) || new Set();
-  const sortedSlots = Array.from(outputSlots).sort((a, b) => a - b);
+  const outputSlots = nodeOutputRequirements.get(nodeId) || new Set()
+  const sortedSlots = Array.from(outputSlots).sort((a, b) => a - b)
 
-  sortedSlots.forEach(slot => {
+  sortedSlots.forEach((slot) => {
     outputs.push({
       name: `output_${slot}`,
       type: '*',
       links: [],
       slot_index: slot
-    });
-  });
+    })
+  })
 
   const nodeObj = {
     id: parseInt(nodeId),
@@ -61,37 +61,30 @@ Object.entries(workflow).forEach(([nodeId, node], index) => {
     properties: { 'Node name for S&R': node.class_type },
     widgets_values: [],
     title: node._meta?.title || node.class_type
-  };
+  }
 
-  nodesMap.set(parseInt(nodeId), nodeObj);
-});
+  nodesMap.set(parseInt(nodeId), nodeObj)
+})
 
 // Third pass: create inputs and links, and update output links
 Object.entries(workflow).forEach(([nodeId, node]) => {
-  const targetNode = nodesMap.get(parseInt(nodeId));
-  if (!targetNode) return;
+  const targetNode = nodesMap.get(parseInt(nodeId))
+  if (!targetNode) return
 
   if (node.inputs) {
     Object.entries(node.inputs).forEach(([inputName, inputValue], inputIndex) => {
       if (Array.isArray(inputValue)) {
-        const [sourceNodeId, sourceSlot] = inputValue;
+        const [sourceNodeId, sourceSlot] = inputValue
 
         // Create link
-        links.push([
-          linkId,
-          parseInt(sourceNodeId),
-          sourceSlot,
-          parseInt(nodeId),
-          inputIndex,
-          '*'
-        ]);
+        links.push([linkId, parseInt(sourceNodeId), sourceSlot, parseInt(nodeId), inputIndex, '*'])
 
         // Add link to source node's output
-        const sourceNode = nodesMap.get(parseInt(sourceNodeId));
+        const sourceNode = nodesMap.get(parseInt(sourceNodeId))
         if (sourceNode && sourceNode.outputs) {
-          const output = sourceNode.outputs.find(o => o.slot_index === sourceSlot);
+          const output = sourceNode.outputs.find((o) => o.slot_index === sourceSlot)
           if (output) {
-            output.links.push(linkId);
+            output.links.push(linkId)
           }
         }
 
@@ -100,35 +93,35 @@ Object.entries(workflow).forEach(([nodeId, node]) => {
           name: inputName,
           type: '*',
           link: linkId
-        });
+        })
 
-        linkId++;
+        linkId++
       } else {
         targetNode.inputs.push({
           name: inputName,
           type: '*',
           link: null
-        });
+        })
       }
-    });
+    })
   }
 
   // Clean up empty inputs
   if (targetNode.inputs.length === 0) {
-    delete targetNode.inputs;
+    delete targetNode.inputs
   }
-});
+})
 
 // Convert map to array and clean up slot_index
-const nodes = Array.from(nodesMap.values());
-nodes.forEach(node => {
+const nodes = Array.from(nodesMap.values())
+nodes.forEach((node) => {
   if (node.outputs) {
-    node.outputs.forEach(o => delete o.slot_index);
+    node.outputs.forEach((o) => delete o.slot_index)
   }
-});
+})
 
 const fullWorkflow = {
-  last_node_id: Math.max(...nodes.map(n => n.id)),
+  last_node_id: Math.max(...nodes.map((n) => n.id)),
   last_link_id: linkId - 1,
   nodes,
   links,
@@ -136,8 +129,8 @@ const fullWorkflow = {
   config: {},
   extra: {},
   version: 0.4
-};
+}
 
-fs.writeFileSync(outputPath, JSON.stringify(fullWorkflow, null, 2));
-console.log('Generated workflow at:', outputPath);
-console.log(`Created ${nodes.length} nodes and ${links.length} links`);
+fs.writeFileSync(outputPath, JSON.stringify(fullWorkflow, null, 2))
+console.log('Generated workflow at:', outputPath)
+console.log(`Created ${nodes.length} nodes and ${links.length} links`)

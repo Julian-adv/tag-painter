@@ -70,7 +70,10 @@ export function findNodesByTitle(workflow: ComfyUIWorkflow, titlePattern: string
 /**
  * Find first node matching a title pattern
  */
-export function findNodeByTitle(workflow: ComfyUIWorkflow, titlePattern: string): NodeMapping | undefined {
+export function findNodeByTitle(
+  workflow: ComfyUIWorkflow,
+  titlePattern: string
+): NodeMapping | undefined {
   // Exact title match only; no substring fallback to avoid collisions
   for (const [nodeId, node] of Object.entries(workflow)) {
     const title = node._meta?.title || ''

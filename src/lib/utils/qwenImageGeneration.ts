@@ -120,6 +120,7 @@ function validateQwenWorkflow(
 
   return missing
 }
+
 function applyQwenLoraChain(workflow: ComfyUIWorkflow, loras: { name: string; weight: number }[]) {
   const baseUnet = findNodeByTitle(workflow, 'Load Qwen UNet')?.nodeId || '37'
   const modelSampling = findNodeByTitle(workflow, 'Model Sampling Aura Flow')?.nodeId || '66'
@@ -209,8 +210,8 @@ export async function generateQwenImage(
     const clientId = generateClientId()
 
     // Validate required workflow nodes by title
-    const fdSettings = (modelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS)
-    const usSettings = (modelSettings?.upscale || DEFAULT_UPSCALE_SETTINGS)
+    const fdSettings = modelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
+    const usSettings = modelSettings?.upscale || DEFAULT_UPSCALE_SETTINGS
     const missingTitles = validateQwenWorkflow(workflow, {
       useFaceDetailer: !!options.promptsData.useFaceDetailer,
       fdModelType: fdSettings.modelType || 'sdxl',
@@ -241,7 +242,14 @@ export async function generateQwenImage(
     // Create shared disabled context to propagate disables across zones
     const sharedDisabledContext = { names: new Set<string>(), patterns: [] as string[] }
 
-    const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, previousAll, sharedDisabledContext)
+    const allResult = expandCustomTags(
+      wildcardZones.all,
+      model,
+      new Set(),
+      {},
+      previousAll,
+      sharedDisabledContext
+    )
 
     // Detect composition from expanded 'all' tags and propagate to store/UI
     const detectedComposition = detectCompositionFromTags([allResult.expandedText])
@@ -333,7 +341,12 @@ export async function generateQwenImage(
     })
 
     // Canvas size
-    setNodeImageSize(workflow, 'Empty Latent Image', appliedSettings.imageWidth, appliedSettings.imageHeight)
+    setNodeImageSize(
+      workflow,
+      'Empty Latent Image',
+      appliedSettings.imageWidth,
+      appliedSettings.imageHeight
+    )
 
     // UNet checkpoint (Qwen)
     if (promptsData.selectedCheckpoint) {
@@ -377,7 +390,8 @@ export async function generateQwenImage(
 
         if (fdModelType === 'qwen') {
           const resolvedFdUnet =
-            faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
+            faceDetailerSettings.checkpoint &&
+            faceDetailerSettings.checkpoint !== 'model.safetensors'
               ? faceDetailerSettings.checkpoint
               : promptsData.selectedCheckpoint || 'qwen_image_fp8_e4m3fn.safetensors'
 
@@ -394,15 +408,24 @@ export async function generateQwenImage(
             if (fdClipLoader) workflow[fdNodeId].inputs.clip = [fdClipLoader, 0]
           }
 
-          const fdVaeLoaderQwen = findNodeByTitle(workflow, 'FaceDetailer VAE Loader (Qwen)')?.nodeId
+          const fdVaeLoaderQwen = findNodeByTitle(
+            workflow,
+            'FaceDetailer VAE Loader (Qwen)'
+          )?.nodeId
           if (fdVaeLoaderQwen) {
             const fdVaeName = faceDetailerSettings.selectedVae || 'qwen_image_vae.safetensors'
             if (workflow[fdNodeId]) workflow[fdNodeId].inputs.vae = [fdVaeLoaderQwen, 0]
             if (workflow[fdVaeLoaderQwen]) workflow[fdVaeLoaderQwen].inputs.vae_name = fdVaeName
           }
 
-          const fdPos = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Positive)')?.nodeId
-          const fdNeg = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Negative)')?.nodeId
+          const fdPos = findNodeByTitle(
+            workflow,
+            'FaceDetailer CLIP Text Encode (Positive)'
+          )?.nodeId
+          const fdNeg = findNodeByTitle(
+            workflow,
+            'FaceDetailer CLIP Text Encode (Negative)'
+          )?.nodeId
           if (fdPos && fdClipLoader && workflow[fdPos]) {
             workflow[fdPos].inputs.clip = [fdClipLoader, 0]
             workflow[fdPos].inputs.text = combinedPrompt
@@ -413,7 +436,8 @@ export async function generateQwenImage(
           }
         } else {
           const resolvedFdCkpt =
-            faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
+            faceDetailerSettings.checkpoint &&
+            faceDetailerSettings.checkpoint !== 'model.safetensors'
               ? faceDetailerSettings.checkpoint
               : promptsData.selectedCheckpoint || faceDetailerSettings.checkpoint
           const fdCkpt = findNodeByTitle(workflow, 'FaceDetailer Checkpoint Loader (SDXL)')?.nodeId
@@ -431,11 +455,18 @@ export async function generateQwenImage(
             if (workflow[fdNodeId] && fdVaeLoader) workflow[fdNodeId].inputs.vae = [fdVaeLoader, 0]
             const fdVaeName =
               faceDetailerSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
-            if (fdVaeLoader && workflow[fdVaeLoader]) workflow[fdVaeLoader].inputs.vae_name = fdVaeName
+            if (fdVaeLoader && workflow[fdVaeLoader])
+              workflow[fdVaeLoader].inputs.vae_name = fdVaeName
           }
 
-          const fdPos = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Positive)')?.nodeId
-          const fdNeg = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Negative)')?.nodeId
+          const fdPos = findNodeByTitle(
+            workflow,
+            'FaceDetailer CLIP Text Encode (Positive)'
+          )?.nodeId
+          const fdNeg = findNodeByTitle(
+            workflow,
+            'FaceDetailer CLIP Text Encode (Negative)'
+          )?.nodeId
           if (fdPos && fdCkpt && workflow[fdPos]) {
             workflow[fdPos].inputs.clip = [fdCkpt, 1]
             workflow[fdPos].inputs.text = combinedPrompt
@@ -498,7 +529,10 @@ export async function generateQwenImage(
 
         // Set KSampler to use Qwen model sampling node
         const upscaleSampler = findNodeByTitle(workflow, 'KSampler (Upscale)')?.nodeId
-        const upscaleModelSampling = findNodeByTitle(workflow, 'Upscale Model Sampling Aura Flow (Qwen)')?.nodeId
+        const upscaleModelSampling = findNodeByTitle(
+          workflow,
+          'Upscale Model Sampling Aura Flow (Qwen)'
+        )?.nodeId
         if (upscaleSampler && upscaleModelSampling && workflow[upscaleSampler]) {
           workflow[upscaleSampler].inputs.model = [upscaleModelSampling, 0]
         }
@@ -509,7 +543,8 @@ export async function generateQwenImage(
         if (upscaleEncode && upscaleVaeQwen && workflow[upscaleEncode]) {
           workflow[upscaleEncode].inputs.vae = [upscaleVaeQwen, 0]
           const usVaeName = upscaleSettings.selectedVae || 'qwen_image_vae.safetensors'
-          if (upscaleVaeQwen && workflow[upscaleVaeQwen]) workflow[upscaleVaeQwen].inputs.vae_name = usVaeName
+          if (upscaleVaeQwen && workflow[upscaleVaeQwen])
+            workflow[upscaleVaeQwen].inputs.vae_name = usVaeName
         }
 
         // Configure Upscale VAE for decoding - same loader

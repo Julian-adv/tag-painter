@@ -99,7 +99,14 @@ export async function generateChromaImage(
 
     const sharedDisabledContext = { names: new Set<string>(), patterns: [] as string[] }
 
-    const allResult = expandCustomTags(wildcardZones.all, model, new Set(), {}, {}, sharedDisabledContext)
+    const allResult = expandCustomTags(
+      wildcardZones.all,
+      model,
+      new Set(),
+      {},
+      {},
+      sharedDisabledContext
+    )
     const detectedComposition = detectCompositionFromTags([allResult.expandedText])
     if (detectedComposition) {
       const { updateComposition } = await import('../stores/promptsStore')
@@ -172,7 +179,12 @@ export async function generateChromaImage(
     }
 
     // Configure size (Chroma uses EmptySD3LatentImage)
-    setNodeImageSize(workflow, 'Empty Latent Image', appliedSettings.imageWidth, appliedSettings.imageHeight)
+    setNodeImageSize(
+      workflow,
+      'Empty Latent Image',
+      appliedSettings.imageWidth,
+      appliedSettings.imageHeight
+    )
     const sd3EmptyId = findFirstNodeByClassType(workflow, 'EmptySD3LatentImage')
     if (sd3EmptyId && workflow[sd3EmptyId]) {
       workflow[sd3EmptyId].inputs.width = appliedSettings.imageWidth
@@ -227,19 +239,22 @@ export async function generateChromaImage(
       workflow[ksamplerSelectId].inputs.sampler_name = appliedSettings.sampler
     }
     // Also support classic SamplerCustom if present (for rare custom chroma pipelines)
-    if (!setNodeSampler(workflow, 'KSampler (Main)', {
-      steps: appliedSettings.steps,
-      cfg: appliedSettings.cfgScale,
-      sampler_name: appliedSettings.sampler,
-      scheduler,
-      seed: mainSeed
-    }) && !setNodeSampler(workflow, 'KSampler', {
-      steps: appliedSettings.steps,
-      cfg: appliedSettings.cfgScale,
-      sampler_name: appliedSettings.sampler,
-      scheduler,
-      seed: mainSeed
-    })) {
+    if (
+      !setNodeSampler(workflow, 'KSampler (Main)', {
+        steps: appliedSettings.steps,
+        cfg: appliedSettings.cfgScale,
+        sampler_name: appliedSettings.sampler,
+        scheduler,
+        seed: mainSeed
+      }) &&
+      !setNodeSampler(workflow, 'KSampler', {
+        steps: appliedSettings.steps,
+        cfg: appliedSettings.cfgScale,
+        sampler_name: appliedSettings.sampler,
+        scheduler,
+        seed: mainSeed
+      })
+    ) {
       const samplerNode = findNodeByTitle(workflow, 'SamplerCustom')
       if (samplerNode) {
         const inputs = workflow[samplerNode.nodeId].inputs
@@ -329,9 +344,15 @@ export async function generateChromaImage(
     const baseDecode = findNodeByTitle(workflow, 'VAE Decode (Base)')
 
     if (promptsData.useUpscale) {
-      imageSourceNodeId = promptsData.useFaceDetailer && fdNode ? fdNode.nodeId : (upscaleDecode?.nodeId || imageSourceNodeId)
+      imageSourceNodeId =
+        promptsData.useFaceDetailer && fdNode
+          ? fdNode.nodeId
+          : upscaleDecode?.nodeId || imageSourceNodeId
     } else {
-      imageSourceNodeId = promptsData.useFaceDetailer && fdNode ? fdNode.nodeId : (baseDecode?.nodeId || imageSourceNodeId)
+      imageSourceNodeId =
+        promptsData.useFaceDetailer && fdNode
+          ? fdNode.nodeId
+          : baseDecode?.nodeId || imageSourceNodeId
     }
     // Add SaveImageWebsocket node (always overwrite the constant ID)
     workflow[FINAL_SAVE_NODE_ID] = {
