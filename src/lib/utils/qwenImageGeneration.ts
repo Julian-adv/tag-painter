@@ -322,120 +322,124 @@ export async function generateQwenImage(
 
     // Configure FaceDetailer if enabled
     if (promptsData.useFaceDetailer) {
-      const fdNodeId = findNodeByTitle(workflow, 'FaceDetailer')?.nodeId
-      if (fdNodeId) {
-        const faceDetailerSettings = modelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
-        const fdModelType = faceDetailerSettings.modelType || 'sdxl'
+      const fdNode = findNodeByTitle(workflow, 'FaceDetailer')
+      if (!fdNode) {
+        return { error: 'Missing required node: "FaceDetailer"' }
+      }
 
-        if (fdModelType === 'qwen') {
-          const resolvedFdUnet =
-            faceDetailerSettings.checkpoint &&
-            faceDetailerSettings.checkpoint !== 'model.safetensors'
-              ? faceDetailerSettings.checkpoint
-              : promptsData.selectedCheckpoint || 'qwen_image_fp8_e4m3fn.safetensors'
+      const faceDetailerSettings = modelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
+      const fdModelType = faceDetailerSettings.modelType || 'sdxl'
 
-          const fdUnet = findNodeByTitle(workflow, 'FaceDetailer UNet Loader (Qwen)')?.nodeId
-          if (fdUnet && workflow[fdUnet]) workflow[fdUnet].inputs.unet_name = resolvedFdUnet
+      if (fdModelType === 'qwen') {
+        const resolvedFdUnet =
+          faceDetailerSettings.checkpoint &&
+          faceDetailerSettings.checkpoint !== 'model.safetensors'
+            ? faceDetailerSettings.checkpoint
+            : promptsData.selectedCheckpoint || 'qwen_image_fp8_e4m3fn.safetensors'
 
-          const fdModelSampling = findNodeByTitle(
-            workflow,
-            'FaceDetailer Model Sampling Aura Flow (Qwen)'
-          )?.nodeId
-          const fdClipLoader = findNodeByTitle(workflow, 'FaceDetailer CLIP Loader (Qwen)')?.nodeId
-          if (workflow[fdNodeId]) {
-            if (fdModelSampling) workflow[fdNodeId].inputs.model = [fdModelSampling, 0]
-            if (fdClipLoader) workflow[fdNodeId].inputs.clip = [fdClipLoader, 0]
-          }
+        const fdUnet = findNodeByTitle(workflow, 'FaceDetailer UNet Loader (Qwen)')
+        if (!fdUnet) {
+          return { error: 'Missing required node: "FaceDetailer UNet Loader (Qwen)"' }
+        }
+        workflow[fdUnet.nodeId].inputs.unet_name = resolvedFdUnet
 
-          const fdVaeLoaderQwen = findNodeByTitle(
-            workflow,
-            'FaceDetailer VAE Loader (Qwen)'
-          )?.nodeId
-          if (fdVaeLoaderQwen) {
-            const fdVaeName = faceDetailerSettings.selectedVae || 'qwen_image_vae.safetensors'
-            if (workflow[fdNodeId]) workflow[fdNodeId].inputs.vae = [fdVaeLoaderQwen, 0]
-            if (workflow[fdVaeLoaderQwen]) workflow[fdVaeLoaderQwen].inputs.vae_name = fdVaeName
-          }
+        const fdModelSampling = findNodeByTitle(
+          workflow,
+          'FaceDetailer Model Sampling Aura Flow (Qwen)'
+        )
+        if (!fdModelSampling) {
+          return { error: 'Missing required node: "FaceDetailer Model Sampling Aura Flow (Qwen)"' }
+        }
 
-          const fdPos = findNodeByTitle(
-            workflow,
-            'FaceDetailer CLIP Text Encode (Positive)'
-          )?.nodeId
-          const fdNeg = findNodeByTitle(
-            workflow,
-            'FaceDetailer CLIP Text Encode (Negative)'
-          )?.nodeId
-          if (fdPos && fdClipLoader && workflow[fdPos]) {
-            workflow[fdPos].inputs.clip = [fdClipLoader, 0]
-            workflow[fdPos].inputs.text = combinedPrompt
-          }
-          if (fdNeg && fdClipLoader && workflow[fdNeg]) {
-            workflow[fdNeg].inputs.clip = [fdClipLoader, 0]
-            workflow[fdNeg].inputs.text = negativeTagsText
-          }
+        const fdClipLoader = findNodeByTitle(workflow, 'FaceDetailer CLIP Loader (Qwen)')
+        if (!fdClipLoader) {
+          return { error: 'Missing required node: "FaceDetailer CLIP Loader (Qwen)"' }
+        }
+
+        workflow[fdNode.nodeId].inputs.model = [fdModelSampling.nodeId, 0]
+        workflow[fdNode.nodeId].inputs.clip = [fdClipLoader.nodeId, 0]
+
+        const fdVaeLoaderQwen = findNodeByTitle(workflow, 'FaceDetailer VAE Loader (Qwen)')
+        if (!fdVaeLoaderQwen) {
+          return { error: 'Missing required node: "FaceDetailer VAE Loader (Qwen)"' }
+        }
+        const fdVaeName = faceDetailerSettings.selectedVae || 'qwen_image_vae.safetensors'
+        workflow[fdNode.nodeId].inputs.vae = [fdVaeLoaderQwen.nodeId, 0]
+        workflow[fdVaeLoaderQwen.nodeId].inputs.vae_name = fdVaeName
+
+        const fdPos = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Positive)')
+        if (!fdPos) {
+          return { error: 'Missing required node: "FaceDetailer CLIP Text Encode (Positive)"' }
+        }
+        workflow[fdPos.nodeId].inputs.clip = [fdClipLoader.nodeId, 0]
+        workflow[fdPos.nodeId].inputs.text = combinedPrompt
+
+        const fdNeg = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Negative)')
+        if (!fdNeg) {
+          return { error: 'Missing required node: "FaceDetailer CLIP Text Encode (Negative)"' }
+        }
+        workflow[fdNeg.nodeId].inputs.clip = [fdClipLoader.nodeId, 0]
+        workflow[fdNeg.nodeId].inputs.text = negativeTagsText
+      } else {
+        // SDXL FaceDetailer
+        const resolvedFdCkpt =
+          faceDetailerSettings.checkpoint &&
+          faceDetailerSettings.checkpoint !== 'model.safetensors'
+            ? faceDetailerSettings.checkpoint
+            : promptsData.selectedCheckpoint || faceDetailerSettings.checkpoint
+
+        const fdCkpt = findNodeByTitle(workflow, 'FaceDetailer Checkpoint Loader (SDXL)')
+        if (!fdCkpt) {
+          return { error: 'Missing required node: "FaceDetailer Checkpoint Loader (SDXL)"' }
+        }
+        workflow[fdCkpt.nodeId].inputs.ckpt_name = resolvedFdCkpt
+
+        workflow[fdNode.nodeId].inputs.model = [fdCkpt.nodeId, 0]
+        workflow[fdNode.nodeId].inputs.clip = [fdCkpt.nodeId, 1]
+
+        if (faceDetailerSettings.selectedVae === '__embedded__') {
+          workflow[fdNode.nodeId].inputs.vae = [fdCkpt.nodeId, 2]
         } else {
-          const resolvedFdCkpt =
-            faceDetailerSettings.checkpoint &&
-            faceDetailerSettings.checkpoint !== 'model.safetensors'
-              ? faceDetailerSettings.checkpoint
-              : promptsData.selectedCheckpoint || faceDetailerSettings.checkpoint
-          const fdCkpt = findNodeByTitle(workflow, 'FaceDetailer Checkpoint Loader (SDXL)')?.nodeId
-          if (fdCkpt && workflow[fdCkpt]) workflow[fdCkpt].inputs.ckpt_name = resolvedFdCkpt
-
-          if (workflow[fdNodeId] && fdCkpt) {
-            workflow[fdNodeId].inputs.model = [fdCkpt, 0]
-            workflow[fdNodeId].inputs.clip = [fdCkpt, 1]
+          const fdVaeLoader = findNodeByTitle(workflow, 'FaceDetailer VAE Loader (SDXL)')
+          if (!fdVaeLoader) {
+            return { error: 'Missing required node: "FaceDetailer VAE Loader (SDXL)"' }
           }
-
-          if (faceDetailerSettings.selectedVae === '__embedded__') {
-            if (workflow[fdNodeId] && fdCkpt) workflow[fdNodeId].inputs.vae = [fdCkpt, 2]
-          } else {
-            const fdVaeLoader = findNodeByTitle(workflow, 'FaceDetailer VAE Loader (SDXL)')?.nodeId
-            if (workflow[fdNodeId] && fdVaeLoader) workflow[fdNodeId].inputs.vae = [fdVaeLoader, 0]
-            const fdVaeName =
-              faceDetailerSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
-            if (fdVaeLoader && workflow[fdVaeLoader])
-              workflow[fdVaeLoader].inputs.vae_name = fdVaeName
-          }
-
-          const fdPos = findNodeByTitle(
-            workflow,
-            'FaceDetailer CLIP Text Encode (Positive)'
-          )?.nodeId
-          const fdNeg = findNodeByTitle(
-            workflow,
-            'FaceDetailer CLIP Text Encode (Negative)'
-          )?.nodeId
-          if (fdPos && fdCkpt && workflow[fdPos]) {
-            workflow[fdPos].inputs.clip = [fdCkpt, 1]
-            workflow[fdPos].inputs.text = combinedPrompt
-          }
-          if (fdNeg && fdCkpt && workflow[fdNeg]) {
-            workflow[fdNeg].inputs.clip = [fdCkpt, 1]
-            workflow[fdNeg].inputs.text = negativeTagsText
-          }
+          workflow[fdNode.nodeId].inputs.vae = [fdVaeLoader.nodeId, 0]
+          const fdVaeName =
+            faceDetailerSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
+          workflow[fdVaeLoader.nodeId].inputs.vae_name = fdVaeName
         }
 
-        // Common FaceDetailer settings
-        if (workflow[fdNodeId]) {
-          workflow[fdNodeId].inputs.seed = appliedSeed + 1
-          workflow[fdNodeId].inputs.steps = faceDetailerSettings.steps
-          workflow[fdNodeId].inputs.cfg = faceDetailerSettings.cfgScale
-          workflow[fdNodeId].inputs.sampler_name = faceDetailerSettings.sampler
-          workflow[fdNodeId].inputs.scheduler = faceDetailerSettings.scheduler
-          workflow[fdNodeId].inputs.denoise = faceDetailerSettings.denoise
+        const fdPos = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Positive)')
+        if (!fdPos) {
+          return { error: 'Missing required node: "FaceDetailer CLIP Text Encode (Positive)"' }
         }
+        workflow[fdPos.nodeId].inputs.clip = [fdCkpt.nodeId, 1]
+        workflow[fdPos.nodeId].inputs.text = combinedPrompt
 
-        // FD input image: upscale decode output or base decode output
-        const upscaleDecode = findNodeByTitle(workflow, 'Upscale VAE Decode')?.nodeId
-        const baseDecode = findNodeByTitle(workflow, 'VAE Decode')?.nodeId
-        if (workflow[fdNodeId]) {
-          if (promptsData.useUpscale && upscaleDecode) {
-            workflow[fdNodeId].inputs.image = [upscaleDecode, 0]
-          } else if (!promptsData.useUpscale && baseDecode) {
-            workflow[fdNodeId].inputs.image = [baseDecode, 0]
-          }
+        const fdNeg = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Negative)')
+        if (!fdNeg) {
+          return { error: 'Missing required node: "FaceDetailer CLIP Text Encode (Negative)"' }
         }
+        workflow[fdNeg.nodeId].inputs.clip = [fdCkpt.nodeId, 1]
+        workflow[fdNeg.nodeId].inputs.text = negativeTagsText
+      }
+
+      // Common FaceDetailer settings
+      workflow[fdNode.nodeId].inputs.seed = appliedSeed + 1
+      workflow[fdNode.nodeId].inputs.steps = faceDetailerSettings.steps
+      workflow[fdNode.nodeId].inputs.cfg = faceDetailerSettings.cfgScale
+      workflow[fdNode.nodeId].inputs.sampler_name = faceDetailerSettings.sampler
+      workflow[fdNode.nodeId].inputs.scheduler = faceDetailerSettings.scheduler
+      workflow[fdNode.nodeId].inputs.denoise = faceDetailerSettings.denoise
+
+      // FD input image: upscale decode output or base decode output
+      const upscaleDecode = findNodeByTitle(workflow, 'Upscale VAE Decode')?.nodeId
+      const baseDecode = findNodeByTitle(workflow, 'VAE Decode')?.nodeId
+      if (promptsData.useUpscale && upscaleDecode) {
+        workflow[fdNode.nodeId].inputs.image = [upscaleDecode, 0]
+      } else if (!promptsData.useUpscale && baseDecode) {
+        workflow[fdNode.nodeId].inputs.image = [baseDecode, 0]
       }
     }
 
@@ -446,14 +450,20 @@ export async function generateQwenImage(
       const usModelType = upscaleSettings.modelType || 'sdxl'
 
       // Configure LatentUpscale dimensions (use scale from settings)
-      const latentUpscaleId = findNodeByTitle(workflow, 'Latent Upscale')?.nodeId
-      if (latentUpscaleId && workflow[latentUpscaleId]) {
-        workflow[latentUpscaleId].inputs.width = Math.round(
-          appliedSettings.imageWidth * upscaleSettings.scale
-        )
-        workflow[latentUpscaleId].inputs.height = Math.round(
-          appliedSettings.imageHeight * upscaleSettings.scale
-        )
+      const latentUpscale = findNodeByTitle(workflow, 'Latent Upscale')
+      if (!latentUpscale) {
+        return { error: 'Missing required node: "Latent Upscale"' }
+      }
+      workflow[latentUpscale.nodeId].inputs.width = Math.round(
+        appliedSettings.imageWidth * upscaleSettings.scale
+      )
+      workflow[latentUpscale.nodeId].inputs.height = Math.round(
+        appliedSettings.imageHeight * upscaleSettings.scale
+      )
+
+      const upscaleSampler = findNodeByTitle(workflow, 'KSampler (Upscale)')
+      if (!upscaleSampler) {
+        return { error: 'Missing required node: "KSampler (Upscale)"' }
       }
 
       if (usModelType === 'qwen') {
@@ -463,105 +473,123 @@ export async function generateQwenImage(
             ? upscaleSettings.checkpoint
             : promptsData.selectedCheckpoint || 'qwen_image_fp8_e4m3fn.safetensors'
 
-        const usUnet = findNodeByTitle(workflow, 'Upscale UNet Loader (Qwen)')?.nodeId
-        if (usUnet && workflow[usUnet]) workflow[usUnet].inputs.unet_name = resolvedUsUnet
+        const usUnet = findNodeByTitle(workflow, 'Upscale UNet Loader (Qwen)')
+        if (!usUnet) {
+          return { error: 'Missing required node: "Upscale UNet Loader (Qwen)"' }
+        }
+        workflow[usUnet.nodeId].inputs.unet_name = resolvedUsUnet
 
-        // Set KSampler to use Qwen model sampling node
-        const upscaleSampler = findNodeByTitle(workflow, 'KSampler (Upscale)')?.nodeId
         const upscaleModelSampling = findNodeByTitle(
           workflow,
           'Upscale Model Sampling Aura Flow (Qwen)'
-        )?.nodeId
-        if (upscaleSampler && upscaleModelSampling && workflow[upscaleSampler]) {
-          workflow[upscaleSampler].inputs.model = [upscaleModelSampling, 0]
+        )
+        if (!upscaleModelSampling) {
+          return { error: 'Missing required node: "Upscale Model Sampling Aura Flow (Qwen)"' }
+        }
+        workflow[upscaleSampler.nodeId].inputs.model = [upscaleModelSampling.nodeId, 0]
+
+        const upscaleVaeQwen = findNodeByTitle(workflow, 'Upscale VAE Loader (Qwen)')
+        if (!upscaleVaeQwen) {
+          return { error: 'Missing required node: "Upscale VAE Loader (Qwen)"' }
+        }
+        const usVaeName = upscaleSettings.selectedVae || 'qwen_image_vae.safetensors'
+        workflow[upscaleVaeQwen.nodeId].inputs.vae_name = usVaeName
+
+        const upscaleEncode = findNodeByTitle(workflow, 'SDXL VAE Encode')
+        if (!upscaleEncode) {
+          return { error: 'Missing required node: "SDXL VAE Encode"' }
+        }
+        workflow[upscaleEncode.nodeId].inputs.vae = [upscaleVaeQwen.nodeId, 0]
+
+        const upscaleDecode = findNodeByTitle(workflow, 'Upscale VAE Decode')
+        if (!upscaleDecode) {
+          return { error: 'Missing required node: "Upscale VAE Decode"' }
+        }
+        workflow[upscaleDecode.nodeId].inputs.vae = [upscaleVaeQwen.nodeId, 0]
+
+        const upscaleClipQwen = findNodeByTitle(workflow, 'Upscale CLIP Loader (Qwen)')
+        if (!upscaleClipQwen) {
+          return { error: 'Missing required node: "Upscale CLIP Loader (Qwen)"' }
         }
 
-        // Configure Upscale VAE for encoding
-        const upscaleEncode = findNodeByTitle(workflow, 'SDXL VAE Encode')?.nodeId
-        const upscaleVaeQwen = findNodeByTitle(workflow, 'Upscale VAE Loader (Qwen)')?.nodeId
-        if (upscaleEncode && upscaleVaeQwen && workflow[upscaleEncode]) {
-          workflow[upscaleEncode].inputs.vae = [upscaleVaeQwen, 0]
-          const usVaeName = upscaleSettings.selectedVae || 'qwen_image_vae.safetensors'
-          if (upscaleVaeQwen && workflow[upscaleVaeQwen])
-            workflow[upscaleVaeQwen].inputs.vae_name = usVaeName
+        const upscalePos = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Positive)')
+        if (!upscalePos) {
+          return { error: 'Missing required node: "Upscale CLIP Text Encode (Positive)"' }
         }
+        workflow[upscalePos.nodeId].inputs.clip = [upscaleClipQwen.nodeId, 0]
+        workflow[upscalePos.nodeId].inputs.text = combinedPrompt
 
-        // Configure Upscale VAE for decoding - same loader
-        const upscaleDecodeNode = findNodeByTitle(workflow, 'Upscale VAE Decode')?.nodeId
-        if (upscaleDecodeNode && upscaleVaeQwen && workflow[upscaleDecodeNode]) {
-          workflow[upscaleDecodeNode].inputs.vae = [upscaleVaeQwen, 0]
+        const upscaleNeg = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Negative)')
+        if (!upscaleNeg) {
+          return { error: 'Missing required node: "Upscale CLIP Text Encode (Negative)"' }
         }
-
-        // Configure upscale text prompts with Qwen CLIP
-        const upscalePos = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Positive)')?.nodeId
-        const upscaleNeg = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Negative)')?.nodeId
-        const upscaleClipQwen = findNodeByTitle(workflow, 'Upscale CLIP Loader (Qwen)')?.nodeId
-        if (upscalePos && upscaleClipQwen && workflow[upscalePos]) {
-          workflow[upscalePos].inputs.clip = [upscaleClipQwen, 0]
-          workflow[upscalePos].inputs.text = combinedPrompt
-        }
-        if (upscaleNeg && upscaleClipQwen && workflow[upscaleNeg]) {
-          workflow[upscaleNeg].inputs.clip = [upscaleClipQwen, 0]
-          workflow[upscaleNeg].inputs.text = negativeTagsText
-        }
+        workflow[upscaleNeg.nodeId].inputs.clip = [upscaleClipQwen.nodeId, 0]
+        workflow[upscaleNeg.nodeId].inputs.text = negativeTagsText
       } else {
         // Configure SDXL upscale path
         const resolvedUpscaleCkpt =
           upscaleSettings.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors'
             ? upscaleSettings.checkpoint
             : promptsData.selectedCheckpoint || upscaleSettings.checkpoint
-        const upCkpt = findNodeByTitle(workflow, 'Upscale Checkpoint Loader (SDXL)')?.nodeId
-        if (upCkpt && workflow[upCkpt]) workflow[upCkpt].inputs.ckpt_name = resolvedUpscaleCkpt
 
-        // Set KSampler to use SDXL checkpoint
-        const upscaleSampler = findNodeByTitle(workflow, 'KSampler (Upscale)')?.nodeId
-        if (upscaleSampler && upCkpt && workflow[upscaleSampler]) {
-          workflow[upscaleSampler].inputs.model = [upCkpt, 0]
+        const upCkpt = findNodeByTitle(workflow, 'Upscale Checkpoint Loader (SDXL)')
+        if (!upCkpt) {
+          return { error: 'Missing required node: "Upscale Checkpoint Loader (SDXL)"' }
+        }
+        workflow[upCkpt.nodeId].inputs.ckpt_name = resolvedUpscaleCkpt
+        workflow[upscaleSampler.nodeId].inputs.model = [upCkpt.nodeId, 0]
+
+        const upscaleEncode = findNodeByTitle(workflow, 'SDXL VAE Encode')
+        if (!upscaleEncode) {
+          return { error: 'Missing required node: "SDXL VAE Encode"' }
         }
 
-        // Configure VAE input for encode
-        const upscaleEncode = findNodeByTitle(workflow, 'SDXL VAE Encode')?.nodeId
-        if (upscaleEncode && upCkpt && workflow[upscaleEncode]) {
-          if (upscaleSettings.selectedVae === '__embedded__') {
-            workflow[upscaleEncode].inputs.vae = [upCkpt, 2]
-          } else {
-            const upVae = findNodeByTitle(workflow, 'Upscale VAE Loader (SDXL)')?.nodeId
-            if (upVae) {
-              workflow[upscaleEncode].inputs.vae = [upVae, 0]
-              const usVaeName =
-                upscaleSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
-              if (workflow[upVae]) workflow[upVae].inputs.vae_name = usVaeName
-            }
+        if (upscaleSettings.selectedVae === '__embedded__') {
+          workflow[upscaleEncode.nodeId].inputs.vae = [upCkpt.nodeId, 2]
+        } else {
+          const upVae = findNodeByTitle(workflow, 'Upscale VAE Loader (SDXL)')
+          if (!upVae) {
+            return { error: 'Missing required node: "Upscale VAE Loader (SDXL)"' }
           }
+          workflow[upscaleEncode.nodeId].inputs.vae = [upVae.nodeId, 0]
+          const usVaeName =
+            upscaleSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
+          workflow[upVae.nodeId].inputs.vae_name = usVaeName
         }
 
-        // Configure Upscale VAE for decoding
-        const upscaleDecodeNode = findNodeByTitle(workflow, 'Upscale VAE Decode')?.nodeId
-        if (upscaleDecodeNode && upCkpt && workflow[upscaleDecodeNode]) {
-          workflow[upscaleDecodeNode].inputs.vae = [upCkpt, 2]
+        const upscaleDecode = findNodeByTitle(workflow, 'Upscale VAE Decode')
+        if (!upscaleDecode) {
+          return { error: 'Missing required node: "Upscale VAE Decode"' }
         }
+        workflow[upscaleDecode.nodeId].inputs.vae = [upCkpt.nodeId, 2]
 
-        // Configure upscale text prompts with SDXL CLIP
-        const upscalePos = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Positive)')?.nodeId
-        const upscaleNeg = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Negative)')?.nodeId
-        if (upscalePos && upCkpt && workflow[upscalePos]) {
-          workflow[upscalePos].inputs.clip = [upCkpt, 1]
-          workflow[upscalePos].inputs.text = combinedPrompt
+        const upscalePos = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Positive)')
+        if (!upscalePos) {
+          return { error: 'Missing required node: "Upscale CLIP Text Encode (Positive)"' }
         }
-        if (upscaleNeg && upCkpt && workflow[upscaleNeg]) {
-          workflow[upscaleNeg].inputs.clip = [upCkpt, 1]
-          workflow[upscaleNeg].inputs.text = negativeTagsText
+        workflow[upscalePos.nodeId].inputs.clip = [upCkpt.nodeId, 1]
+        workflow[upscalePos.nodeId].inputs.text = combinedPrompt
+
+        const upscaleNeg = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Negative)')
+        if (!upscaleNeg) {
+          return { error: 'Missing required node: "Upscale CLIP Text Encode (Negative)"' }
         }
+        workflow[upscaleNeg.nodeId].inputs.clip = [upCkpt.nodeId, 1]
+        workflow[upscaleNeg.nodeId].inputs.text = negativeTagsText
       }
 
       // Configure upscale KSampler (common for both model types)
-      setNodeSampler(workflow, 'KSampler (Upscale)', {
-        steps: upscaleSettings.steps,
-        cfg: upscaleSettings.cfgScale,
-        sampler_name: upscaleSettings.sampler,
-        scheduler: upscaleSettings.scheduler,
-        denoise: upscaleSettings.denoise
-      })
+      if (
+        !setNodeSampler(workflow, 'KSampler (Upscale)', {
+          steps: upscaleSettings.steps,
+          cfg: upscaleSettings.cfgScale,
+          sampler_name: upscaleSettings.sampler,
+          scheduler: upscaleSettings.scheduler,
+          denoise: upscaleSettings.denoise
+        })
+      ) {
+        return { error: 'Missing required node: "KSampler (Upscale)"' }
+      }
     }
 
     // Configure final save node based on upscale and FaceDetailer usage
