@@ -217,157 +217,179 @@ export async function generateChromaImage(
       .filter((t) => t && t.trim().length > 0)
       .join(', ')
     // Main prompts (Chroma path)
-    setNodeTextInput(workflow, 'CLIP Text Encode (Positive Prompt)', combinedPrompt)
-    setNodeTextInput(workflow, 'CLIP Text Encode (Negative Prompt)', negativeTagsText)
-
-    // Upscale/FaceDetailer prompts (separate nodes with explicit titles)
-    if (promptsData.useFaceDetailer) {
-      setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Positive)', combinedPrompt)
-      setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Negative)', negativeTagsText)
+    if (!setNodeTextInput(workflow, 'CLIP Text Encode (Positive Prompt)', combinedPrompt)) {
+      return { error: 'Missing required node: "CLIP Text Encode (Positive Prompt)"' }
+    }
+    if (!setNodeTextInput(workflow, 'CLIP Text Encode (Negative Prompt)', negativeTagsText)) {
+      return { error: 'Missing required node: "CLIP Text Encode (Negative Prompt)"' }
     }
 
     // Configure main sampler / scheduler / noise seed (Chroma: RandomNoise + BasicScheduler + CFGGuider + KSamplerSelect)
     const mainSeed = seed ?? Math.floor(Math.random() * 1000000000000000)
+
     // RandomNoise node
     const randomNoiseId = findFirstNodeByClassType(workflow, 'RandomNoise')
-    if (randomNoiseId && workflow[randomNoiseId]) {
-      workflow[randomNoiseId].inputs.noise_seed = mainSeed
+    if (!randomNoiseId || !workflow[randomNoiseId]) {
+      return { error: 'Missing required node with class type: "RandomNoise"' }
     }
+    workflow[randomNoiseId].inputs.noise_seed = mainSeed
+
     // BasicScheduler
     const schedulerId = findFirstNodeByClassType(workflow, 'BasicScheduler')
-    if (schedulerId && workflow[schedulerId]) {
-      const inputs = workflow[schedulerId].inputs
-      if (typeof appliedSettings.steps === 'number') inputs.steps = appliedSettings.steps
-      inputs.scheduler = scheduler
-      if (typeof inputs.denoise === 'number') {
-        // Keep existing denoise if present; users can change via settings.upscale/face detailer where relevant
-      }
+    if (!schedulerId || !workflow[schedulerId]) {
+      return { error: 'Missing required node with class type: "BasicScheduler"' }
     }
+    const inputs = workflow[schedulerId].inputs
+    if (typeof appliedSettings.steps === 'number') inputs.steps = appliedSettings.steps
+    inputs.scheduler = scheduler
+
     // CFGGuider (cfg scale)
     const cfgGuiderId = findFirstNodeByClassType(workflow, 'CFGGuider')
-    if (cfgGuiderId && workflow[cfgGuiderId]) {
-      workflow[cfgGuiderId].inputs.cfg = appliedSettings.cfgScale
+    if (!cfgGuiderId || !workflow[cfgGuiderId]) {
+      return { error: 'Missing required node with class type: "CFGGuider"' }
     }
+    workflow[cfgGuiderId].inputs.cfg = appliedSettings.cfgScale
+
     // KSamplerSelect (sampler algorithm)
     const ksamplerSelectId = findFirstNodeByClassType(workflow, 'KSamplerSelect')
-    if (ksamplerSelectId && workflow[ksamplerSelectId]) {
-      workflow[ksamplerSelectId].inputs.sampler_name = appliedSettings.sampler
+    if (!ksamplerSelectId || !workflow[ksamplerSelectId]) {
+      return { error: 'Missing required node with class type: "KSamplerSelect"' }
     }
-    // Also support classic SamplerCustom if present (for rare custom chroma pipelines)
-    if (
-      !setNodeSampler(workflow, 'KSampler (Main)', {
-        steps: appliedSettings.steps,
-        cfg: appliedSettings.cfgScale,
-        sampler_name: appliedSettings.sampler,
-        scheduler,
-        seed: mainSeed
-      }) &&
-      !setNodeSampler(workflow, 'KSampler', {
-        steps: appliedSettings.steps,
-        cfg: appliedSettings.cfgScale,
-        sampler_name: appliedSettings.sampler,
-        scheduler,
-        seed: mainSeed
-      })
-    ) {
-      const samplerNode = findNodeByTitle(workflow, 'SamplerCustom')
-      if (samplerNode) {
-        const inputs = workflow[samplerNode.nodeId].inputs
-        inputs.cfg = appliedSettings.cfgScale
-        if ('noise_seed' in inputs) inputs.noise_seed = mainSeed
+    workflow[ksamplerSelectId].inputs.sampler_name = appliedSettings.sampler
+
+    // Upscale configuration (required when upscale is enabled)
+    if (promptsData.useUpscale) {
+      // Upscale prompts
+      if (!setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Positive)', combinedPrompt)) {
+        return { error: 'Missing required node: "Upscale CLIP Text Encode (Positive)"' }
+      }
+      if (!setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Negative)', negativeTagsText)) {
+        return { error: 'Missing required node: "Upscale CLIP Text Encode (Negative)"' }
+      }
+
+      // Upscale KSampler
+      if (
+        !setNodeSampler(workflow, 'KSampler (Upscale)', {
+          steps: modelSettings?.upscale.steps,
+          cfg: modelSettings?.upscale.cfgScale,
+          sampler_name: modelSettings?.upscale.sampler,
+          scheduler: modelSettings?.upscale.scheduler,
+          denoise: modelSettings?.upscale.denoise
+        })
+      ) {
+        return { error: 'Missing required node: "KSampler (Upscale)"' }
       }
     }
 
-    // Upscale KSampler (if present)
-    setNodeSampler(workflow, 'KSampler (Upscale)', {
-      steps: modelSettings?.upscale.steps,
-      cfg: modelSettings?.upscale.cfgScale,
-      sampler_name: modelSettings?.upscale.sampler,
-      scheduler: modelSettings?.upscale.scheduler,
-      denoise: modelSettings?.upscale.denoise
-    })
-
-    // FaceDetailer wiring and settings (only when enabled)
+    // FaceDetailer configuration (required when face detailer is enabled)
     if (promptsData.useFaceDetailer && modelSettings) {
-      // Configure sampler params
-      setNodeSampler(workflow, 'FaceDetailer', {
-        steps: modelSettings.faceDetailer.steps,
-        cfg: modelSettings.faceDetailer.cfgScale,
-        sampler_name: modelSettings.faceDetailer.sampler,
-        scheduler: modelSettings.faceDetailer.scheduler,
-        denoise: modelSettings.faceDetailer.denoise,
-        seed: mainSeed + 1
-      })
+      // FaceDetailer prompts
+      if (!setNodeTextInput(workflow, 'FaceDetailer CLIP Text Encode (Positive)', combinedPrompt)) {
+        return { error: 'Missing required node: "FaceDetailer CLIP Text Encode (Positive)"' }
+      }
+      if (!setNodeTextInput(workflow, 'FaceDetailer CLIP Text Encode (Negative)', negativeTagsText)) {
+        return { error: 'Missing required node: "FaceDetailer CLIP Text Encode (Negative)"' }
+      }
+
+      // FaceDetailer sampler params
+      if (
+        !setNodeSampler(workflow, 'FaceDetailer', {
+          steps: modelSettings.faceDetailer.steps,
+          cfg: modelSettings.faceDetailer.cfgScale,
+          sampler_name: modelSettings.faceDetailer.sampler,
+          scheduler: modelSettings.faceDetailer.scheduler,
+          denoise: modelSettings.faceDetailer.denoise,
+          seed: mainSeed + 1
+        })
+      ) {
+        return { error: 'Missing required node: "FaceDetailer"' }
+      }
 
       // Configure FaceDetailer checkpoint if specified in settings
       const fdCkpt = modelSettings.faceDetailer.checkpoint
       if (fdCkpt && typeof fdCkpt === 'string' && fdCkpt.length > 0) {
-        setNodeCheckpoint(workflow, 'Load Checkpoint', fdCkpt)
+        if (!setNodeCheckpoint(workflow, 'FaceDetailer Load Checkpoint', fdCkpt)) {
+          return { error: 'Missing required node: "FaceDetailer Load Checkpoint"' }
+        }
       }
 
       // Configure FaceDetailer VAE based on per-model choice
       const fdNode = findNodeByTitle(workflow, 'FaceDetailer')
-      const vaeLoaderId = findFirstNodeByClassType(workflow, 'VAELoader')
-      if (fdNode && vaeLoaderId) {
-        const fdVae = modelSettings.faceDetailer.selectedVae
+      const fdVae = modelSettings.faceDetailer.selectedVae
+      if (fdNode) {
         if (fdVae && fdVae !== '__embedded__') {
-          // Point FD to external VAE loader
-          workflow[fdNode.nodeId].inputs.vae = [vaeLoaderId, 0]
-          setNodeVae(workflow, 'Load VAE', fdVae)
+          // Point FD to external VAE loader with unique title
+          const fdVaeNode = findNodeByTitle(workflow, 'FaceDetailer Load VAE')
+          if (!fdVaeNode) {
+            return { error: 'Missing required node: "FaceDetailer Load VAE"' }
+          }
+          workflow[fdNode.nodeId].inputs.vae = [fdVaeNode.nodeId, 0]
+          if (!setNodeVae(workflow, 'FaceDetailer Load VAE', fdVae)) {
+            return { error: 'Missing required node: "FaceDetailer Load VAE"' }
+          }
         } else {
-          // Use embedded VAE from checkpoint (keep as-is)
+          // Use embedded VAE from checkpoint
+          const fdCheckpointNode = findNodeByTitle(workflow, 'FaceDetailer Load Checkpoint')
+          if (!fdCheckpointNode) {
+            return { error: 'Missing required node: "FaceDetailer Load Checkpoint"' }
+          }
+          workflow[fdNode.nodeId].inputs.vae = [fdCheckpointNode.nodeId, 2]
         }
-      }
-
-      // Provide FaceDetailer wildcard with zone prompts
-      const isAllComposition = promptsData.selectedComposition === 'all'
-      const combinedZonePrompt = isAllComposition
-        ? zone1TagsText
-        : zone1TagsText && zone2TagsText
-          ? `[ASC] ${zone1TagsText} [SEP] ${zone2TagsText}`
-          : zone1TagsText || zone2TagsText
-      if (fdNode && workflow[fdNode.nodeId] && 'wildcard' in workflow[fdNode.nodeId].inputs) {
-        workflow[fdNode.nodeId].inputs.wildcard = combinedZonePrompt
       }
     }
 
-    // VAE override if selected explicitly
-    if (appliedSettings.selectedVae && appliedSettings.selectedVae !== '__embedded__') {
-      // Try English title first, otherwise set first VAELoader by class_type
-      if (!setNodeVae(workflow, 'Load VAE', appliedSettings.selectedVae)) {
-        const vaeNodeId = findFirstNodeByClassType(workflow, 'VAELoader')
-        if (vaeNodeId && workflow[vaeNodeId]) {
-          workflow[vaeNodeId].inputs.vae_name = appliedSettings.selectedVae
-        }
+    // Main VAE configuration (Chroma UNETLoader doesn't provide VAE output, so always use VAE Loader)
+    if (appliedSettings.selectedVae) {
+      const vaeToLoad =
+        appliedSettings.selectedVae === '__embedded__'
+          ? 'ae.safetensors' // Default Chroma VAE
+          : appliedSettings.selectedVae
+
+      if (!setNodeVae(workflow, 'Load VAE', vaeToLoad)) {
+        return { error: 'Missing required node: "Load VAE"' }
       }
     }
 
     // Chroma UNET selection from selected checkpoint when provided
     if (promptsData.selectedCheckpoint) {
-      const unetNodeId = findFirstNodeByClassType(workflow, 'UNETLoader')
-      if (unetNodeId && workflow[unetNodeId]) {
-        if (typeof workflow[unetNodeId].inputs.unet_name === 'string') {
-          workflow[unetNodeId].inputs.unet_name = promptsData.selectedCheckpoint
-        }
+      const unetNode = findNodeByTitle(workflow, 'Load Diffusion Model')
+      if (!unetNode) {
+        return { error: 'Missing required node: "Load Diffusion Model"' }
       }
+      workflow[unetNode.nodeId].inputs.unet_name = promptsData.selectedCheckpoint
     }
 
     // Final Save node wiring: respect upscale/face detailer toggles
-    let imageSourceNodeId = '19'
-    const fdNode = findNodeByTitle(workflow, 'FaceDetailer')
-    const upscaleDecode = findNodeByTitle(workflow, 'VAE Decode (Upscale)')
-    const baseDecode = findNodeByTitle(workflow, 'VAE Decode (Base)')
+    let imageSourceNodeId: string
 
     if (promptsData.useUpscale) {
-      imageSourceNodeId =
-        promptsData.useFaceDetailer && fdNode
-          ? fdNode.nodeId
-          : upscaleDecode?.nodeId || imageSourceNodeId
+      if (promptsData.useFaceDetailer) {
+        const fdNode = findNodeByTitle(workflow, 'FaceDetailer')
+        if (!fdNode) {
+          return { error: 'Missing required node: "FaceDetailer"' }
+        }
+        imageSourceNodeId = fdNode.nodeId
+      } else {
+        const upscaleDecode = findNodeByTitle(workflow, 'VAE Decode (Upscale)')
+        if (!upscaleDecode) {
+          return { error: 'Missing required node: "VAE Decode (Upscale)"' }
+        }
+        imageSourceNodeId = upscaleDecode.nodeId
+      }
     } else {
-      imageSourceNodeId =
-        promptsData.useFaceDetailer && fdNode
-          ? fdNode.nodeId
-          : baseDecode?.nodeId || imageSourceNodeId
+      if (promptsData.useFaceDetailer) {
+        const fdNode = findNodeByTitle(workflow, 'FaceDetailer')
+        if (!fdNode) {
+          return { error: 'Missing required node: "FaceDetailer"' }
+        }
+        imageSourceNodeId = fdNode.nodeId
+      } else {
+        const baseDecode = findNodeByTitle(workflow, 'VAE Decode (Base)')
+        if (!baseDecode) {
+          return { error: 'Missing required node: "VAE Decode (Base)"' }
+        }
+        imageSourceNodeId = baseDecode.nodeId
+      }
     }
     // Add SaveImageWebsocket node (always overwrite the constant ID)
     workflow[FINAL_SAVE_NODE_ID] = {
