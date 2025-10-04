@@ -164,64 +164,79 @@ export async function generateImage(options: GenerationOptions): Promise<{
     }
 
     const previousZone1 = previousRandomTagResolutions?.zone1 || {}
-    const zone1Result = expandCustomTags(
-      wildcardZones.zone1,
-      model,
-      new Set(),
-      { ...allResult.randomTagResolutions },
-      previousZone1,
-      sharedDisabledContext
-    )
+    // Check if zone1 is disabled before expanding
+    const zone1Result = sharedDisabledContext.names.has('zone1')
+      ? { expandedText: '', randomTagResolutions: {} }
+      : expandCustomTags(
+          wildcardZones.zone1,
+          model,
+          new Set(),
+          { ...allResult.randomTagResolutions },
+          previousZone1,
+          sharedDisabledContext
+        )
 
     const previousZone2 = previousRandomTagResolutions?.zone2 || {}
-    const zone2Result = expandCustomTags(
-      wildcardZones.zone2,
-      model,
-      new Set(),
-      { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions },
-      previousZone2,
-      sharedDisabledContext
-    )
+    // Check if zone2 is disabled before expanding
+    const zone2Result = sharedDisabledContext.names.has('zone2')
+      ? { expandedText: '', randomTagResolutions: {} }
+      : expandCustomTags(
+          wildcardZones.zone2,
+          model,
+          new Set(),
+          { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions },
+          previousZone2,
+          sharedDisabledContext
+        )
 
     const previousNegative = previousRandomTagResolutions?.negative || {}
-    const negativeResult = expandCustomTags(
-      wildcardZones.negative,
-      model,
-      new Set(),
-      {
-        ...allResult.randomTagResolutions,
-        ...zone1Result.randomTagResolutions,
-        ...zone2Result.randomTagResolutions
-      },
-      previousNegative,
-      sharedDisabledContext
-    )
+    // Check if negative is disabled before expanding
+    const negativeResult = sharedDisabledContext.names.has('negative')
+      ? { expandedText: '', randomTagResolutions: {} }
+      : expandCustomTags(
+          wildcardZones.negative,
+          model,
+          new Set(),
+          {
+            ...allResult.randomTagResolutions,
+            ...zone1Result.randomTagResolutions,
+            ...zone2Result.randomTagResolutions
+          },
+          previousNegative,
+          sharedDisabledContext
+        )
 
     const previousInpainting = previousRandomTagResolutions?.inpainting || {}
-    const inpaintingResult = expandCustomTags(
-      wildcardZones.inpainting,
-      model,
-      new Set(),
-      {
-        ...allResult.randomTagResolutions,
-        ...zone1Result.randomTagResolutions,
-        ...zone2Result.randomTagResolutions,
-        ...negativeResult.randomTagResolutions
-      },
-      previousInpainting,
-      sharedDisabledContext
-    )
+    // Check if inpainting is disabled before expanding
+    const inpaintingResult = sharedDisabledContext.names.has('inpainting')
+      ? { expandedText: '', randomTagResolutions: {} }
+      : expandCustomTags(
+          wildcardZones.inpainting,
+          model,
+          new Set(),
+          {
+            ...allResult.randomTagResolutions,
+            ...zone1Result.randomTagResolutions,
+            ...zone2Result.randomTagResolutions,
+            ...negativeResult.randomTagResolutions
+          },
+          previousInpainting,
+          sharedDisabledContext
+        )
 
     // Resolve wildcard directives inside leaf expansion already; now just clean directives
     let allTagsText = cleanDirectivesFromTags(allResult.expandedText)
 
-    const zone1TagsText = cleanDirectivesFromTags(zone1Result.expandedText)
+    let zone1TagsText = cleanDirectivesFromTags(zone1Result.expandedText)
 
     let zone2TagsText = cleanDirectivesFromTags(zone2Result.expandedText)
 
     let negativeTagsText = cleanDirectivesFromTags(negativeResult.expandedText)
 
-    const inpaintingTagsText = cleanDirectivesFromTags(inpaintingResult.expandedText)
+    let inpaintingTagsText = cleanDirectivesFromTags(inpaintingResult.expandedText)
+
+    // Track disabled zones for UI feedback (zones already filtered during expansion)
+    const disabledZones = new Set<string>(sharedDisabledContext.names)
 
     // Organize random tag resolutions by zone (already resolved, includes wildcard replacements)
     const allRandomResolutions = {
@@ -266,6 +281,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
       const isAll = promptsData.selectedComposition === 'all'
       if (isAll) {
         zone2TagsText = ''
+        disabledZones.add('zone2')
       }
 
       // Assign prompts to different nodes (title-based)
@@ -399,7 +415,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     return {
       seed: appliedSeed,
       randomTagResolutions: allRandomResolutions,
-      disabledZones: sharedDisabledContext.names
+      disabledZones
     }
   } catch (error) {
     console.error('Failed to generate image:', error)

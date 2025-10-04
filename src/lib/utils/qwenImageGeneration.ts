@@ -258,46 +258,59 @@ export async function generateQwenImage(
       promptsData.selectedComposition = detectedComposition
     }
 
-    const zone1Result = expandCustomTags(
-      wildcardZones.zone1,
-      model,
-      new Set(),
-      { ...allResult.randomTagResolutions },
-      previousZone1,
-      sharedDisabledContext
-    )
+    // Check if zone1 is disabled before expanding
+    const zone1Result = sharedDisabledContext.names.has('zone1')
+      ? { expandedText: '', randomTagResolutions: {} }
+      : expandCustomTags(
+          wildcardZones.zone1,
+          model,
+          new Set(),
+          { ...allResult.randomTagResolutions },
+          previousZone1,
+          sharedDisabledContext
+        )
 
-    const zone2Result = expandCustomTags(
-      wildcardZones.zone2,
-      model,
-      new Set(),
-      { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions },
-      previousZone2,
-      sharedDisabledContext
-    )
+    // Check if zone2 is disabled before expanding
+    const zone2Result = sharedDisabledContext.names.has('zone2')
+      ? { expandedText: '', randomTagResolutions: {} }
+      : expandCustomTags(
+          wildcardZones.zone2,
+          model,
+          new Set(),
+          { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions },
+          previousZone2,
+          sharedDisabledContext
+        )
 
-    const negativeResult = expandCustomTags(
-      wildcardZones.negative,
-      model,
-      new Set(),
-      {
-        ...allResult.randomTagResolutions,
-        ...zone1Result.randomTagResolutions,
-        ...zone2Result.randomTagResolutions
-      },
-      previousNegative,
-      sharedDisabledContext
-    )
+    // Check if negative is disabled before expanding
+    const negativeResult = sharedDisabledContext.names.has('negative')
+      ? { expandedText: '', randomTagResolutions: {} }
+      : expandCustomTags(
+          wildcardZones.negative,
+          model,
+          new Set(),
+          {
+            ...allResult.randomTagResolutions,
+            ...zone1Result.randomTagResolutions,
+            ...zone2Result.randomTagResolutions
+          },
+          previousNegative,
+          sharedDisabledContext
+        )
 
     let allTagsText = cleanDirectivesFromTags(allResult.expandedText)
     let zone1TagsText = cleanDirectivesFromTags(zone1Result.expandedText)
     let zone2TagsText = cleanDirectivesFromTags(zone2Result.expandedText)
     let negativeTagsText = cleanDirectivesFromTags(negativeResult.expandedText)
 
+    // Track disabled zones for UI feedback (zones already filtered during expansion)
+    const disabledZones = new Set<string>(sharedDisabledContext.names)
+
     // Apply composition-based zone filtering
     const isAll = promptsData.selectedComposition === 'all'
     if (isAll) {
       zone2TagsText = '' // Disable zone2 for 'all' composition
+      disabledZones.add('zone2')
     }
 
     const qualityPrefix = modelSettings?.qualityPrefix ?? ''
@@ -666,7 +679,7 @@ export async function generateQwenImage(
     return {
       seed: appliedSeed,
       randomTagResolutions: allRandomResolutions,
-      disabledZones: sharedDisabledContext.names
+      disabledZones
     }
   } catch (error) {
     console.error('Failed to generate Qwen image:', error)

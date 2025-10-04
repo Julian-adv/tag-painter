@@ -114,7 +114,11 @@ export function toYAML(model: TreeModel): string {
   function materialize(nodeId: NodeId): unknown {
     const n = model.nodes[nodeId]
     if (!n) return null
-    if (n.kind === 'leaf') return (n as LeafNode).value
+    if (n.kind === 'leaf') {
+      const value = (n as LeafNode).value
+      // Convert null to empty string "" to preserve empty values in YAML
+      return value === null ? '' : value
+    }
     if (n.kind === 'ref') return { $ref: (n as RefNode).refName }
     if (n.kind === 'object') {
       const obj: Record<string, unknown> = {}
