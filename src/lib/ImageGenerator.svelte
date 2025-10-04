@@ -289,18 +289,18 @@
         if (imageViewer?.updateFileList) {
           await imageViewer.updateFileList()
         }
-      },
-      onError: (error) => {
-        console.error('Generation error:', error)
-        toastsRef?.error(typeof error === 'string' ? error : 'Failed to generate image')
-        isLoading = false
       }
     })
 
     // Store the results
-    lastSeed = result.seed
-    currentRandomTagResolutions = result.randomTagResolutions
-    disabledZones = result.disabledZones
+    if (result.error) {
+      toastsRef?.error(result.error)
+      isLoading = false
+    } else {
+      lastSeed = result.seed!
+      currentRandomTagResolutions = result.randomTagResolutions!
+      disabledZones = result.disabledZones!
+    }
   }
 
   async function handleInpaint(denoiseStrength: number) {
@@ -396,18 +396,18 @@
         if (imageViewer?.updateFileList) {
           await imageViewer.updateFileList()
         }
-      },
-      onError: (error) => {
-        console.error('Generation error:', error)
-        toastsRef?.error(typeof error === 'string' ? error : 'Failed to generate image')
-        isLoading = false
       }
     })
 
     // Store the results
-    lastSeed = result.seed
-    currentRandomTagResolutions = result.randomTagResolutions
-    disabledZones = result.disabledZones
+    if (result.error) {
+      toastsRef?.error(result.error)
+      isLoading = false
+    } else {
+      lastSeed = result.seed!
+      currentRandomTagResolutions = result.randomTagResolutions!
+      disabledZones = result.disabledZones!
+    }
   }
 
   async function handleGenerateForever() {

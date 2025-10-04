@@ -167,15 +167,16 @@ export async function generateQwenImage(
   options: GenerationOptions,
   modelSettings: ModelSettings | null
 ): Promise<{
-  seed: number
-  randomTagResolutions: {
+  error?: string
+  seed?: number
+  randomTagResolutions?: {
     all: Record<string, string>
     zone1: Record<string, string>
     zone2: Record<string, string>
     negative: Record<string, string>
     inpainting: Record<string, string>
   }
-  disabledZones: Set<string>
+  disabledZones?: Set<string>
 }> {
   const {
     promptsData,
@@ -184,8 +185,7 @@ export async function generateQwenImage(
     previousRandomTagResolutions,
     onLoadingChange,
     onProgressUpdate,
-    onImageReceived,
-    onError
+    onImageReceived
   } = options
 
   // Load custom workflow if specified, otherwise use default Qwen workflow
@@ -223,9 +223,7 @@ export async function generateQwenImage(
     if (missingTitles.length > 0) {
       const msg = `Missing required nodes in Qwen workflow: ${missingTitles.join(', ')}`
       console.error(msg)
-      onError(msg)
-      onLoadingChange(false)
-      throw new Error(msg)
+      return { error: msg }
     }
 
     // Read wildcard zones for Qwen model (this also loads the Qwen wildcard model)
@@ -661,8 +659,7 @@ export async function generateQwenImage(
       {
         onLoadingChange,
         onProgressUpdate,
-        onImageReceived,
-        onError
+        onImageReceived
       }
     )
 
@@ -673,8 +670,8 @@ export async function generateQwenImage(
     }
   } catch (error) {
     console.error('Failed to generate Qwen image:', error)
-    onError(error instanceof Error ? error.message : 'Failed to generate image')
-    onLoadingChange(false)
-    throw error
+    return {
+      error: error instanceof Error ? error.message : 'Failed to generate image'
+    }
   }
 }

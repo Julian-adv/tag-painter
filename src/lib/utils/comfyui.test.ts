@@ -164,8 +164,7 @@ describe('comfyui utilities', () => {
     const mockCallbacks: WebSocketCallbacks = {
       onLoadingChange: vi.fn(),
       onProgressUpdate: vi.fn(),
-      onImageReceived: vi.fn(),
-      onError: vi.fn()
+      onImageReceived: vi.fn()
     }
 
     const mockWorkflow = {
@@ -289,7 +288,6 @@ describe('comfyui utilities', () => {
       expect(mockCallbacks.onLoadingChange).toBeInstanceOf(Function)
       expect(mockCallbacks.onProgressUpdate).toBeInstanceOf(Function)
       expect(mockCallbacks.onImageReceived).toBeInstanceOf(Function)
-      expect(mockCallbacks.onError).toBeInstanceOf(Function)
 
       expect(() => {
         connectWebSocket(

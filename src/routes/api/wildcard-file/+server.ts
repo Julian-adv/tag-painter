@@ -4,20 +4,31 @@ import path from 'path'
 
 const dataDir = path.resolve(process.cwd(), 'data')
 
-function sanitizeFilename(name: string): string {
-  // Allow only basename to avoid path traversal
-  const base = path.basename(name)
-  // Reject anything that resolves to empty or attempts directory tricks
-  return base
+function sanitizePath(name: string): string {
+  // Normalize path separators
+  const normalized = name.replace(/\\/g, '/')
+
+  // Check for path traversal attempts
+  if (normalized.includes('..') || normalized.startsWith('/')) {
+    return ''
+  }
+
+  // Resolve to ensure it stays within data directory
+  const resolved = path.resolve(dataDir, normalized)
+  if (!resolved.startsWith(dataDir)) {
+    return ''
+  }
+
+  return normalized
 }
 
 export async function GET({ url }: RequestEvent) {
   try {
     const name = url.searchParams.get('name') || ''
-    const safeName = sanitizeFilename(name)
-    if (!safeName) return json({ error: 'Invalid filename' }, { status: 400 })
+    const safePath = sanitizePath(name)
+    if (!safePath) return json({ error: 'Invalid filename' }, { status: 400 })
 
-    const filePath = path.join(dataDir, safeName)
+    const filePath = path.join(dataDir, safePath)
     const content = await fs.readFile(filePath, 'utf-8')
     return new Response(content, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
   } catch {

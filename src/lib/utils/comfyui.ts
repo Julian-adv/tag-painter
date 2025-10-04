@@ -110,7 +110,6 @@ export interface WebSocketCallbacks {
   onLoadingChange: (loading: boolean) => void
   onProgressUpdate: (progress: ProgressData) => void
   onImageReceived: (imageBlob: Blob) => void
-  onError: (error: string) => void
 }
 
 export function connectWebSocket(

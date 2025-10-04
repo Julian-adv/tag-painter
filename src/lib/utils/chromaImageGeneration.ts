@@ -64,15 +64,16 @@ export async function generateChromaImage(
   options: GenerationOptions,
   modelSettings: ModelSettings | null
 ): Promise<{
-  seed: number
-  randomTagResolutions: {
+  error?: string
+  seed?: number
+  randomTagResolutions?: {
     all: Record<string, string>
     zone1: Record<string, string>
     zone2: Record<string, string>
     negative: Record<string, string>
     inpainting: Record<string, string>
   }
-  disabledZones: Set<string>
+  disabledZones?: Set<string>
 }> {
   const {
     promptsData,
@@ -80,8 +81,7 @@ export async function generateChromaImage(
     seed,
     onLoadingChange,
     onProgressUpdate,
-    onImageReceived,
-    onError
+    onImageReceived
   } = options
 
   let workflow: ComfyUIWorkflow = await loadChromaWorkflow(modelSettings?.customWorkflowPath)
@@ -179,16 +179,17 @@ export async function generateChromaImage(
     }
 
     // Configure size (Chroma uses EmptySD3LatentImage)
-    setNodeImageSize(
-      workflow,
-      'Empty Latent Image',
-      appliedSettings.imageWidth,
-      appliedSettings.imageHeight
-    )
-    const sd3EmptyId = findFirstNodeByClassType(workflow, 'EmptySD3LatentImage')
-    if (sd3EmptyId && workflow[sd3EmptyId]) {
-      workflow[sd3EmptyId].inputs.width = appliedSettings.imageWidth
-      workflow[sd3EmptyId].inputs.height = appliedSettings.imageHeight
+    if (
+      !setNodeImageSize(
+        workflow,
+        'Empty Latent Image',
+        appliedSettings.imageWidth,
+        appliedSettings.imageHeight
+      )
+    ) {
+      return {
+        error: 'Could not find Empty Latent Image node in workflow'
+      }
     }
 
     // Do not override SDXL CheckpointLoader for Chroma workflows.
@@ -379,8 +380,7 @@ export async function generateChromaImage(
       {
         onLoadingChange,
         onProgressUpdate,
-        onImageReceived,
-        onError
+        onImageReceived
       }
     )
 
@@ -391,8 +391,8 @@ export async function generateChromaImage(
     }
   } catch (error) {
     console.error('Failed to generate Chroma image:', error)
-    onError(error instanceof Error ? error.message : 'Failed to generate image')
-    onLoadingChange(false)
-    throw error
+    return {
+      error: error instanceof Error ? error.message : 'Failed to generate image'
+    }
   }
 }

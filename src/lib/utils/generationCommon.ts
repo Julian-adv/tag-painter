@@ -129,7 +129,6 @@ export async function submitToComfyUI(
     onLoadingChange: (loading: boolean) => void
     onProgressUpdate: (progress: ProgressData) => void
     onImageReceived: (imageBlob: Blob, filePath: string) => void
-    onError: (error: string) => void
   }
 ) {
   const payload = {
@@ -169,8 +168,7 @@ export async function submitToComfyUI(
         const fallbackPath = `unsaved_${Date.now()}.png`
         callbacks.onImageReceived(imageBlob, fallbackPath)
       }
-    },
-    onError: callbacks.onError
+    }
   }
 
   connectWebSocket(result.prompt_id, clientId, FINAL_SAVE_NODE_ID, workflow, wsCallbacks, comfyBase)

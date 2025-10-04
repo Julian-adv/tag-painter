@@ -58,19 +58,19 @@ export interface GenerationOptions {
   onLoadingChange: (loading: boolean) => void
   onProgressUpdate: (progress: ProgressData) => void
   onImageReceived: (imageBlob: Blob, filePath: string) => void
-  onError: (error: string) => void
 }
 
 export async function generateImage(options: GenerationOptions): Promise<{
-  seed: number
-  randomTagResolutions: {
+  error?: string
+  seed?: number
+  randomTagResolutions?: {
     all: Record<string, string>
     zone1: Record<string, string>
     zone2: Record<string, string>
     negative: Record<string, string>
     inpainting: Record<string, string>
   }
-  disabledZones: Set<string>
+  disabledZones?: Set<string>
 }> {
   const {
     promptsData,
@@ -83,8 +83,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     previousRandomTagResolutions,
     onLoadingChange,
     onProgressUpdate,
-    onImageReceived,
-    onError
+    onImageReceived
   } = options
   const modelSettings = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
 
@@ -95,8 +94,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
   if (isInpainting && modelSettings?.modelType === 'qwen') {
     const message = 'Qwen models do not support inpainting.'
     console.warn(message)
-    onError(message)
-    throw new Error(message)
+    return { error: message }
   }
 
   if (!isInpainting && modelSettings?.modelType === 'chroma') {
@@ -394,8 +392,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
       {
         onLoadingChange,
         onProgressUpdate,
-        onImageReceived,
-        onError
+        onImageReceived
       }
     )
 
@@ -406,10 +403,9 @@ export async function generateImage(options: GenerationOptions): Promise<{
     }
   } catch (error) {
     console.error('Failed to generate image:', error)
-
-    onError(error instanceof Error ? error.message : 'Failed to generate image')
-    onLoadingChange(false)
-    throw error
+    return {
+      error: error instanceof Error ? error.message : 'Failed to generate image'
+    }
   }
 }
 
