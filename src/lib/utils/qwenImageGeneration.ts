@@ -32,95 +32,6 @@ import {
 import type { ComfyUIWorkflow, ModelSettings } from '$lib/types'
 import type { GenerationOptions } from './imageGeneration'
 
-function validateQwenWorkflow(
-  workflow: ComfyUIWorkflow,
-  opts: {
-    useFaceDetailer: boolean
-    fdModelType: string
-    fdSelectedVae: string
-    useUpscale: boolean
-    usModelType: string
-    usSelectedVae: string
-  }
-): string[] {
-  const missing: string[] = []
-
-  // Base required nodes
-  missing.push(
-    ...findMissingNodeTitles(workflow, [
-      'KSampler',
-      'Model Sampling Aura Flow',
-      'Load Qwen UNet',
-      'Load Qwen VAE',
-      'CLIP Text Encode (Positive)',
-      'CLIP Text Encode (Negative)',
-      'Empty Latent Image',
-      'VAE Decode'
-    ])
-  )
-
-  // FaceDetailer (optional)
-  if (opts.useFaceDetailer) {
-    missing.push(
-      ...findMissingNodeTitles(workflow, [
-        'FaceDetailer',
-        'FaceDetailer CLIP Text Encode (Positive)',
-        'FaceDetailer CLIP Text Encode (Negative)'
-      ])
-    )
-
-    if (opts.fdModelType === 'qwen') {
-      missing.push(
-        ...findMissingNodeTitles(workflow, [
-          'FaceDetailer UNet Loader (Qwen)',
-          'FaceDetailer Model Sampling Aura Flow (Qwen)',
-          'FaceDetailer CLIP Loader (Qwen)',
-          'FaceDetailer VAE Loader (Qwen)'
-        ])
-      )
-    } else {
-      // SDXL FD path
-      missing.push(...findMissingNodeTitles(workflow, ['FaceDetailer Checkpoint Loader (SDXL)']))
-      if (opts.fdSelectedVae && opts.fdSelectedVae !== '__embedded__') {
-        missing.push(...findMissingNodeTitles(workflow, ['FaceDetailer VAE Loader (SDXL)']))
-      }
-    }
-  }
-
-  // Upscale (optional)
-  if (opts.useUpscale) {
-    missing.push(
-      ...findMissingNodeTitles(workflow, [
-        'Latent Upscale',
-        'KSampler (Upscale)',
-        'Upscale CLIP Text Encode (Positive)',
-        'Upscale CLIP Text Encode (Negative)',
-        'Upscale VAE Decode',
-        'SDXL VAE Encode'
-      ])
-    )
-
-    if (opts.usModelType === 'qwen') {
-      missing.push(
-        ...findMissingNodeTitles(workflow, [
-          'Upscale UNet Loader (Qwen)',
-          'Upscale Model Sampling Aura Flow (Qwen)',
-          'Upscale CLIP Loader (Qwen)',
-          'Upscale VAE Loader (Qwen)'
-        ])
-      )
-    } else {
-      // SDXL upscale path
-      missing.push(...findMissingNodeTitles(workflow, ['Upscale Checkpoint Loader (SDXL)']))
-      if (opts.usSelectedVae && opts.usSelectedVae !== '__embedded__') {
-        missing.push(...findMissingNodeTitles(workflow, ['Upscale VAE Loader (SDXL)']))
-      }
-    }
-  }
-
-  return missing
-}
-
 function applyQwenLoraChain(workflow: ComfyUIWorkflow, loras: { name: string; weight: number }[]) {
   const baseUnet = findNodeByTitle(workflow, 'Load Qwen UNet')?.nodeId || '37'
   const modelSampling = findNodeByTitle(workflow, 'Model Sampling Aura Flow')?.nodeId || '66'
@@ -208,23 +119,6 @@ export async function generateQwenImage(
     onProgressUpdate({ value: 0, max: 100, currentNode: '' })
 
     const clientId = generateClientId()
-
-    // Validate required workflow nodes by title
-    const fdSettings = modelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
-    const usSettings = modelSettings?.upscale || DEFAULT_UPSCALE_SETTINGS
-    const missingTitles = validateQwenWorkflow(workflow, {
-      useFaceDetailer: !!options.promptsData.useFaceDetailer,
-      fdModelType: fdSettings.modelType || 'sdxl',
-      fdSelectedVae: fdSettings.selectedVae,
-      useUpscale: !!options.promptsData.useUpscale,
-      usModelType: usSettings.modelType || 'sdxl',
-      usSelectedVae: usSettings.selectedVae
-    })
-    if (missingTitles.length > 0) {
-      const msg = `Missing required nodes in Qwen workflow: ${missingTitles.join(', ')}`
-      console.error(msg)
-      return { error: msg }
-    }
 
     // Read wildcard zones for Qwen model (this also loads the Qwen wildcard model)
     const wildcardZones = await readWildcardZones('qwen')
@@ -344,53 +238,87 @@ export async function generateQwenImage(
     applyQwenLoraChain(workflow, effectiveLoras)
 
     // Main sampler settings
-    setNodeSampler(workflow, 'KSampler', {
-      steps: appliedSettings.steps,
-      cfg: appliedSettings.cfgScale,
-      sampler_name: appliedSettings.sampler,
-      scheduler
-    })
+    if (
+      !setNodeSampler(workflow, 'KSampler', {
+        steps: appliedSettings.steps,
+        cfg: appliedSettings.cfgScale,
+        sampler_name: appliedSettings.sampler,
+        scheduler
+      })
+    ) {
+      return { error: 'Missing required node: "KSampler"' }
+    }
 
     // Canvas size
-    setNodeImageSize(
-      workflow,
-      'Empty Latent Image',
-      appliedSettings.imageWidth,
-      appliedSettings.imageHeight
-    )
+    if (
+      !setNodeImageSize(
+        workflow,
+        'Empty Latent Image',
+        appliedSettings.imageWidth,
+        appliedSettings.imageHeight
+      )
+    ) {
+      return { error: 'Missing required node: "Empty Latent Image"' }
+    }
+
+    // Model Sampling
+    const modelSamplingNode = findNodeByTitle(workflow, 'Model Sampling Aura Flow')
+    if (!modelSamplingNode) {
+      return { error: 'Missing required node: "Model Sampling Aura Flow"' }
+    }
 
     // UNet checkpoint (Qwen)
     if (promptsData.selectedCheckpoint) {
-      const unetNodeId = findNodeByTitle(workflow, 'Load Qwen UNet')?.nodeId
-      if (unetNodeId && workflow[unetNodeId]) {
-        workflow[unetNodeId].inputs.unet_name = promptsData.selectedCheckpoint
+      const unetNode = findNodeByTitle(workflow, 'Load Qwen UNet')
+      if (!unetNode) {
+        return { error: 'Missing required node: "Load Qwen UNet"' }
       }
+      workflow[unetNode.nodeId].inputs.unet_name = promptsData.selectedCheckpoint
     }
 
     // VAE selection (use explicit selection or keep existing/default)
-    const vaeDefaultFromWorkflow = (() => {
-      const nodeId = findNodeByTitle(workflow, 'Load Qwen VAE')?.nodeId
-      if (nodeId && workflow[nodeId] && typeof workflow[nodeId].inputs.vae_name === 'string') {
-        return workflow[nodeId].inputs.vae_name as string
-      }
-      return 'qwen_image_vae.safetensors'
-    })()
+    const vaeNode = findNodeByTitle(workflow, 'Load Qwen VAE')
+    if (!vaeNode) {
+      return { error: 'Missing required node: "Load Qwen VAE"' }
+    }
+    const vaeDefaultFromWorkflow =
+      typeof workflow[vaeNode.nodeId].inputs.vae_name === 'string'
+        ? (workflow[vaeNode.nodeId].inputs.vae_name as string)
+        : 'qwen_image_vae.safetensors'
+
     const vaeName =
       appliedSettings.selectedVae && appliedSettings.selectedVae !== '__embedded__'
         ? appliedSettings.selectedVae
         : vaeDefaultFromWorkflow
-    setNodeVae(workflow, 'Load Qwen VAE', vaeName)
+
+    if (!setNodeVae(workflow, 'Load Qwen VAE', vaeName)) {
+      return { error: 'Missing required node: "Load Qwen VAE"' }
+    }
 
     // Combine all enabled zones for Qwen's single prompt input
     const combinedPrompt = [allTagsText, zone1TagsText, zone2TagsText]
       .filter((text) => text && text.trim().length > 0)
       .join(' BREAK ')
 
-    setNodeTextInput(workflow, 'CLIP Text Encode (Positive)', combinedPrompt)
-    setNodeTextInput(workflow, 'CLIP Text Encode (Negative)', negativeTagsText)
+    if (!setNodeTextInput(workflow, 'CLIP Text Encode (Positive)', combinedPrompt)) {
+      return { error: 'Missing required node: "CLIP Text Encode (Positive)"' }
+    }
+    if (!setNodeTextInput(workflow, 'CLIP Text Encode (Negative)', negativeTagsText)) {
+      return { error: 'Missing required node: "CLIP Text Encode (Negative)"' }
+    }
 
     const appliedSeed = seed ?? Math.floor(Math.random() * 1000000000000000)
-    setNodeSampler(workflow, 'KSampler', { seed: appliedSeed })
+    if (
+      !setNodeSampler(workflow, 'KSampler', {
+        seed: appliedSeed,
+        steps: appliedSettings.steps,
+        cfg: appliedSettings.cfgScale,
+        sampler_name: appliedSettings.sampler,
+        scheduler
+      })
+    ) {
+      return { error: 'Missing required node: "KSampler"' }
+    }
 
     // Configure FaceDetailer if enabled
     if (promptsData.useFaceDetailer) {
