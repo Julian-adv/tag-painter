@@ -19,9 +19,9 @@ import {
   detectCompositionFromTags,
   cleanDirectivesFromTags,
   prefetchWildcardFilesFromTexts
-} from './tagExpansion'
+} from '../utils/tagExpansion'
 import { getWildcardModel } from '../stores/tagsStore'
-import { readWildcardZones } from './wildcardZones'
+import { readWildcardZones } from '../utils/wildcardZones'
 import { updateComposition } from '../stores/promptsStore'
 import {
   generateClientId,

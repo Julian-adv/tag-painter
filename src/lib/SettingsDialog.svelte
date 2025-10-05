@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Settings, LoraWithWeight } from '$lib/types'
-  import { fetchVaeModels, fetchCheckpoints } from './utils/comfyui'
+  import { fetchVaeModels, fetchCheckpoints } from './generation/comfyui'
   import LoraSelector from './LoraSelector.svelte'
   import { promptsData } from './stores/promptsStore'
   import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'

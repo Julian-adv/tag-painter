@@ -2,7 +2,7 @@
 //
 // This module contains shared functions used by both regular and Qwen image generation
 
-import { saveImage } from './fileIO'
+import { saveImage } from '../utils/fileIO'
 import {
   buildComfyHttpUrl,
   connectWebSocket,

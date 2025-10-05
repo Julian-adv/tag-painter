@@ -9,9 +9,9 @@ import {
   detectCompositionFromTags,
   cleanDirectivesFromTags,
   prefetchWildcardFilesFromTexts
-} from './tagExpansion'
+} from '../utils/tagExpansion'
 import { getWildcardModel } from '../stores/tagsStore'
-import { readWildcardZones } from './wildcardZones'
+import { readWildcardZones } from '../utils/wildcardZones'
 import {
   generateClientId,
   applyPerModelOverrides,

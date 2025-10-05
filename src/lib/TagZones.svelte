@@ -9,7 +9,7 @@
   import { Tag, LockOpen } from 'svelte-heros-v2'
   import type { Settings } from './types'
   import { m } from '$lib/paraglide/messages'
-  import { getEffectiveModelSettings } from './utils/generationCommon'
+  import { getEffectiveModelSettings } from './generation/generationCommon'
   // Use callback prop instead of deprecated createEventDispatcher
 
   interface Props {
