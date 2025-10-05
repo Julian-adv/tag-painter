@@ -6,6 +6,7 @@
   import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
   import SamplerSelector from './SamplerSelector.svelte'
   import SchedulerSelector from './SchedulerSelector.svelte'
+  import CustomSelect from './CustomSelect.svelte'
   import { m } from '$lib/paraglide/messages'
   import { locales, baseLocale } from '$lib/paraglide/runtime.js'
   import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
@@ -324,15 +325,17 @@
 
         {#if localSettings.perModel[selectedModelKey]}
           <label for="pm-model-type" class="two-col-label">{m['settingsDialog.modelType']()}</label>
-          <select
+          <CustomSelect
             id="pm-model-type"
             class="two-col-input"
             bind:value={localSettings.perModel[selectedModelKey].modelType}
-          >
-            <option value="sdxl">SDXL</option>
-            <option value="qwen">Qwen</option>
-            <option value="chroma">Chroma</option>
-          </select>
+            options={[
+              { value: 'sdxl', label: 'SDXL' },
+              { value: 'qwen', label: 'Qwen' },
+              { value: 'chroma', label: 'Chroma' },
+              { value: 'flux1_krea', label: 'Flux1 Krea' }
+            ]}
+          />
 
           <label for="pm-cfg" class="two-col-label">{m['settingsDialog.cfgScale']()}</label>
           <input

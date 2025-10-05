@@ -12,6 +12,7 @@ import {
 import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
 import { generateQwenImage } from './qwenImageGeneration'
 import { generateChromaImage } from './chromaImageGeneration'
+import { generateFlux1KreaImage } from './flux1KreaImageGeneration'
 import {
   generateClientId,
   getEffectiveModelSettings,
@@ -104,6 +105,16 @@ export async function generateImage(options: GenerationOptions): Promise<{
   if (isInpainting && modelSettings?.modelType === 'chroma') {
     // Conservatively treat like SDXL inpainting unless specified otherwise
     // If Chroma does not support inpainting in your workflow, set a custom workflow per model.
+  }
+
+  if (!isInpainting && modelSettings?.modelType === 'flux1_krea') {
+    return generateFlux1KreaImage(options, modelSettings)
+  }
+
+  if (isInpainting && modelSettings?.modelType === 'flux1_krea') {
+    const message = 'Flux1 Krea models do not support inpainting.'
+    console.warn(message)
+    return { error: message }
   }
 
   try {
