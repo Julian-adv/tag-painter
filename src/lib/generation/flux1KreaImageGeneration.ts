@@ -11,6 +11,7 @@ import {
   prefetchWildcardFilesFromTexts
 } from '../utils/tagExpansion'
 import { getWildcardModel } from '../stores/tagsStore'
+import { updateComposition } from '../stores/promptsStore'
 import { readWildcardZones } from '../utils/wildcardZones'
 import {
   generateClientId,
@@ -29,24 +30,22 @@ import {
   loadCustomWorkflow
 } from './workflowMapping'
 
-async function loadFlux1KreaWorkflow(customPath: string | undefined): Promise<ComfyUIWorkflow> {
-  // Try per-model custom workflow first
-  if (customPath) {
-    try {
-      const wf = await loadCustomWorkflow(customPath)
-      return wf
-    } catch {
-      // Fall through to default
+async function loadFlux1KreaWorkflow(
+  customPath: string | undefined
+): Promise<{ workflow?: ComfyUIWorkflow; error?: string }> {
+  if (!customPath) {
+    return {
+      error: 'Flux1 Krea requires a custom workflow file. Please set a workflow path in per-model settings or place flux1_krea.api.workflow.json in data/workflow/ directory.'
     }
   }
-  // Try bundled flux1_krea workflow in data/workflow
+
   try {
-    const wf = await loadCustomWorkflow('flux1_krea.api.workflow.json')
-    return wf
-  } catch {
-    // As a last resort, load the default SD workflow
-    const { defaultWorkflowPrompt } = await import('./workflow')
-    return JSON.parse(JSON.stringify(defaultWorkflowPrompt))
+    const wf = await loadCustomWorkflow(customPath)
+    return { workflow: wf }
+  } catch (error) {
+    return {
+      error: `Failed to load custom workflow '${customPath}': ${error instanceof Error ? error.message : 'Unknown error'}`
+    }
   }
 }
 
@@ -74,7 +73,15 @@ export async function generateFlux1KreaImage(
     onImageReceived
   } = options
 
-  let workflow: ComfyUIWorkflow = await loadFlux1KreaWorkflow(modelSettings?.customWorkflowPath)
+  const workflowResult = await loadFlux1KreaWorkflow(modelSettings?.customWorkflowPath)
+  if (workflowResult.error) {
+    return { error: workflowResult.error }
+  }
+  if (!workflowResult.workflow) {
+    return { error: 'Failed to load workflow' }
+  }
+
+  let workflow: ComfyUIWorkflow = workflowResult.workflow
 
   try {
     onLoadingChange(true)
@@ -99,7 +106,6 @@ export async function generateFlux1KreaImage(
     )
     const detectedComposition = detectCompositionFromTags([allResult.expandedText])
     if (detectedComposition) {
-      const { updateComposition } = await import('../stores/promptsStore')
       updateComposition(detectedComposition)
       promptsData.selectedComposition = detectedComposition
     }
@@ -201,9 +207,9 @@ export async function generateFlux1KreaImage(
       .filter((t) => t && t.trim().length > 0)
       .join(', ')
 
-    // Flux1 Krea uses CLIP Text Encode (Prompt) for positive
-    if (!setNodeTextInput(workflow, 'CLIP Text Encode (Prompt)', combinedPrompt)) {
-      return { error: 'Missing required node: "CLIP Text Encode (Prompt)"' }
+    // Flux1 Krea uses a dedicated positive prompt node
+    if (!setNodeTextInput(workflow, 'CLIP Text Encode (Positive)', combinedPrompt)) {
+      return { error: 'Missing required node: "CLIP Text Encode (Positive)"' }
     }
 
     // Flux1 Krea uses ConditioningZeroOut for negative (no text input needed)
@@ -231,8 +237,8 @@ export async function generateFlux1KreaImage(
           ? 'ae.safetensors' // Default Flux1 Krea VAE
           : appliedSettings.selectedVae
 
-      if (!setNodeVae(workflow, 'Load VAE', vaeToLoad)) {
-        return { error: 'Missing required node: "Load VAE"' }
+      if (!setNodeVae(workflow, 'Load VAE (Base)', vaeToLoad)) {
+        return { error: 'Missing required node: "Load VAE (Base)"' }
       }
     }
 
@@ -252,30 +258,25 @@ export async function generateFlux1KreaImage(
       // Configure upscale checkpoint (SDXL)
       const upscaleCkpt = upscaleSettings.checkpoint
       if (upscaleCkpt && upscaleCkpt.length > 0) {
-        if (!setNodeCheckpoint(workflow, 'Load Checkpoint', upscaleCkpt)) {
-          return { error: 'Missing required node: "Load Checkpoint" for upscale' }
+        if (!setNodeCheckpoint(workflow, 'Upscale Checkpoint', upscaleCkpt)) {
+          return { error: 'Missing required node: "Upscale Checkpoint" for upscale' }
         }
       }
 
       // Configure upscale prompts (SDXL uses same prompts)
-      const upscaleCheckpointNode = findNodeByTitle(workflow, 'Load Checkpoint')
-      if (upscaleCheckpointNode) {
-        const upscalePosNode = findNodeByTitle(workflow, 'CLIP Text Encode (Prompt)')
-        if (upscalePosNode && upscalePosNode.nodeId === '61') {
-          // Node 61 is the upscale positive prompt
-          workflow[upscalePosNode.nodeId].inputs.text = combinedPrompt
-        }
+      const upscalePosNode = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Positive)')
+      if (upscalePosNode) {
+        workflow[upscalePosNode.nodeId].inputs.text = combinedPrompt
+      }
 
-        const upscaleNegNode = findNodeByTitle(workflow, 'CLIP Text Encode (Prompt)')
-        if (upscaleNegNode && upscaleNegNode.nodeId === '62') {
-          // Node 62 is the upscale negative prompt
-          workflow[upscaleNegNode.nodeId].inputs.text = negativeTagsText
-        }
+      const upscaleNegNode = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Negative)')
+      if (upscaleNegNode) {
+        workflow[upscaleNegNode.nodeId].inputs.text = negativeTagsText
       }
 
       // Configure upscale KSampler (node 59)
-      const upscaleSamplerNode = findNodeByTitle(workflow, 'KSampler')
-      if (upscaleSamplerNode && upscaleSamplerNode.nodeId === '59') {
+      const upscaleSamplerNode = findNodeByTitle(workflow, 'KSampler (Upscale)')
+      if (upscaleSamplerNode) {
         workflow[upscaleSamplerNode.nodeId].inputs.seed = mainSeed + 1
         workflow[upscaleSamplerNode.nodeId].inputs.steps = upscaleSettings.steps
         workflow[upscaleSamplerNode.nodeId].inputs.cfg = upscaleSettings.cfgScale
@@ -285,8 +286,8 @@ export async function generateFlux1KreaImage(
       }
 
       // Configure upscale VAE (node 58)
-      const upscaleVaeNode = findNodeByTitle(workflow, 'Load VAE')
-      if (upscaleVaeNode && upscaleVaeNode.nodeId === '58') {
+      const upscaleVaeNode = findNodeByTitle(workflow, 'Load VAE (Upscale)')
+      if (upscaleVaeNode) {
         const upscaleVae =
           upscaleSettings.selectedVae === '__embedded__'
             ? 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
@@ -313,26 +314,26 @@ export async function generateFlux1KreaImage(
       // Configure FaceDetailer checkpoint (node 69, SDXL)
       const fdCkpt = fdSettings.checkpoint
       if (fdCkpt && fdCkpt.length > 0) {
-        const fdCheckpointNode = findNodeByTitle(workflow, 'Load Checkpoint')
-        if (fdCheckpointNode && fdCheckpointNode.nodeId === '69') {
+        const fdCheckpointNode = findNodeByTitle(workflow, 'FaceDetailer Checkpoint')
+        if (fdCheckpointNode) {
           workflow[fdCheckpointNode.nodeId].inputs.ckpt_name = fdCkpt
         }
       }
 
       // Configure FaceDetailer prompts (nodes 71, 72)
-      const fdPosNode = findNodeByTitle(workflow, 'CLIP Text Encode (Prompt)')
-      if (fdPosNode && fdPosNode.nodeId === '71') {
+      const fdPosNode = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Positive)')
+      if (fdPosNode) {
         workflow[fdPosNode.nodeId].inputs.text = combinedPrompt
       }
 
-      const fdNegNode = findNodeByTitle(workflow, 'CLIP Text Encode (Prompt)')
-      if (fdNegNode && fdNegNode.nodeId === '72') {
+      const fdNegNode = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Negative)')
+      if (fdNegNode) {
         workflow[fdNegNode.nodeId].inputs.text = negativeTagsText
       }
 
       // Configure FaceDetailer VAE (node 70)
-      const fdVaeNode = findNodeByTitle(workflow, 'Load VAE')
-      if (fdVaeNode && fdVaeNode.nodeId === '70') {
+      const fdVaeNode = findNodeByTitle(workflow, 'FaceDetailer Load VAE')
+      if (fdVaeNode) {
         const fdVae =
           fdSettings.selectedVae === '__embedded__'
             ? 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
@@ -349,6 +350,20 @@ export async function generateFlux1KreaImage(
         workflow[fdNode.nodeId].inputs.sampler_name = fdSettings.sampler
         workflow[fdNode.nodeId].inputs.scheduler = fdSettings.scheduler
         workflow[fdNode.nodeId].inputs.denoise = fdSettings.denoise
+
+        if (promptsData.useUpscale) {
+          const upscaleDecode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')
+          if (!upscaleDecode) {
+            return { error: 'Missing required node: "VAE Decode (Tiled)" for FaceDetailer' }
+          }
+          workflow[fdNode.nodeId].inputs.image = [upscaleDecode.nodeId, 0]
+        } else {
+          const baseDecode = findNodeByTitle(workflow, 'VAE Decode')
+          if (!baseDecode) {
+            return { error: 'Missing required node: "VAE Decode" for FaceDetailer' }
+          }
+          workflow[fdNode.nodeId].inputs.image = [baseDecode.nodeId, 0]
+        }
       }
     }
 
