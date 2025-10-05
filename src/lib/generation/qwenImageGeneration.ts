@@ -139,8 +139,15 @@ export async function generateQwenImage(
 
     const clientId = generateClientId()
 
-    // Read wildcard zones for Qwen model (this also loads the Qwen wildcard model)
-    const wildcardZones = await readWildcardZones('qwen')
+    // Read wildcard zones for Qwen model
+    let wildcardZones
+    try {
+      wildcardZones = await readWildcardZones(modelSettings?.wildcardsFile)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load wildcards file'
+      onLoadingChange(false)
+      return { error: message }
+    }
     const model = getWildcardModel()
 
     const previousAll = previousRandomTagResolutions?.all || {}

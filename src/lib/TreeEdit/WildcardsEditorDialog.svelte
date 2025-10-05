@@ -8,7 +8,7 @@
     isOpen: boolean
     initialSelectedName?: string
     initialTargetText?: string
-    modelType?: string
+    filename?: string
     onSaved: () => void
   }
 
@@ -16,7 +16,7 @@
     isOpen = $bindable(),
     initialSelectedName = '',
     initialTargetText = '',
-    modelType,
+    filename,
     onSaved = () => {}
   }: Props = $props()
   let loading = $state(false)
@@ -102,7 +102,7 @@
   $effect(() => {
     if (isOpen) {
       loading = true
-      fetchWildcardsText(modelType)
+      fetchWildcardsText(filename)
         .then((text) => {
           // Yield a frame so the dialog paints before heavy parse
           requestAnimationFrame(() => {
@@ -115,7 +115,7 @@
           })
         })
         .catch((err) => {
-          console.error('Failed to load wildcards.yaml:', err)
+          console.error('Failed to load wildcards file:', err)
           loading = false
         })
     } else {
@@ -147,11 +147,11 @@
     const body = tree.getYaml()
     try {
       // Save first to avoid overwriting wrong file
-      await saveWildcardsText(body, modelType)
+      await saveWildcardsText(body, filename)
 
-      // Only update the global model if we're saving the same model type that's currently loaded
-      const currentlyLoadedModelType = getCurrentWildcardModelType()
-      if (currentlyLoadedModelType === modelType) {
+      // Only update the global model if we're saving the same file that's currently loaded
+      const currentlyLoadedFile = getCurrentWildcardModelType()
+      if (currentlyLoadedFile === filename) {
         updateWildcardsFromText(body)
       }
 

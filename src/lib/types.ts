@@ -67,6 +67,8 @@ export interface ModelSettings {
   upscale: UpscaleSettings
   // Custom workflow file path (optional, relative to data folder)
   customWorkflowPath?: string
+  // Custom wildcards file path (optional, defaults to model type specific file)
+  wildcardsFile?: string
 }
 
 export interface Settings {

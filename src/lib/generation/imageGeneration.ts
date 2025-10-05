@@ -20,6 +20,7 @@ import {
   applyPerModelOverrides,
   submitToComfyUI
 } from './generationCommon'
+import { loadCustomWorkflow } from './workflowMapping'
 import {
   expandCustomTags,
   detectCompositionFromTags,
@@ -123,7 +124,6 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const customWorkflowPath = modelSettings?.customWorkflowPath
     if (customWorkflowPath) {
       try {
-        const { loadCustomWorkflow } = await import('./workflowMapping')
         workflow = await loadCustomWorkflow(customWorkflowPath)
         console.log('Loaded custom workflow from:', customWorkflowPath)
       } catch (error) {
@@ -145,7 +145,14 @@ export async function generateImage(options: GenerationOptions): Promise<{
     const clientId = generateClientId()
 
     // Read wildcard zones instead of using promptsData.tags
-    const wildcardZones = await readWildcardZones(modelSettings?.modelType)
+    let wildcardZones
+    try {
+      wildcardZones = await readWildcardZones(modelSettings?.wildcardsFile)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load wildcards file'
+      onLoadingChange(false)
+      return { error: message }
+    }
 
     // Expand custom tags and create prompt parts, using previous resolutions if regenerating
     const previousAll = previousRandomTagResolutions?.all || {}

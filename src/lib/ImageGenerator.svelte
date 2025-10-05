@@ -567,6 +567,7 @@
           {settings}
           {isGeneratingForever}
           {lastSeed}
+          {toastsRef}
           onGenerate={() => handleGenerate(null)}
           onInpaint={handleInpaint}
           onRegenerate={() => handleGenerate(lastSeed)}

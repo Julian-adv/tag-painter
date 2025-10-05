@@ -1,28 +1,32 @@
 // APIs for reading/writing wildcards.yaml
 // Keep minimal and reusable across components.
 
-import { getWildcardsFileName } from '../utils/wildcards'
-
-export async function fetchWildcardsText(modelType?: string): Promise<string> {
+export async function fetchWildcardsText(filename?: string): Promise<string> {
   try {
-    const params = modelType ? `?modelType=${encodeURIComponent(modelType)}` : ''
+    const params = filename ? `?filename=${encodeURIComponent(filename)}` : ''
     const res = await fetch(`/api/wildcards${params}`)
-    if (!res.ok) return ''
+    if (!res.ok) {
+      if (res.status === 404) {
+        throw new Error(`Wildcards file not found: ${filename}`)
+      }
+      return ''
+    }
     return await res.text()
   } catch (e) {
-    const fileName = getWildcardsFileName(modelType)
-    console.error(`Failed to load ${fileName}:`, e)
+    if (e instanceof Error && e.message.includes('not found')) {
+      throw e
+    }
+    console.error(`Failed to load ${filename || 'wildcards file'}:`, e)
     return ''
   }
 }
 
-export async function saveWildcardsText(text: string, modelType?: string): Promise<void> {
-  const params = modelType ? `?modelType=${encodeURIComponent(modelType)}` : ''
+export async function saveWildcardsText(text: string, filename?: string): Promise<void> {
+  const params = filename ? `?filename=${encodeURIComponent(filename)}` : ''
   const res = await fetch(`/api/wildcards${params}`, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     body: text
   })
-  const fileName = getWildcardsFileName(modelType)
-  if (!res.ok) throw new Error(`Failed to save ${fileName}`)
+  if (!res.ok) throw new Error(`Failed to save ${filename || 'wildcards file'}`)
 }

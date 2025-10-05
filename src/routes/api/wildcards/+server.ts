@@ -1,12 +1,12 @@
 import { json, type RequestEvent } from '@sveltejs/kit'
 import fs from 'fs/promises'
 import path from 'path'
-import { getWildcardsFileName } from '$lib/utils/wildcards'
 
 const dataDir = path.resolve(process.cwd(), 'data')
 
-function getWildcardsFilePath(modelType?: string): string {
-  return path.join(dataDir, getWildcardsFileName(modelType))
+function getWildcardsFilePath(filename?: string): string {
+  const defaultFile = 'wildcards.yaml'
+  return path.join(dataDir, filename || defaultFile)
 }
 
 async function ensureDir() {
@@ -20,13 +20,13 @@ async function ensureDir() {
 export async function POST({ request, url }: RequestEvent) {
   await ensureDir()
   try {
-    const modelType = url.searchParams.get('modelType') || undefined
-    const filePath = getWildcardsFilePath(modelType)
+    const filename = url.searchParams.get('filename') || undefined
+    const filePath = getWildcardsFilePath(filename)
     const text = await request.text()
     await fs.writeFile(filePath, text, 'utf-8')
     return json({ success: true })
   } catch (error) {
-    const fileName = getWildcardsFileName(url.searchParams.get('modelType') || undefined)
+    const fileName = url.searchParams.get('filename') || 'wildcards.yaml'
     console.error(`Error writing ${fileName}:`, error)
     return json({ success: false, error: `Failed to save ${fileName}` }, { status: 500 })
   }
@@ -38,16 +38,21 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
 
 export async function GET({ url }) {
   await ensureDir()
+  const filename = url.searchParams.get('filename') || undefined
   try {
-    const modelType = url.searchParams.get('modelType') || undefined
-    const filePath = getWildcardsFilePath(modelType)
+    const filePath = getWildcardsFilePath(filename)
     const text = await fs.readFile(filePath, 'utf-8')
     return new Response(text, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
   } catch (error: unknown) {
     if (isErrnoException(error) && error.code === 'ENOENT') {
+      // If a custom filename was specified but not found, return 404
+      if (filename) {
+        return json({ error: `Wildcards file not found: ${filename}` }, { status: 404 })
+      }
+      // For default file, return empty content to allow starting fresh
       return new Response('', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
     }
-    const fileName = getWildcardsFileName(url.searchParams.get('modelType') || undefined)
+    const fileName = filename || 'wildcards.yaml'
     console.error(`Error reading ${fileName}:`, error)
     return json({ error: `Failed to read ${fileName}` }, { status: 500 })
   }

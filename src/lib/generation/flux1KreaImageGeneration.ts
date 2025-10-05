@@ -90,7 +90,14 @@ export async function generateFlux1KreaImage(
     const clientId = generateClientId()
 
     // Read wildcard zones for flux1_krea model
-    const wildcardZones = await readWildcardZones('flux1_krea')
+    let wildcardZones
+    try {
+      wildcardZones = await readWildcardZones(modelSettings?.wildcardsFile)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load wildcards file'
+      onLoadingChange(false)
+      return { error: message }
+    }
     const model = getWildcardModel()
     await prefetchWildcardFilesFromTexts(model)
 

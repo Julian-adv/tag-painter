@@ -16,10 +16,11 @@
     settings: Settings
     onClose: () => void
     onSave: (settings: Settings) => void
+    onError?: (message: string) => void
     initialFocus: 'quality' | 'negative' | null
   }
 
-  let { show, settings, onClose, onSave, initialFocus }: Props = $props()
+  let { show, settings, onClose, onSave, onError, initialFocus }: Props = $props()
 
   // Local copy of settings for editing
   let localSettings: Settings = $state({
@@ -201,7 +202,30 @@
     }
   })
 
-  function handleSave() {
+  async function handleSave() {
+    // Validate wildcards files exist
+    const wildcardsToCheck = new Set<string>()
+    for (const modelSettings of Object.values(localSettings.perModel)) {
+      if (modelSettings.wildcardsFile && modelSettings.wildcardsFile.trim()) {
+        wildcardsToCheck.add(modelSettings.wildcardsFile.trim())
+      }
+    }
+
+    // Check each unique wildcards file
+    for (const filename of wildcardsToCheck) {
+      try {
+        const params = `?filename=${encodeURIComponent(filename)}`
+        const res = await fetch(`/api/wildcards${params}`)
+        if (res.status === 404) {
+          onError?.(`Wildcards file not found: ${filename}`)
+          return
+        }
+      } catch (error) {
+        onError?.(`Failed to check wildcards file: ${filename}`)
+        return
+      }
+    }
+
     onSave(deepClone(localSettings))
     // Update baseline immediately so button disables if dialog remains open
     originalLocalSettings = deepClone(localSettings)
@@ -460,6 +484,15 @@
               <option value={workflow}>{workflow}</option>
             {/each}
           </select>
+
+          <label for="pm-wildcards-file" class="two-col-label">Wildcards File</label>
+          <input
+            id="pm-wildcards-file"
+            type="text"
+            bind:value={localSettings.perModel[selectedModelKey].wildcardsFile}
+            placeholder="wildcards.yaml"
+            class="two-col-input-wide"
+          />
 
           <label for="pm-quality" class="two-col-label">{m['settingsDialog.qualityPrefix']()}</label
           >

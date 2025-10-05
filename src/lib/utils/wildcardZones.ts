@@ -6,15 +6,15 @@ import { toYAML } from '../TreeEdit/yaml-io'
 /**
  * Read zone data from the current wildcard model
  */
-export async function readWildcardZones(modelType?: string): Promise<{
+export async function readWildcardZones(filename?: string): Promise<{
   all: string
   zone1: string
   zone2: string
   negative: string
   inpainting: string
 }> {
-  // Always refresh wildcard data to ensure we have the correct model type
-  await refreshWildcardsFromServer(modelType)
+  // Always refresh wildcard data to ensure we have the correct file
+  await refreshWildcardsFromServer(filename)
 
   const wildcardModel = getWildcardModel()
 
@@ -61,11 +61,11 @@ export async function writeWildcardZones(
     negative: string
     inpainting: string
   },
-  modelType?: string
+  filename?: string
 ): Promise<void> {
   try {
     // Always refresh from the correct file to ensure we have the right model
-    await refreshWildcardsFromServer(modelType)
+    await refreshWildcardsFromServer(filename)
     const wildcardModel = getWildcardModel()
 
     // Clone the current model to modify it
@@ -134,12 +134,12 @@ export async function writeWildcardZones(
     const yamlText = toYAML(updatedModel)
 
     // Save to server
-    await saveWildcardsText(yamlText, modelType)
+    await saveWildcardsText(yamlText, filename)
 
     // Update local model by refreshing from server
-    await refreshWildcardsFromServer(modelType)
+    await refreshWildcardsFromServer(filename)
   } catch (error) {
-    console.error('Failed to write wildcard zones:', error)
+    // Re-throw error so caller can handle it (will be shown as toast)
     throw error
   }
 }

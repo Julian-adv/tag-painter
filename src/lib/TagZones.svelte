@@ -57,6 +57,12 @@
     return mt === 'qwen' || mt === 'chroma' ? mt : undefined
   })
 
+  let currentWildcardsFile = $derived.by(() => {
+    const key = $promptsData.selectedCheckpoint || 'Default'
+    const effectiveModel = getEffectiveModelSettings(settings, key)
+    return effectiveModel?.wildcardsFile || undefined
+  })
+
   let hasLoadedTags = $state(false)
   let saveTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -65,11 +71,11 @@
     const effectiveModel = getEffectiveModelSettings(settings, key)
     qualityPrefixText = effectiveModel?.qualityPrefix || ''
     negativePrefixText = effectiveModel?.negativePrefix || ''
-    const signature = `${currentModelType === 'qwen' || currentModelType === 'chroma' ? 'qwen' : 'default'}|${key}`
+    const signature = `${currentWildcardsFile || 'default'}|${key}`
     if (signature !== lastModelSignature || !hasLoadedTags) {
       lastModelSignature = signature
       hasLoadedTags = true
-      void loadTagsFromWildcards(currentModelType)
+      void loadTagsFromWildcards(currentWildcardsFile)
     }
   })
 
@@ -77,15 +83,24 @@
   // Loading happens in $effect when isQwenModel is properly determined
 
   // Load tags from wildcard zones
-  async function loadTagsFromWildcards(modelTypeOverride?: string) {
-    const mt = modelTypeOverride ?? currentModelType
-    const targetModelType = mt === 'qwen' || mt === 'chroma' ? mt : undefined
-    const zones = await readWildcardZones(targetModelType)
-    allTags = zones.all
-    firstZoneTags = zones.zone1
-    secondZoneTags = zones.zone2
-    negativeTags = zones.negative
-    inpaintingTags = zones.inpainting
+  async function loadTagsFromWildcards(filenameOverride?: string) {
+    const targetFile = filenameOverride ?? currentWildcardsFile
+    try {
+      const zones = await readWildcardZones(targetFile)
+      allTags = zones.all
+      firstZoneTags = zones.zone1
+      secondZoneTags = zones.zone2
+      negativeTags = zones.negative
+      inpaintingTags = zones.inpainting
+    } catch (error) {
+      // If wildcards file doesn't exist, start with empty zones
+      // Error will be shown as toast when user tries to generate image
+      allTags = ''
+      firstZoneTags = ''
+      secondZoneTags = ''
+      negativeTags = ''
+      inpaintingTags = ''
+    }
   }
 
   // Debounced save - only saves after user stops typing for 2 seconds
@@ -111,16 +126,14 @@
         inpainting: inpaintingTags
       }
 
-      const targetModelType =
-        currentModelType === 'qwen' || currentModelType === 'chroma' ? currentModelType : undefined
-      await writeWildcardZones(zones, targetModelType)
+      await writeWildcardZones(zones, currentWildcardsFile)
 
       if (saveTimeout) {
         clearTimeout(saveTimeout)
         saveTimeout = null
       }
     } catch (error) {
-      console.error('Failed to save tags to wildcard zones:', error)
+      // Silently fail - error will be shown as toast when generating image
     }
   }
 
@@ -298,7 +311,7 @@
     bind:isOpen={showTreeEditDialog}
     initialSelectedName={preselectTagName}
     initialTargetText={preselectTargetText}
-    modelType={currentModelType}
+    filename={currentWildcardsFile}
     onSaved={handleWildcardsSaved}
   />
 </div>

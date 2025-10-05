@@ -18,6 +18,7 @@
     onSettingsChange: (settings: Settings) => void
     lastSeed: number | null
     disableInpaint?: boolean
+    toastsRef?: any
   }
 
   let {
@@ -32,7 +33,8 @@
     isGeneratingForever,
     onSettingsChange,
     lastSeed,
-    disableInpaint = false
+    disableInpaint = false,
+    toastsRef
   }: Props = $props()
 
   let showSettingsDialog = $state(false)
@@ -162,4 +164,5 @@
   initialFocus={initialSettingsFocus}
   onClose={closeSettingsDialog}
   onSave={handleSettingsChange}
+  onError={(msg) => toastsRef?.error(msg)}
 />

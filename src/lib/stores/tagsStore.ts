@@ -16,8 +16,7 @@ let currentWildcardModelType: string | undefined = undefined
 export const combinedTags = writable<string[]>([])
 let initPromise: Promise<void> | null = null
 
-export async function initTags(modelType?: string): Promise<void> {
-  const effectiveModelType = modelType ?? currentWildcardModelType
+export async function initTags(filename?: string): Promise<void> {
   // Return cached tags if already loaded
   const currentCombinedTags = get(combinedTags)
   if (tags.length > 0 && currentCombinedTags.length > 0) {
@@ -32,10 +31,10 @@ export async function initTags(modelType?: string): Promise<void> {
   // Create and cache the initialization promise
   initPromise = (async () => {
     try {
-      // Load both danbooru tags and wildcards.yaml
+      // Load both danbooru tags and wildcards file
       const [tagsRes, wcRes] = await Promise.allSettled([
         fetch('/api/tags'),
-        fetchWildcardsText(effectiveModelType)
+        fetchWildcardsText(filename)
       ])
 
       if (tagsRes.status === 'fulfilled' && tagsRes.value.ok) {
@@ -58,9 +57,9 @@ export async function initTags(modelType?: string): Promise<void> {
           const text = wcRes.value ?? ''
           wildcardModel = fromYAML(text)
           wildcardNameSet = computeWildcardNames(wildcardModel)
-          currentWildcardModelType = effectiveModelType
+          currentWildcardModelType = filename
         } catch (e) {
-          console.error('Failed to parse wildcards.yaml:', e)
+          console.error('Failed to parse wildcards file:', e)
           wildcardNameSet = new Set()
           wildcardModel = fromYAML('')
         }
@@ -68,7 +67,7 @@ export async function initTags(modelType?: string): Promise<void> {
         // If failed, fall back to empty
         wildcardNameSet = new Set()
         wildcardModel = fromYAML('')
-        console.error('Failed to load wildcards.yaml:', wcRes.reason)
+        console.error('Failed to load wildcards file:', wcRes.reason)
       }
 
       updateCombinedTags()
@@ -141,17 +140,18 @@ export function updateWildcardsFromText(text: string) {
 }
 
 // Public helper to re-fetch wildcards from server and refresh combined tags
-export async function refreshWildcardsFromServer(modelType?: string) {
+export async function refreshWildcardsFromServer(filename?: string) {
   try {
-    const text = await fetchWildcardsText(modelType)
-    currentWildcardModelType = modelType
+    const text = await fetchWildcardsText(filename)
+    currentWildcardModelType = filename
     updateWildcardsFromText(text)
   } catch (e) {
-    console.error('refreshWildcardsFromServer failed:', e)
     wildcardNameSet = new Set()
     wildcardModel = fromYAML('')
     currentWildcardModelType = undefined
     updateCombinedTags()
+    // Re-throw error so caller can handle it
+    throw e
   }
 }
 
