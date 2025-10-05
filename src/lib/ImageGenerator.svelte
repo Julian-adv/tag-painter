@@ -541,7 +541,7 @@
                 type="checkbox"
                 checked={$promptsData.useUpscale}
                 onchange={(e) => updateUpscale((e.target as HTMLInputElement).checked)}
-                class="m-0 cursor-pointer"
+                class="m-0 cursor-pointer accent-sky-600"
               />
               {m['imageGenerator.useUpscale']()}
             </label>
