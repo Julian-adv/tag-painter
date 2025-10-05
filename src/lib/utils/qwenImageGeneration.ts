@@ -32,10 +32,27 @@ import {
 import type { ComfyUIWorkflow, ModelSettings } from '$lib/types'
 import type { GenerationOptions } from './imageGeneration'
 
-function applyQwenLoraChain(workflow: ComfyUIWorkflow, loras: { name: string; weight: number }[]) {
-  const baseUnet = findNodeByTitle(workflow, 'Load Qwen UNet')?.nodeId || '37'
-  const modelSampling = findNodeByTitle(workflow, 'Model Sampling Aura Flow')?.nodeId || '66'
-  const mainSampler = findNodeByTitle(workflow, 'KSampler')?.nodeId || '3'
+function applyQwenLoraChain(
+  workflow: ComfyUIWorkflow,
+  loras: { name: string; weight: number }[]
+): string | null {
+  const baseUnetNode = findNodeByTitle(workflow, 'Load Qwen UNet')
+  if (!baseUnetNode) {
+    return 'Missing required node: "Load Qwen UNet"'
+  }
+  const baseUnet = baseUnetNode.nodeId
+
+  const modelSamplingNode = findNodeByTitle(workflow, 'Model Sampling Aura Flow')
+  if (!modelSamplingNode) {
+    return 'Missing required node: "Model Sampling Aura Flow"'
+  }
+  const modelSampling = modelSamplingNode.nodeId
+
+  const mainSamplerNode = findNodeByTitle(workflow, 'KSampler')
+  if (!mainSamplerNode) {
+    return 'Missing required node: "KSampler"'
+  }
+  const mainSampler = mainSamplerNode.nodeId
 
   if (!Array.isArray(loras) || loras.length === 0) {
     if (workflow[modelSampling]) {
@@ -44,7 +61,7 @@ function applyQwenLoraChain(workflow: ComfyUIWorkflow, loras: { name: string; we
     if (workflow[mainSampler]) {
       workflow[mainSampler].inputs.model = [modelSampling, 0]
     }
-    return
+    return null
   }
 
   let previousNodeId = baseUnet
@@ -72,6 +89,8 @@ function applyQwenLoraChain(workflow: ComfyUIWorkflow, loras: { name: string; we
   if (workflow[mainSampler]) {
     workflow[mainSampler].inputs.model = [modelSampling, 0]
   }
+
+  return null
 }
 
 export async function generateQwenImage(
@@ -235,7 +254,10 @@ export async function generateQwenImage(
       promptsData.selectedCheckpoint,
       promptsData.selectedLoras
     )
-    applyQwenLoraChain(workflow, effectiveLoras)
+    const loraError = applyQwenLoraChain(workflow, effectiveLoras)
+    if (loraError) {
+      return { error: loraError }
+    }
 
     // Main sampler settings
     if (
