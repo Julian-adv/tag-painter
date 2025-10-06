@@ -225,6 +225,8 @@
   }
 
   async function handleGenerate(seedToUse: number | null = null) {
+    toastsRef?.clear()
+
     // Check if checkpoints are available before generating
     if (!availableCheckpoints || availableCheckpoints.length === 0) {
       openNoCheckpointsDialog()
@@ -320,6 +322,8 @@
   }
 
   async function handleInpaintGeneration(denoiseStrength: number) {
+    toastsRef?.clear()
+
     // Add current values to options if they're not already there
     autoSaveCurrentValues()
 

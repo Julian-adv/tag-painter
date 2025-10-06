@@ -27,6 +27,10 @@
     push(message, 'success')
   }
 
+  export function clear() {
+    toasts = []
+  }
+
   function bgClass(type?: string): string {
     if (type === 'error') return 'bg-red-600'
     if (type === 'success') return 'bg-green-600'
