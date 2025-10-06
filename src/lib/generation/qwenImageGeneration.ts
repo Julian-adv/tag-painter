@@ -462,7 +462,7 @@ export async function generateQwenImage(
       workflow[fdNode.nodeId].inputs.denoise = faceDetailerSettings.denoise
 
       // FD input image: upscale decode output or base decode output
-      const upscaleDecode = findNodeByTitle(workflow, 'Upscale VAE Decode')?.nodeId
+      const upscaleDecode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')?.nodeId
       const baseDecode = findNodeByTitle(workflow, 'VAE Decode')?.nodeId
       if (promptsData.useUpscale && upscaleDecode) {
         workflow[fdNode.nodeId].inputs.image = [upscaleDecode, 0]
@@ -478,9 +478,9 @@ export async function generateQwenImage(
       const usModelType = upscaleSettings.modelType || 'sdxl'
 
       // Configure LatentUpscale dimensions (use scale from settings)
-      const latentUpscale = findNodeByTitle(workflow, 'Latent Upscale')
+      const latentUpscale = findNodeByTitle(workflow, 'Upscale Image')
       if (!latentUpscale) {
-        return { error: 'Missing required node: "Latent Upscale"' }
+        return { error: 'Missing required node: "Upscale Image"' }
       }
       workflow[latentUpscale.nodeId].inputs.width = Math.round(
         appliedSettings.imageWidth * upscaleSettings.scale
@@ -523,15 +523,15 @@ export async function generateQwenImage(
         const usVaeName = upscaleSettings.selectedVae || 'qwen_image_vae.safetensors'
         workflow[upscaleVaeQwen.nodeId].inputs.vae_name = usVaeName
 
-        const upscaleEncode = findNodeByTitle(workflow, 'SDXL VAE Encode')
+        const upscaleEncode = findNodeByTitle(workflow, 'VAE Encode (Tiled)')
         if (!upscaleEncode) {
-          return { error: 'Missing required node: "SDXL VAE Encode"' }
+          return { error: 'Missing required node: "VAE Encode (Tiled)"' }
         }
         workflow[upscaleEncode.nodeId].inputs.vae = [upscaleVaeQwen.nodeId, 0]
 
-        const upscaleDecode = findNodeByTitle(workflow, 'Upscale VAE Decode')
+        const upscaleDecode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')
         if (!upscaleDecode) {
-          return { error: 'Missing required node: "Upscale VAE Decode"' }
+          return { error: 'Missing required node: "VAE Decode (Tiled)"' }
         }
         workflow[upscaleDecode.nodeId].inputs.vae = [upscaleVaeQwen.nodeId, 0]
 
@@ -567,9 +567,9 @@ export async function generateQwenImage(
         workflow[upCkpt.nodeId].inputs.ckpt_name = resolvedUpscaleCkpt
         workflow[upscaleSampler.nodeId].inputs.model = [upCkpt.nodeId, 0]
 
-        const upscaleEncode = findNodeByTitle(workflow, 'SDXL VAE Encode')
+        const upscaleEncode = findNodeByTitle(workflow, 'VAE Encode (Tiled)')
         if (!upscaleEncode) {
-          return { error: 'Missing required node: "SDXL VAE Encode"' }
+          return { error: 'Missing required node: "VAE Encode (Tiled)"' }
         }
 
         if (upscaleSettings.selectedVae === '__embedded__') {
@@ -585,9 +585,9 @@ export async function generateQwenImage(
           workflow[upVae.nodeId].inputs.vae_name = usVaeName
         }
 
-        const upscaleDecode = findNodeByTitle(workflow, 'Upscale VAE Decode')
+        const upscaleDecode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')
         if (!upscaleDecode) {
-          return { error: 'Missing required node: "Upscale VAE Decode"' }
+          return { error: 'Missing required node: "VAE Decode (Tiled)"' }
         }
         workflow[upscaleDecode.nodeId].inputs.vae = [upCkpt.nodeId, 2]
 
@@ -626,7 +626,7 @@ export async function generateQwenImage(
       if (promptsData.useFaceDetailer) {
         imageSourceNodeId = findNodeByTitle(workflow, 'FaceDetailer')?.nodeId || '69'
       } else {
-        imageSourceNodeId = findNodeByTitle(workflow, 'Upscale VAE Decode')?.nodeId || '126'
+        imageSourceNodeId = findNodeByTitle(workflow, 'VAE Decode (Tiled)')?.nodeId || '126'
       }
     } else {
       imageSourceNodeId = promptsData.useFaceDetailer
