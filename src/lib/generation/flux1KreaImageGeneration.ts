@@ -95,7 +95,6 @@ export async function generateFlux1KreaImage(
       wildcardZones = await readWildcardZones(modelSettings?.wildcardsFile)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load wildcards file'
-      onLoadingChange(false)
       return { error: message }
     }
     const model = getWildcardModel()

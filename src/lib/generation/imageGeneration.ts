@@ -150,7 +150,6 @@ export async function generateImage(options: GenerationOptions): Promise<{
       wildcardZones = await readWildcardZones(modelSettings?.wildcardsFile)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load wildcards file'
-      onLoadingChange(false)
       return { error: message }
     }
 
