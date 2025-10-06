@@ -3,62 +3,48 @@
 export const FINAL_SAVE_NODE_ID = 'final_save_output' // Consistent ID for our dynamically added save node
 
 import type { ComfyUIWorkflow } from '$lib/types'
-
-// Configure CLIP skip for the workflow
-export function configureClipSkip(workflow: ComfyUIWorkflow, clipSkip: number) {
-  // Update standalone CLIP skip nodes
-  if (workflow['97']) {
-    // Inpainting workflow
-    workflow['97'].inputs.stop_at_clip_layer = -clipSkip
-  }
-  if (workflow['98']) {
-    // Default workflow
-    workflow['98'].inputs.stop_at_clip_layer = -clipSkip
-  }
-  if (workflow['99']) {
-    // LoRA chain workflow
-    workflow['99'].inputs.stop_at_clip_layer = -clipSkip
-  }
-}
+import { deleteNodesByTitlePattern, findNodeByTitle } from './workflowMapping'
 
 // Dynamic LoRA chain generation
 export function generateLoraChain(
   selectedLoras: { name: string; weight: number }[],
   workflow: ComfyUIWorkflow,
   clipSkip: number = 2
-) {
-  // Remove existing LoRA nodes (70-85) and CLIP skip node (99)
-  for (let i = 70; i <= 85; i++) {
-    delete workflow[i.toString()]
+): { error?: string } {
+  // Remove existing LoRA nodes by title
+  deleteNodesByTitlePattern(workflow, 'Load LoRA')
+
+  // Find the base checkpoint loader node
+  const checkpointNode = findNodeByTitle(workflow, 'Load Checkpoint')
+  if (!checkpointNode) {
+    return { error: 'Workflow node not found: Load Checkpoint' }
   }
-  delete workflow['99']
+
+  const baseNodeId = checkpointNode.nodeId
+
+  // Find existing CLIP skip node in workflow
+  let clipSkipNode = findNodeByTitle(workflow, 'CLIP Set Last Layer')
+  if (!clipSkipNode) {
+    return { error: 'Workflow node not found: CLIP Set Last Layer' }
+  }
 
   if (selectedLoras.length === 0) {
-    // If no LoRAs selected, add CLIP skip node for base checkpoint
-    const clipSkipNodeId = '99'
-    workflow[clipSkipNodeId] = {
-      inputs: {
-        stop_at_clip_layer: -clipSkip,
-        clip: ['11', 1]
-      },
-      class_type: 'CLIPSetLastLayer',
-      _meta: {
-        title: 'CLIP Set Last Layer (Base)'
-      }
-    }
+    // If no LoRAs selected, connect CLIP skip node to base checkpoint
+    workflow[clipSkipNode.nodeId].inputs.stop_at_clip_layer = -clipSkip
+    workflow[clipSkipNode.nodeId].inputs.clip = [baseNodeId, 1]
 
-    // Update all references to point to node '11' for model, CLIP skip node for CLIP
-    updateLoraReferences(workflow, '11', clipSkipNodeId)
-    return
+    // Update all references to point to base checkpoint for model, CLIP skip node for CLIP
+    updateLoraReferences(workflow, baseNodeId, clipSkipNode.nodeId)
+    return {}
   }
 
-  // Generate LoRA chain starting from node 70
-  let previousModelNode = '11'
-  let previousClipNode = '11'
-  let lastLoraNodeId = '11'
+  // Generate LoRA chain with unique IDs
+  let previousModelNode = baseNodeId
+  let previousClipNode = baseNodeId
+  let lastLoraNodeId = baseNodeId
 
   selectedLoras.forEach((loraData, index) => {
-    const nodeId = (70 + index).toString()
+    const nodeId = `lora_${index}_${Date.now()}`
 
     workflow[nodeId] = {
       inputs: {
@@ -79,21 +65,13 @@ export function generateLoraChain(
     lastLoraNodeId = nodeId
   })
 
-  // Add CLIP skip node after LoRA chain
-  const clipSkipNodeId = '99'
-  workflow[clipSkipNodeId] = {
-    inputs: {
-      stop_at_clip_layer: -clipSkip,
-      clip: [lastLoraNodeId, 1]
-    },
-    class_type: 'CLIPSetLastLayer',
-    _meta: {
-      title: 'CLIP Set Last Layer (LoRA)'
-    }
-  }
+  // Update existing CLIP skip node to connect to LoRA chain
+  workflow[clipSkipNode.nodeId].inputs.stop_at_clip_layer = -clipSkip
+  workflow[clipSkipNode.nodeId].inputs.clip = [lastLoraNodeId, 1]
 
   // Update all references to use the CLIP skip node for CLIP outputs
-  updateLoraReferences(workflow, lastLoraNodeId, clipSkipNodeId)
+  updateLoraReferences(workflow, lastLoraNodeId, clipSkipNode.nodeId)
+  return {}
 }
 
 function updateLoraReferences(
@@ -101,18 +79,26 @@ function updateLoraReferences(
   targetNodeId: string,
   clipSkipNodeId?: string
 ) {
-  // Update all nodes that were referencing '85' to use the target node
-  // Note: FaceDetailer nodes (56, 69) and upscale nodes (121) are excluded as they use separate checkpoints
-  const nodesToUpdate = ['10', '12', '13', '18', '51']
+  // Update all nodes that use model/clip inputs to reference the LoRA chain output
+  // Note: FaceDetailer and upscale nodes are excluded as they use separate checkpoints
+  const nodeTitlesToUpdate = [
+    'KSampler (inpainting)',
+    'CLIP Text Encode (Prompt)',
+    'CLIP Text Encode (Zone1)',
+    'CLIP Text Encode (Negative)',
+    'CLIP Text Encode (Zone2)'
+  ]
 
-  nodesToUpdate.forEach((nodeId) => {
-    if (workflow[nodeId] && workflow[nodeId].inputs) {
-      if (workflow[nodeId].inputs.model && Array.isArray(workflow[nodeId].inputs.model)) {
-        workflow[nodeId].inputs.model = [targetNodeId, 0]
+  nodeTitlesToUpdate.forEach((title) => {
+    const node = findNodeByTitle(workflow, title)
+    if (node && workflow[node.nodeId] && workflow[node.nodeId].inputs) {
+      const nodeInputs = workflow[node.nodeId].inputs
+      if (nodeInputs.model && Array.isArray(nodeInputs.model)) {
+        nodeInputs.model = [targetNodeId, 0]
       }
-      if (workflow[nodeId].inputs.clip && Array.isArray(workflow[nodeId].inputs.clip)) {
+      if (nodeInputs.clip && Array.isArray(nodeInputs.clip)) {
         // If we have a CLIP skip node, use it for CLIP references, otherwise use the target node
-        workflow[nodeId].inputs.clip = clipSkipNodeId ? [clipSkipNodeId, 0] : [targetNodeId, 1]
+        nodeInputs.clip = clipSkipNodeId ? [clipSkipNodeId, 0] : [targetNodeId, 1]
       }
     }
   })
@@ -671,7 +657,7 @@ export const defaultWorkflowPrompt = {
     },
     class_type: 'VAEDecode',
     _meta: {
-      title: 'VAE Decode (Upscale)'
+      title: 'VAE Decode (Tiled)'
     }
   },
   '69': {

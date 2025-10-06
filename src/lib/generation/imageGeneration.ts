@@ -6,8 +6,7 @@ import {
   defaultWorkflowPrompt,
   inpaintingWorkflowPrompt,
   FINAL_SAVE_NODE_ID,
-  generateLoraChain,
-  configureClipSkip
+  generateLoraChain
 } from './workflow'
 import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
 import { generateQwenImage } from './qwenImageGeneration'
@@ -278,18 +277,26 @@ export async function generateImage(options: GenerationOptions): Promise<{
 
     if (isInpainting) {
       // Configure inpainting workflow (title-based)
-      setNodeTextInput(workflow, 'CLIP Text Encode (Prompt)', inpaintingTagsText)
-      setNodeTextInput(workflow, 'CLIP Text Encode (Negative)', negativeTagsText)
+      if (!setNodeTextInput(workflow, 'CLIP Text Encode (Prompt)', inpaintingTagsText)) {
+        return { error: 'Workflow node not found: CLIP Text Encode (Prompt)' }
+      }
+      if (!setNodeTextInput(workflow, 'CLIP Text Encode (Negative)', negativeTagsText)) {
+        return { error: 'Workflow node not found: CLIP Text Encode (Negative)' }
+      }
 
       // Set the current image as input
       if (currentImagePath) {
-        setNodeImagePath(workflow, 'Load Input Image', currentImagePath)
+        if (!setNodeImagePath(workflow, 'Load Input Image', currentImagePath)) {
+          return { error: 'Workflow node not found: Load Input Image' }
+        }
         console.log('Using image path:', currentImagePath)
       }
 
       // Set the mask image (already has full path)
       if (maskFilePath) {
-        setNodeImagePath(workflow, 'Load Mask Image', maskFilePath)
+        if (!setNodeImagePath(workflow, 'Load Mask Image', maskFilePath)) {
+          return { error: 'Workflow node not found: Load Mask Image' }
+        }
         console.log('Using mask path:', maskFilePath)
       }
     } else {
@@ -302,23 +309,38 @@ export async function generateImage(options: GenerationOptions): Promise<{
       }
 
       // Assign prompts to different nodes (title-based)
-      setNodeTextInput(workflow, 'CLIP Text Encode (All)', allTagsText)
-      setNodeTextInput(workflow, 'CLIP Text Encode (Zone1)', zone1TagsText)
-      setNodeTextInput(workflow, 'CLIP Text Encode (Zone2)', zone2TagsText)
+      if (!setNodeTextInput(workflow, 'CLIP Text Encode (All)', allTagsText)) {
+        return { error: 'Workflow node not found: CLIP Text Encode (All)' }
+      }
+      if (!setNodeTextInput(workflow, 'CLIP Text Encode (Zone1)', zone1TagsText)) {
+        return { error: 'Workflow node not found: CLIP Text Encode (Zone1)' }
+      }
+      if (!setNodeTextInput(workflow, 'CLIP Text Encode (Zone2)', zone2TagsText)) {
+        return { error: 'Workflow node not found: CLIP Text Encode (Zone2)' }
+      }
 
       // Set mask configuration for regional separation (title-based)
       const coupleNode = findNodeByTitle(workflow, 'Attention Couple 🍌')?.nodeId
-      const leftMask = findNodeByTitle(workflow, 'Convert Image to Mask')?.nodeId
-      const invertedMask = findNodeByTitle(workflow, 'InvertMask')?.nodeId
-      if (coupleNode && leftMask && workflow[coupleNode]) {
-        workflow[coupleNode].inputs.mask_1 = [leftMask, 0]
+      if (!coupleNode) {
+        return { error: 'Workflow node not found: Attention Couple 🍌' }
       }
-      if (coupleNode && invertedMask && workflow[coupleNode]) {
+      const leftMask = findNodeByTitle(workflow, 'Convert Image to Mask')?.nodeId
+      if (!leftMask) {
+        return { error: 'Workflow node not found: Convert Image to Mask' }
+      }
+      const invertedMask = findNodeByTitle(workflow, 'InvertMask')?.nodeId
+      if (!invertedMask) {
+        return { error: 'Workflow node not found: InvertMask' }
+      }
+      if (workflow[coupleNode]) {
+        workflow[coupleNode].inputs.mask_1 = [leftMask, 0]
         workflow[coupleNode].inputs.mask_2 = [invertedMask, 0]
       }
 
       // Set negative prompt from negative tags
-      setNodeTextInput(workflow, 'CLIP Text Encode (Negative)', negativeTagsText)
+      if (!setNodeTextInput(workflow, 'CLIP Text Encode (Negative)', negativeTagsText)) {
+        return { error: 'Workflow node not found: CLIP Text Encode (Negative)' }
+      }
 
       // Get mask image path from server-side API with selected composition
       const maskResponse = await fetch(
@@ -328,7 +350,9 @@ export async function generateImage(options: GenerationOptions): Promise<{
         throw new Error(`Failed to get mask path: ${maskResponse.statusText}`)
       }
       const { maskImagePath } = await maskResponse.json()
-      setNodeImagePath(workflow, 'Load Image', maskImagePath)
+      if (!setNodeImagePath(workflow, 'Load Image', maskImagePath)) {
+        return { error: 'Workflow node not found: Load Image' }
+      }
     }
 
     // Configure workflow based on settings merged with per-model overrides
@@ -340,26 +364,40 @@ export async function generateImage(options: GenerationOptions): Promise<{
       promptsData.selectedCheckpoint,
       promptsData.selectedLoras
     )
-    generateLoraChain(effectiveLoras, workflow, appliedSettings.clipSkip)
+    const loraResult = generateLoraChain(effectiveLoras, workflow, appliedSettings.clipSkip)
+    if (loraResult.error) {
+      return { error: loraResult.error }
+    }
 
-    configureWorkflow(workflow, promptsData, appliedSettings, isInpainting, inpaintDenoiseStrength)
+    const configureResult = configureWorkflow(
+      workflow,
+      promptsData,
+      appliedSettings,
+      isInpainting,
+      inpaintDenoiseStrength
+    )
+    if (configureResult) {
+      return { error: configureResult.error }
+    }
 
     // Configure CLIP skip (title-based and legacy numeric for compatibility)
-    setNodeClipSkip(workflow, 'CLIP Set Last Layer', appliedSettings.clipSkip)
-    if (isInpainting)
-      setNodeClipSkip(workflow, 'CLIP Set Last Layer (Inpainting)', appliedSettings.clipSkip)
-    configureClipSkip(workflow, appliedSettings.clipSkip)
-
-    // If a custom VAE is selected, inject VAELoader and rewire all VAE inputs
-    if (appliedSettings.selectedVae && appliedSettings.selectedVae !== '__embedded__') {
-      applyCustomVae(workflow, appliedSettings.selectedVae)
+    if (!setNodeClipSkip(workflow, 'CLIP Set Last Layer', appliedSettings.clipSkip)) {
+      return { error: 'Workflow node not found: CLIP Set Last Layer' }
+    }
+    if (isInpainting) {
+      if (!setNodeClipSkip(workflow, 'CLIP Set Last Layer (Inpainting)', appliedSettings.clipSkip)) {
+        return { error: 'Workflow node not found: CLIP Set Last Layer (Inpainting)' }
+      }
     }
 
     // Apply seeds (either use provided seed or generate new one)
     const appliedSeed = applySeedsToWorkflow(workflow, seed, isInpainting)
 
     // Add SaveImageWebsocket node for output
-    addSaveImageWebsocketNode(workflow, promptsData, isInpainting)
+    const saveImageResult = addSaveImageWebsocketNode(workflow, promptsData, isInpainting)
+    if (saveImageResult) {
+      return { error: saveImageResult.error }
+    }
 
     // Configure upscale text prompts if enabled
     if (promptsData.useUpscale) {
@@ -370,8 +408,12 @@ export async function generateImage(options: GenerationOptions): Promise<{
           ? `${allTagsText}, ${zone1TagsText || ''}${zone2TagsText ? (zone1TagsText ? ', ' : '') + zone2TagsText : ''}`
           : allTagsText || zone1TagsText || zone2TagsText
 
-      setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Positive)', combinedPrompt)
-      setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Negative)', negativeTagsText)
+      if (!setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Positive)', combinedPrompt)) {
+        return { error: 'Workflow node not found: Upscale CLIP Text Encode (Positive)' }
+      }
+      if (!setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Negative)', negativeTagsText)) {
+        return { error: 'Workflow node not found: Upscale CLIP Text Encode (Negative)' }
+      }
     }
 
     // Configure FaceDetailer text prompts and wildcard if enabled
@@ -397,15 +439,14 @@ export async function generateImage(options: GenerationOptions): Promise<{
           ? `${allTagsText}, ${zone1TagsText || ''}${zone2TagsText ? (zone1TagsText ? ', ' : '') + zone2TagsText : ''}`
           : allTagsText || zone1TagsText || zone2TagsText
 
-      setNodeTextInput(workflow, 'FaceDetailer CLIP Text Encode (Positive)', combinedPrompt)
-      setNodeTextInput(workflow, 'FaceDetailer CLIP Text Encode (Negative)', negativeTagsText)
-    }
-
-    // Update mask file in workflow if provided
-    if (maskFilePath) {
-      console.log('Using mask file:', maskFilePath)
-      // Update composition mask image node
-      setNodeImagePath(workflow, 'Load Image', maskFilePath)
+      if (!setNodeTextInput(workflow, 'FaceDetailer CLIP Text Encode (Positive)', combinedPrompt)) {
+        return { error: 'Workflow node not found: FaceDetailer CLIP Text Encode (Positive)' }
+      }
+      if (
+        !setNodeTextInput(workflow, 'FaceDetailer CLIP Text Encode (Negative)', negativeTagsText)
+      ) {
+        return { error: 'Workflow node not found: FaceDetailer CLIP Text Encode (Negative)' }
+      }
     }
 
     console.log('workflow', workflow)
@@ -448,10 +489,18 @@ function configureWorkflow(
   settings: Settings,
   isInpainting: boolean = false,
   inpaintDenoiseStrength?: number
-) {
+): { error: string } | null {
   // Set checkpoint by title
   if (promptsData.selectedCheckpoint) {
-    setNodeCheckpoint(workflow, 'Load Checkpoint', promptsData.selectedCheckpoint)
+    if (!setNodeCheckpoint(workflow, 'Load Checkpoint', promptsData.selectedCheckpoint)) {
+      return { error: 'Workflow node not found: Load Checkpoint' }
+    }
+  }
+
+  if (settings.selectedVae && settings.selectedVae !== '__embedded__') {
+    if (!setNodeVae(workflow, 'Load VAE', settings.selectedVae)) {
+      return { error: 'Workflow node not found: Load VAE' }
+    }
   }
 
   // Get effective model settings (includes scheduler)
@@ -460,42 +509,41 @@ function configureWorkflow(
 
   if (isInpainting) {
     // Inpainting workflow configuration (title-based)
-    setNodeSampler(workflow, 'KSampler (inpainting)', {
-      steps: settings.steps,
-      cfg: settings.cfgScale,
-      sampler_name: settings.sampler,
-      scheduler,
-      denoise: inpaintDenoiseStrength
-    })
+    if (
+      !setNodeSampler(workflow, 'KSampler (inpainting)', {
+        steps: settings.steps,
+        cfg: settings.cfgScale,
+        sampler_name: settings.sampler,
+        scheduler,
+        denoise: inpaintDenoiseStrength
+      })
+    ) {
+      return { error: 'Workflow node not found: KSampler (inpainting)' }
+    }
 
     // For inpainting, image size is determined by input image, not by EmptyLatentImage
   } else {
     // Regular workflow configuration
     // Apply settings values to workflow
-    setNodeSampler(workflow, 'BasicScheduler', { steps: settings.steps, scheduler })
-    setNodeSampler(workflow, 'SamplerCustom', { cfg: settings.cfgScale })
-    setNodeSampler(workflow, 'KSamplerSelect', { sampler_name: settings.sampler })
-    setNodeImageSize(workflow, 'Empty Latent Image', settings.imageWidth, settings.imageHeight)
-
-    // Ensure Upscale Checkpoint Loader has a valid checkpoint even if upscale is disabled
-    const effectiveModel2 = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
-    const upscaleSettings2 = effectiveModel2?.upscale || DEFAULT_UPSCALE_SETTINGS
-    const baseCkptNodeId = findNodeByTitle(workflow, 'Load Checkpoint')?.nodeId
-    const baseCkptName =
-      baseCkptNodeId && typeof workflow[baseCkptNodeId]?.inputs?.ckpt_name === 'string'
-        ? (workflow[baseCkptNodeId].inputs.ckpt_name as string)
-        : null
-    const resolvedUpscaleCkptAlways =
-      (upscaleSettings2.checkpoint && upscaleSettings2.checkpoint !== 'model.safetensors'
-        ? upscaleSettings2.checkpoint
-        : null) ||
-      promptsData.selectedCheckpoint ||
-      baseCkptName ||
-      upscaleSettings2.checkpoint
-    setNodeCheckpoint(workflow, 'Upscale Checkpoint Loader', resolvedUpscaleCkptAlways)
+    if (!setNodeSampler(workflow, 'BasicScheduler', { steps: settings.steps, scheduler })) {
+      return { error: 'Workflow node not found: BasicScheduler' }
+    }
+    if (!setNodeSampler(workflow, 'SamplerCustom', { cfg: settings.cfgScale })) {
+      return { error: 'Workflow node not found: SamplerCustom' }
+    }
+    if (!setNodeSampler(workflow, 'KSamplerSelect', { sampler_name: settings.sampler })) {
+      return { error: 'Workflow node not found: KSamplerSelect' }
+    }
+    if (
+      !setNodeImageSize(workflow, 'Empty Latent Image', settings.imageWidth, settings.imageHeight)
+    ) {
+      return { error: 'Workflow node not found: Empty Latent Image' }
+    }
 
     // Configure FaceDetailer scheduler (title-based)
-    setNodeSampler(workflow, 'FaceDetailer', { scheduler })
+    if (!setNodeSampler(workflow, 'FaceDetailer', { scheduler })) {
+      return { error: 'Workflow node not found: FaceDetailer' }
+    }
 
     // Configure optional features
     if (promptsData.useUpscale) {
@@ -505,44 +553,84 @@ function configureWorkflow(
         const effectiveModel = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
         const upscaleSettings = effectiveModel?.upscale || DEFAULT_UPSCALE_SETTINGS
 
-        // Configure LatentUpscale dimensions (use scale from settings)
-        const latentUpscale = findNodeByTitle(workflow, 'Latent Upscale')?.nodeId
-        if (latentUpscale && workflow[latentUpscale]) {
-          workflow[latentUpscale].inputs.width = Math.round(
+        // Validate upscale checkpoint is configured
+        if (!upscaleSettings.checkpoint || upscaleSettings.checkpoint === 'model.safetensors') {
+          return { error: 'Upscale checkpoint not configured in model settings' }
+        }
+
+        // Configure Upscale Image dimensions (use scale from settings)
+        const upscaleImage = findNodeByTitle(workflow, 'Upscale Image')?.nodeId
+        if (upscaleImage && workflow[upscaleImage]) {
+          workflow[upscaleImage].inputs.width = Math.round(
             settings.imageWidth * upscaleSettings.scale
           )
-          workflow[latentUpscale].inputs.height = Math.round(
+          workflow[upscaleImage].inputs.height = Math.round(
             settings.imageHeight * upscaleSettings.scale
           )
         }
 
-        // Configure upscale checkpoint (default to selected base model if unset/placeholder)
-        const resolvedUpscaleCkpt =
-          upscaleSettings.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors'
-            ? upscaleSettings.checkpoint
-            : promptsData.selectedCheckpoint || upscaleSettings.checkpoint
-        setNodeCheckpoint(workflow, 'Upscale Checkpoint Loader', resolvedUpscaleCkpt)
-
-        // Configure upscale VAE (if not using embedded)
-        if (upscaleSettings.selectedVae && upscaleSettings.selectedVae !== '__embedded__') {
-          // For regular workflow, we don't have separate VAE loader for upscale yet
-          // This would need additional implementation
+        // Configure upscale checkpoint
+        if (!setNodeCheckpoint(workflow, 'Upscale Checkpoint Loader', upscaleSettings.checkpoint)) {
+          return { error: 'Workflow node not found: Upscale Checkpoint Loader' }
         }
 
-        // Configure upscale KSampler
-        setNodeSampler(workflow, 'KSampler (Upscale)', {
-          steps: upscaleSettings.steps,
-          cfg: upscaleSettings.cfgScale,
-          sampler_name: upscaleSettings.sampler,
-          scheduler: upscaleSettings.scheduler,
-          denoise: upscaleSettings.denoise
-        })
+        // Configure upscale VAE nodes
+        const vaeEncodeNode = findNodeByTitle(workflow, 'VAE Encode (Tiled)')
+        if (!vaeEncodeNode) {
+          return { error: 'Workflow node not found: VAE Encode (Tiled)' }
+        }
 
-        // Change VAEDecode to use upscale KSampler output
+        const vaeDecodeNode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')
+        if (!vaeDecodeNode) {
+          return { error: 'Workflow node not found: VAE Decode (Tiled)' }
+        }
+
+        // Determine VAE source and connect to both encode and decode nodes
+        let vaeSourceNodeId: string
+        let vaeSourceOutputIndex: number
+
+        if (upscaleSettings.selectedVae && upscaleSettings.selectedVae !== '__embedded__') {
+          // Use external VAE loader
+          if (!setNodeVae(workflow, 'Load VAE (Upscale)', upscaleSettings.selectedVae)) {
+            return { error: 'Workflow node not found: Load VAE (Upscale)' }
+          }
+          const vaeLoaderNode = findNodeByTitle(workflow, 'Load VAE (Upscale)')
+          if (!vaeLoaderNode) {
+            return { error: 'Workflow node not found: Load VAE (Upscale)' }
+          }
+          vaeSourceNodeId = vaeLoaderNode.nodeId
+          vaeSourceOutputIndex = 0
+        } else {
+          // Use embedded VAE from checkpoint
+          const upscaleCkptNode = findNodeByTitle(workflow, 'Upscale Checkpoint Loader')
+          if (!upscaleCkptNode) {
+            return { error: 'Workflow node not found: Upscale Checkpoint Loader' }
+          }
+          vaeSourceNodeId = upscaleCkptNode.nodeId
+          vaeSourceOutputIndex = 2
+        }
+
+        // Connect VAE to both encode and decode nodes
+        workflow[vaeEncodeNode.nodeId].inputs.vae = [vaeSourceNodeId, vaeSourceOutputIndex]
+        workflow[vaeDecodeNode.nodeId].inputs.vae = [vaeSourceNodeId, vaeSourceOutputIndex]
+
+        // Configure upscale KSampler
+        if (
+          !setNodeSampler(workflow, 'KSampler (Upscale)', {
+            steps: upscaleSettings.steps,
+            cfg: upscaleSettings.cfgScale,
+            sampler_name: upscaleSettings.sampler,
+            scheduler: upscaleSettings.scheduler,
+            denoise: upscaleSettings.denoise
+          })
+        ) {
+          return { error: 'Workflow node not found: KSampler (Upscale)' }
+        }
+
+        // Connect KSampler output to VAE Decode
         const upscaleSampler = findNodeByTitle(workflow, 'KSampler (Upscale)')?.nodeId
-        const baseDecode = findNodeByTitle(workflow, 'VAE Decode')?.nodeId
-        if (upscaleSampler && baseDecode && workflow[baseDecode]) {
-          workflow[baseDecode].inputs.samples = [upscaleSampler, 0]
+        if (upscaleSampler && workflow[vaeDecodeNode.nodeId]) {
+          workflow[vaeDecodeNode.nodeId].inputs.samples = [upscaleSampler, 0]
         }
       }
     }
@@ -552,74 +640,66 @@ function configureWorkflow(
       const effectiveModel = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
       const faceDetailerSettings = effectiveModel?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
 
-      // Set FaceDetailer checkpoint model (default to selected base model if unset/placeholder)
-      if (findNodeByTitle(workflow, 'FaceDetailer Checkpoint Loader')?.nodeId) {
-        const resolvedFdCkpt =
-          faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
-            ? faceDetailerSettings.checkpoint
-            : promptsData.selectedCheckpoint || faceDetailerSettings.checkpoint
-        setNodeCheckpoint(workflow, 'FaceDetailer Checkpoint Loader', resolvedFdCkpt)
+      // Validate FaceDetailer checkpoint is configured
+      if (
+        !faceDetailerSettings.checkpoint ||
+        faceDetailerSettings.checkpoint === 'model.safetensors'
+      ) {
+        return { error: 'FaceDetailer checkpoint not configured in model settings' }
+      }
+
+      // Set FaceDetailer checkpoint model
+      if (
+        !setNodeCheckpoint(workflow, 'FaceDetailer Checkpoint Loader', faceDetailerSettings.checkpoint)
+      ) {
+        return { error: 'Workflow node not found: FaceDetailer Checkpoint Loader' }
       }
 
       // Configure FaceDetailer generation settings
-      if (findNodeByTitle(workflow, 'FaceDetailer')?.nodeId) {
-        setNodeSampler(workflow, 'FaceDetailer', {
+      if (
+        !setNodeSampler(workflow, 'FaceDetailer', {
           steps: faceDetailerSettings.steps,
           cfg: faceDetailerSettings.cfgScale,
           sampler_name: faceDetailerSettings.sampler,
           scheduler: faceDetailerSettings.scheduler,
           denoise: faceDetailerSettings.denoise
         })
+      ) {
+        return { error: 'Workflow node not found: FaceDetailer' }
+      }
 
-        // Configure VAE
-        if (faceDetailerSettings.selectedVae === '__embedded__') {
-          const fdCkpt = findNodeByTitle(workflow, 'FaceDetailer Checkpoint Loader')?.nodeId
-          const fdNode = findNodeByTitle(workflow, 'FaceDetailer')?.nodeId
-          if (fdCkpt && fdNode && workflow[fdNode]) workflow[fdNode].inputs.vae = [fdCkpt, 2]
+      // Configure VAE
+      const fdNodeEntry = findNodeByTitle(workflow, 'FaceDetailer')
+      const fdNodeId = fdNodeEntry?.nodeId
+      if (faceDetailerSettings.selectedVae === '__embedded__') {
+        const fdCkpt = findNodeByTitle(workflow, 'FaceDetailer Checkpoint Loader')?.nodeId
+        if (fdCkpt && fdNodeId && workflow[fdNodeId]) {
+          workflow[fdNodeId].inputs.vae = [fdCkpt, 2]
         }
+      } else {
+        const desiredVae = faceDetailerSettings.selectedVae
+        const fdVaeNode = findNodeByTitle(workflow, 'Load VAE (FaceDetailer)')
+        if (!fdNodeId || !fdVaeNode) {
+          return { error: 'Workflow node not found: Load VAE (FaceDetailer)' }
+        }
+        workflow[fdVaeNode.nodeId].inputs.vae_name = desiredVae
+        workflow[fdNodeId].inputs.vae = [fdVaeNode.nodeId, 0]
+      }
 
-        // Set FaceDetailer input image based on upscale usage
-        const fdNode = findNodeByTitle(workflow, 'FaceDetailer')?.nodeId
-        const upDecode = findNodeByTitle(workflow, 'VAE Decode (Upscale)')?.nodeId
+      // Set FaceDetailer input image based on upscale usage
+      if (fdNodeId && workflow[fdNodeId]) {
+        const upDecode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')?.nodeId
         const baseDecode = findNodeByTitle(workflow, 'VAE Decode')?.nodeId
-        if (fdNode && workflow[fdNode]) {
-          if (promptsData.useUpscale && upDecode) workflow[fdNode].inputs.image = [upDecode, 0]
-          else if (!promptsData.useUpscale && baseDecode)
-            workflow[fdNode].inputs.image = [baseDecode, 0]
+        if (promptsData.useUpscale && upDecode) {
+          workflow[fdNodeId].inputs.image = [upDecode, 0]
+        } else if (!promptsData.useUpscale && baseDecode) {
+          workflow[fdNodeId].inputs.image = [baseDecode, 0]
         }
       }
     }
   }
-}
 
-function applyCustomVae(workflow: ComfyUIWorkflow, vaeName: string) {
-  // Pick a unique node id for the injected VAELoader
-  const baseId = 'custom_vae_loader'
-  let vaeNodeId = baseId
-  if (workflow[vaeNodeId]) {
-    let i = 1
-    while (workflow[`${baseId}_${i}`]) i++
-    vaeNodeId = `${baseId}_${i}`
-  }
-
-  // Add VAELoader node
-  workflow[vaeNodeId] = {
-    inputs: {
-      vae_name: vaeName
-    },
-    class_type: 'VAELoader',
-    _meta: {
-      title: 'Load VAE'
-    }
-  }
-
-  // Rewire all inputs that reference a VAE to use the VAELoader output
-  for (const node of Object.values(workflow)) {
-    if (!node || !node.inputs) continue
-    if (Object.prototype.hasOwnProperty.call(node.inputs, 'vae')) {
-      node.inputs.vae = [vaeNodeId, 0]
-    }
-  }
+  return null
 }
 
 function applySeedsToWorkflow(
@@ -648,17 +728,32 @@ function addSaveImageWebsocketNode(
   workflow: ComfyUIWorkflow,
   promptsData: PromptsData,
   isInpainting: boolean = false
-) {
+): { error: string } | null {
   if (isInpainting) {
     // Inpainting workflow - check if FaceDetailer should be used
     let imageSourceNodeId: string
     if (promptsData.useFaceDetailer) {
-      // Composite FaceDetailer result with original
-      imageSourceNodeId =
-        findNodeByTitle(workflow, 'Composite FaceDetailer Result with Original')?.nodeId || '106'
+      // Use FaceDetailer output
+      const faceDetailerNode = findNodeByTitle(workflow, 'FaceDetailer')
+      if (!faceDetailerNode) {
+        return { error: 'Workflow node not found: FaceDetailer' }
+      }
+      imageSourceNodeId = faceDetailerNode.nodeId
     } else {
       // Use VAE Decode output directly from LatentCompositeMasked path
-      imageSourceNodeId = findNodeByTitle(workflow, 'VAE Decode for FaceDetailer')?.nodeId || '102'
+      if (promptsData.useUpscale) {
+        const vaeDecode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')
+        if (!vaeDecode) {
+          return { error: 'Workflow node not found: VAE Decode (Tiled)' }
+        }
+        imageSourceNodeId = vaeDecode.nodeId
+      } else {
+        const vaeDecode = findNodeByTitle(workflow, 'VAE Decode')
+        if (!vaeDecode) {
+          return { error: 'Workflow node not found: VAE Decode' }
+        }
+        imageSourceNodeId = vaeDecode.nodeId
+      }
     }
 
     workflow[FINAL_SAVE_NODE_ID] = {
@@ -666,7 +761,7 @@ function addSaveImageWebsocketNode(
       class_type: 'SaveImageWebsocket',
       _meta: { title: 'Final Save Image Websocket' }
     }
-    return
+    return null
   }
 
   // Determine which node to use as image source based on upscale and face detailer settings
@@ -674,16 +769,32 @@ function addSaveImageWebsocketNode(
 
   if (promptsData.useUpscale) {
     if (promptsData.useFaceDetailer) {
-      imageSourceNodeId = findNodeByTitle(workflow, 'FaceDetailer')?.nodeId || '69'
+      const faceDetailerNode = findNodeByTitle(workflow, 'FaceDetailer')
+      if (!faceDetailerNode) {
+        return { error: 'Workflow node not found: FaceDetailer' }
+      }
+      imageSourceNodeId = faceDetailerNode.nodeId
     } else {
-      imageSourceNodeId = findNodeByTitle(workflow, 'VAE Decode (Upscale)')?.nodeId || '126'
+      const vaeDecode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')
+      if (!vaeDecode) {
+        return { error: 'Workflow node not found: VAE Decode (Tiled)' }
+      }
+      imageSourceNodeId = vaeDecode.nodeId
     }
   } else {
-    imageSourceNodeId =
-      (promptsData.useFaceDetailer
-        ? findNodeByTitle(workflow, 'FaceDetailer')?.nodeId
-        : findNodeByTitle(workflow, 'VAE Decode')?.nodeId) ||
-      (promptsData.useFaceDetailer ? '69' : '19')
+    if (promptsData.useFaceDetailer) {
+      const faceDetailerNode = findNodeByTitle(workflow, 'FaceDetailer')
+      if (!faceDetailerNode) {
+        return { error: 'Workflow node not found: FaceDetailer' }
+      }
+      imageSourceNodeId = faceDetailerNode.nodeId
+    } else {
+      const vaeDecode = findNodeByTitle(workflow, 'VAE Decode')
+      if (!vaeDecode) {
+        return { error: 'Workflow node not found: VAE Decode' }
+      }
+      imageSourceNodeId = vaeDecode.nodeId
+    }
   }
 
   // Add the single, dynamically configured SaveImageWebsocket node
@@ -692,4 +803,6 @@ function addSaveImageWebsocketNode(
     class_type: 'SaveImageWebsocket',
     _meta: { title: 'Final Save Image Websocket' }
   }
+
+  return null
 }

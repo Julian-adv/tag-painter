@@ -136,7 +136,7 @@ Tag Painter는 Chroma 워크플로를 구성할 때 노드의 `_meta.title`(대�
   - 메인 모델 로더 — 메인 경로에 `UNETLoader` 노드가 있어야 합니다. 첫 번째 `UNETLoader`의 `unet_name`을 선택한 체크포인트로 설정합니다.
 
 - 선택(페이스 디테일러)
-  - `FaceDetailer` — FD 본체 노드. 시드/스텝/CFG/샘플러/스케줄러/디노이즈를 적용합니다. 입력 이미지(`image`)는 업스케일 사용 시 `VAE Decode (Upscale)`에서, 아니면 `VAE Decode (Base)`에서 가져옵니다. 또한 `wildcard` 입력에는 존 1/존 2 프롬프트를 결합해 전달합니다.
+  - `FaceDetailer` — FD 본체 노드. 시드/스텝/CFG/샘플러/스케줄러/디노이즈를 적용합니다. 입력 이미지(`image`)는 업스케일 사용 시 `VAE Decode (Tiled)`에서, 아니면 `VAE Decode (Base)`에서 가져옵니다. 또한 `wildcard` 입력에는 존 1/존 2 프롬프트를 결합해 전달합니다.
   - `Load Checkpoint` — FD용 체크포인트 로더. 모델(0)/CLIP(1)/VAE(2)를 `FaceDetailer`에 제공합니다.
   - `Load VAE` — FD에서 임베디드 VAE를 사용하지 않을 때 쓰는 VAELoader. `vae_name`을 설정에서 적용합니다.
   - `Upscale CLIP Text Encode (Positive)` — FD/업스케일 분기에서 사용하는 긍정 텍스트 인코더.
@@ -148,7 +148,7 @@ Tag Painter는 Chroma 워크플로를 구성할 때 노드의 `_meta.title`(대�
   - `KSampler (Upscale)` — 스텝/CFG/샘플러/스케줄러/디노이즈를 적용합니다.
   - `Upscale CLIP Text Encode (Positive)` — 업스케일 분기의 긍정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
   - `Upscale CLIP Text Encode (Negative)` — 업스케일 분기의 부정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
-  - `VAE Decode (Upscale)` — 업스케일 분기의 최종 디코드(업스케일 사용 시 출력 소스로 사용됨).
+  - `VAE Decode (Tiled)` — 업스케일 분기의 최종 디코드(업스케일 사용 시 출력 소스로 사용됨).
 
 동작 및 참고 사항:
 
@@ -177,7 +177,7 @@ Qwen 모델용 워크플로도 노드의 `_meta.title`(부분 일치, 대소문�
     - `FaceDetailer` — FD 본체 노드. 시드/스텝/CFG/샘플러/스케줄러/디노이즈를 적용합니다.
     - `FaceDetailer CLIP Text Encode (Positive)` — FD 긍정 프롬프트(텍스트와 CLIP 입력 연결).
     - `FaceDetailer CLIP Text Encode (Negative)` — FD 부정 프롬프트(텍스트와 CLIP 입력 연결).
-    - 입력 이미지 연결: 업스케일 사용 시 `Upscale VAE Decode`, 아니면 베이스 `VAE Decode`.
+    - 입력 이미지 연결: 업스케일 사용 시 `VAE Decode (Tiled)`, 아니면 베이스 `VAE Decode`.
   - Qwen FD 경로:
     - `FaceDetailer UNet Loader (Qwen)` — FD용 UNETLoader. 체크포인트를 설정합니다.
     - `FaceDetailer Model Sampling Aura Flow (Qwen)` — FD용 모델 샘플링 래퍼. `FaceDetailer`의 model 입력에 연결됩니다.
@@ -198,13 +198,13 @@ Qwen 모델용 워크플로도 노드의 `_meta.title`(부분 일치, 대소문�
     - `Upscale VAE Loader (Qwen)` — 업스케일용 VAE 로더. 이름을 설정하며 인코드/디코드 모두에서 사용합니다.
     - `Upscale CLIP Text Encode (Positive)` — 업스케일 긍정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
     - `Upscale CLIP Text Encode (Negative)` — 업스케일 부정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
-    - `Upscale VAE Decode` — 업스케일 분기의 최종 디코드 노드.
+    - `VAE Decode (Tiled)` — 업스케일 분기의 최종 디코드 노드.
   - SDXL 업스케일 경로:
     - `Upscale Checkpoint Loader (SDXL)` — 업스케일 경로에 model(0)/clip(1)/vae(2)를 제공합니다.
     - `Upscale VAE Loader (SDXL)` — 체크포인트 임베디드 VAE를 사용하지 않을 때 쓰는 외부 VAE 로더.
     - `Upscale CLIP Text Encode (Positive)` — 업스케일 긍정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
     - `Upscale CLIP Text Encode (Negative)` — 업스케일 부정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
-    - `Upscale VAE Decode` — 업스케일 분기의 최종 디코드 노드.
+    - `VAE Decode (Tiled)` — 업스케일 분기의 최종 디코드 노드.
 
 동작 및 참고 사항:
 

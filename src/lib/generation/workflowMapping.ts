@@ -237,3 +237,17 @@ export function findMissingNodeTitles(workflow: ComfyUIWorkflow, titles: string[
   }
   return missing
 }
+
+/**
+ * Delete all nodes matching a title pattern
+ */
+export function deleteNodesByTitlePattern(
+  workflow: ComfyUIWorkflow,
+  titlePattern: string
+): number {
+  const nodesToDelete = findNodesByTitle(workflow, titlePattern)
+  for (const node of nodesToDelete) {
+    delete workflow[node.nodeId]
+  }
+  return nodesToDelete.length
+}

@@ -140,7 +140,7 @@ Tag Painter applies parameters to Chroma workflows by matching node `_meta.title
   - Main model loader — have a `UNETLoader` in the main path. Tag Painter sets `unet_name` on the first `UNETLoader` (by class type).
 
 - Optional (FaceDetailer)
-  - `FaceDetailer` — main FD node. Seed/steps/CFG/sampler/scheduler/denoise are applied. Its `image` input is wired from `VAE Decode (Upscale)` when upscaling, otherwise from `VAE Decode (Base)`. The `wildcard` input receives a combined Zone 1/Zone 2 prompt.
+  - `FaceDetailer` — main FD node. Seed/steps/CFG/sampler/scheduler/denoise are applied. Its `image` input is wired from `VAE Decode (Tiled)` when upscaling, otherwise from `VAE Decode (Base)`. The `wildcard` input receives a combined Zone 1/Zone 2 prompt.
   - `Load Checkpoint` — checkpoint loader used by FaceDetailer. Provides model(0), clip(1), vae(2) to FD when you use an SDXL path for FD.
   - `Load VAE` — VAELoader used when not using embedded VAE for FD; its `vae_name` is applied from settings.
   - `Upscale CLIP Text Encode (Positive)` — positive text encoder used by FD/upscale branches.
@@ -152,7 +152,7 @@ Tag Painter applies parameters to Chroma workflows by matching node `_meta.title
   - `KSampler (Upscale)` — steps/CFG/sampler/scheduler/denoise are applied; the model input remains as defined in your workflow.
   - `Upscale CLIP Text Encode (Positive)` — upscale positive prompt; text and CLIP input are set.
   - `Upscale CLIP Text Encode (Negative)` — upscale negative prompt; text and CLIP input are set.
-  - `VAE Decode (Upscale)` — final decode for the upscale branch (used as the image source when upscaling is enabled).
+  - `VAE Decode (Tiled)` — final decode for the upscale branch (used as the image source when upscaling is enabled).
 
 Behavior and notes:
 
@@ -181,7 +181,7 @@ Tag Painter resolves Qwen workflows by matching the `_meta.title` of nodes (subs
     - `FaceDetailer` — main FD node. Seed/steps/CFG/sampler/scheduler/denoise are applied.
     - `FaceDetailer CLIP Text Encode (Positive)` — FD positive prompt (text and CLIP input are set).
     - `FaceDetailer CLIP Text Encode (Negative)` — FD negative prompt (text and CLIP input are set).
-    - Input image is wired from `Upscale VAE Decode` if upscaling is enabled, otherwise from base `VAE Decode`.
+    - Input image is wired from `VAE Decode (Tiled)` if upscaling is enabled, otherwise from base `VAE Decode`.
   - Qwen FD path:
     - `FaceDetailer UNet Loader (Qwen)` — UNETLoader for FD; checkpoint set from settings/selection.
     - `FaceDetailer Model Sampling Aura Flow (Qwen)` — model sampling wrapper for FD (wired to FD model).
@@ -202,13 +202,13 @@ Tag Painter resolves Qwen workflows by matching the `_meta.title` of nodes (subs
     - `Upscale VAE Loader (Qwen)` — VAELoader; name set and used for both encode/decode.
     - `Upscale CLIP Text Encode (Positive)` — upscale positive text; CLIP input is set.
     - `Upscale CLIP Text Encode (Negative)` — upscale negative text; CLIP input is set.
-    - `Upscale VAE Decode` — final decode for the upscale branch.
+    - `VAE Decode (Tiled)` — final decode for the upscale branch.
   - SDXL upscale path:
     - `Upscale Checkpoint Loader (SDXL)` — provides model(0), clip(1), vae(2) to the upscale branch.
     - `Upscale VAE Loader (SDXL)` — used when not using embedded VAE from the checkpoint.
     - `Upscale CLIP Text Encode (Positive)` — upscale positive text; CLIP set from checkpoint.
     - `Upscale CLIP Text Encode (Negative)` — upscale negative text; CLIP set from checkpoint.
-    - `Upscale VAE Decode` — final decode for the upscale branch.
+    - `VAE Decode (Tiled)` — final decode for the upscale branch.
 
 Behavior and notes:
 
