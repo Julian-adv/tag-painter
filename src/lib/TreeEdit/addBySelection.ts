@@ -1,5 +1,12 @@
 import type { ArrayNode, LeafNode, TreeModel } from './model'
-import { addChild, convertLeafToArray, isContainer, uid, rebuildPathSymbols } from './model'
+import {
+  addChild,
+  convertLeafToArray,
+  isContainer,
+  uid,
+  rebuildPathSymbols,
+  normalizeArrayOrdering
+} from './model'
 
 export type AutoEditBehavior = 'selectAll' | 'caretEnd'
 
@@ -59,6 +66,7 @@ export function addBySelectionAction(
     addChild(model, arrayNode.id, firstItem)
 
     expandAncestors(model, arrayNode.id)
+    normalizeArrayOrdering(model)
     rebuildPathSymbols(model)
 
     return {
@@ -108,6 +116,7 @@ export function addBySelectionAction(
     addChild(model, arrayNode.id, firstItem)
 
     expandAncestors(model, arrayNode.id)
+    normalizeArrayOrdering(model)
     rebuildPathSymbols(model)
 
     return {
@@ -131,6 +140,7 @@ export function addBySelectionAction(
   addChild(model, targetId, child)
 
   expandAncestors(model, child.id)
+  normalizeArrayOrdering(model)
   rebuildPathSymbols(model)
 
   return {

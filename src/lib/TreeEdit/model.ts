@@ -201,3 +201,31 @@ export function rebuildPathSymbols(model: TreeModel): void {
   dfs(model.rootId, '')
   model.pathSymbols = map
 }
+
+export function normalizeArrayOrdering(model: TreeModel): boolean {
+  let changed = false
+  const stack: NodeId[] = [model.rootId]
+  while (stack.length) {
+    const currentId = stack.pop()!
+    const node = model.nodes[currentId]
+    if (!node) continue
+    if (node.kind === 'array') {
+      const children = node.children
+      for (let i = 0; i < children.length; i++) {
+        const childId = children[i]
+        const child = model.nodes[childId]
+        const expectedName = String(i)
+        if (child && child.name !== expectedName) {
+          child.name = expectedName
+          changed = true
+        }
+      }
+    }
+    if (isContainer(node)) {
+      for (const childId of node.children) {
+        stack.push(childId)
+      }
+    }
+  }
+  return changed
+}

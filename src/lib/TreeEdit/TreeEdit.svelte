@@ -7,7 +7,15 @@
   import { getNextSelectionId, findNearestVisibleAncestorId } from './nav'
   import type { TreeModel, LeafNode, ArrayNode, ObjectNode, AnyNode } from './model'
   import { fromYAML, toYAML } from './yaml-io'
-  import { addChild, isContainer, uid, removeNode, moveChild, rebuildPathSymbols } from './model'
+  import {
+    addChild,
+    isContainer,
+    uid,
+    removeNode,
+    moveChild,
+    rebuildPathSymbols,
+    normalizeArrayOrdering
+  } from './model'
   import {
     groupSelectedNodes,
     expandAll,
@@ -132,6 +140,8 @@
       appendedIndex,
       Math.min(insertIndex, (parent as ObjectNode | ArrayNode).children.length - 1)
     )
+    normalizeArrayOrdering(model)
+    rebuildPathSymbols(model)
     setAutoEditChildId(newId)
     selectedIds = [newId]
     lastSelectedId = newId
@@ -304,7 +314,10 @@
   }
 
   function handleTreeMutate(structural: boolean) {
-    if (structural) rebuildPathSymbols(model)
+    if (structural) {
+      normalizeArrayOrdering(model)
+      rebuildPathSymbols(model)
+    }
     hasUnsavedChanges = true
   }
 
@@ -484,6 +497,7 @@
 
     // Perform deletion
     for (const id of validIds) removeNode(model, id)
+    normalizeArrayOrdering(model)
     rebuildPathSymbols(model)
 
     if (uniqueNext.length > 0) {
@@ -524,6 +538,8 @@
         const appendedIndex = children.length - 1
         const [moved] = children.splice(appendedIndex, 1)
         children.splice(0, 0, moved)
+        normalizeArrayOrdering(model)
+        rebuildPathSymbols(model)
         hasUnsavedChanges = true
       }
       return
@@ -532,6 +548,8 @@
     if (isConsistentRandomArray(model, selectedIds[0])) {
       const firstId = n.children[0]
       removeNode(model, firstId)
+      normalizeArrayOrdering(model)
+      rebuildPathSymbols(model)
       hasUnsavedChanges = true
     }
   }
@@ -543,6 +561,7 @@
       return
     }
 
+    normalizeArrayOrdering(model)
     rebuildPathSymbols(model)
     hasUnsavedChanges = true
     selectedIds = result.newGroupId ? [result.newGroupId] : []
@@ -570,6 +589,7 @@
     autoEditChildId = newRootId
     selectedIds = [newRootId]
     lastSelectedId = newRootId
+    normalizeArrayOrdering(model)
     rebuildPathSymbols(model)
     hasUnsavedChanges = true
   }
