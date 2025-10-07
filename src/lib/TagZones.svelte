@@ -150,7 +150,7 @@
   }
 
   async function refreshSelectedTags() {
-    await loadTagsFromWildcards(currentWildcardsFile, { reroll: true, skipRefresh: true })
+    await loadTagsFromWildcards(currentWildcardsFile, { skipRefresh: true })
   }
 
   async function openTreeEditDialog() {
