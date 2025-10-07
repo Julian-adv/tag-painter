@@ -2,11 +2,101 @@
 import { refreshWildcardsFromServer, getWildcardModel } from '../stores/tagsStore'
 import { saveWildcardsText } from '../api/wildcards'
 import { toYAML } from '../TreeEdit/yaml-io'
+import { parseWeightDirective } from './tagExpansion'
+import { getWeightedRandomIndex } from './random'
+
+type ZoneName = 'all' | 'zone1' | 'zone2' | 'negative' | 'inpainting'
+
+const ZONE_NAMES: ZoneName[] = ['all', 'zone1', 'zone2', 'negative', 'inpainting']
+
+type ZoneSelectionState = { index: number }
+
+const zoneSelectionState = new Map<ZoneName, ZoneSelectionState>()
+
+function getStoredSelection(zone: ZoneName): number | undefined {
+  const entry = zoneSelectionState.get(zone)
+  return entry?.index
+}
+
+function storeSelection(zone: ZoneName, index: number) {
+  zoneSelectionState.set(zone, { index })
+}
+
+function clearSelection(zone: ZoneName) {
+  zoneSelectionState.delete(zone)
+}
+
+function selectRandomChildIndex(
+  children: string[] | undefined,
+  nodes: Record<string, { kind: string; value?: unknown }>
+): number | null {
+  if (!children || children.length === 0) {
+    return null
+  }
+
+  const options: { index: number; weight: number }[] = []
+
+  for (let i = 0; i < children.length; i++) {
+    const childNode = nodes[children[i]]
+    if (!childNode || childNode.kind !== 'leaf') continue
+
+    const value = childNode.value
+    const asString =
+      typeof value === 'string'
+        ? value
+        : value !== null && value !== undefined
+          ? String(value)
+          : ''
+    const weight = parseWeightDirective(asString)
+
+    options.push({ index: i, weight })
+  }
+
+  if (options.length === 0) {
+    return null
+  }
+
+  const selected = getWeightedRandomIndex(options)
+  const chosen = options[selected]
+  return chosen ? chosen.index : null
+}
+
+function resolveChildValue(
+  nodes: Record<string, { kind: string; value?: unknown }>,
+  children: string[],
+  index: number
+): string | null {
+  if (index < 0 || index >= children.length) {
+    return null
+  }
+
+  const childNode = nodes[children[index]]
+
+  if (!childNode || childNode.kind !== 'leaf') {
+    return null
+  }
+
+  const value = childNode.value
+
+  if (typeof value !== 'string') {
+    return value !== null && value !== undefined ? String(value) : null
+  }
+
+  const trimmed = value.trim()
+  return trimmed || ''
+}
+
+export function getZoneSelectionIndex(zone: ZoneName): number | undefined {
+  return getStoredSelection(zone)
+}
 
 /**
  * Read zone data from the current wildcard model
  */
-export async function readWildcardZones(filename?: string): Promise<{
+export async function readWildcardZones(
+  filename?: string,
+  options?: { reroll?: boolean; skipRefresh?: boolean }
+): Promise<{
   all: string
   zone1: string
   zone2: string
@@ -14,29 +104,52 @@ export async function readWildcardZones(filename?: string): Promise<{
   inpainting: string
 }> {
   // Always refresh wildcard data to ensure we have the correct file
-  await refreshWildcardsFromServer(filename)
+  const skipRefresh = options?.skipRefresh ?? false
+  if (!skipRefresh) {
+    await refreshWildcardsFromServer(filename)
+  }
 
   const wildcardModel = getWildcardModel()
+  const shouldReroll = options?.reroll ?? false
+  const nodes = wildcardModel.nodes
 
-  const extractZoneData = (zoneName: string): string => {
+  const extractZoneData = (zoneName: ZoneName): string => {
     // Find the zone node
     const symId = wildcardModel.symbols[zoneName]
     const node = symId ? wildcardModel.nodes[symId] : undefined
 
     if (!node || node.kind !== 'array' || !node.children || node.children.length === 0) {
+      clearSelection(zoneName)
       return ''
     }
 
-    // Get first child (array element)
-    const firstChildId = node.children[0]
-    const firstChild = wildcardModel.nodes[firstChildId]
+    let selectedIndex = getStoredSelection(zoneName)
+    const existingValue =
+      typeof selectedIndex === 'number'
+        ? resolveChildValue(nodes, node.children, selectedIndex)
+        : null
 
-    if (!firstChild || firstChild.kind !== 'leaf' || typeof firstChild.value !== 'string') {
+    if (!shouldReroll && existingValue !== null) {
+      return existingValue
+    }
+
+    const chosenIndex = selectRandomChildIndex(node.children, nodes)
+
+    if (chosenIndex === null) {
+      clearSelection(zoneName)
       return ''
     }
 
-    const value = firstChild.value.trim()
-    return value || ''
+    storeSelection(zoneName, chosenIndex)
+
+    const value = resolveChildValue(nodes, node.children, chosenIndex)
+
+    if (value === null) {
+      clearSelection(zoneName)
+      return ''
+    }
+
+    return value
   }
 
   const result = {
@@ -72,15 +185,13 @@ export async function writeWildcardZones(
     const updatedModel = { ...wildcardModel }
     const updatedNodes = { ...updatedModel.nodes }
 
-    const updateZone = (zoneName: string, tagsText: string) => {
+    const updateZone = (zoneName: ZoneName, tagsText: string) => {
       const joinedTags = tagsText
 
-      // Find or create the zone array node
       let zoneSymId = updatedModel.symbols[zoneName]
       let zoneNode = zoneSymId ? updatedNodes[zoneSymId] : undefined
 
       if (!zoneNode || zoneNode.kind !== 'array') {
-        // Create new array node
         const newZoneNodeId = `array_${zoneName}_${Date.now()}`
         zoneNode = {
           id: newZoneNodeId,
@@ -92,40 +203,54 @@ export async function writeWildcardZones(
         updatedNodes[newZoneNodeId] = zoneNode
         updatedModel.symbols[zoneName] = newZoneNodeId
 
-        // Add to root children
         const rootNode = updatedNodes['root']
         if (rootNode && rootNode.kind === 'object') {
           rootNode.children = [...(rootNode.children || []), newZoneNodeId]
         }
       }
 
-      // Find or create the first child leaf node
-      let firstChildId = zoneNode.children?.[0]
-      let firstChild = firstChildId ? updatedNodes[firstChildId] : undefined
+      zoneNode.children ||= []
 
-      if (!firstChild || firstChild.kind !== 'leaf') {
-        // Create new leaf node
-        const newLeafId = `leaf_${zoneName}_0_${Date.now()}`
-        firstChild = {
+      let selectedIndex = getStoredSelection(zoneName)
+
+      if (typeof selectedIndex !== 'number' || selectedIndex < 0) {
+        selectedIndex = 0
+      }
+
+      if (selectedIndex >= zoneNode.children.length) {
+        selectedIndex = zoneNode.children.length === 0 ? 0 : zoneNode.children.length - 1
+      }
+
+      const existingChildId = zoneNode.children[selectedIndex]
+      let childNode = existingChildId ? updatedNodes[existingChildId] : undefined
+
+      if (!childNode || childNode.kind !== 'leaf') {
+        const newLeafId = `leaf_${zoneName}_${selectedIndex}_${Date.now()}`
+        childNode = {
           id: newLeafId,
-          name: '0',
+          name: String(selectedIndex),
           kind: 'leaf',
           parentId: zoneNode.id,
           value: joinedTags
         }
-        updatedNodes[newLeafId] = firstChild
-        zoneNode.children = [newLeafId, ...(zoneNode.children?.slice(1) || [])]
+        updatedNodes[newLeafId] = childNode
+        const updatedChildren = [...zoneNode.children]
+        if (selectedIndex >= updatedChildren.length) {
+          updatedChildren.push(newLeafId)
+        } else {
+          updatedChildren[selectedIndex] = newLeafId
+        }
+        zoneNode.children = updatedChildren
       } else {
-        // Update existing leaf value
-        firstChild.value = joinedTags
+        childNode.value = joinedTags
       }
+
+      storeSelection(zoneName, selectedIndex)
     }
 
-    updateZone('all', zones.all)
-    updateZone('zone1', zones.zone1)
-    updateZone('zone2', zones.zone2)
-    updateZone('negative', zones.negative)
-    updateZone('inpainting', zones.inpainting)
+    for (const zoneName of ZONE_NAMES) {
+      updateZone(zoneName, zones[zoneName])
+    }
 
     // Update the model
     updatedModel.nodes = updatedNodes

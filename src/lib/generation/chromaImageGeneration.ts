@@ -95,7 +95,10 @@ export async function generateChromaImage(
     // Read wildcard zones for chroma model
     let wildcardZones
     try {
-      wildcardZones = await readWildcardZones(modelSettings?.wildcardsFile)
+      wildcardZones = await readWildcardZones(modelSettings?.wildcardsFile, {
+        reroll: true,
+        skipRefresh: true
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load wildcards file'
       return { error: message }

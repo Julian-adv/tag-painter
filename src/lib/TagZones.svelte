@@ -32,9 +32,6 @@
     onOpenSettings
   }: Props = $props()
 
-  // Expose saveTagsImmediately function for parent component to call
-  export { saveTagsImmediately }
-
   let allTags = $state<string>('')
   let firstZoneTags = $state<string>('')
   let secondZoneTags = $state<string>('')
@@ -75,7 +72,7 @@
     if (signature !== lastModelSignature || !hasLoadedTags) {
       lastModelSignature = signature
       hasLoadedTags = true
-      void loadTagsFromWildcards(currentWildcardsFile)
+      void loadTagsFromWildcards(currentWildcardsFile, { reroll: true })
     }
   })
 
@@ -83,15 +80,21 @@
   // Loading happens in $effect when isQwenModel is properly determined
 
   // Load tags from wildcard zones
-  async function loadTagsFromWildcards(filenameOverride?: string) {
+  async function loadTagsFromWildcards(
+    filenameOverride?: string,
+    options?: { reroll?: boolean; skipRefresh?: boolean }
+  ) {
     const targetFile = filenameOverride ?? currentWildcardsFile
+    const shouldReroll = options?.reroll ?? false
+    const skipRefresh = options?.skipRefresh ?? false
     try {
-      const zones = await readWildcardZones(targetFile)
+      const zones = await readWildcardZones(targetFile, { reroll: shouldReroll, skipRefresh })
       allTags = zones.all
       firstZoneTags = zones.zone1
       secondZoneTags = zones.zone2
       negativeTags = zones.negative
       inpaintingTags = zones.inpainting
+      wildcardsRefreshToken += 1
     } catch (error) {
       // If wildcards file doesn't exist, start with empty zones
       // Error will be shown as toast when user tries to generate image
@@ -146,6 +149,10 @@
     await saveTags()
   }
 
+  async function refreshSelectedTags() {
+    await loadTagsFromWildcards(currentWildcardsFile, { reroll: true, skipRefresh: true })
+  }
+
   async function openTreeEditDialog() {
     // Save any pending changes before opening dialog
     await saveTagsImmediately()
@@ -155,7 +162,6 @@
   async function handleWildcardsSaved() {
     try {
       await loadTagsFromWildcards(currentModelType)
-      wildcardsRefreshToken += 1
     } catch (error) {
       console.error('Failed to reload wildcard zones after save:', error)
     }
@@ -190,6 +196,9 @@
   function clearAllPins() {
     clearAllPinsStore()
   }
+
+  // Expose functions for parent component to call
+  export { saveTagsImmediately, refreshSelectedTags }
 </script>
 
 <div class="flex h-full w-full flex-shrink-1 flex-col">

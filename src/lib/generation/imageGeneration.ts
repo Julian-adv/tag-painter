@@ -146,7 +146,10 @@ export async function generateImage(options: GenerationOptions): Promise<{
     // Read wildcard zones instead of using promptsData.tags
     let wildcardZones
     try {
-      wildcardZones = await readWildcardZones(modelSettings?.wildcardsFile)
+      wildcardZones = await readWildcardZones(modelSettings?.wildcardsFile, {
+        reroll: true,
+        skipRefresh: true
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load wildcards file'
       return { error: message }

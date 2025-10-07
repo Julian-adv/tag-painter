@@ -142,7 +142,10 @@ export async function generateQwenImage(
     // Read wildcard zones for Qwen model
     let wildcardZones
     try {
-      wildcardZones = await readWildcardZones(modelSettings?.wildcardsFile)
+      wildcardZones = await readWildcardZones(modelSettings?.wildcardsFile, {
+        reroll: true,
+        skipRefresh: true
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load wildcards file'
       return { error: message }

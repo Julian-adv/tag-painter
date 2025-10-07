@@ -16,6 +16,7 @@ import {
   getCachedWildcardLines,
   getCachedWildcardYamlTree
 } from './wildcards'
+import { getSecureRandomIndex, getWeightedRandomIndex } from './random'
 
 // Core context and helpers extracted for clarity
 type DisabledContext = { names: Set<string>; patterns: string[] }
@@ -760,47 +761,6 @@ function getOptionWeight(ctx: TagExpansionCtx, childNode: AnyNode): number {
     return parseWeightDirective(String(childNode.value))
   }
   return DEFAULT_ARRAY_WEIGHT
-}
-
-/**
- * Perform weighted random selection from array options
- */
-function getWeightedRandomIndex<T extends { weight: number }>(options: T[]): number {
-  if (options.length === 0) return 0
-  if (options.length === 1) return 0
-
-  // Calculate total weight
-  const totalWeight = options.reduce((sum, option) => sum + option.weight, 0)
-  if (totalWeight <= 0) {
-    // Fallback to uniform random if all weights are zero
-    return getSecureRandomIndex(options.length)
-  }
-
-  // Generate random number between 0 and totalWeight
-  const array = new Uint32Array(1)
-  crypto.getRandomValues(array)
-  const random = (array[0] / 0xffffffff) * totalWeight
-
-  // Find the selected option
-  let accumulator = 0
-  for (let i = 0; i < options.length; i++) {
-    accumulator += options[i].weight
-    if (random <= accumulator) {
-      return i
-    }
-  }
-
-  // Fallback (should not happen with proper weights)
-  return options.length - 1
-}
-
-/**
- * Generate a cryptographically secure random number for better randomness
- */
-function getSecureRandomIndex(max: number): number {
-  const array = new Uint32Array(1)
-  crypto.getRandomValues(array)
-  return array[0] % max
 }
 
 /**

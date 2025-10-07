@@ -69,7 +69,11 @@
     inpainting: {}
   })
   let disabledZones = $state<Set<string>>(new Set())
-  let tagZonesRef: { saveTagsImmediately: () => Promise<void> } | undefined = $state()
+  type TagZonesHandle = {
+    saveTagsImmediately: () => Promise<void>
+    refreshSelectedTags: () => Promise<void>
+  }
+  let tagZonesRef: TagZonesHandle | undefined = $state()
 
   // Toasts component ref for showing messages
   let toastsRef = $state<any>()
@@ -302,6 +306,9 @@
       lastSeed = result.seed!
       currentRandomTagResolutions = result.randomTagResolutions!
       disabledZones = result.disabledZones!
+      if (tagZonesRef) {
+        await tagZonesRef.refreshSelectedTags()
+      }
     }
   }
 
@@ -411,6 +418,9 @@
       lastSeed = result.seed!
       currentRandomTagResolutions = result.randomTagResolutions!
       disabledZones = result.disabledZones!
+      if (tagZonesRef) {
+        await tagZonesRef.refreshSelectedTags()
+      }
     }
   }
 
