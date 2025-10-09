@@ -23,12 +23,12 @@
   let editor: HTMLDivElement
 
   // === 패턴 정규식 ===
-  // __abc__  → 보라색 단일 태그 (내부에 언더스코어 허용, 쉼표 불허)
-  const entityRe = /__([^_\s,](?:(?!__|,).)*?)__/g
+  // __abc__  → 보라색 단일 태그 (내부에 언더스코어 허용, 쉼표/공백 불허, 뒤에 구분자 필요)
+  const entityRe = /__([^_\s,](?:(?!__|,|\s).)*?[^_\s,])__(?=[\s,.]|$)/g
   // {aaa|bbb|ccc} → 초록색 칸분할 태그
   const choiceRe = /\{([^{}]+)\}/g
   // 하나로 합친 스캐너 (순서 중요: 겹침 방지)
-  const masterRe = /__([^_\s,](?:(?!__|,).)*?)__|\{([^{}]+)\}/g
+  const masterRe = /__([^_\s,](?:(?!__|,|\s).)*?[^_\s,])__(?=[\s,.]|$)|\{([^{}]+)\}/g
 
   // === API: 내부 텍스트 직렬화 ===
   // 예: "abc __def__ {x|y}"
@@ -71,7 +71,37 @@
     span.contentEditable = 'false'
     span.dataset.type = 'entity'
     span.dataset.value = name
-    span.textContent = name
+
+    // Create chip-name (editable display name)
+    const chipName = document.createElement('span')
+    chipName.className = 'chip-name'
+    chipName.contentEditable = 'true'
+    chipName.textContent = name
+    chipName.dataset.originalName = name
+
+    // Create chip-body (contains hidden name + resolution)
+    const chipBody = document.createElement('span')
+    chipBody.className = 'chip-body'
+
+    // Hidden name for layout
+    const chipNameHidden = document.createElement('span')
+    chipNameHidden.className = 'chip-name-hidden'
+    chipNameHidden.setAttribute('aria-hidden', 'true')
+    chipNameHidden.textContent = name
+    chipBody.appendChild(chipNameHidden)
+
+    // Resolution text (if available)
+    const resolution = currentRandomTagResolutions?.[name]
+    if (resolution) {
+      const chipResolution = document.createElement('span')
+      chipResolution.className = 'chip-resolution'
+      chipResolution.textContent = resolution
+      chipBody.appendChild(chipResolution)
+    }
+
+    span.appendChild(chipName)
+    span.appendChild(chipBody)
+
     return span
   }
 
@@ -441,19 +471,66 @@
     align-items: stretch;
     border-radius: 0.375rem;
     border: 1px dashed;
-    padding: 0.125rem 0.375rem;
+    padding: 0 0.35rem 0rem 0.25rem;
     margin: 0.0625rem 0.125rem;
-    font-size: 0.875rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 500;
     cursor: pointer;
     vertical-align: baseline;
     user-select: none;
+    position: relative;
   }
 
   :global(.tag-purple) {
     background: #ede9fe; /* 연보라 배경 */
     color: #5b21b6; /* 보라 텍스트 */
     border-color: #c084fc;
+  }
+
+  :global(.chip-name) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 0 0.25rem 0.0625rem 0.25rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    border-radius: 0.375rem 0 0 0.375rem;
+    cursor: text;
+    background-color: #e9d5ff;
+    outline: none;
+  }
+
+  :global(.chip-name:focus) {
+    outline: 2px solid rgba(56, 189, 248, 0.5);
+    outline-offset: 1px;
+  }
+
+  :global(.chip-body) {
+    display: inline-block;
+    max-width: 100%;
+    min-width: 0;
+    padding: 0.0625rem 0 0 0;
+  }
+
+  :global(.chip-name-hidden) {
+    visibility: hidden;
+    display: inline-block;
+    padding-right: 0.4rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  :global(.chip-resolution) {
+    display: inline;
+    font-weight: 400;
+    opacity: 0.8;
+    font-style: italic;
+    vertical-align: top;
+    min-width: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    max-width: 100%;
   }
 
   :global(.tag-green) {
