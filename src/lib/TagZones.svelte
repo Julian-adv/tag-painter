@@ -1,6 +1,6 @@
 <!-- Component for tag input zones -->
 <script lang="ts">
-  import LeafNodeEditor from './placeholder/LeafNodeEditor.svelte'
+  import ChipEditor from './placeholder/ChipEditor.svelte'
   import WildcardsEditorDialog from './TreeEdit/WildcardsEditorDialog.svelte'
   import { promptsData } from './stores/promptsStore'
   import { wildcardTagType } from './stores/tagsStore'
@@ -42,6 +42,13 @@
   let preselectTargetText = $state('')
   let wildcardsRefreshToken = $state(0)
 
+  // ChipEditor refs for getting text content
+  let allTagsEditorRef: { getText: () => string } | undefined = $state()
+  let firstZoneEditorRef: { getText: () => string } | undefined = $state()
+  let secondZoneEditorRef: { getText: () => string } | undefined = $state()
+  let negativeEditorRef: { getText: () => string } | undefined = $state()
+  let inpaintingEditorRef: { getText: () => string } | undefined = $state()
+
   // Display-only prefixes from Settings per selected model
   let qualityPrefixText = $state('')
   let negativePrefixText = $state('')
@@ -61,7 +68,6 @@
   })
 
   let hasLoadedTags = $state(false)
-  let saveTimeout: ReturnType<typeof setTimeout> | null = null
 
   $effect(() => {
     const key = $promptsData.selectedCheckpoint || 'Default'
@@ -106,47 +112,21 @@
     }
   }
 
-  // Debounced save - only saves after user stops typing for 2 seconds
-  function debouncedSave() {
-    if (saveTimeout) {
-      clearTimeout(saveTimeout)
-    }
-
-    saveTimeout = setTimeout(() => {
-      saveTags()
-      saveTimeout = null
-    }, 10000) // 10 second debounce
-  }
-
-  // Immediate save function for when we need to save right away
+  // Save function
   async function saveTags() {
     try {
       const zones = {
-        all: allTags,
-        zone1: firstZoneTags,
-        zone2: secondZoneTags,
-        negative: negativeTags,
-        inpainting: inpaintingTags
+        all: allTagsEditorRef?.getText() ?? '',
+        zone1: firstZoneEditorRef?.getText() ?? '',
+        zone2: secondZoneEditorRef?.getText() ?? '',
+        negative: negativeEditorRef?.getText() ?? '',
+        inpainting: inpaintingEditorRef?.getText() ?? ''
       }
 
       await writeWildcardZones(zones, currentWildcardsFile)
-
-      if (saveTimeout) {
-        clearTimeout(saveTimeout)
-        saveTimeout = null
-      }
     } catch (error) {
       // Silently fail - error will be shown as toast when generating image
     }
-  }
-
-  // Force immediate save (for image generation, dialog opening, etc.)
-  async function saveTagsImmediately() {
-    if (saveTimeout) {
-      clearTimeout(saveTimeout)
-      saveTimeout = null
-    }
-    await saveTags()
   }
 
   async function refreshSelectedTags() {
@@ -155,7 +135,7 @@
 
   async function openTreeEditDialog() {
     // Save any pending changes before opening dialog
-    await saveTagsImmediately()
+    await saveTags()
     showTreeEditDialog = true
   }
 
@@ -198,7 +178,7 @@
   }
 
   // Expose functions for parent component to call
-  export { saveTagsImmediately, refreshSelectedTags }
+  export { saveTags, refreshSelectedTags }
 </script>
 
 <div class="flex h-full w-full flex-shrink-1 flex-col">
@@ -262,56 +242,51 @@
         {negativePrefixText || ''}
       </div>
     </div>
-    <LeafNodeEditor
+    <ChipEditor
+      bind:this={allTagsEditorRef}
       id="all-tags"
       label={m['tagZones.allLabel']()}
-      bind:value={allTags}
-      onValueChange={debouncedSave}
-      onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('all', name)}
+      value={allTags}
+      onTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('all', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.all}
-      {wildcardsRefreshToken}
     />
 
-    <LeafNodeEditor
+    <ChipEditor
+      bind:this={firstZoneEditorRef}
       id="first-zone-tags"
       label={m['tagZones.firstLabel']()}
-      bind:value={firstZoneTags}
-      onValueChange={debouncedSave}
-      onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
+      value={firstZoneTags}
+      onTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone1}
       disabled={disabledZones.has('zone1')}
-      {wildcardsRefreshToken}
     />
 
-    <LeafNodeEditor
+    <ChipEditor
+      bind:this={secondZoneEditorRef}
       id="second-zone-tags"
       label={m['tagZones.secondLabel']()}
-      bind:value={secondZoneTags}
-      onValueChange={debouncedSave}
-      onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
+      value={secondZoneTags}
+      onTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone2}
       disabled={$promptsData.selectedComposition === 'all' || disabledZones.has('zone2')}
-      {wildcardsRefreshToken}
     />
 
-    <LeafNodeEditor
+    <ChipEditor
+      bind:this={negativeEditorRef}
       id="negative-tags"
       label={m['tagZones.negativeLabel']()}
-      bind:value={negativeTags}
-      onValueChange={debouncedSave}
-      onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('negative', name)}
+      value={negativeTags}
+      onTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('negative', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.negative}
-      {wildcardsRefreshToken}
     />
 
-    <LeafNodeEditor
+    <ChipEditor
+      bind:this={inpaintingEditorRef}
       id="inpainting-tags"
       label={m['tagZones.inpaintingLabel']()}
-      bind:value={inpaintingTags}
-      onValueChange={debouncedSave}
-      onCustomTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('inpainting', name)}
+      value={inpaintingTags}
+      onTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('inpainting', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.inpainting}
-      {wildcardsRefreshToken}
     />
   </div>
 

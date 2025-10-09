@@ -70,7 +70,7 @@
   })
   let disabledZones = $state<Set<string>>(new Set())
   type TagZonesHandle = {
-    saveTagsImmediately: () => Promise<void>
+    saveTags: () => Promise<void>
     refreshSelectedTags: () => Promise<void>
   }
   let tagZonesRef: TagZonesHandle | undefined = $state()
@@ -242,7 +242,7 @@
 
     // Save tag zones immediately before generating
     if (tagZonesRef) {
-      await tagZonesRef.saveTagsImmediately()
+      await tagZonesRef.saveTags()
     }
 
     // Save prompts before generating
@@ -336,7 +336,7 @@
 
     // Save tag zones immediately before generating
     if (tagZonesRef) {
-      await tagZonesRef.saveTagsImmediately()
+      await tagZonesRef.saveTags()
     }
 
     // Save prompts before generating
