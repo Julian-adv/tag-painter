@@ -531,119 +531,15 @@
             />
           </div>
 
-          <!-- FaceDetailer Settings -->
+          <!-- Upscale Settings -->
           <div
             class="section-title"
             style="grid-column: 1 / 4; font-weight: 600; color: #333; text-align: left; justify-self: start; margin-top: 16px;"
           >
-            {m['settingsDialog.faceDetailerTitle']()}
+            {m['settingsDialog.upscaleTitle']()}
           </div>
 
           {#if localSettings.perModel[selectedModelKey]}
-            <label for="fd-checkpoint" class="two-col-label"
-              >{m['settingsDialog.faceDetailerCheckpoint']()}</label
-            >
-            <select
-              id="fd-checkpoint"
-              class="two-col-input-wide"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.checkpoint}
-            >
-              {#each availableCheckpoints as checkpoint}
-                <option value={checkpoint}>{checkpoint}</option>
-              {/each}
-            </select>
-
-            <label for="fd-model-type" class="two-col-label"
-              >{m['settingsDialog.faceDetailerModelType']()}</label
-            >
-            <select
-              id="fd-model-type"
-              class="two-col-input"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.modelType}
-            >
-              <option value="sdxl">SDXL</option>
-              <option value="qwen">Qwen</option>
-              <option value="chroma">Chroma</option>
-            </select>
-
-            <label for="fd-steps" class="two-col-label"
-              >{m['settingsDialog.faceDetailerSteps']()}</label
-            >
-            <input
-              id="fd-steps"
-              type="number"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.steps}
-              min="1"
-              max="100"
-              step="1"
-              class="two-col-input"
-            />
-
-            <label for="fd-cfg" class="two-col-label"
-              >{m['settingsDialog.faceDetailerCfgScale']()}</label
-            >
-            <input
-              id="fd-cfg"
-              type="number"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.cfgScale}
-              min="1"
-              max="20"
-              step="0.5"
-              class="two-col-input"
-            />
-
-            <label for="fd-sampler" class="two-col-label"
-              >{m['settingsDialog.faceDetailerSampler']()}</label
-            >
-            <SamplerSelector
-              id="fd-sampler"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.sampler}
-              class="two-col-input"
-            />
-
-            <label for="fd-scheduler" class="two-col-label"
-              >{m['settingsDialog.faceDetailerScheduler']()}</label
-            >
-            <SchedulerSelector
-              id="fd-scheduler"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.scheduler}
-              class="two-col-input"
-            />
-
-            <label for="fd-denoise" class="two-col-label"
-              >{m['settingsDialog.faceDetailerDenoise']()}</label
-            >
-            <input
-              id="fd-denoise"
-              type="number"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.denoise}
-              min="0"
-              max="1"
-              step="0.05"
-              class="two-col-input"
-            />
-
-            <label for="fd-vae" class="two-col-label">{m['settingsDialog.faceDetailerVae']()}</label
-            >
-            <select
-              id="fd-vae"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.selectedVae}
-              class="two-col-input-wide"
-            >
-              <option value="__embedded__">{m['settingsDialog.useEmbeddedVae']()}</option>
-              {#each availableVaes as vae}
-                <option value={vae}>{vae}</option>
-              {/each}
-            </select>
-
-            <!-- Upscale Settings -->
-            <div
-              class="section-title"
-              style="grid-column: 1 / 4; font-weight: 600; color: #333; text-align: left; justify-self: start; margin-top: 16px;"
-            >
-              {m['settingsDialog.upscaleTitle']()}
-            </div>
-
             <label for="us-checkpoint" class="two-col-label"
               >{m['settingsDialog.upscaleCheckpoint']()}</label
             >
@@ -738,6 +634,110 @@
             <select
               id="us-vae"
               bind:value={localSettings.perModel[selectedModelKey].upscale.selectedVae}
+              class="two-col-input-wide"
+            >
+              <option value="__embedded__">{m['settingsDialog.useEmbeddedVae']()}</option>
+              {#each availableVaes as vae}
+                <option value={vae}>{vae}</option>
+              {/each}
+            </select>
+
+            <!-- FaceDetailer Settings -->
+            <div
+              class="section-title"
+              style="grid-column: 1 / 4; font-weight: 600; color: #333; text-align: left; justify-self: start; margin-top: 16px;"
+            >
+              {m['settingsDialog.faceDetailerTitle']()}
+            </div>
+
+            <label for="fd-checkpoint" class="two-col-label"
+              >{m['settingsDialog.faceDetailerCheckpoint']()}</label
+            >
+            <select
+              id="fd-checkpoint"
+              class="two-col-input-wide"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.checkpoint}
+            >
+              {#each availableCheckpoints as checkpoint}
+                <option value={checkpoint}>{checkpoint}</option>
+              {/each}
+            </select>
+
+            <label for="fd-model-type" class="two-col-label"
+              >{m['settingsDialog.faceDetailerModelType']()}</label
+            >
+            <select
+              id="fd-model-type"
+              class="two-col-input"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.modelType}
+            >
+              <option value="sdxl">SDXL</option>
+              <option value="qwen">Qwen</option>
+              <option value="chroma">Chroma</option>
+            </select>
+
+            <label for="fd-steps" class="two-col-label"
+              >{m['settingsDialog.faceDetailerSteps']()}</label
+            >
+            <input
+              id="fd-steps"
+              type="number"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.steps}
+              min="1"
+              max="100"
+              step="1"
+              class="two-col-input"
+            />
+
+            <label for="fd-cfg" class="two-col-label"
+              >{m['settingsDialog.faceDetailerCfgScale']()}</label
+            >
+            <input
+              id="fd-cfg"
+              type="number"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.cfgScale}
+              min="1"
+              max="20"
+              step="0.5"
+              class="two-col-input"
+            />
+
+            <label for="fd-sampler" class="two-col-label"
+              >{m['settingsDialog.faceDetailerSampler']()}</label
+            >
+            <SamplerSelector
+              id="fd-sampler"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.sampler}
+              class="two-col-input"
+            />
+
+            <label for="fd-scheduler" class="two-col-label"
+              >{m['settingsDialog.faceDetailerScheduler']()}</label
+            >
+            <SchedulerSelector
+              id="fd-scheduler"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.scheduler}
+              class="two-col-input"
+            />
+
+            <label for="fd-denoise" class="two-col-label"
+              >{m['settingsDialog.faceDetailerDenoise']()}</label
+            >
+            <input
+              id="fd-denoise"
+              type="number"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.denoise}
+              min="0"
+              max="1"
+              step="0.05"
+              class="two-col-input"
+            />
+
+            <label for="fd-vae" class="two-col-label">{m['settingsDialog.faceDetailerVae']()}</label
+            >
+            <select
+              id="fd-vae"
+              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.selectedVae}
               class="two-col-input-wide"
             >
               <option value="__embedded__">{m['settingsDialog.useEmbeddedVae']()}</option>
