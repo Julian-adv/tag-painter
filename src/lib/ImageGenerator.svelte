@@ -14,7 +14,7 @@
   import { fetchCheckpoints } from './generation/comfyui'
   import { ArrowPath } from 'svelte-heros-v2'
   import { generateImage } from './generation/imageGeneration'
-  import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
+  import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY, DEFAULT_SETTINGS } from '$lib/constants'
   import Toasts from './Toasts.svelte'
   import { baseLocale, setLocale, getLocale, isLocale } from '$lib/paraglide/runtime.js'
   import {
@@ -120,16 +120,17 @@
 
   // Settings state
   let settings: Settings = $state({
-    imageWidth: 832,
-    imageHeight: 1216,
-    cfgScale: 5,
-    steps: 28,
-    seed: -1,
-    sampler: 'euler_ancestral',
+    imageWidth: DEFAULT_SETTINGS.imageWidth,
+    imageHeight: DEFAULT_SETTINGS.imageHeight,
+    cfgScale: DEFAULT_SETTINGS.cfgScale,
+    steps: DEFAULT_SETTINGS.steps,
+    seed: DEFAULT_SETTINGS.seed,
+    sampler: DEFAULT_SETTINGS.sampler,
+    scheduler: DEFAULT_SETTINGS.scheduler,
     comfyUrl: DEFAULT_COMFY_URL,
     outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
     selectedVae: '__embedded__',
-    clipSkip: 2,
+    clipSkip: DEFAULT_SETTINGS.clipSkip,
     locale: baseLocale,
     perModel: {}
   })
@@ -139,6 +140,7 @@
       ...input,
       comfyUrl: input.comfyUrl || DEFAULT_COMFY_URL,
       selectedVae: input.selectedVae || '__embedded__',
+      scheduler: input.scheduler || DEFAULT_SETTINGS.scheduler,
       perModel: input.perModel || {},
       locale: input.locale || baseLocale
     }
@@ -152,7 +154,7 @@
         if (entry.steps == null) entry.steps = 8
         if (entry.cfgScale == null) entry.cfgScale = 1.5
         if (!entry.sampler) entry.sampler = 'euler'
-        if (!entry.scheduler) entry.scheduler = 'simple'
+        if (!entry.scheduler) entry.scheduler = DEFAULT_SETTINGS.scheduler
       }
     }
 

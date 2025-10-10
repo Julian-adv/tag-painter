@@ -141,7 +141,7 @@
 
   async function handleWildcardsSaved() {
     try {
-      await loadTagsFromWildcards(currentModelType)
+      await loadTagsFromWildcards(currentWildcardsFile)
     } catch (error) {
       console.error('Failed to reload wildcard zones after save:', error)
     }

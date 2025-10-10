@@ -283,6 +283,7 @@ describe('fileIO utilities', () => {
         steps: 20,
         seed: -1,
         sampler: 'euler',
+        scheduler: 'simple',
         comfyUrl: 'http://127.0.0.1:8188',
         outputDirectory: '/test/output',
         selectedVae: '__embedded__',

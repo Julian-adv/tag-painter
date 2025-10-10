@@ -4,11 +4,23 @@ export const DEFAULT_ARRAY_WEIGHT = 100
 export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8188'
 export const DEFAULT_WORKFLOW = 'sdxl.api.workflow.json'
 
+// Default Settings
+export const DEFAULT_SETTINGS = {
+  imageWidth: 832,
+  imageHeight: 1216,
+  cfgScale: 4.5,
+  steps: 20,
+  seed: -1,
+  sampler: 'euler_ancestral',
+  scheduler: 'simple',
+  clipSkip: 2
+} as const
+
 // Default FaceDetailer settings
 export const DEFAULT_FACE_DETAILER_SETTINGS = {
   checkpoint: 'zenijiMixKIllust_v10.safetensors',
   modelType: 'sdxl' as const,
-  steps: 28,
+  steps: 20,
   cfgScale: 4.5,
   sampler: 'euler_ancestral',
   scheduler: 'simple',
@@ -20,11 +32,11 @@ export const DEFAULT_UPSCALE_SETTINGS = {
   checkpoint: 'zenijiMixKIllust_v10.safetensors',
   modelType: 'sdxl' as const,
   scale: 1.5,
-  steps: 15,
+  steps: 20,
   cfgScale: 4.5,
   sampler: 'euler_ancestral',
   scheduler: 'simple',
-  denoise: 0.5,
+  denoise: 0.35,
   selectedVae: '__embedded__'
 } as const
 

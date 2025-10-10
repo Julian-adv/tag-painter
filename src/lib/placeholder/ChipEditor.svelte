@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Svelte 5 호환 일반 Svelte 문법 사용
+  // Using standard Svelte syntax compatible with Svelte 5
   import { onMount } from 'svelte'
   import { getWildcardModel } from '../stores/tagsStore'
   import { findNodeByName, isConsistentRandomArray } from '../TreeEdit/utils'
@@ -24,22 +24,22 @@
 
   let editor: HTMLDivElement
 
-  // === 패턴 정규식 ===
-  // __abc__  → 보라색 단일 태그 (내부에 언더스코어 허용, 쉼표/공백 불허, 뒤에 구분자 필요)
+  // === Pattern Regular Expressions ===
+  // __abc__  → Purple single tag (allows underscores inside, no commas/spaces, requires delimiter after)
   const entityRe = /__([^_\s,](?:(?!__|,|\s).)*?[^_\s,])__(?=[\s,.]|$)/g
-  // {aaa|bbb|ccc} → 초록색 칸분할 태그
+  // {aaa|bbb|ccc} → Green choice tag
   const choiceRe = /\{([^{}]+)\}/g
-  // 하나로 합친 스캐너 (순서 중요: 겹침 방지)
+  // Combined scanner (order matters: prevents overlaps)
   const masterRe = /__([^_\s,](?:(?!__|,|\s).)*?[^_\s,])__(?=[\s,.]|$)|\{([^{}]+)\}/g
 
-  // === API: 내부 텍스트 직렬화 ===
-  // 예: "abc __def__ {x|y}"
+  // === API: Serialize internal text ===
+  // Example: "abc __def__ {x|y}"
   export function getText(): string {
     return serializeEditor()
   }
 
-  // === API: 외부 텍스트 로딩 ===
-  // 예: readText("xxx, yyy, __aaa__, {b|c|d}")
+  // === API: Load external text ===
+  // Example: readText("xxx, yyy, __aaa__, {b|c|d}")
   export function readText(input: string) {
     clearEditor()
     parseAndInsert(input)
@@ -47,24 +47,24 @@
   }
 
   onMount(() => {
-    // 초기 내용이 비면 하나의 빈 텍스트 노드라도 있게 함 (경계 처리 용이)
+    // Ensure at least one empty text node if initial content is empty (facilitates boundary handling)
     if (!editorHasContent()) {
       editor.appendChild(document.createTextNode(''))
     }
   })
 
-  // value prop이나 currentRandomTagResolutions가 바뀌면 에디터 내용 업데이트
+  // Update editor content when value prop or currentRandomTagResolutions changes
   $effect(() => {
     if (editor && value !== undefined) {
       const currentText = serializeEditor()
-      // value가 바뀌었거나, resolutions만 바뀐 경우 업데이트
+      // Update if value changed or only resolutions changed
       if (currentText !== value || currentRandomTagResolutions) {
         readText(value)
       }
     }
   })
 
-  // === 유틸: 에디터 비우기 ===
+  // === Util: Clear editor ===
   function clearEditor() {
     editor.innerHTML = ''
   }
@@ -73,9 +73,9 @@
     return editor && editor.childNodes.length > 0
   }
 
-  // === 유틸: HTML 이스케이프 불필요 (텍스트 노드로만 삽입) ===
+  // === Util: HTML escaping unnecessary (inserted as text nodes only) ===
 
-  // === 태그 타입 판별 ===
+  // === Tag type detection ===
   function getTagType(tagName: string): 'random' | 'consistent-random' | 'unknown' {
     const model = getWildcardModel()
     if (!model) return 'unknown'
@@ -90,7 +90,7 @@
     return 'unknown'
   }
 
-  // === 태그 DOM 생성 ===
+  // === Tag DOM creation ===
   function createEntityTag(name: string): HTMLSpanElement {
     const tagType = getTagType(name)
     const span = document.createElement('span')
@@ -143,7 +143,7 @@
     outer.dataset.type = 'choice'
     outer.dataset.values = parts.join('|')
 
-    // 칸 분할 렌더링
+    // Render choice cells
     const box = document.createElement('span')
     box.className = 'choice-box'
     for (let i = 0; i < parts.length; i++) {
@@ -156,7 +156,7 @@
     return outer
   }
 
-  // === 파싱 & 삽입: 순수 텍스트 → (텍스트/태그) 혼합 노드 ===
+  // === Parsing & Insertion: Plain text → Mixed (text/tag) nodes ===
   function parseAndInsert(text: string, range?: Range) {
     const frag = document.createDocumentFragment()
     let lastIdx = 0
@@ -185,7 +185,7 @@
       editor.appendChild(frag)
     }
 
-    // 태그 사이를 위해 뒤에 빈 텍스트 노드 보장 (경계 삭제/입력 편의)
+    // Ensure trailing text node for boundary deletion/input convenience between tags
     ensureTrailingTextNode()
   }
 
@@ -196,7 +196,7 @@
     }
   }
 
-  // === 직렬화: DOM → 패턴 포함 원본 문자열 ===
+  // === Serialization: DOM → Original string with patterns ===
   function serializeEditor(): string {
     let out = ''
     editor.childNodes.forEach((node) => {
@@ -219,7 +219,7 @@
     return out
   }
 
-  // === 커서/선택 ===
+  // === Cursor/Selection ===
   function getCurrentRange(): Range | null {
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0) return null
@@ -244,22 +244,22 @@
     sel.addRange(range)
   }
 
-  // 텍스트 인덱스 ↔ 노드 위치 매핑 (간단 버전)
+  // Text index ↔ node position mapping (simple version)
   function getPlainTextBeforeCaret(): string {
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0) return ''
     const r = sel.getRangeAt(0).cloneRange()
     r.selectNodeContents(editor)
     r.setEnd(sel.anchorNode!, sel.anchorOffset)
-    // 태그는 패턴 문자열로 치환한 텍스트를 사용
+    // Tags are represented as pattern strings in the text
     return serializeSlice(r)
   }
 
   function serializeSlice(range: Range): string {
-    // range 안의 내용을 직렬화 (태그 → 패턴)
+    // Serialize content within range (tag → pattern)
     const div = document.createElement('div')
     div.appendChild(range.cloneContents())
-    // div의 childNodes를 순회해 직렬화 로직 재사용
+    // Traverse div's childNodes and reuse serialization logic
     let out = ''
     div.childNodes.forEach((node) => {
       if (node.nodeType === Node.TEXT_NODE) {
@@ -287,7 +287,7 @@
     const target = prefix.length
     let acc = 0
 
-    // 에디터의 "직계" 자식만 순회 (텍스트 노드, .tag 엘리먼트)
+    // Traverse only "direct" children of editor (text nodes, .tag elements)
     const children = Array.from(editor.childNodes)
 
     for (const node of children) {
@@ -295,22 +295,22 @@
         const text = (node as Text).data
         if (acc + text.length >= target) {
           setCaret(node as Text, target - acc)
-          editor.focus() // 포커스 보장
+          editor.focus() // Ensure focus
           return
         }
         acc += text.length
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         const el = node as HTMLElement
         if (el.classList.contains('tag')) {
-          // 태그는 직렬화 문자열 기준으로 길이를 계산
+          // Calculate tag length based on serialized string
           let rep = ''
           if (el.dataset.type === 'entity') rep = `__${el.dataset.value ?? ''}__`
           else if (el.dataset.type === 'choice') rep = `{${el.dataset.values ?? ''}}`
 
           if (acc + rep.length >= target) {
-            // 태그 내부에는 커서를 놓지 않고, 태그 "뒤"의 텍스트 노드로
+            // Don't place cursor inside tag, place it in text node "after" tag
             const next = el.nextSibling ?? insertEmptyTextAfter(el)
-            // next가 텍스트가 아닐 수도 있으니 보정
+            // Adjust in case next is not a text node
             let anchor = next
             if (!anchor || anchor.nodeType !== Node.TEXT_NODE) {
               anchor = document.createTextNode('')
@@ -326,7 +326,7 @@
       }
     }
 
-    // 못 찾으면 맨 뒤
+    // If not found, place at the end
     placeCaretAtEnd()
     editor.focus()
   }
@@ -349,32 +349,32 @@
   }
 
   function reparseAllPreserveCaret() {
-    const before = getPlainTextBeforeCaret() // 커서 앞 직렬화 텍스트
+    const before = getPlainTextBeforeCaret() // Serialized text before caret
     const all = serializeEditor()
 
     clearEditor()
     parseAndInsert(all)
 
     restoreCaretByPlainPrefix(before)
-    editor.focus() // ← 추가
+    editor.focus() // ← Added
   }
 
-  // === 경계 삭제 처리 ===
+  // === Boundary deletion handling ===
   function handleBoundaryDelete(ev: KeyboardEvent) {
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0) return
     const { anchorNode, anchorOffset } = sel
 
-    // caret이 텍스트 노드에 있는 상황에 한해 처리
+    // Handle only when caret is in a text node
     if (!anchorNode) return
 
-    // Backspace: 커서 앞이 태그면 제거
+    // Backspace: Remove tag if it's before the cursor
     if (ev.key === 'Backspace') {
-      // 텍스트 노드의 시작 지점(0)에서, 앞 형제가 태그면 삭제
+      // At text node start (0), delete previous sibling if it's a tag
       const container = anchorNode.nodeType === Node.TEXT_NODE ? anchorNode : anchorNode.parentNode
       if (!container) return
 
-      // caret이 텍스트 노드의 시작
+      // Caret at text node start
       if (anchorNode.nodeType === Node.TEXT_NODE && anchorOffset === 0) {
         const prev = (container as Node).previousSibling
         if (prev && (prev as HTMLElement).classList?.contains('tag')) {
@@ -386,7 +386,7 @@
       }
     }
 
-    // Delete: 커서 뒤가 태그면 제거
+    // Delete: Remove tag if it's after the cursor
     if (ev.key === 'Delete') {
       const container = anchorNode.nodeType === Node.TEXT_NODE ? anchorNode : anchorNode.parentNode
       if (!container) return
@@ -406,7 +406,7 @@
     }
   }
 
-  // === 더블클릭 태그 콜백 ===
+  // === Double-click tag callback ===
   function onDblClick(e: MouseEvent) {
     const target = e.target as HTMLElement
     const tag = target.closest('.tag') as HTMLElement | null
@@ -419,20 +419,20 @@
     }
   }
 
-  // === 붙여넣기: 무조건 플레인 텍스트, 즉시 파싱 ===
+  // === Paste: Always plain text, parse immediately ===
   function onPaste(e: ClipboardEvent) {
     e.preventDefault()
     const text = e.clipboardData?.getData('text/plain') ?? ''
     const range = getCurrentRange()
     if (!range) return
     parseAndInsert(text, range)
-    // 붙여넣기 후 전체 재파싱(안전) + caret 복원
+    // After paste, full reparse (safe) + restore caret
     reparseAllPreserveCaret()
   }
 
-  // === 입력 이벤트: 즉시 재파싱 (간단/안정 위주) ===
+  // === Input event: Immediate reparse (simple/stable approach) ===
   function onInput() {
-    // composition 중에는 건드리지 않음
+    // Don't touch during composition
     if (isComposing) return
     reparseAllPreserveCaret()
   }
@@ -510,8 +510,8 @@
   }
 
   :global(.tag-purple) {
-    background: #ede9fe; /* 연보라 배경 */
-    color: #5b21b6; /* 보라 텍스트 */
+    background: #ede9fe; /* Light purple background */
+    color: #5b21b6; /* Purple text */
     border-color: #c084fc;
   }
 
@@ -606,10 +606,10 @@
   :global(.tag-green) {
     background: #eaffea;
     color: #166534;
-    padding: 2px; /* choice-box가 내부 여백 관리 */
+    padding: 2px; /* choice-box manages internal padding */
   }
 
-  /* choice 칸 분할 */
+  /* Choice cell division */
   :global(.choice-box) {
     display: inline-flex;
     gap: 0;
@@ -624,7 +624,7 @@
     border-left: none;
   }
 
-  /* 태그가 포커스 가능하지 않게 */
+  /* Prevent tags from being focusable */
   :global(.tag):focus {
     outline: none;
   }
