@@ -504,20 +504,64 @@ export async function generateQwenImage(
             ? upscaleSettings.checkpoint
             : promptsData.selectedCheckpoint || 'qwen_image_fp8_e4m3fn.safetensors'
 
-        const usUnet = findNodeByTitle(workflow, 'Upscale UNet Loader (Qwen)')
-        if (!usUnet) {
-          return { error: 'Missing required node: "Upscale UNet Loader (Qwen)"' }
-        }
-        workflow[usUnet.nodeId].inputs.unet_name = resolvedUsUnet
+        // Check if upscale checkpoint is the same as the main checkpoint
+        const isSameCheckpoint = resolvedUsUnet === promptsData.selectedCheckpoint
 
-        const upscaleModelSampling = findNodeByTitle(
-          workflow,
-          'Upscale Model Sampling Aura Flow (Qwen)'
-        )
-        if (!upscaleModelSampling) {
-          return { error: 'Missing required node: "Upscale Model Sampling Aura Flow (Qwen)"' }
+        if (isSameCheckpoint) {
+          // Reuse base model nodes
+          const baseModelSampling = findNodeByTitle(workflow, 'Model Sampling Aura Flow')
+          if (!baseModelSampling) {
+            return { error: 'Missing required node: "Model Sampling Aura Flow"' }
+          }
+          workflow[upscaleSampler.nodeId].inputs.model = [baseModelSampling.nodeId, 0]
+
+          const basePos = findNodeByTitle(workflow, 'CLIP Text Encode (Positive)')
+          if (!basePos) {
+            return { error: 'Missing required node: "CLIP Text Encode (Positive)"' }
+          }
+          workflow[upscaleSampler.nodeId].inputs.positive = [basePos.nodeId, 0]
+
+          const baseNeg = findNodeByTitle(workflow, 'CLIP Text Encode (Negative)')
+          if (!baseNeg) {
+            return { error: 'Missing required node: "CLIP Text Encode (Negative)"' }
+          }
+          workflow[upscaleSampler.nodeId].inputs.negative = [baseNeg.nodeId, 0]
+        } else {
+          // Use separate upscale model nodes
+          const usUnet = findNodeByTitle(workflow, 'Upscale UNet Loader (Qwen)')
+          if (!usUnet) {
+            return { error: 'Missing required node: "Upscale UNet Loader (Qwen)"' }
+          }
+          workflow[usUnet.nodeId].inputs.unet_name = resolvedUsUnet
+
+          const upscaleModelSampling = findNodeByTitle(
+            workflow,
+            'Upscale Model Sampling Aura Flow (Qwen)'
+          )
+          if (!upscaleModelSampling) {
+            return { error: 'Missing required node: "Upscale Model Sampling Aura Flow (Qwen)"' }
+          }
+          workflow[upscaleSampler.nodeId].inputs.model = [upscaleModelSampling.nodeId, 0]
+
+          const upscaleClipQwen = findNodeByTitle(workflow, 'Upscale CLIP Loader (Qwen)')
+          if (!upscaleClipQwen) {
+            return { error: 'Missing required node: "Upscale CLIP Loader (Qwen)"' }
+          }
+
+          const upscalePos = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Positive)')
+          if (!upscalePos) {
+            return { error: 'Missing required node: "Upscale CLIP Text Encode (Positive)"' }
+          }
+          workflow[upscalePos.nodeId].inputs.clip = [upscaleClipQwen.nodeId, 0]
+          workflow[upscalePos.nodeId].inputs.text = combinedPrompt
+
+          const upscaleNeg = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Negative)')
+          if (!upscaleNeg) {
+            return { error: 'Missing required node: "Upscale CLIP Text Encode (Negative)"' }
+          }
+          workflow[upscaleNeg.nodeId].inputs.clip = [upscaleClipQwen.nodeId, 0]
+          workflow[upscaleNeg.nodeId].inputs.text = negativeTagsText
         }
-        workflow[upscaleSampler.nodeId].inputs.model = [upscaleModelSampling.nodeId, 0]
 
         const upscaleVaeQwen = findNodeByTitle(workflow, 'Upscale VAE Loader (Qwen)')
         if (!upscaleVaeQwen) {
@@ -537,25 +581,6 @@ export async function generateQwenImage(
           return { error: 'Missing required node: "VAE Decode (Tiled)"' }
         }
         workflow[upscaleDecode.nodeId].inputs.vae = [upscaleVaeQwen.nodeId, 0]
-
-        const upscaleClipQwen = findNodeByTitle(workflow, 'Upscale CLIP Loader (Qwen)')
-        if (!upscaleClipQwen) {
-          return { error: 'Missing required node: "Upscale CLIP Loader (Qwen)"' }
-        }
-
-        const upscalePos = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Positive)')
-        if (!upscalePos) {
-          return { error: 'Missing required node: "Upscale CLIP Text Encode (Positive)"' }
-        }
-        workflow[upscalePos.nodeId].inputs.clip = [upscaleClipQwen.nodeId, 0]
-        workflow[upscalePos.nodeId].inputs.text = combinedPrompt
-
-        const upscaleNeg = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Negative)')
-        if (!upscaleNeg) {
-          return { error: 'Missing required node: "Upscale CLIP Text Encode (Negative)"' }
-        }
-        workflow[upscaleNeg.nodeId].inputs.clip = [upscaleClipQwen.nodeId, 0]
-        workflow[upscaleNeg.nodeId].inputs.text = negativeTagsText
       } else {
         // Configure SDXL upscale path
         const resolvedUpscaleCkpt =
