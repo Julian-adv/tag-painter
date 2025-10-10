@@ -1,6 +1,8 @@
 <script lang="ts">
   // Svelte 5 호환 일반 Svelte 문법 사용
   import { onMount } from 'svelte'
+  import { getWildcardModel } from '../stores/tagsStore'
+  import { findNodeByName, isConsistentRandomArray } from '../TreeEdit/utils'
 
   interface Props {
     id?: string
@@ -45,11 +47,20 @@
   }
 
   onMount(() => {
-    console.log('ChipEditor mounted', value)
-    readText(value)
     // 초기 내용이 비면 하나의 빈 텍스트 노드라도 있게 함 (경계 처리 용이)
     if (!editorHasContent()) {
       editor.appendChild(document.createTextNode(''))
+    }
+  })
+
+  // value prop이나 currentRandomTagResolutions가 바뀌면 에디터 내용 업데이트
+  $effect(() => {
+    if (editor && value !== undefined) {
+      const currentText = serializeEditor()
+      // value가 바뀌었거나, resolutions만 바뀐 경우 업데이트
+      if (currentText !== value || currentRandomTagResolutions) {
+        readText(value)
+      }
     }
   })
 
@@ -64,10 +75,26 @@
 
   // === 유틸: HTML 이스케이프 불필요 (텍스트 노드로만 삽입) ===
 
+  // === 태그 타입 판별 ===
+  function getTagType(tagName: string): 'random' | 'consistent-random' | 'unknown' {
+    const model = getWildcardModel()
+    if (!model) return 'unknown'
+    const node = findNodeByName(model, tagName)
+    if (!node) return 'unknown'
+    if (node.kind === 'array') {
+      return isConsistentRandomArray(model, node.id) ? 'consistent-random' : 'random'
+    }
+    if (node.kind === 'object') {
+      return 'random'
+    }
+    return 'unknown'
+  }
+
   // === 태그 DOM 생성 ===
   function createEntityTag(name: string): HTMLSpanElement {
+    const tagType = getTagType(name)
     const span = document.createElement('span')
-    span.className = 'tag tag-purple'
+    span.className = `tag tag-purple ${tagType}`
     span.contentEditable = 'false'
     span.dataset.type = 'entity'
     span.dataset.value = name
@@ -476,15 +503,58 @@
     font-size: 0.75rem;
     font-weight: 500;
     cursor: pointer;
-    vertical-align: baseline;
+    vertical-align: bottom;
     user-select: none;
     position: relative;
+    max-width: calc(100% - 0.5rem);
   }
 
   :global(.tag-purple) {
     background: #ede9fe; /* 연보라 배경 */
     color: #5b21b6; /* 보라 텍스트 */
     border-color: #c084fc;
+  }
+
+  :global(.tag.random) {
+    background-color: #f3e8ff;
+    color: #6b21a8;
+    border-color: #c084fc;
+  }
+
+  :global(.tag.random:hover) {
+    background-color: #e9d5ff;
+  }
+
+  :global(.tag.random .chip-name) {
+    background-color: #e9d5ff;
+  }
+
+  :global(.tag.consistent-random) {
+    background-color: #ffedd5;
+    color: #9a3412;
+    border-color: #fb923c;
+  }
+
+  :global(.tag.consistent-random:hover) {
+    background-color: #fed7aa;
+  }
+
+  :global(.tag.consistent-random .chip-name) {
+    background-color: #fed7aa;
+  }
+
+  :global(.tag.unknown) {
+    background-color: #e5e7eb;
+    color: #374151;
+    border-color: #d1d5db;
+  }
+
+  :global(.tag.unknown:hover) {
+    background-color: #d1d5db;
+  }
+
+  :global(.tag.unknown .chip-name) {
+    background-color: #d1d5db;
   }
 
   :global(.chip-name) {
