@@ -268,12 +268,109 @@ export async function generateChromaImage(
 
     // Upscale configuration (required when upscale is enabled)
     if (promptsData.useUpscale) {
-      // Upscale prompts
-      if (!setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Positive)', combinedPrompt)) {
-        return { error: 'Missing required node: "Upscale CLIP Text Encode (Positive)"' }
+      const upscaleSettings = modelSettings?.upscale
+      const isSameCheckpoint =
+        upscaleSettings?.checkpoint === promptsData.selectedCheckpoint ||
+        !upscaleSettings?.checkpoint ||
+        upscaleSettings?.checkpoint === 'model.safetensors'
+
+      // Configure Upscale Image dimensions
+      const upscaleImage = findNodeByTitle(workflow, 'Upscale Image')
+      if (!upscaleImage) {
+        return { error: 'Missing required node: "Upscale Image"' }
       }
-      if (!setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Negative)', negativeTagsText)) {
-        return { error: 'Missing required node: "Upscale CLIP Text Encode (Negative)"' }
+      const scale = upscaleSettings?.scale || 1.5
+      workflow[upscaleImage.nodeId].inputs.width = Math.round(appliedSettings.imageWidth * scale)
+      workflow[upscaleImage.nodeId].inputs.height = Math.round(appliedSettings.imageHeight * scale)
+
+      const upscaleSampler = findNodeByTitle(workflow, 'KSampler (Upscale)')
+      if (!upscaleSampler) {
+        return { error: 'Missing required node: "KSampler (Upscale)"' }
+      }
+
+      if (isSameCheckpoint) {
+        // Reuse base model nodes when checkpoint is the same
+        const flowShift = findNodeByTitle(workflow, 'Flow Shift')
+        if (!flowShift) {
+          return { error: 'Missing required node: "Flow Shift"' }
+        }
+        workflow[upscaleSampler.nodeId].inputs.model = [flowShift.nodeId, 0]
+
+        const basePos = findNodeByTitle(workflow, 'CLIP Text Encode (Positive Prompt)')
+        if (!basePos) {
+          return { error: 'Missing required node: "CLIP Text Encode (Positive Prompt)"' }
+        }
+        workflow[upscaleSampler.nodeId].inputs.positive = [basePos.nodeId, 0]
+
+        const baseNeg = findNodeByTitle(workflow, 'CLIP Text Encode (Negative Prompt)')
+        if (!baseNeg) {
+          return { error: 'Missing required node: "CLIP Text Encode (Negative Prompt)"' }
+        }
+        workflow[upscaleSampler.nodeId].inputs.negative = [baseNeg.nodeId, 0]
+      } else {
+        // Use separate upscale nodes when checkpoint is different
+        const upscaleCheckpoint = findNodeByTitle(workflow, 'Upscale Load Checkpoint')
+        if (!upscaleCheckpoint) {
+          return { error: 'Missing required node: "Upscale Load Checkpoint"' }
+        }
+
+        // Set upscale checkpoint name
+        if (upscaleSettings?.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors') {
+          workflow[upscaleCheckpoint.nodeId].inputs.ckpt_name = upscaleSettings.checkpoint
+        }
+
+        workflow[upscaleSampler.nodeId].inputs.model = [upscaleCheckpoint.nodeId, 0]
+
+        const upscalePos = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Positive)')
+        if (!upscalePos) {
+          return { error: 'Missing required node: "Upscale CLIP Text Encode (Positive)"' }
+        }
+        workflow[upscalePos.nodeId].inputs.clip = [upscaleCheckpoint.nodeId, 1]
+        workflow[upscalePos.nodeId].inputs.text = combinedPrompt
+        workflow[upscaleSampler.nodeId].inputs.positive = [upscalePos.nodeId, 0]
+
+        const upscaleNeg = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Negative)')
+        if (!upscaleNeg) {
+          return { error: 'Missing required node: "Upscale CLIP Text Encode (Negative)"' }
+        }
+        workflow[upscaleNeg.nodeId].inputs.clip = [upscaleCheckpoint.nodeId, 1]
+        workflow[upscaleNeg.nodeId].inputs.text = negativeTagsText
+        workflow[upscaleSampler.nodeId].inputs.negative = [upscaleNeg.nodeId, 0]
+      }
+
+      // Configure VAE nodes for upscale
+      const upscaleEncode = findNodeByTitle(workflow, 'VAE Encode (Tiled)')
+      if (!upscaleEncode) {
+        return { error: 'Missing required node: "VAE Encode (Tiled)"' }
+      }
+
+      const upscaleDecode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')
+      if (!upscaleDecode) {
+        return { error: 'Missing required node: "VAE Decode (Tiled)"' }
+      }
+
+      if (isSameCheckpoint) {
+        // Reuse base VAE when checkpoint is the same
+        const baseVae = findNodeByTitle(workflow, 'Load VAE')
+        if (!baseVae) {
+          return { error: 'Missing required node: "Load VAE"' }
+        }
+        workflow[upscaleEncode.nodeId].inputs.vae = [baseVae.nodeId, 0]
+        workflow[upscaleDecode.nodeId].inputs.vae = [baseVae.nodeId, 0]
+      } else {
+        // Use separate upscale VAE when checkpoint is different
+        const upscaleVae = findNodeByTitle(workflow, 'Upscale Load VAE')
+        if (!upscaleVae) {
+          return { error: 'Missing required node: "Upscale Load VAE"' }
+        }
+
+        // Set upscale VAE name if specified
+        if (upscaleSettings?.selectedVae && upscaleSettings.selectedVae !== '__embedded__') {
+          workflow[upscaleVae.nodeId].inputs.vae_name = upscaleSettings.selectedVae
+        }
+
+        workflow[upscaleEncode.nodeId].inputs.vae = [upscaleVae.nodeId, 0]
+        workflow[upscaleDecode.nodeId].inputs.vae = [upscaleVae.nodeId, 0]
       }
 
       // Upscale KSampler
@@ -379,9 +476,9 @@ export async function generateChromaImage(
         }
         imageSourceNodeId = fdNode.nodeId
       } else {
-        const upscaleDecode = findNodeByTitle(workflow, 'VAE Decode (Upscale)')
+        const upscaleDecode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')
         if (!upscaleDecode) {
-          return { error: 'Missing required node: "VAE Decode (Upscale)"' }
+          return { error: 'Missing required node: "VAE Decode (Tiled)"' }
         }
         imageSourceNodeId = upscaleDecode.nodeId
       }
