@@ -9,13 +9,15 @@
   let { value = $bindable(), id, class: className, disabled = false }: Props = $props()
 
   const schedulers = [
-    { value: 'normal', label: 'Normal' },
+    { value: 'simple', label: 'Simple' },
+    { value: 'sgm_uniform', label: 'SGM Uniform' },
     { value: 'karras', label: 'Karras' },
     { value: 'exponential', label: 'Exponential' },
-    { value: 'sgm_uniform', label: 'SGM Uniform' },
-    { value: 'simple', label: 'Simple' },
     { value: 'ddim_uniform', label: 'DDIM Uniform' },
-    { value: 'beta', label: 'Beta' }
+    { value: 'beta', label: 'Beta' },
+    { value: 'normal', label: 'Normal' },
+    { value: 'linear_quadratic', label: 'Linear Quadratic' },
+    { value: 'kl_optimal', label: 'KL Optimal' }
   ]
 </script>
 
