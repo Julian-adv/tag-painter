@@ -3,6 +3,7 @@
   import { onMount } from 'svelte'
   import { getWildcardModel } from '../stores/tagsStore'
   import { findNodeByName, isConsistentRandomArray } from '../TreeEdit/utils'
+  import ChipEditorAutocomplete from '../ChipEditorAutocomplete.svelte'
 
   interface Props {
     id?: string
@@ -22,7 +23,10 @@
     onTagDoubleClick
   }: Props = $props()
 
-  let editor: HTMLDivElement
+  let editor = $state<HTMLDivElement | null>(null)
+  let autocompleteController:
+    | { handleKeydown: (event: KeyboardEvent) => boolean; close: () => void }
+    | null = null
 
   // === Pattern Regular Expressions ===
   // __abc__  → Purple single tag (allows underscores inside, no commas/spaces, requires delimiter after)
@@ -48,7 +52,7 @@
 
   onMount(() => {
     // Ensure at least one empty text node if initial content is empty (facilitates boundary handling)
-    if (!editorHasContent()) {
+    if (editor && !editorHasContent()) {
       editor.appendChild(document.createTextNode(''))
     }
   })
@@ -66,11 +70,12 @@
 
   // === Util: Clear editor ===
   function clearEditor() {
+    if (!editor) return
     editor.innerHTML = ''
   }
 
   function editorHasContent() {
-    return editor && editor.childNodes.length > 0
+    return !!editor && editor.childNodes.length > 0
   }
 
   // === Util: HTML escaping unnecessary (inserted as text nodes only) ===
@@ -158,6 +163,8 @@
 
   // === Parsing & Insertion: Plain text → Mixed (text/tag) nodes ===
   function parseAndInsert(text: string, range?: Range) {
+    const host = editor
+    if (!host) return
     const frag = document.createDocumentFragment()
     let lastIdx = 0
     for (const m of text.matchAll(masterRe)) {
@@ -182,7 +189,7 @@
       range.deleteContents()
       range.insertNode(frag)
     } else {
-      editor.appendChild(frag)
+      host.appendChild(frag)
     }
 
     // Ensure trailing text node for boundary deletion/input convenience between tags
@@ -190,16 +197,20 @@
   }
 
   function ensureTrailingTextNode() {
-    const last = editor.lastChild
+    const host = editor
+    if (!host) return
+    const last = host.lastChild
     if (!(last && last.nodeType === Node.TEXT_NODE)) {
-      editor.appendChild(document.createTextNode(''))
+      host.appendChild(document.createTextNode(''))
     }
   }
 
   // === Serialization: DOM → Original string with patterns ===
   function serializeEditor(): string {
+    const host = editor
+    if (!host) return ''
     let out = ''
-    editor.childNodes.forEach((node) => {
+    host.childNodes.forEach((node) => {
       if (node.nodeType === Node.TEXT_NODE) {
         out += (node as Text).data
       } else if (node.nodeType === Node.ELEMENT_NODE) {
@@ -230,13 +241,15 @@
     const sel = window.getSelection()
     if (!sel) return
     const range = document.createRange()
-    const last = editor.lastChild
+    const host = editor
+    if (!host) return
+    const last = host.lastChild
     if (!last) return
     if (last.nodeType === Node.TEXT_NODE) {
       range.setStart(last, (last as Text).data.length)
     } else {
       const txt = document.createTextNode('')
-      editor.appendChild(txt)
+      host.appendChild(txt)
       range.setStart(txt, 0)
     }
     range.collapse(true)
@@ -248,8 +261,10 @@
   function getPlainTextBeforeCaret(): string {
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0) return ''
+    const host = editor
+    if (!host) return ''
     const r = sel.getRangeAt(0).cloneRange()
-    r.selectNodeContents(editor)
+    r.selectNodeContents(host)
     r.setEnd(sel.anchorNode!, sel.anchorOffset)
     // Tags are represented as pattern strings in the text
     return serializeSlice(r)
@@ -284,18 +299,20 @@
   }
 
   function restoreCaretByPlainPrefix(prefix: string) {
+    const host = editor
+    if (!host) return
     const target = prefix.length
     let acc = 0
 
     // Traverse only "direct" children of editor (text nodes, .tag elements)
-    const children = Array.from(editor.childNodes)
+    const children = Array.from(host.childNodes)
 
     for (const node of children) {
       if (node.nodeType === Node.TEXT_NODE) {
         const text = (node as Text).data
         if (acc + text.length >= target) {
           setCaret(node as Text, target - acc)
-          editor.focus() // Ensure focus
+          host.focus() // Ensure focus
           return
         }
         acc += text.length
@@ -314,11 +331,11 @@
             let anchor = next
             if (!anchor || anchor.nodeType !== Node.TEXT_NODE) {
               anchor = document.createTextNode('')
-              if (el.nextSibling) editor.insertBefore(anchor, el.nextSibling)
-              else editor.appendChild(anchor)
+              if (el.nextSibling) host.insertBefore(anchor, el.nextSibling)
+              else host.appendChild(anchor)
             }
             setCaret(anchor as Text, 0)
-            editor.focus()
+            host.focus()
             return
           }
           acc += rep.length
@@ -328,7 +345,7 @@
 
     // If not found, place at the end
     placeCaretAtEnd()
-    editor.focus()
+    host.focus()
   }
 
   function insertEmptyTextAfter(el: Node) {
@@ -356,7 +373,7 @@
     parseAndInsert(all)
 
     restoreCaretByPlainPrefix(before)
-    editor.focus() // ← Added
+    editor?.focus() // ← Added
   }
 
   // === Boundary deletion handling ===
@@ -404,6 +421,13 @@
         }
       }
     }
+  }
+
+  function handleEditorKeydown(event: KeyboardEvent) {
+    if (autocompleteController?.handleKeydown(event)) {
+      return
+    }
+    handleBoundaryDelete(event)
   }
 
   // === Double-click tag callback ===
@@ -464,12 +488,19 @@
     tabindex="0"
     onpaste={onPaste}
     oninput={onInput}
-    onkeydown={handleBoundaryDelete}
+    onkeydown={handleEditorKeydown}
     ondblclick={onDblClick}
     oncompositionstart={onCompStart}
     oncompositionend={onCompEnd}
     aria-label="Tag-enabled text editor"
   ></div>
+
+  <ChipEditorAutocomplete
+    bind:this={autocompleteController}
+    {disabled}
+    target={editor}
+    active={!disabled}
+  />
 </div>
 
 <style>
