@@ -4,6 +4,9 @@ import { saveWildcardsText } from '../api/wildcards'
 import { toYAML } from '../TreeEdit/yaml-io'
 import { parseWeightDirective } from './tagExpansion'
 import { getWeightedRandomIndex } from './random'
+import { testModeStore } from '../stores/testModeStore.svelte'
+import type { TreeModel } from '../TreeEdit/model'
+import { getNodePath } from '../TreeEdit/utils'
 
 type ZoneName = 'all' | 'zone1' | 'zone2' | 'negative' | 'inpainting'
 
@@ -27,6 +30,8 @@ function clearSelection(zone: ZoneName) {
 }
 
 function selectRandomChildIndex(
+  model: TreeModel,
+  arrayNodeId: string,
   children: string[] | undefined,
   nodes: Record<string, { kind: string; value?: unknown }>
 ): number | null {
@@ -35,9 +40,16 @@ function selectRandomChildIndex(
   }
 
   const options: { index: number; weight: number }[] = []
+  let pinnedMatchIndex: number | null = null
+  let overrideMatchIndex: number | null = null
+
+  const pinKey = getNodePath(model, arrayNodeId)
+  const store = testModeStore[pinKey]
+  const hasPin = !!store && !!store.enabled
 
   for (let i = 0; i < children.length; i++) {
-    const childNode = nodes[children[i]]
+    const childId = children[i]
+    const childNode = nodes[childId]
     if (!childNode || childNode.kind !== 'leaf') continue
 
     const value = childNode.value
@@ -50,10 +62,35 @@ function selectRandomChildIndex(
     const weight = parseWeightDirective(asString)
 
     options.push({ index: i, weight })
+
+    if (!hasPin) continue
+
+    if (store.pinnedLeafPath) {
+      const childPath = getNodePath(model, childId)
+      if (childPath === store.pinnedLeafPath) {
+        pinnedMatchIndex = i
+      }
+    }
+
+    if (store.overrideTag && store.overrideTag.trim()) {
+      const normalizedValue = asString.trim()
+      if (normalizedValue === store.overrideTag.trim()) {
+        overrideMatchIndex = i
+      }
+    }
   }
 
   if (options.length === 0) {
     return null
+  }
+
+  if (hasPin) {
+    if (pinnedMatchIndex !== null) {
+      return pinnedMatchIndex
+    }
+    if (overrideMatchIndex !== null) {
+      return overrideMatchIndex
+    }
   }
 
   const selected = getWeightedRandomIndex(options)
@@ -133,7 +170,7 @@ export async function readWildcardZones(
       return existingValue
     }
 
-    const chosenIndex = selectRandomChildIndex(node.children, nodes)
+    const chosenIndex = selectRandomChildIndex(wildcardModel, node.id, node.children, nodes)
 
     if (chosenIndex === null) {
       clearSelection(zoneName)
