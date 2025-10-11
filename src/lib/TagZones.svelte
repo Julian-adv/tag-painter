@@ -41,6 +41,18 @@
   let preselectTagName = $state('')
   let preselectTargetText = $state('')
   let wildcardsRefreshToken = $state(0)
+  let directiveDisabledZones = $state<Set<string>>(new Set())
+
+  let effectiveDisabledZones = $derived.by(() => {
+    const combined = new Set<string>()
+    for (const zone of disabledZones) {
+      combined.add(zone)
+    }
+    for (const zone of directiveDisabledZones) {
+      combined.add(zone)
+    }
+    return combined
+  })
 
   // ChipEditor refs for getting text content
   let allTagsEditorRef: { getText: () => string } | undefined = $state()
@@ -100,6 +112,7 @@
       secondZoneTags = zones.zone2
       negativeTags = zones.negative
       inpaintingTags = zones.inpainting
+      directiveDisabledZones = new Set(zones.directives?.disabledZones ?? [])
       wildcardsRefreshToken += 1
     } catch (error) {
       // If wildcards file doesn't exist, start with empty zones
@@ -109,6 +122,7 @@
       secondZoneTags = ''
       negativeTags = ''
       inpaintingTags = ''
+      directiveDisabledZones = new Set()
     }
   }
 
@@ -258,7 +272,7 @@
       value={firstZoneTags}
       onTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone1}
-      disabled={disabledZones.has('zone1')}
+      disabled={effectiveDisabledZones.has('zone1')}
     />
 
     <ChipEditor
@@ -268,7 +282,7 @@
       value={secondZoneTags}
       onTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone2}
-      disabled={$promptsData.selectedComposition === 'all' || disabledZones.has('zone2')}
+      disabled={$promptsData.selectedComposition === 'all' || effectiveDisabledZones.has('zone2')}
     />
 
     <ChipEditor

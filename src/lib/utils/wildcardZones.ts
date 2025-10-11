@@ -6,7 +6,12 @@ import { parseWeightDirective } from './tagExpansion'
 import { getWeightedRandomIndex } from './random'
 import { testModeStore } from '../stores/testModeStore.svelte'
 import type { TreeModel } from '../TreeEdit/model'
-import { getNodePath } from '../TreeEdit/utils'
+import {
+  getNodePath,
+  extractCompositionDirective,
+  extractDisablesDirective
+} from '../TreeEdit/utils'
+import { updateComposition } from '../stores/promptsStore'
 
 type ZoneName = 'all' | 'zone1' | 'zone2' | 'negative' | 'inpainting'
 
@@ -27,6 +32,45 @@ function storeSelection(zone: ZoneName, index: number) {
 
 function clearSelection(zone: ZoneName) {
   zoneSelectionState.delete(zone)
+}
+
+export type ZoneDirectiveState = {
+  composition: string | null
+  disabledZones: Set<ZoneName>
+}
+
+const defaultDirectiveState = (): ZoneDirectiveState => ({
+  composition: null,
+  disabledZones: new Set<ZoneName>()
+})
+
+function normalizeCompositionValue(raw: string | null): string | null {
+  if (!raw) return null
+  const normalized = raw.trim().toLowerCase()
+  switch (normalized) {
+    case 'all':
+    case 'temp-mask':
+    case 'left-horizontal':
+    case 'top-vertical':
+      return normalized
+    case '2h':
+      return 'left-horizontal'
+    case '2v':
+      return 'top-vertical'
+    default:
+      return null
+  }
+}
+
+function normalizeZoneName(raw: string): ZoneName | null {
+  const value = raw.trim().toLowerCase()
+  if (value === 'all' || value === 'zone1' || value === 'zone2' || value === 'negative') {
+    return value as ZoneName
+  }
+  if (value === 'inpainting') {
+    return 'inpainting'
+  }
+  return null
 }
 
 function selectRandomChildIndex(
@@ -139,6 +183,7 @@ export async function readWildcardZones(
   zone2: string
   negative: string
   inpainting: string
+  directives: ZoneDirectiveState
 }> {
   // Always refresh wildcard data to ensure we have the correct file
   const skipRefresh = options?.skipRefresh ?? false
@@ -149,6 +194,37 @@ export async function readWildcardZones(
   const wildcardModel = getWildcardModel()
   const shouldReroll = options?.reroll ?? false
   const nodes = wildcardModel.nodes
+
+  const directiveState = defaultDirectiveState()
+
+  const applyAllZoneDirectives = (value: string | null) => {
+    // Reset previous state
+    directiveState.composition = null
+    directiveState.disabledZones = new Set<ZoneName>()
+
+    if (!value || value.length === 0) {
+      return
+    }
+
+    const compositionRaw = extractCompositionDirective(value)
+    const normalizedComposition = normalizeCompositionValue(compositionRaw)
+    if (normalizedComposition) {
+      directiveState.composition = normalizedComposition
+      updateComposition(normalizedComposition)
+    }
+
+    const disablesRaw = extractDisablesDirective(value)
+    if (disablesRaw.length > 0) {
+      const disabledSet = new Set<ZoneName>()
+      for (const entry of disablesRaw) {
+        const zone = normalizeZoneName(entry)
+        if (zone) {
+          disabledSet.add(zone)
+        }
+      }
+      directiveState.disabledZones = disabledSet
+    }
+  }
 
   const extractZoneData = (zoneName: ZoneName): string => {
     // Find the zone node
@@ -167,6 +243,9 @@ export async function readWildcardZones(
         : null
 
     if (!shouldReroll && existingValue !== null) {
+      if (zoneName === 'all') {
+        applyAllZoneDirectives(existingValue)
+      }
       return existingValue
     }
 
@@ -181,6 +260,10 @@ export async function readWildcardZones(
 
     const value = resolveChildValue(nodes, node.children, chosenIndex)
 
+    if (zoneName === 'all') {
+      applyAllZoneDirectives(value)
+    }
+
     if (value === null) {
       clearSelection(zoneName)
       return ''
@@ -194,7 +277,11 @@ export async function readWildcardZones(
     zone1: extractZoneData('zone1'),
     zone2: extractZoneData('zone2'),
     negative: extractZoneData('negative'),
-    inpainting: extractZoneData('inpainting')
+    inpainting: extractZoneData('inpainting'),
+    directives: {
+      composition: directiveState.composition,
+      disabledZones: new Set(directiveState.disabledZones)
+    }
   }
 
   return result
