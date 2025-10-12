@@ -138,6 +138,14 @@
       chipBody.appendChild(chipResolution)
     }
 
+    chipName.addEventListener('input', (event) => {
+      event.stopPropagation()
+      const raw = chipName.textContent ?? ''
+      const trimmed = raw.trim()
+      span.dataset.value = trimmed
+      chipNameHidden.textContent = trimmed || '\u00a0'
+    })
+
     span.appendChild(chipName)
     span.appendChild(chipBody)
 
