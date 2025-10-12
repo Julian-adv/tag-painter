@@ -4,6 +4,7 @@
   import { getWildcardModel } from '../stores/tagsStore'
   import { findNodeByName, isConsistentRandomArray } from '../TreeEdit/utils'
   import ChipEditorAutocomplete from '../ChipEditorAutocomplete.svelte'
+  import { createPlaceholderRegex } from '$lib/constants'
 
   interface Props {
     id?: string
@@ -38,12 +39,9 @@
   } | null = null
 
   // === Pattern Regular Expressions ===
-  // __abc__  → Purple single tag (allows underscores inside, no commas/spaces, requires delimiter after)
-  const entityRe = /__([^_\s,](?:(?!__|,|\s).)*?[^_\s,])__(?=[\s,.]|$)/g
+  const placeholderRe = createPlaceholderRegex()
   // {aaa|bbb|ccc} → Green choice tag
   const choiceRe = /\{([^{}]+)\}/g
-  // Combined scanner (order matters: prevents overlaps)
-  const masterRe = /__([^_\s,](?:(?!__|,|\s).)*?[^_\s,])__(?=[\s,.]|$)|\{([^{}]+)\}/g
 
   // === API: Serialize internal text ===
   // Example: "abc __def__ {x|y}"
@@ -147,23 +145,28 @@
   }
 
   function createChoiceTag(raw: string): HTMLSpanElement {
-    const parts = raw
-      .split('|')
-      .map((s) => s.trim())
-      .filter(Boolean)
+    const parts = raw.split('|')
+    const normalizedParts = parts.map((s) => s.trim())
     const outer = document.createElement('span')
     outer.className = 'tag tag-green'
     outer.contentEditable = 'false'
     outer.dataset.type = 'choice'
-    outer.dataset.values = parts.join('|')
+    outer.dataset.values = normalizedParts.join('|')
 
     // Render choice cells
     const box = document.createElement('span')
     box.className = 'choice-box'
-    for (let i = 0; i < parts.length; i++) {
+    for (let i = 0; i < normalizedParts.length; i++) {
       const cell = document.createElement('span')
       cell.className = 'choice-cell'
-      cell.textContent = parts[i]
+      cell.contentEditable = 'true'
+      cell.spellcheck = false
+      cell.textContent = normalizedParts[i]
+      cell.addEventListener('input', (event) => {
+        event.stopPropagation()
+        normalizedParts[i] = cell.textContent ? cell.textContent.trim() : ''
+        outer.dataset.values = normalizedParts.join('|')
+      })
       box.appendChild(cell)
     }
     outer.appendChild(box)
@@ -175,23 +178,59 @@
     const host = editor
     if (!host) return
     const frag = document.createDocumentFragment()
-    let lastIdx = 0
-    for (const m of text.matchAll(masterRe)) {
-      const idx = m.index ?? 0
-      if (idx > lastIdx) {
-        frag.appendChild(document.createTextNode(text.slice(lastIdx, idx)))
+    let cursor = 0
+    placeholderRe.lastIndex = 0
+    choiceRe.lastIndex = 0
+
+    while (cursor < text.length) {
+      placeholderRe.lastIndex = cursor
+      choiceRe.lastIndex = cursor
+
+      const placeholderMatch = placeholderRe.exec(text)
+      const choiceMatch = choiceRe.exec(text)
+
+      let nextMatch: RegExpExecArray | null = null
+      let matchType: 'placeholder' | 'choice' | null = null
+      let nextIndex = text.length
+
+      if (placeholderMatch && placeholderMatch.index !== undefined && placeholderMatch.index >= 0) {
+        nextMatch = placeholderMatch
+        matchType = 'placeholder'
+        nextIndex = placeholderMatch.index
       }
-      if (m[1] !== undefined) {
-        // __name__
-        frag.appendChild(createEntityTag(m[1].trim()))
-      } else if (m[2] !== undefined) {
-        // {a|b|c}
-        frag.appendChild(createChoiceTag(m[2].trim()))
+
+      if (choiceMatch && choiceMatch.index !== undefined && choiceMatch.index >= 0) {
+        if (!nextMatch || choiceMatch.index < nextIndex) {
+          nextMatch = choiceMatch
+          matchType = 'choice'
+          nextIndex = choiceMatch.index
+        }
       }
-      lastIdx = idx + m[0].length
-    }
-    if (lastIdx < text.length) {
-      frag.appendChild(document.createTextNode(text.slice(lastIdx)))
+
+      if (!nextMatch || matchType === null) {
+        if (cursor < text.length) {
+          frag.appendChild(document.createTextNode(text.slice(cursor)))
+        }
+        break
+      }
+
+      if (nextIndex > cursor) {
+        frag.appendChild(document.createTextNode(text.slice(cursor, nextIndex)))
+      }
+
+      if (matchType === 'placeholder') {
+        const value = (nextMatch[1] ?? '').trim()
+        if (value.length > 0) {
+          frag.appendChild(createEntityTag(value))
+        } else {
+          frag.appendChild(document.createTextNode(nextMatch[0]))
+        }
+      } else {
+        const raw = nextMatch[1] ?? ''
+        frag.appendChild(createChoiceTag(raw))
+      }
+
+      cursor = nextMatch.index + nextMatch[0].length
     }
 
     if (range) {
@@ -679,6 +718,11 @@
   :global(.choice-cell) {
     padding: 2px 8px;
     border-left: 1px dashed rgba(0, 0, 0, 0.15);
+    min-width: 0.5rem;
+    outline: none;
+  }
+  :global(.choice-cell:empty::after) {
+    content: '\00a0';
   }
   :global(.choice-cell):first-child {
     border-left: none;
