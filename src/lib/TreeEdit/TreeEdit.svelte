@@ -110,7 +110,6 @@
     const sid = selectedIds[0]
     autoEditChildId = sid
     autoEditBehavior = 'selectAll'
-    focusSelectedSoon()
   }
 
   function addSiblingAfterLeaf(leafId: string) {

@@ -12,6 +12,10 @@
     disabled?: boolean
     currentRandomTagResolutions?: Record<string, string>
     onTagDoubleClick?: (tagName: string) => void
+    specialSuggestions?: string[]
+    specialTrigger?: string
+    showLabel?: boolean
+    autocompleteActive?: boolean
   }
 
   let {
@@ -20,13 +24,18 @@
     value = '',
     disabled = false,
     currentRandomTagResolutions,
-    onTagDoubleClick
+    onTagDoubleClick,
+    specialSuggestions = [],
+    specialTrigger = '__',
+    showLabel = true,
+    autocompleteActive = true
   }: Props = $props()
 
   let editor = $state<HTMLDivElement | null>(null)
-  let autocompleteController:
-    | { handleKeydown: (event: KeyboardEvent) => boolean; close: () => void }
-    | null = null
+  let autocompleteController: {
+    handleKeydown: (event: KeyboardEvent) => boolean
+    close: () => void
+  } | null = null
 
   // === Pattern Regular Expressions ===
   // __abc__  → Purple single tag (allows underscores inside, no commas/spaces, requires delimiter after)
@@ -258,7 +267,7 @@
   }
 
   // Text index ↔ node position mapping (simple version)
-  function getPlainTextBeforeCaret(): string {
+  function getCaretPrefix(): string {
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0) return ''
     const host = editor
@@ -298,7 +307,7 @@
     return out
   }
 
-  function restoreCaretByPlainPrefix(prefix: string) {
+  function restoreCaret(prefix: string) {
     const host = editor
     if (!host) return
     const target = prefix.length
@@ -366,13 +375,13 @@
   }
 
   function reparseAllPreserveCaret() {
-    const before = getPlainTextBeforeCaret() // Serialized text before caret
+    const before = getCaretPrefix() // Serialized text before caret
     const all = serializeEditor()
 
     clearEditor()
     parseAndInsert(all)
 
-    restoreCaretByPlainPrefix(before)
+    restoreCaret(before)
     editor?.focus() // ← Added
   }
 
@@ -427,6 +436,7 @@
     if (autocompleteController?.handleKeydown(event)) {
       return
     }
+
     handleBoundaryDelete(event)
   }
 
@@ -469,16 +479,38 @@
     isComposing = false
     reparseAllPreserveCaret()
   }
+
+  export { getCaretPrefix }
+
+  export { restoreCaret }
+
+  export function focusEditor(mode: 'selectAll' | 'caretEnd' = 'selectAll') {
+    if (!editor) return
+    editor.focus()
+    if (mode === 'selectAll') {
+      const range = document.createRange()
+      range.selectNodeContents(editor)
+      const sel = window.getSelection()
+      if (sel) {
+        sel.removeAllRanges()
+        sel.addRange(range)
+      }
+    } else {
+      placeCaretAtEnd()
+    }
+  }
 </script>
 
 <div class={disabled ? 'pointer-events-none opacity-50' : ''}>
-  <div class="mb-1 flex items-center justify-between">
-    <label
-      for={id}
-      class="text-xs font-medium {disabled ? 'text-gray-400' : 'text-gray-700'} text-left"
-      >{label}</label
-    >
-  </div>
+  {#if showLabel}
+    <div class="mb-1 flex items-center justify-between">
+      <label
+        for={id}
+        class="text-xs font-medium {disabled ? 'text-gray-400' : 'text-gray-700'} text-left"
+        >{label}</label
+      >
+    </div>
+  {/if}
   <div
     class="editor"
     bind:this={editor}
@@ -499,16 +531,18 @@
     bind:this={autocompleteController}
     {disabled}
     target={editor}
-    active={!disabled}
+    active={!disabled && autocompleteActive}
+    specialTriggerPrefix={specialTrigger}
+    {specialSuggestions}
   />
 </div>
 
 <style>
   .editor {
-    min-height: 3rem;
-    padding: 0.5rem;
+    min-height: 1.25rem;
+    padding: 0.125rem 0.25rem;
     border: 1px solid #e5e7eb;
-    border-radius: 0.375rem;
+    border-radius: 0.25rem;
     background-color: #f9fafb;
     cursor: text;
     text-align: left;
@@ -516,11 +550,8 @@
     white-space: pre-wrap;
     word-break: break-word;
     outline: none;
-    line-height: 1.5;
   }
   .editor:focus {
-    border-color: #38bdf8;
-    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
     background-color: #ffffff;
   }
 
@@ -529,19 +560,18 @@
     align-items: stretch;
     border-radius: 0.375rem;
     border: 1px dashed;
-    padding: 0 0.35rem 0rem 0.25rem;
-    margin: 0.0625rem 0.125rem;
+    padding: 0 0.35rem 0 0.35rem;
+    margin: 1px 0.125rem;
     font-size: 0.75rem;
     font-weight: 500;
     cursor: pointer;
-    vertical-align: bottom;
     user-select: none;
     position: relative;
     max-width: calc(100% - 0.5rem);
   }
 
   :global(.tag-purple) {
-    background: #ede9fe; /* Light purple background */
+    background: #f3e8ff; /* Light purple background */
     color: #5b21b6; /* Purple text */
     border-color: #c084fc;
   }
@@ -593,7 +623,6 @@
     top: 0;
     left: 0;
     padding: 0 0.25rem 0.0625rem 0.25rem;
-    font-weight: 600;
     font-size: 0.875rem;
     border-radius: 0.375rem 0 0 0.375rem;
     cursor: text;

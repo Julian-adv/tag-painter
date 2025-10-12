@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte'
-  import AutoCompleteTextarea from '../AutoCompleteTextarea.svelte'
+  import ChipEditor from '../placeholder/ChipEditor.svelte'
   import PlaceholderChipDisplay from './PlaceholderChipDisplay.svelte'
   import type { TreeModel } from './model'
   import { formatCommaSeparatedValues, isCommaSeparated } from '../utils/textFormatting'
@@ -43,39 +43,32 @@
 
   let isEditing = $state(false)
   let editingValue = $state('')
-  let inputElement: HTMLInputElement | null = $state(null)
-  let acWrapper: HTMLDivElement | null = $state(null)
+  let chipEditorRef: {
+    getText: () => string
+    readText: (input: string) => void
+    getCaretPrefix: () => string
+    restoreCaret: (prefix: string) => void
+    focusEditor: (mode: 'selectAll' | 'caretEnd') => void
+  } | null = $state(null)
+  const EMPTY_RESOLUTIONS: Record<string, string> = {}
+  let wrapperEl: HTMLDivElement | null = $state(null)
 
   // Adjust the weight of the comma-separated token at caret with Ctrl+Wheel
   function handleWheel(event: WheelEvent) {
-    if (!event.ctrlKey) return
+    if (!event.ctrlKey || !enableAutocomplete || !chipEditorRef) return
     event.preventDefault()
     event.stopPropagation()
 
-    // Determine the active editable element (textarea for autocomplete, input otherwise)
-    let el: HTMLTextAreaElement | HTMLInputElement | null = null
-    if (enableAutocomplete) {
-      el = (acWrapper?.querySelector('textarea') as HTMLTextAreaElement) ?? null
-    } else {
-      el = inputElement
-    }
-    if (!el) return
-
-    const caret = el.selectionStart ?? 0
     const step = event.deltaY < 0 ? 0.1 : -0.1
+    const currentText = chipEditorRef.getText?.() ?? editingValue
+    const caretPrefix = chipEditorRef.getCaretPrefix?.() ?? ''
+    const caretPos = caretPrefix.length
 
-    const { text, caretPos } = adjustWeightAtCaret(editingValue, caret, step)
-    if (text !== editingValue) {
+    const { text, caretPos: nextCaret } = adjustWeightAtCaret(currentText, caretPos, step)
+    if (text !== currentText) {
+      chipEditorRef.readText?.(text)
+      chipEditorRef.restoreCaret?.(text.slice(0, nextCaret))
       editingValue = text
-      // Update caret after DOM updates
-      setTimeout(() => {
-        try {
-          el?.setSelectionRange(caretPos, caretPos)
-        } catch (err) {
-          // Ignore errors when element is not focusable or is detached
-          void err
-        }
-      }, 0)
     }
   }
 
@@ -183,31 +176,14 @@
     isEditing = true
     onEditingChange?.(true)
     await tick()
-    if (enableAutocomplete) {
-      const ta = acWrapper?.querySelector('textarea') as HTMLTextAreaElement | null
-      if (ta) {
-        ta.focus()
-        if (behavior === 'selectAll') {
-          ta.select()
-        } else {
-          const end = ta.value?.length ?? 0
-          ta.selectionStart = end
-          ta.selectionEnd = end
-        }
-      }
-    } else if (inputElement) {
-      inputElement.focus()
-      if (behavior === 'selectAll') {
-        inputElement.select()
-      } else {
-        const end = inputElement.value?.length ?? 0
-        inputElement.setSelectionRange?.(end, end)
-      }
-    }
+    chipEditorRef?.readText?.(value)
+    chipEditorRef?.focusEditor?.(behavior)
   }
 
   function finishEditing() {
-    let finalValue = editingValue.trim()
+    const editorValue = chipEditorRef?.getText?.() ?? editingValue
+    editingValue = editorValue
+    let finalValue = editorValue.trim()
 
     // Apply comma formatting for leaf nodes
     if (isLeafNode && finalValue && isCommaSeparated(finalValue)) {
@@ -230,100 +206,59 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    // Prevent bubbling to parent row handlers (e.g., space/enter on row)
-    event.stopPropagation()
     if (event.key === 'Enter') {
       event.preventDefault()
+      event.stopPropagation()
       finishEditing()
     } else if (event.key === 'Escape') {
       event.preventDefault()
+      event.stopPropagation()
       cancelEditing()
     } else if (event.key === 'Tab' && !event.shiftKey) {
-      // Commit current change and advance focus if requested
       if (onTab) {
         event.preventDefault()
-        // Finish editing to persist the current value
+        event.stopPropagation()
         finishEditing()
-        // Let parent move focus/start editing next field
         onTab()
       }
     }
   }
 
-  export async function activate(behavior: 'selectAll' | 'caretEnd' = 'selectAll') {
-    // Programmatically start editing and focus/select input with desired caret behavior
-    startEditing(behavior)
-    await tick()
-    if (enableAutocomplete) {
-      // Focus the inner textarea of AutoCompleteTextarea
-      const ta = acWrapper?.querySelector('textarea') as HTMLTextAreaElement | null
-      if (ta) {
-        ta.focus()
-        if (behavior === 'selectAll') {
-          ta.select()
-        } else {
-          const end = ta.value?.length ?? 0
-          ta.selectionStart = end
-          ta.selectionEnd = end
-        }
-      }
-    } else if (inputElement) {
-      inputElement.focus()
-      if (behavior === 'selectAll') {
-        inputElement.select()
-      } else {
-        const end = inputElement.value?.length ?? 0
-        inputElement.setSelectionRange?.(end, end)
-      }
+  function handleFocusOut(event: FocusEvent) {
+    const next = event.relatedTarget as Node | null
+    if (wrapperEl && next && wrapperEl.contains(next)) {
+      return
     }
+    finishEditing()
+  }
+
+  export async function activate(behavior: 'selectAll' | 'caretEnd' = 'selectAll') {
+    await startEditing(behavior)
   }
 </script>
 
 {#if isEditing}
-  {#if enableAutocomplete}
-    <div
-      bind:this={acWrapper}
-      onfocusout={finishEditing}
-      class="w-full"
-      style="width: 100%;"
-      onwheel={handleWheel}
-    >
-      <AutoCompleteTextarea
-        value={editingValue}
-        {placeholder}
-        class={'inline-editor-input ' + className}
-        onValueChange={(v) => (editingValue = v)}
-        {specialSuggestions}
-        specialTriggerPrefix={specialTrigger}
-        onkeydown={(event: KeyboardEvent) => {
-          event.stopPropagation()
-          if (event.key === 'Enter') {
-            event.preventDefault()
-            finishEditing()
-          } else if (event.key === 'Escape') {
-            event.preventDefault()
-            cancelEditing()
-          } else if (event.key === 'Tab' && !event.shiftKey) {
-            if (onTab) {
-              event.preventDefault()
-              finishEditing()
-              onTab()
-            }
-          }
-        }}
-      />
-    </div>
-  {:else}
-    <input
-      class="inline-editor-input {className} {expandOnEdit ? 'full-width' : ''}"
-      bind:value={editingValue}
-      onblur={finishEditing}
-      onkeydown={handleKeydown}
-      onwheel={handleWheel}
-      {placeholder}
-      bind:this={inputElement}
+  <div
+    class="chip-editor-wrapper {expandOnEdit ? 'full-width' : ''}"
+    bind:this={wrapperEl}
+    onfocusout={handleFocusOut}
+    onkeydown={handleKeydown}
+    onwheel={handleWheel}
+    role="presentation"
+  >
+    <ChipEditor
+      bind:this={chipEditorRef}
+      label=""
+      value={editingValue}
+      disabled={false}
+      currentRandomTagResolutions={EMPTY_RESOLUTIONS}
+      onTagDoubleClick={onChipDoubleClick}
+      specialSuggestions={enableAutocomplete ? specialSuggestions : []}
+      specialTrigger={enableAutocomplete ? specialTrigger : '__'}
+      showLabel={false}
+      autocompleteActive={enableAutocomplete}
     />
-  {/if}
+  </div>
 {:else}
   <div
     class="inline-editor-display {className}"
@@ -343,8 +278,17 @@
 {/if}
 
 <style>
+  .chip-editor-wrapper {
+    width: 100%;
+  }
+
+  .chip-editor-wrapper.full-width {
+    width: 100%;
+  }
+
   .inline-editor-display {
     padding: 0.125rem 0.25rem;
+    border: 1px solid transparent;
     font-size: 0.875rem;
     cursor: pointer;
     /* Allow wrapping across multiple lines when content exceeds parent width */

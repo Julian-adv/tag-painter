@@ -144,10 +144,31 @@
   }
 
   function handleRowKeydown(e: KeyboardEvent) {
-    // Keep Space to toggle/select on the current row; let other keys bubble
     if (e.key === ' ') {
+      const target = e.target as HTMLElement | null
+      if (isNameEditing || isValueEditing) return
+      if (target && (target.isContentEditable || target.closest('[contenteditable="true"]'))) {
+        return
+      }
       e.preventDefault()
       onSelect(id)
+      return
+    }
+
+    if (e.key === 'Enter') {
+      if (isNameEditing || isValueEditing) return
+      const target = e.target as HTMLElement | null
+      if (target && (target.isContentEditable || target.closest('[contenteditable="true"]'))) {
+        return
+      }
+      e.preventDefault()
+      const node = model.nodes[id]
+      if (!node) return
+      if (node.kind === 'leaf') {
+        valueEditorRef?.activate('selectAll')
+      } else {
+        nameEditorRef?.activate('selectAll')
+      }
     }
   }
 
@@ -193,12 +214,10 @@
       renameCallbacks[id]('__CANCEL__')
     }
     onSelect(id)
-    rowEl?.focus()
   }
 
   function handleValueFinish(_completed: boolean = true) {
     onSelect(id)
-    rowEl?.focus()
   }
 </script>
 
@@ -360,11 +379,6 @@
     gap: 0.25rem;
     position: relative;
   }
-  .row.name-editing,
-  .row.value-editing {
-    display: flex;
-    width: 100%;
-  }
   .row.selected {
     outline: 2px solid #3b82f6;
     border-radius: 0.375rem;
@@ -437,8 +451,7 @@
   }
   /* When value is editing, expand value editor to fill remaining width */
   .row.value-editing .value-wrapper.editing {
-    flex: 1 1 auto;
-    width: 100%;
+    flex: 0 1 auto;
   }
 
   /* When name is being edited, allow header/editor to grow */
