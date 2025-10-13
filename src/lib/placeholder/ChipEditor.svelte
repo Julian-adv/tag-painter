@@ -106,7 +106,7 @@
   function createEntityTag(name: string): HTMLSpanElement {
     const tagType = getTagType(name)
     const span = document.createElement('span')
-    span.className = `tag tag-purple ${tagType}`
+    span.className = `tag ${tagType}`
     span.contentEditable = 'false'
     span.dataset.type = 'entity'
     span.dataset.value = name
@@ -161,9 +161,7 @@
     outer.dataset.type = 'choice'
     outer.dataset.values = normalizedParts.join('|')
 
-    // Render choice cells
-    const box = document.createElement('span')
-    box.className = 'choice-box'
+    // Render choice cells directly in outer
     for (let i = 0; i < normalizedParts.length; i++) {
       const cell = document.createElement('span')
       cell.className = 'choice-cell'
@@ -175,9 +173,8 @@
         normalizedParts[i] = cell.textContent ? cell.textContent.trim() : ''
         outer.dataset.values = normalizedParts.join('|')
       })
-      box.appendChild(cell)
+      outer.appendChild(cell)
     }
-    outer.appendChild(box)
     return outer
   }
 
@@ -597,6 +594,10 @@
     white-space: pre-wrap;
     word-break: break-word;
     outline: none;
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    row-gap: 2px;
   }
   .editor:focus {
     background-color: #ffffff;
@@ -604,7 +605,7 @@
 
   :global(.tag) {
     display: inline-flex;
-    align-items: stretch;
+    align-items: center;
     border-radius: 0.375rem;
     border: 1px dashed;
     padding: 0 0.35rem 0 0.35rem;
@@ -617,16 +618,11 @@
     max-width: calc(100% - 0.5rem);
   }
 
-  :global(.tag-purple) {
-    background: #f3e8ff; /* Light purple background */
-    color: #5b21b6; /* Purple text */
-    border-color: #c084fc;
-  }
-
   :global(.tag.random) {
     background-color: #f3e8ff;
     color: #6b21a8;
     border-color: #c084fc;
+    padding-bottom: 0.0625rem;
   }
 
   :global(.tag.random:hover) {
@@ -669,7 +665,7 @@
     position: absolute;
     top: 0;
     left: 0;
-    padding: 0 0.25rem 0.0625rem 0.25rem;
+    padding: 0 0.35rem 0.0625rem 0.35rem;
     font-size: 0.875rem;
     border-radius: 0.375rem 0 0 0.375rem;
     cursor: text;
@@ -683,22 +679,21 @@
   }
 
   :global(.chip-body) {
-    display: inline-block;
+    display: inline;
+    align-items: baseline;
     max-width: 100%;
     min-width: 0;
-    padding: 0.0625rem 0 0 0;
   }
 
   :global(.chip-name-hidden) {
     visibility: hidden;
-    display: inline-block;
-    padding-right: 0.4rem;
-    font-weight: 600;
+    display: inline;
     font-size: 0.875rem;
   }
 
   :global(.chip-resolution) {
     display: inline;
+    padding-left: 0.4rem;
     font-weight: 400;
     opacity: 0.8;
     font-style: italic;
@@ -711,23 +706,26 @@
   }
 
   :global(.tag-green) {
-    background: #eaffea;
-    color: #166534;
-    padding: 2px; /* choice-box manages internal padding */
+    font-size: 0.875rem;
+    background-color: #ecfccb;
+    color: #1f3c08;
+    border-color: #166534;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding-left: 0.1rem;
+    padding-bottom: 0.0625rem;
   }
 
   /* Choice cell division */
-  :global(.choice-box) {
-    display: inline-flex;
-    gap: 0;
-    overflow: hidden;
-    border-radius: 9999px;
-  }
   :global(.choice-cell) {
-    padding: 2px 8px;
-    border-left: 1px dashed rgba(0, 0, 0, 0.15);
+    padding: 0 0 0 0.25rem;
+    border-left: 1px dashed #166534;
     min-width: 0.5rem;
     outline: none;
+    display: inline-flex;
+    align-items: center;
+    white-space: pre;
   }
   :global(.choice-cell:empty::after) {
     content: '\00a0';

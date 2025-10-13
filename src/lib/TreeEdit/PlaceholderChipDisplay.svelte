@@ -155,7 +155,7 @@
     align-items: center;
     gap: 0.25rem;
     padding: 0 0.35rem 0.0625rem 0.35rem;
-    margin: 0 0.1rem;
+    margin: 0.0625rem 0.125rem;
     border-radius: 0.375rem;
     border: 1px dashed #d1d5db;
     white-space: nowrap;

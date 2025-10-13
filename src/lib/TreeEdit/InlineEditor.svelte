@@ -229,7 +229,14 @@
     if (wrapperEl && next && wrapperEl.contains(next)) {
       return
     }
-    finishEditing()
+
+    // Delay finishing to allow focus to settle (e.g., choice-cell getting focus)
+    setTimeout(() => {
+      if (wrapperEl && wrapperEl.contains(document.activeElement)) {
+        return
+      }
+      finishEditing()
+    }, 0)
   }
 
   export async function activate(behavior: 'selectAll' | 'caretEnd' = 'selectAll') {
