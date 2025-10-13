@@ -109,7 +109,7 @@
     if (selectedIds.length !== 1) return
     const sid = selectedIds[0]
     autoEditChildId = sid
-    autoEditBehavior = 'selectAll'
+    autoEditBehavior = 'caretEnd'
   }
 
   function addSiblingAfterLeaf(leafId: string) {
@@ -308,8 +308,8 @@
   // Allow descendants to request auto-editing of a specific child id
   function setAutoEditChildId(id: string | null) {
     autoEditChildId = id
-    // Default behavior: select all when entering edit programmatically
-    autoEditBehavior = 'selectAll'
+    // Default behavior: caret at end when entering edit programmatically
+    autoEditBehavior = 'caretEnd'
   }
 
   function handleTreeMutate(structural: boolean) {

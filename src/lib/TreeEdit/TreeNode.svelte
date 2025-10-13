@@ -131,7 +131,7 @@
 
     if (n.kind === 'leaf') {
       // Move from name to value editor on leaves
-      valueEditorRef?.activate('selectAll')
+      valueEditorRef?.activate('caretEnd')
     } else if (n.kind === 'array' && autoEditName) {
       const children = (n as ArrayNode).children
       if (children && children.length > 0) {
@@ -165,9 +165,9 @@
       const node = model.nodes[id]
       if (!node) return
       if (node.kind === 'leaf') {
-        valueEditorRef?.activate('selectAll')
+        valueEditorRef?.activate('caretEnd')
       } else {
-        nameEditorRef?.activate('selectAll')
+        nameEditorRef?.activate('caretEnd')
       }
     }
   }
