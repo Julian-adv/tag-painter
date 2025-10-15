@@ -3,7 +3,7 @@
   import { onMount } from 'svelte'
   import { getWildcardModel } from '../stores/tagsStore'
   import { findNodeByName, isConsistentRandomArray } from '../TreeEdit/utils'
-  import ChipEditorAutocomplete from '../ChipEditorAutocomplete.svelte'
+  import ChipEditorAutocomplete from './ChipEditorAutocomplete.svelte'
   import { createPlaceholderRegex } from '$lib/constants'
 
   interface Props {

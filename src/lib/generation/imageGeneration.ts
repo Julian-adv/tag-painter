@@ -8,7 +8,10 @@ import {
   FINAL_SAVE_NODE_ID,
   generateLoraChain
 } from './workflow'
-import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
+import {
+  DEFAULT_FACE_DETAILER_SETTINGS,
+  DEFAULT_UPSCALE_SETTINGS
+} from '$lib/constants'
 import { generateQwenImage } from './qwenImageGeneration'
 import { generateChromaImage } from './chromaImageGeneration'
 import { generateFlux1KreaImage } from './flux1KreaImageGeneration'
@@ -59,6 +62,23 @@ export interface GenerationOptions {
   onLoadingChange: (loading: boolean) => void
   onProgressUpdate: (progress: ProgressData) => void
   onImageReceived: (imageBlob: Blob, filePath: string) => void
+}
+
+/**
+ * Get default workflow file based on model type
+ */
+function getDefaultWorkflowForModelType(modelType?: string): string {
+  switch (modelType) {
+    case 'qwen':
+      return 'qwen.api.workflow.json'
+    case 'chroma':
+      return 'chroma.api.workflow.json'
+    case 'flux1_krea':
+      return 'flux1_krea.api.workflow.json'
+    case 'sdxl':
+    default:
+      return 'sdxl.api.workflow.json'
+  }
 }
 
 export async function generateImage(options: GenerationOptions): Promise<{
@@ -118,20 +138,14 @@ export async function generateImage(options: GenerationOptions): Promise<{
   }
 
   try {
-    // Load custom workflow if specified, otherwise use default
+    // Load custom workflow if specified, otherwise use default based on model type
     let workflow: ComfyUIWorkflow
-    const customWorkflowPath = modelSettings?.customWorkflowPath
-    if (customWorkflowPath) {
-      try {
-        workflow = await loadCustomWorkflow(customWorkflowPath)
-        console.log('Loaded custom workflow from:', customWorkflowPath)
-      } catch (error) {
-        console.error('Failed to load custom workflow, using default:', error)
-        workflow = JSON.parse(
-          JSON.stringify(isInpainting ? inpaintingWorkflowPrompt : defaultWorkflowPrompt)
-        )
-      }
-    } else {
+    const customWorkflowPath = modelSettings?.customWorkflowPath || getDefaultWorkflowForModelType(modelSettings?.modelType)
+    try {
+      workflow = await loadCustomWorkflow(customWorkflowPath)
+      console.log('Loaded custom workflow from:', customWorkflowPath)
+    } catch (error) {
+      console.error('Failed to load custom workflow, using fallback:', error)
       workflow = JSON.parse(
         JSON.stringify(isInpainting ? inpaintingWorkflowPrompt : defaultWorkflowPrompt)
       )

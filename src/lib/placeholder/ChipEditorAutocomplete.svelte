@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
-  import { initTags, isCustomTag, combinedTags } from './stores/tagsStore'
+  import { initTags, isCustomTag, combinedTags } from '../stores/tagsStore'
 
   interface Props {
     target: HTMLElement | null
