@@ -142,6 +142,7 @@
   .chip-flow {
     display: inline-flex;
     flex-wrap: wrap;
+    white-space: pre-wrap;
     align-items: baseline;
     row-gap: 2px;
   }
@@ -158,7 +159,7 @@
     margin: 0.0625rem 0.125rem;
     border-radius: 0.375rem;
     border: 1px dashed #d1d5db;
-    white-space: nowrap;
+    white-space: pre-wrap;
     cursor: pointer;
     transition: background-color 0.2s ease;
   }
@@ -190,6 +191,8 @@
     background-color: #ecfccb;
     color: #1f3c08;
     border-color: #166534;
+    display: inline-flex;
+    flex-wrap: wrap;
   }
   .chip.choice:hover {
     background-color: #d9f99d;
@@ -204,6 +207,7 @@
   .choice-option {
     display: inline-flex;
     align-items: center;
-    white-space: pre;
+    flex-wrap: wrap;
+    white-space: pre-wrap;
   }
 </style>

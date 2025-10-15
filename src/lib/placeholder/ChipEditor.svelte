@@ -675,7 +675,7 @@
 
   :global(.chip-name:focus) {
     outline: 2px solid rgba(56, 189, 248, 0.5);
-    outline-offset: 1px;
+    outline-offset: 0px;
   }
 
   :global(.chip-body) {
@@ -697,7 +697,7 @@
     font-weight: 400;
     opacity: 0.8;
     font-style: italic;
-    vertical-align: top;
+    vertical-align: baseline;
     min-width: 0;
     white-space: pre-wrap;
     word-break: break-word;
@@ -715,6 +715,7 @@
     gap: 0.25rem;
     padding-left: 0.1rem;
     padding-bottom: 0.0625rem;
+    flex-wrap: wrap;
   }
 
   /* Choice cell division */
@@ -725,7 +726,7 @@
     outline: none;
     display: inline-flex;
     align-items: center;
-    white-space: pre;
+    white-space: pre-wrap;
   }
   :global(.choice-cell:empty::after) {
     content: '\00a0';
