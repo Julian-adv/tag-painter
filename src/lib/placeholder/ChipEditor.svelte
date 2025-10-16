@@ -594,10 +594,11 @@
     white-space: pre-wrap;
     word-break: break-word;
     outline: none;
-    display: inline-flex;
+    display: inline flow-root;
     flex-wrap: wrap;
     align-items: baseline;
     row-gap: 2px;
+    width: 100%;
   }
   .editor:focus {
     background-color: #ffffff;
