@@ -156,6 +156,7 @@
     }
 
     if (e.key === 'Enter') {
+      if (e.ctrlKey || e.metaKey) return
       if (isNameEditing || isValueEditing) return
       const target = e.target as HTMLElement | null
       if (target && (target.isContentEditable || target.closest('[contenteditable="true"]'))) {
