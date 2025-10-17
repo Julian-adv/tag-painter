@@ -175,4 +175,26 @@ install_custom_node "$ESSENTIALS_REPO" "$COMFY_DIR/custom_nodes/ComfyUI_essentia
 # ControlNet Aux (OpenPose, DWpose, etc.) for preprocessors used by inpainting workflow
 install_custom_node "$CONTROLNET_AUX_REPO" "$COMFY_DIR/custom_nodes/comfyui_controlnet_aux" "$CONTROLNET_AUX_BRANCH"
 
+echo "Installing upscale model..."
+UPSCALE_DIR="$COMFY_DIR/models/upscale_models"
+mkdir -p "$UPSCALE_DIR"
+MODEL_NAME="2x_NMKD-UpgifLiteV2_210k.pth"
+MODEL_PATH="$UPSCALE_DIR/$MODEL_NAME"
+
+if [[ -f "$MODEL_PATH" ]]; then
+  echo "Upscale model already present: $MODEL_PATH"
+else
+  echo "Downloading upscale model: $MODEL_NAME"
+  MODEL_URL="https://huggingface.co/utnah/esrgan/resolve/dc83465df24b219350e452750e881656f91d1d8b/2x_NMKD-UpgifLiteV2_210k.pth"
+  if command -v curl >/dev/null 2>&1; then
+    curl -L "$MODEL_URL" -o "$MODEL_PATH"
+  elif command -v wget >/dev/null 2>&1; then
+    wget "$MODEL_URL" -O "$MODEL_PATH"
+  else
+    echo "Error: curl or wget required to download upscale model." >&2
+    exit 1
+  fi
+  echo "Upscale model downloaded to: $MODEL_PATH"
+fi
+
 echo "Done. Use scripts/start.sh to run ComfyUI + app server."

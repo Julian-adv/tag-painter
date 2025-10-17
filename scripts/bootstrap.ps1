@@ -629,6 +629,32 @@ function Install-ControlNetAux($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
   Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
 }
 
+function Install-UpscaleModel($comfyDir) {
+  if (-not (Test-Path $comfyDir)) {
+    Write-Host "ComfyUI not found at $comfyDir; skipping upscale model install." -ForegroundColor Yellow
+    return
+  }
+
+  $upscaleDir = Join-Path $comfyDir "models\upscale_models"
+  New-DirectoryIfMissing $upscaleDir
+
+  $modelName = "2x_NMKD-UpgifLiteV2_210k.pth"
+  $modelPath = Join-Path $upscaleDir $modelName
+
+  if (Test-Path $modelPath) {
+    Write-Host "Upscale model already present: $modelPath" -ForegroundColor Green
+    return
+  }
+
+  Write-Header "Download upscale model: $modelName"
+
+  # Use resolve URL for direct download from Hugging Face
+  $modelUrl = "https://huggingface.co/utnah/esrgan/resolve/dc83465df24b219350e452750e881656f91d1d8b/2x_NMKD-UpgifLiteV2_210k.pth"
+  Save-UrlIfMissing $modelUrl $modelPath
+
+  Write-Host "Upscale model downloaded to: $modelPath" -ForegroundColor Green
+}
+
 # Main
 Push-Location (Resolve-Path (Join-Path $PSScriptRoot ".."))
 try {
@@ -654,6 +680,7 @@ try {
     Install-ImpactSubpack -comfyDir $ComfyDir -repoUrl $ImpactSubpackRepo -branch $ImpactSubpackBranch -venvPy $venvPy -uv $uv
     Install-Essentials -comfyDir $ComfyDir -repoUrl $EssentialsRepo -branch $EssentialsBranch -venvPy $venvPy -uv $uv
     Install-ControlNetAux -comfyDir $ComfyDir -repoUrl $ControlNetAuxRepo -branch $ControlNetAuxBranch -venvPy $venvPy -uv $uv
+    Install-UpscaleModel -comfyDir $ComfyDir
     # Common extras used by some custom nodes (e.g., matplotlib for cgem156-ComfyUI)
     if (Test-Path $venvPy) {
       # onnxruntime-gpu for DWpose if NVIDIA is present; fallback to CPU onnxruntime
