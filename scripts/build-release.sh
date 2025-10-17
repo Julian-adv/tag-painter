@@ -122,10 +122,36 @@ done
 
 DATA_DIR="$PAYLOAD_ROOT/data"
 mkdir -p "$DATA_DIR"
-for data_file in prompts.json settings.json wildcards.yaml outfits.txt lights.txt; do
+data_files=(
+  "prompts.json"
+  "settings.json"
+  "wildcards.yaml"
+  "wildcards.qwen.yaml"
+  "Vision2.1.yaml"
+  "outfits.txt"
+  "lights.txt"
+)
+for data_file in "${data_files[@]}"; do
   src_path="data/$data_file"
   if [[ -f "$src_path" ]]; then
     cp "$src_path" "$DATA_DIR/"
+  fi
+done
+
+data_dirs=(
+  "wildcards"
+  "examples"
+  "workflow"
+)
+for data_dir in "${data_dirs[@]}"; do
+  src_dir="data/$data_dir"
+  if [[ -d "$src_dir" ]]; then
+    if [[ $use_rsync -eq 1 ]]; then
+      rsync -a "$src_dir/" "$DATA_DIR/$data_dir/"
+    else
+      mkdir -p "$DATA_DIR/$data_dir"
+      cp -R "$src_dir/." "$DATA_DIR/$data_dir/"
+    fi
   fi
 done
 

@@ -4,7 +4,7 @@
 // and applies Settings into the workflow similarly to the Qwen path, but using
 // title-based node lookups to minimize coupling to specific node IDs.
 
-import { FINAL_SAVE_NODE_ID } from './workflow'
+import { FINAL_SAVE_NODE_ID, defaultWorkflowPrompt } from './workflow'
 import {
   expandCustomTags,
   detectCompositionFromTags,
@@ -12,6 +12,7 @@ import {
   prefetchWildcardFilesFromTexts
 } from '../utils/tagExpansion'
 import { getWildcardModel } from '../stores/tagsStore'
+import { updateComposition } from '../stores/promptsStore'
 import { readWildcardZones } from '../utils/wildcardZones'
 import {
   generateClientId,
@@ -55,7 +56,6 @@ async function loadChromaWorkflow(customPath: string | undefined): Promise<Comfy
     return wf
   } catch {
     // As a last resort, load the default SD workflow
-    const { defaultWorkflowPrompt } = await import('./workflow')
     return JSON.parse(JSON.stringify(defaultWorkflowPrompt))
   }
 }
@@ -118,7 +118,6 @@ export async function generateChromaImage(
     )
     const detectedComposition = detectCompositionFromTags([allResult.expandedText])
     if (detectedComposition) {
-      const { updateComposition } = await import('../stores/promptsStore')
       updateComposition(detectedComposition)
       promptsData.selectedComposition = detectedComposition
     }

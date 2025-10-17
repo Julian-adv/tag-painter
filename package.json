@@ -1,7 +1,7 @@
 {
   "name": "tag-painter",
   "private": true,
-  "version": "0.3.3",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
@@ -21,7 +21,6 @@
     "@eslint/compat": "^1.2.5",
     "@eslint/js": "^9.18.0",
     "@inlang/paraglide-js": "^2.3.2",
-    "@inlang/paraglide-sveltekit": "^0.16.1",
     "@sveltejs/adapter-auto": "^6.0.0",
     "@sveltejs/adapter-node": "^5.0.0",
     "@sveltejs/kit": "^2.16.0",
