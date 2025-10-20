@@ -139,6 +139,24 @@ background:
     expect(backgroundResult.expandedText).not.toContain('window')
   })
 
+  it('extracts disables from plain text without placeholders', () => {
+    const yaml = `
+all:
+  - hero, disables=[zone1]
+zone1:
+  - zone1content
+`
+    const model2 = fromYAML(yaml)
+    const disabledContext = { names: new Set<string>(), patterns: [] as string[] }
+
+    const allResult = expandCustomTags('hero, disables=[zone1]', model2, new Set(), {}, {}, disabledContext)
+    expect(allResult.expandedText).toContain('hero')
+    expect(disabledContext.names.has('zone1')).toBe(true)
+
+    const zone1Result = expandCustomTags('zone1', model2, new Set(), {}, {}, disabledContext)
+    expect(zone1Result.expandedText).not.toContain('zone1content')
+  })
+
   it('extracts disables from wildcard placeholder expansion results', () => {
     const yaml = `
 all:

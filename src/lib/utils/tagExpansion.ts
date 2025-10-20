@@ -914,6 +914,7 @@ export function expandCustomTags(
   // Otherwise, treat as leaf node content - expand choice patterns and placeholders
   const expandedText = expandChoicePatterns(text, ctx.disables)
   const finalExpanded = expandPlaceholders(ctx, expandedText, ctx.randomTagResolutions)
+  extractDisablesInfo(ctx, finalExpanded)
 
   // Return the expanded result
   return { expandedText: finalExpanded, randomTagResolutions: ctx.randomTagResolutions }
