@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import { isContainer, setLeafValue, toggle, renameNode } from './model'
   import type { ArrayNode, LeafNode, NodeKind, ObjectNode, RefNode, TreeModel } from './model'
   import TreeNode from './TreeNode.svelte'
@@ -208,17 +209,21 @@
     onMutate(false)
   }
 
-  function handleNameFinish(completed: boolean = true) {
+  async function handleNameFinish(completed: boolean = true) {
     // Check if there's a rename callback for this node (from Rename button)
     if (renameCallbacks[id] && !completed) {
       // Signal cancellation by calling the callback with __CANCEL__
       renameCallbacks[id]('__CANCEL__')
     }
     onSelect(id)
+    await tick()
+    rowEl?.focus()
   }
 
-  function handleValueFinish(_completed: boolean = true) {
+  async function handleValueFinish(_completed: boolean = true) {
     onSelect(id)
+    await tick()
+    rowEl?.focus()
   }
 </script>
 
