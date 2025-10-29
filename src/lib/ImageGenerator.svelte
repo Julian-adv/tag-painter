@@ -5,7 +5,6 @@
   import GenerationControls from './GenerationControls.svelte'
   import CompositionSelector from './CompositionSelector.svelte'
   import TagZones from './TagZones.svelte'
-  import LoraSelector from './LoraSelector.svelte'
   import { dev } from '$app/environment'
   import { m } from '$lib/paraglide/messages'
   import NoCheckpointsDialog from './NoCheckpointsDialog.svelte'
@@ -25,8 +24,7 @@
     updateCheckpoint,
     updateUpscale,
     updateFaceDetailer,
-    updateComposition,
-    updateSelectedLoras
+    updateComposition
   } from './stores/promptsStore'
 
   // Component state
@@ -48,7 +46,6 @@
       }
     | undefined
   let compositionSelector = $state<{ selectTempMask: () => void } | undefined>(undefined)
-  let loraSelectorRef = $state<{ refresh: () => void } | undefined>(undefined)
   let isGeneratingForever = $state(false)
   let shouldStopGeneration = $state(false)
   let lastSeed: number | null = $state(null)
@@ -83,7 +80,7 @@
     showNoCheckpointsDialog = true
   }
 
-  // Reload model/LoRA lists from ComfyUI and refresh UI options
+  // Reload model list from ComfyUI and refresh UI options
   async function refreshModels(event: MouseEvent) {
     // Prevent click from bubbling and default focus/selection behaviors
     event.stopPropagation()
@@ -108,13 +105,6 @@
       }
     } catch (e) {
       console.error('Failed to reload checkpoint list', e)
-    }
-
-    // Refresh LoRA list in the selector
-    try {
-      loraSelectorRef?.refresh()
-    } catch (e) {
-      console.error('Failed to refresh LoRA list', e)
     }
   }
 
@@ -483,11 +473,6 @@
     }
   }
 
-  // PromptForm functions
-  function handleLoraChange(loras: { name: string; weight: number }[]) {
-    updateSelectedLoras(loras)
-  }
-
   // Cleanup
   onDestroy(() => {
     if (imageUrl && imageUrl.startsWith('blob:')) {
@@ -541,16 +526,6 @@
               {/each}
             </select>
           </div>
-
-          <!-- LoRA Selector -->
-          <div class="flex flex-col gap-2">
-            <LoraSelector
-              bind:this={loraSelectorRef}
-              selectedLoras={$promptsData.selectedLoras}
-              onLoraChange={handleLoraChange}
-            />
-          </div>
-
           <div class="flex flex-col gap-2">
             <label class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal">
               <input
