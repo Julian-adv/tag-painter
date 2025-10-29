@@ -142,6 +142,7 @@
       char === '(' ||
       char === ')' ||
       char === ':' ||
+      char === '.' ||
       char === '|'
     )
   }
@@ -321,13 +322,21 @@
       return
     }
 
-    const pool = usingSpecial
-      ? (Array.isArray(specialSuggestions) ? specialSuggestions : [])
-      : $combinedTags
+    const sourceTags =
+      usingSpecial && Array.isArray(specialSuggestions) && specialSuggestions.length > 0
+        ? specialSuggestions
+        : $combinedTags
 
     const lower = searchTerm.toLowerCase()
-    const filtered = pool
-      .filter((tag) => tag && tag.toLowerCase().includes(lower))
+    const filtered = sourceTags
+      .filter((tag) => {
+        if (!tag) return false
+        if (usingSpecial) {
+          if (!isCustomTag(tag)) return false
+          return tag.toLowerCase().startsWith(lower)
+        }
+        return tag.toLowerCase().includes(lower)
+      })
       .slice(0, MAX_SUGGESTIONS)
 
     if (filtered.length === 0) {
@@ -375,7 +384,8 @@
     const selection = window.getSelection()
     if (!selection) return
 
-    const processed = suggestion.replace(/_/g, ' ')
+    const isChipNameSuggestion = isCustomTag(suggestion)
+    const processed = isChipNameSuggestion ? suggestion : suggestion.replace(/_/g, ' ')
     let replacement = processed
 
     if (!currentContext.isChipName && currentContext.usingSpecial && specialTriggerPrefix) {
