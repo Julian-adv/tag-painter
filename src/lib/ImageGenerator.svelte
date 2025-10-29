@@ -6,7 +6,7 @@
   import CompositionSelector from './CompositionSelector.svelte'
   import TagZones from './TagZones.svelte'
   import TabNavigation from './TabNavigation.svelte'
-  import ChatInterface from './ChatInterface.svelte'
+  import ChatInterface from './Chat/ChatInterface.svelte'
   import { dev } from '$app/environment'
   import { m } from '$lib/paraglide/messages'
   import NoCheckpointsDialog from './NoCheckpointsDialog.svelte'
