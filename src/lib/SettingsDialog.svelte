@@ -58,6 +58,13 @@
   })
   let hasUnsavedChanges: boolean = $state(false)
   let sessionInitialized: boolean = $state(false)
+  let availableVaes: string[] = $state([])
+  let availableCheckpoints: string[] = $state([])
+  let availableWorkflows: string[] = $state([])
+  let selectedModelKey: string = $state('Default')
+  let originalSelectedModelKey: string = $state('Default')
+  let selectedModelDirty: boolean = $state(false)
+  let lastSelectedModelKey: string = $state('Default')
 
   function deepClone<T>(obj: T): T {
     return JSON.parse(JSON.stringify(obj))
@@ -96,24 +103,25 @@
       const keyToEnsure = currentSelected || 'Default'
       if (initialFocus) {
         ensureModelEntry(keyToEnsure)
-        selectedModelKey = keyToEnsure
       }
+      selectedModelKey = keyToEnsure
       ensureModelEntry('Default')
       ensureModelEntry(keyToEnsure)
       originalLocalSettings = deepClone(localSettings)
       hasUnsavedChanges = false
+      originalSelectedModelKey = keyToEnsure
+      selectedModelDirty = false
+      lastSelectedModelKey = keyToEnsure
       sessionInitialized = true
     }
     if (!show && sessionInitialized) {
       sessionInitialized = false
       hasUnsavedChanges = false
+      selectedModelDirty = false
+      originalSelectedModelKey = 'Default'
+      lastSelectedModelKey = 'Default'
     }
   })
-
-  let availableVaes: string[] = $state([])
-  let availableCheckpoints: string[] = $state([])
-  let availableWorkflows: string[] = $state([])
-  let selectedModelKey: string = $state('Default')
 
   function ensureModelEntry(key: string) {
     if (localSettings.perModel[key]) {
@@ -141,7 +149,7 @@
     }
   }
 
-  // Create per-model entry only on demand (via dropdown onchange)
+  // Create per-model entry when needed
 
   $effect(() => {
     if (show) {
@@ -173,14 +181,37 @@
     }
   })
 
-  // When dialog opens, select current checkpoint from prompts store
+  // Track whether current selection differs from baseline
   $effect(() => {
-    if (show) {
-      let currentSelected: string | null = null
-      promptsData.subscribe((d) => (currentSelected = d.selectedCheckpoint || null))()
-      selectedModelKey = currentSelected || 'Default'
-      ensureModelEntry(selectedModelKey)
+    if (!show || !sessionInitialized) {
+      return
     }
+    selectedModelDirty = selectedModelKey !== originalSelectedModelKey
+  })
+
+  // Copy currently displayed settings into the newly selected model entry
+  $effect(() => {
+    if (!show || !sessionInitialized) {
+      return
+    }
+    if (selectedModelKey === lastSelectedModelKey) {
+      return
+    }
+    const previousKey = lastSelectedModelKey
+    const nextKey = selectedModelKey
+    ensureModelEntry(nextKey)
+    if (localSettings.perModel[previousKey]) {
+      const cloned = deepClone(localSettings.perModel[previousKey])
+      localSettings = {
+        ...localSettings,
+        perModel: {
+          ...localSettings.perModel,
+          [nextKey]: cloned
+        }
+      }
+      selectedModelDirty = true
+    }
+    lastSelectedModelKey = nextKey
   })
 
   // Focus requested field when dialog opens or when initialFocus changes
@@ -232,6 +263,8 @@
     // Update baseline immediately so button disables if dialog remains open
     originalLocalSettings = deepClone(localSettings)
     hasUnsavedChanges = false
+    originalSelectedModelKey = selectedModelKey
+    selectedModelDirty = false
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -752,12 +785,12 @@
       <div class="dialog-footer">
         <button
           type="button"
-          class={(hasUnsavedChanges
+          class={((hasUnsavedChanges || selectedModelDirty)
             ? 'bg-blue-500 text-white hover:bg-blue-600 focus:ring-blue-500 '
             : 'bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-gray-500 disabled:cursor-default ') +
             'rounded-md px-4 py-2 transition-colors focus:ring-2 focus:outline-none'}
           onclick={handleSave}
-          disabled={!hasUnsavedChanges}
+          disabled={!(hasUnsavedChanges || selectedModelDirty)}
         >
           {m['settingsDialog.save']()}
         </button>
