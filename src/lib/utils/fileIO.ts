@@ -160,6 +160,10 @@ export async function loadSettings(): Promise<Settings | null> {
         }
       }
 
+      if (typeof settings.geminiApiKey !== 'string') {
+        settings.geminiApiKey = ''
+      }
+
       return settings
     } else {
       console.error('Failed to fetch settings')

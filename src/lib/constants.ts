@@ -13,7 +13,8 @@ export const DEFAULT_SETTINGS = {
   seed: -1,
   sampler: 'euler_ancestral',
   scheduler: 'simple',
-  clipSkip: 2
+  clipSkip: 2,
+  geminiApiKey: ''
 } as const
 
 // Default FaceDetailer settings

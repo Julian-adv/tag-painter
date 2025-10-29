@@ -60,6 +60,8 @@
   "settingsDialog.close": "Close",
   "settingsDialog.comfyUrl": "ComfyUI URL:",
   "settingsDialog.comfyUrlPlaceholder": "http://127.0.0.1:8188",
+  "settingsDialog.geminiApiKey": "Gemini API Key:",
+  "settingsDialog.geminiApiKeyPlaceholder": "Paste your Gemini API key",
   "settingsDialog.imageHeight": "Image Height:",
   "settingsDialog.imageWidth": "Image Width:",
   "settingsDialog.loraModels": "LoRA Models:",

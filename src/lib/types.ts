@@ -81,6 +81,7 @@ export interface Settings {
   scheduler: string
   comfyUrl: string
   outputDirectory: string
+  geminiApiKey: string
   // VAE selection: '__embedded__' means use checkpoint's embedded VAE
   selectedVae: string
   clipSkip: number

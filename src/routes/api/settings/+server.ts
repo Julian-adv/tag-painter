@@ -28,6 +28,7 @@ export async function GET() {
           sampler: 'euler_ancestral',
           comfyUrl: DEFAULT_COMFY_URL,
           outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
+          geminiApiKey: '',
           selectedVae: '__embedded__',
           clipSkip: 2,
           locale: baseLocale,
@@ -52,6 +53,10 @@ export async function GET() {
 
     if (!settings.locale) {
       settings.locale = baseLocale
+    }
+
+    if (typeof settings.geminiApiKey !== 'string') {
+      settings.geminiApiKey = ''
     }
 
     if (settings.customWorkflowPath == null) {

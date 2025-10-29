@@ -124,6 +124,7 @@
     scheduler: DEFAULT_SETTINGS.scheduler,
     comfyUrl: DEFAULT_COMFY_URL,
     outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
+    geminiApiKey: DEFAULT_SETTINGS.geminiApiKey,
     selectedVae: '__embedded__',
     clipSkip: DEFAULT_SETTINGS.clipSkip,
     locale: baseLocale,
@@ -134,6 +135,7 @@
     const next: Settings = {
       ...input,
       comfyUrl: input.comfyUrl || DEFAULT_COMFY_URL,
+      geminiApiKey: input.geminiApiKey || '',
       selectedVae: input.selectedVae || '__embedded__',
       scheduler: input.scheduler || DEFAULT_SETTINGS.scheduler,
       perModel: input.perModel || {},
@@ -465,7 +467,7 @@
   }
 
   async function handleSettingsChange(newSettings: Settings) {
-    settings = { ...newSettings }
+    settings = validateSettings({ ...settings, ...newSettings })
     if (!settings.locale) settings.locale = baseLocale
     applyLocaleIfSupported(settings.locale)
 
@@ -598,7 +600,7 @@
             </div>
           {:else if activeTabId === 'chat'}
             <div class="h-full">
-              <ChatInterface />
+              <ChatInterface apiKey={settings.geminiApiKey} />
             </div>
           {/if}
         </div>

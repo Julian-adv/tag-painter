@@ -33,6 +33,7 @@
     scheduler: settings.scheduler,
     comfyUrl: settings.comfyUrl,
     outputDirectory: settings.outputDirectory,
+    geminiApiKey: settings.geminiApiKey || '',
     selectedVae: settings.selectedVae,
     clipSkip: settings.clipSkip,
     locale: settings.locale || baseLocale,
@@ -51,6 +52,7 @@
     scheduler: '',
     comfyUrl: '',
     outputDirectory: '',
+    geminiApiKey: '',
     selectedVae: '',
     clipSkip: 0,
     locale: baseLocale,
@@ -86,6 +88,9 @@
       cloned.locale = cloned.locale || baseLocale
       if (!cloned.perModel) {
         cloned.perModel = {}
+      }
+      if (!cloned.geminiApiKey) {
+        cloned.geminiApiKey = ''
       }
       localSettings = cloned
       // Reset session init so we can capture a fresh baseline below
@@ -347,6 +352,18 @@
           bind:value={localSettings.comfyUrl}
           placeholder={m['settingsDialog.comfyUrlPlaceholder']()}
           class="output-dir-input"
+        />
+
+        <label for="gemini-api-key" class="output-dir-label">
+          {m['settingsDialog.geminiApiKey']()}
+        </label>
+        <input
+          id="gemini-api-key"
+          type="password"
+          bind:value={localSettings.geminiApiKey}
+          placeholder={m['settingsDialog.geminiApiKeyPlaceholder']()}
+          class="output-dir-input"
+          autocomplete="off"
         />
 
         <label for="global-workflow" class="output-dir-label">Global Workflow</label>
