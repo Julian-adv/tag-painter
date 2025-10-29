@@ -176,5 +176,7 @@
   "tagZones.title": "태그",
   "tagDisplay.willPinLabel": "고정될 값:",
   "tagDisplay.pinnedToLabel": "고정 대상:",
-  "settingsDialog.sampler": "샘플러:"
+  "settingsDialog.sampler": "샘플러:",
+  "tabs.wildcards": "와일드카드",
+  "tabs.chat": "채팅"
 }

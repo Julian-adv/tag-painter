@@ -176,5 +176,7 @@
   "tagZones.title": "Tags",
   "tagDisplay.willPinLabel": "Will pin:",
   "tagDisplay.pinnedToLabel": "Pinned to:",
-  "settingsDialog.sampler": "Sampler:"
+  "settingsDialog.sampler": "Sampler:",
+  "tabs.wildcards": "Wildcards",
+  "tabs.chat": "Chat"
 }
