@@ -15,6 +15,8 @@
   import { fetchCheckpoints } from './generation/comfyui'
   import { ArrowPath } from 'svelte-heros-v2'
   import { generateImage } from './generation/imageGeneration'
+  import type { WildcardZoneOverrides } from './generation/imageGeneration'
+  import { getEffectiveModelSettings } from './generation/generationCommon'
   import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY, DEFAULT_SETTINGS } from '$lib/constants'
   import Toasts from './Toasts.svelte'
   import { baseLocale, setLocale, getLocale, isLocale } from '$lib/paraglide/runtime.js'
@@ -28,6 +30,7 @@
     updateFaceDetailer,
     updateComposition
   } from './stores/promptsStore'
+  import { readWildcardZones, writeWildcardZones } from './utils/wildcardZones'
 
   // Component state
   let isLoading = $state(false)
@@ -68,9 +71,11 @@
     inpainting: {}
   })
   let disabledZones = $state<Set<string>>(new Set())
+  let pendingWildcardOverrides: WildcardZoneOverrides | null = $state(null)
   type TagZonesHandle = {
     saveTags: () => Promise<void>
     refreshSelectedTags: () => Promise<void>
+    applyZoneOverrides: (overrides: WildcardZoneOverrides) => void
   }
   let tagZonesRef: TagZonesHandle | undefined = $state()
 
@@ -266,6 +271,7 @@
       }
     }
 
+    const overridesToApply = pendingWildcardOverrides
     const result = await generateImage({
       promptsData: currentPromptsData!,
       settings,
@@ -294,7 +300,8 @@
         if (imageViewer?.updateFileList) {
           await imageViewer.updateFileList()
         }
-      }
+      },
+      wildcardOverrides: overridesToApply
     })
 
     // Store the results
@@ -377,6 +384,7 @@
       }
     }
 
+    const overridesToApply = pendingWildcardOverrides
     const result = await generateImage({
       promptsData: currentPromptsData!,
       settings,
@@ -406,7 +414,8 @@
         if (imageViewer?.updateFileList) {
           await imageViewer.updateFileList()
         }
-      }
+      },
+      wildcardOverrides: overridesToApply
     })
 
     // Store the results
@@ -464,6 +473,49 @@
     }
     imageUrl = `/api/image?path=${encodeURIComponent(filePath)}`
     currentImageFileName = filePath
+  }
+
+  async function handleChatGeneratePrompt(promptText: string) {
+    const text = promptText.trim()
+    if (!text) {
+      return
+    }
+    const overrides: WildcardZoneOverrides = {
+      all: text,
+      zone1: '',
+      zone2: '',
+      negative: null,
+      inpainting: null
+    }
+    pendingWildcardOverrides = overrides
+    if (tagZonesRef) {
+      tagZonesRef.applyZoneOverrides(overrides)
+    }
+    const checkpointKey = $promptsData.selectedCheckpoint || 'Default'
+    try {
+      const modelSettings = getEffectiveModelSettings(settings, checkpointKey)
+      const wildcardsFile = modelSettings?.wildcardsFile
+      const zones = await readWildcardZones(wildcardsFile)
+      await writeWildcardZones(
+        {
+          all: text,
+          zone1: '',
+          zone2: '',
+          negative: zones.negative,
+          inpainting: zones.inpainting
+        },
+        wildcardsFile
+      )
+      if (tagZonesRef && typeof tagZonesRef.refreshSelectedTags === 'function') {
+        await tagZonesRef.refreshSelectedTags()
+      }
+      await handleGenerate(null)
+    } catch (error) {
+      console.error('Failed to generate image from chat prompt', error)
+      toastsRef?.error('Failed to generate image from chat prompt.')
+    } finally {
+      pendingWildcardOverrides = null
+    }
   }
 
   async function handleSettingsChange(newSettings: Settings) {
@@ -545,7 +597,9 @@
                   </select>
                 </div>
                 <div class="flex flex-col gap-2">
-                  <label class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal">
+                  <label
+                    class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal"
+                  >
                     <input
                       type="checkbox"
                       checked={$promptsData.useUpscale}
@@ -557,7 +611,9 @@
                 </div>
 
                 <div class="flex flex-col gap-2">
-                  <label class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal">
+                  <label
+                    class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal"
+                  >
                     <input
                       type="checkbox"
                       class="m-0 cursor-pointer accent-sky-600"
@@ -600,7 +656,10 @@
             </div>
           {:else if activeTabId === 'chat'}
             <div class="h-full">
-              <ChatInterface apiKey={settings.geminiApiKey} />
+              <ChatInterface
+                apiKey={settings.geminiApiKey}
+                onGeneratePrompt={handleChatGeneratePrompt}
+              />
             </div>
           {/if}
         </div>

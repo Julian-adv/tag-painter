@@ -1,6 +1,9 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
+
   interface Props {
     apiKey: string
+    onGeneratePrompt?: (prompt: string) => void
   }
 
   type Message = {
@@ -10,13 +13,14 @@
     timestamp: Date
   }
 
-  let { apiKey = '' }: Props = $props()
+  let { apiKey = '', onGeneratePrompt }: Props = $props()
 
   let messages = $state<Message[]>([])
   let inputMessage = $state('')
   let isLoading = $state(false)
   let errorMessage = $state('')
   let chatContainer: HTMLDivElement | undefined
+  let systemPrompt = $state('')
 
   const GEMINI_MODEL_ID = 'gemini-2.5-pro'
 
@@ -43,6 +47,20 @@
     return `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`
   }
 
+  onMount(async () => {
+    try {
+      const response = await fetch('/api/system-prompt')
+      if (!response.ok) return
+      const data: unknown = await response.json()
+      const prompt = (data as { prompt?: string })?.prompt
+      if (typeof prompt === 'string') {
+        systemPrompt = prompt.trim()
+      }
+    } catch (error) {
+      console.error('Failed to load system prompt', error)
+    }
+  })
+
   function toGeminiContents(history: Message[]) {
     return history.map((message) => ({
       role: message.role === 'assistant' ? 'model' : 'user',
@@ -50,19 +68,42 @@
     }))
   }
 
+  function extractEnglishPrompt(text: string): string | null {
+    const match = text.match(/<english>([\s\S]*?)<\/english>/i)
+    if (!match) return null
+    const prompt = match[1].trim()
+    return prompt || null
+  }
+
+  function stripEnglishTags(text: string): string {
+    return text.replace(/<english>([\s\S]*?)<\/english>/gi, (_match, inner) => inner.trim())
+  }
+
   async function requestGemini(history: Message[], key: string): Promise<string> {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_ID}:generateContent?key=${encodeURIComponent(
       key
     )}`
 
+    const body = {
+      contents: [
+        ...(systemPrompt
+          ? [
+              {
+                role: 'user',
+                parts: [{ text: systemPrompt }]
+              }
+            ]
+          : []),
+        ...toGeminiContents(history)
+      ]
+    }
+    console.log('Gemini request payload:', body)
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        contents: toGeminiContents(history)
-      })
+      body: JSON.stringify(body)
     })
 
     let payload: unknown
@@ -145,13 +186,19 @@
     try {
       const replyText = await requestGemini(conversation, trimmedKey)
       const content = replyText || 'Gemini returned an empty response.'
+      const extractedPrompt = extractEnglishPrompt(content)
+      const stripped = stripEnglishTags(content).trim()
+      const finalContent = stripped || content
       const assistantMessage: Message = {
         id: createId(),
         role: 'assistant',
-        content,
+        content: finalContent,
         timestamp: new Date()
       }
       messages = [...conversation, assistantMessage]
+      if (extractedPrompt) {
+        onGeneratePrompt?.(extractedPrompt)
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to contact Gemini.'
       errorMessage = message

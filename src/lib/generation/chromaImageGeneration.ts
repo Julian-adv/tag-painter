@@ -81,7 +81,8 @@ export async function generateChromaImage(
     seed,
     onLoadingChange,
     onProgressUpdate,
-    onImageReceived
+    onImageReceived,
+    wildcardOverrides
   } = options
 
   let workflow: ComfyUIWorkflow = await loadChromaWorkflow(modelSettings?.customWorkflowPath)
@@ -103,6 +104,24 @@ export async function generateChromaImage(
       const message = error instanceof Error ? error.message : 'Failed to load wildcards file'
       return { error: message }
     }
+    if (wildcardOverrides) {
+      if (wildcardOverrides.all !== null) {
+        wildcardZones.all = wildcardOverrides.all
+      }
+      if (wildcardOverrides.zone1 !== null) {
+        wildcardZones.zone1 = wildcardOverrides.zone1
+      }
+      if (wildcardOverrides.zone2 !== null) {
+        wildcardZones.zone2 = wildcardOverrides.zone2
+      }
+      if (wildcardOverrides.negative !== null) {
+        wildcardZones.negative = wildcardOverrides.negative
+      }
+      if (wildcardOverrides.inpainting !== null) {
+        wildcardZones.inpainting = wildcardOverrides.inpainting
+      }
+    }
+
     const model = getWildcardModel()
     await prefetchWildcardFilesFromTexts(model)
 

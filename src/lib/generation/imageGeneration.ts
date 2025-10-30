@@ -44,6 +44,14 @@ import {
   setNodeClipSkip
 } from './workflowMapping'
 
+export type WildcardZoneOverrides = {
+  all: string | null
+  zone1: string | null
+  zone2: string | null
+  negative: string | null
+  inpainting: string | null
+}
+
 export interface GenerationOptions {
   promptsData: PromptsData
   settings: Settings
@@ -62,6 +70,7 @@ export interface GenerationOptions {
   onLoadingChange: (loading: boolean) => void
   onProgressUpdate: (progress: ProgressData) => void
   onImageReceived: (imageBlob: Blob, filePath: string) => void
+  wildcardOverrides: WildcardZoneOverrides | null
 }
 
 /**
@@ -104,7 +113,8 @@ export async function generateImage(options: GenerationOptions): Promise<{
     previousRandomTagResolutions,
     onLoadingChange,
     onProgressUpdate,
-    onImageReceived
+    onImageReceived,
+    wildcardOverrides
   } = options
   const modelSettings = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
 
@@ -167,6 +177,24 @@ export async function generateImage(options: GenerationOptions): Promise<{
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load wildcards file'
       return { error: message }
+    }
+
+    if (wildcardOverrides) {
+      if (wildcardOverrides.all !== null) {
+        wildcardZones.all = wildcardOverrides.all
+      }
+      if (wildcardOverrides.zone1 !== null) {
+        wildcardZones.zone1 = wildcardOverrides.zone1
+      }
+      if (wildcardOverrides.zone2 !== null) {
+        wildcardZones.zone2 = wildcardOverrides.zone2
+      }
+      if (wildcardOverrides.negative !== null) {
+        wildcardZones.negative = wildcardOverrides.negative
+      }
+      if (wildcardOverrides.inpainting !== null) {
+        wildcardZones.inpainting = wildcardOverrides.inpainting
+      }
     }
 
     // Expand custom tags and create prompt parts, using previous resolutions if regenerating
