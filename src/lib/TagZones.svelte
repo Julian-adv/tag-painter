@@ -9,8 +9,7 @@
   import { Tag, LockOpen } from 'svelte-heros-v2'
   import type { Settings } from './types'
   import { m } from '$lib/paraglide/messages'
-  import { getEffectiveModelSettings } from './generation/generationCommon'
-  import type { WildcardZoneOverrides } from './generation/imageGeneration'
+import { getEffectiveModelSettings } from './generation/generationCommon'
   // Use callback prop instead of deprecated createEventDispatcher
 
   interface Props {
@@ -149,29 +148,6 @@
     await loadTagsFromWildcards(currentWildcardsFile, { skipRefresh: true })
   }
 
-  function applyZoneOverrides(overrides: WildcardZoneOverrides) {
-    if (overrides.all !== null) {
-      allTags = overrides.all
-      allTagsEditorRef?.readText(overrides.all)
-    }
-    if (overrides.zone1 !== null) {
-      firstZoneTags = overrides.zone1
-      firstZoneEditorRef?.readText(overrides.zone1)
-    }
-    if (overrides.zone2 !== null) {
-      secondZoneTags = overrides.zone2
-      secondZoneEditorRef?.readText(overrides.zone2)
-    }
-    if (overrides.negative !== null) {
-      negativeTags = overrides.negative
-      negativeEditorRef?.readText(overrides.negative)
-    }
-    if (overrides.inpainting !== null) {
-      inpaintingTags = overrides.inpainting
-      inpaintingEditorRef?.readText(overrides.inpainting)
-    }
-  }
-
   async function openTreeEditDialog() {
     // Save any pending changes before opening dialog
     await saveTags()
@@ -217,7 +193,7 @@
   }
 
   // Expose functions for parent component to call
-  export { saveTags, refreshSelectedTags, applyZoneOverrides }
+  export { saveTags, refreshSelectedTags }
 </script>
 
 <div class="flex h-full w-full flex-shrink-1 flex-col">

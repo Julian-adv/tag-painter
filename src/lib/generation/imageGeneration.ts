@@ -8,6 +8,7 @@ import {
   FINAL_SAVE_NODE_ID,
   generateLoraChain
 } from './workflow'
+import { getDefaultWorkflowForModelType } from './workflowBuilder'
 import {
   DEFAULT_FACE_DETAILER_SETTINGS,
   DEFAULT_UPSCALE_SETTINGS
@@ -43,14 +44,7 @@ import {
   setNodeVae,
   setNodeClipSkip
 } from './workflowMapping'
-
-export type WildcardZoneOverrides = {
-  all: string | null
-  zone1: string | null
-  zone2: string | null
-  negative: string | null
-  inpainting: string | null
-}
+export { buildWorkflowForPrompts } from './workflowBuilder'
 
 export interface GenerationOptions {
   promptsData: PromptsData
@@ -70,24 +64,6 @@ export interface GenerationOptions {
   onLoadingChange: (loading: boolean) => void
   onProgressUpdate: (progress: ProgressData) => void
   onImageReceived: (imageBlob: Blob, filePath: string) => void
-  wildcardOverrides: WildcardZoneOverrides | null
-}
-
-/**
- * Get default workflow file based on model type
- */
-function getDefaultWorkflowForModelType(modelType?: string): string {
-  switch (modelType) {
-    case 'qwen':
-      return 'qwen.api.workflow.json'
-    case 'chroma':
-      return 'chroma.api.workflow.json'
-    case 'flux1_krea':
-      return 'flux1_krea.api.workflow.json'
-    case 'sdxl':
-    default:
-      return 'sdxl.api.workflow.json'
-  }
 }
 
 export async function generateImage(options: GenerationOptions): Promise<{
@@ -113,8 +89,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
     previousRandomTagResolutions,
     onLoadingChange,
     onProgressUpdate,
-    onImageReceived,
-    wildcardOverrides
+    onImageReceived
   } = options
   const modelSettings = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
 
@@ -177,24 +152,6 @@ export async function generateImage(options: GenerationOptions): Promise<{
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load wildcards file'
       return { error: message }
-    }
-
-    if (wildcardOverrides) {
-      if (wildcardOverrides.all !== null) {
-        wildcardZones.all = wildcardOverrides.all
-      }
-      if (wildcardOverrides.zone1 !== null) {
-        wildcardZones.zone1 = wildcardOverrides.zone1
-      }
-      if (wildcardOverrides.zone2 !== null) {
-        wildcardZones.zone2 = wildcardOverrides.zone2
-      }
-      if (wildcardOverrides.negative !== null) {
-        wildcardZones.negative = wildcardOverrides.negative
-      }
-      if (wildcardOverrides.inpainting !== null) {
-        wildcardZones.inpainting = wildcardOverrides.inpainting
-      }
     }
 
     // Expand custom tags and create prompt parts, using previous resolutions if regenerating
@@ -528,6 +485,7 @@ export async function generateImage(options: GenerationOptions): Promise<{
   }
 }
 
+
 function configureWorkflow(
   workflow: ComfyUIWorkflow,
   promptsData: PromptsData,
@@ -535,7 +493,6 @@ function configureWorkflow(
   isInpainting: boolean = false,
   inpaintDenoiseStrength?: number
 ): { error: string } | null {
-  // Set checkpoint by title
   if (promptsData.selectedCheckpoint) {
     if (!setNodeCheckpoint(workflow, 'Load Checkpoint', promptsData.selectedCheckpoint)) {
       return { error: 'Workflow node not found: Load Checkpoint' }
@@ -548,12 +505,10 @@ function configureWorkflow(
     }
   }
 
-  // Get effective model settings (includes scheduler)
   const effectiveModel = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
   const scheduler = effectiveModel?.scheduler || 'simple'
 
   if (isInpainting) {
-    // Inpainting workflow configuration (title-based)
     if (
       !setNodeSampler(workflow, 'KSampler (inpainting)', {
         steps: settings.steps,
@@ -565,11 +520,7 @@ function configureWorkflow(
     ) {
       return { error: 'Workflow node not found: KSampler (inpainting)' }
     }
-
-    // For inpainting, image size is determined by input image, not by EmptyLatentImage
   } else {
-    // Regular workflow configuration
-    // Apply settings values to workflow
     if (!setNodeSampler(workflow, 'BasicScheduler', { steps: settings.steps, scheduler })) {
       return { error: 'Workflow node not found: BasicScheduler' }
     }
@@ -579,128 +530,97 @@ function configureWorkflow(
     if (!setNodeSampler(workflow, 'KSamplerSelect', { sampler_name: settings.sampler })) {
       return { error: 'Workflow node not found: KSamplerSelect' }
     }
-    if (
-      !setNodeImageSize(workflow, 'Empty Latent Image', settings.imageWidth, settings.imageHeight)
-    ) {
+    if (!setNodeImageSize(workflow, 'Empty Latent Image', settings.imageWidth, settings.imageHeight)) {
       return { error: 'Workflow node not found: Empty Latent Image' }
     }
 
-    // Configure FaceDetailer scheduler (title-based)
     if (!setNodeSampler(workflow, 'FaceDetailer', { scheduler })) {
       return { error: 'Workflow node not found: FaceDetailer' }
     }
 
-    // Configure optional features
     if (promptsData.useUpscale) {
-      // Configure latent upscale workflow when upscale nodes exist
-      {
-        // Get upscale settings
-        const effectiveModel = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
-        const upscaleSettings = effectiveModel?.upscale || DEFAULT_UPSCALE_SETTINGS
+      const effectiveModelSettings = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
+      const upscaleSettings = effectiveModelSettings?.upscale || DEFAULT_UPSCALE_SETTINGS
 
-        // Validate upscale checkpoint is configured
-        if (!upscaleSettings.checkpoint || upscaleSettings.checkpoint === 'model.safetensors') {
-          return { error: 'Upscale checkpoint not configured in model settings' }
+      if (!upscaleSettings.checkpoint || upscaleSettings.checkpoint === 'model.safetensors') {
+        return { error: 'Upscale checkpoint not configured in model settings' }
+      }
+
+      const upscaleImage = findNodeByTitle(workflow, 'Upscale Image')?.nodeId
+      if (upscaleImage && workflow[upscaleImage]) {
+        workflow[upscaleImage].inputs.width = Math.round(settings.imageWidth * upscaleSettings.scale)
+        workflow[upscaleImage].inputs.height = Math.round(settings.imageHeight * upscaleSettings.scale)
+      }
+
+      if (!setNodeCheckpoint(workflow, 'Upscale Checkpoint Loader', upscaleSettings.checkpoint)) {
+        return { error: 'Workflow node not found: Upscale Checkpoint Loader' }
+      }
+
+      const vaeEncodeNode = findNodeByTitle(workflow, 'VAE Encode (Tiled)')
+      if (!vaeEncodeNode) {
+        return { error: 'Workflow node not found: VAE Encode (Tiled)' }
+      }
+
+      const vaeDecodeNode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')
+      if (!vaeDecodeNode) {
+        return { error: 'Workflow node not found: VAE Decode (Tiled)' }
+      }
+
+      let vaeSourceNodeId: string
+      let vaeSourceOutputIndex: number
+
+      if (upscaleSettings.selectedVae && upscaleSettings.selectedVae !== '__embedded__') {
+        if (!setNodeVae(workflow, 'Load VAE (Upscale)', upscaleSettings.selectedVae)) {
+          return { error: 'Workflow node not found: Load VAE (Upscale)' }
         }
-
-        // Configure Upscale Image dimensions (use scale from settings)
-        const upscaleImage = findNodeByTitle(workflow, 'Upscale Image')?.nodeId
-        if (upscaleImage && workflow[upscaleImage]) {
-          workflow[upscaleImage].inputs.width = Math.round(
-            settings.imageWidth * upscaleSettings.scale
-          )
-          workflow[upscaleImage].inputs.height = Math.round(
-            settings.imageHeight * upscaleSettings.scale
-          )
+        const vaeLoaderNode = findNodeByTitle(workflow, 'Load VAE (Upscale)')
+        if (!vaeLoaderNode) {
+          return { error: 'Workflow node not found: Load VAE (Upscale)' }
         }
-
-        // Configure upscale checkpoint
-        if (!setNodeCheckpoint(workflow, 'Upscale Checkpoint Loader', upscaleSettings.checkpoint)) {
+        vaeSourceNodeId = vaeLoaderNode.nodeId
+        vaeSourceOutputIndex = 0
+      } else {
+        const upscaleCkptNode = findNodeByTitle(workflow, 'Upscale Checkpoint Loader')
+        if (!upscaleCkptNode) {
           return { error: 'Workflow node not found: Upscale Checkpoint Loader' }
         }
+        vaeSourceNodeId = upscaleCkptNode.nodeId
+        vaeSourceOutputIndex = 2
+      }
 
-        // Configure upscale VAE nodes
-        const vaeEncodeNode = findNodeByTitle(workflow, 'VAE Encode (Tiled)')
-        if (!vaeEncodeNode) {
-          return { error: 'Workflow node not found: VAE Encode (Tiled)' }
-        }
+      workflow[vaeEncodeNode.nodeId].inputs.vae = [vaeSourceNodeId, vaeSourceOutputIndex]
+      workflow[vaeDecodeNode.nodeId].inputs.vae = [vaeSourceNodeId, vaeSourceOutputIndex]
 
-        const vaeDecodeNode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')
-        if (!vaeDecodeNode) {
-          return { error: 'Workflow node not found: VAE Decode (Tiled)' }
-        }
+      if (
+        !setNodeSampler(workflow, 'KSampler (Upscale)', {
+          steps: upscaleSettings.steps,
+          cfg: upscaleSettings.cfgScale,
+          sampler_name: upscaleSettings.sampler,
+          scheduler: upscaleSettings.scheduler,
+          denoise: upscaleSettings.denoise
+        })
+      ) {
+        return { error: 'Workflow node not found: KSampler (Upscale)' }
+      }
 
-        // Determine VAE source and connect to both encode and decode nodes
-        let vaeSourceNodeId: string
-        let vaeSourceOutputIndex: number
-
-        if (upscaleSettings.selectedVae && upscaleSettings.selectedVae !== '__embedded__') {
-          // Use external VAE loader
-          if (!setNodeVae(workflow, 'Load VAE (Upscale)', upscaleSettings.selectedVae)) {
-            return { error: 'Workflow node not found: Load VAE (Upscale)' }
-          }
-          const vaeLoaderNode = findNodeByTitle(workflow, 'Load VAE (Upscale)')
-          if (!vaeLoaderNode) {
-            return { error: 'Workflow node not found: Load VAE (Upscale)' }
-          }
-          vaeSourceNodeId = vaeLoaderNode.nodeId
-          vaeSourceOutputIndex = 0
-        } else {
-          // Use embedded VAE from checkpoint
-          const upscaleCkptNode = findNodeByTitle(workflow, 'Upscale Checkpoint Loader')
-          if (!upscaleCkptNode) {
-            return { error: 'Workflow node not found: Upscale Checkpoint Loader' }
-          }
-          vaeSourceNodeId = upscaleCkptNode.nodeId
-          vaeSourceOutputIndex = 2
-        }
-
-        // Connect VAE to both encode and decode nodes
-        workflow[vaeEncodeNode.nodeId].inputs.vae = [vaeSourceNodeId, vaeSourceOutputIndex]
-        workflow[vaeDecodeNode.nodeId].inputs.vae = [vaeSourceNodeId, vaeSourceOutputIndex]
-
-        // Configure upscale KSampler
-        if (
-          !setNodeSampler(workflow, 'KSampler (Upscale)', {
-            steps: upscaleSettings.steps,
-            cfg: upscaleSettings.cfgScale,
-            sampler_name: upscaleSettings.sampler,
-            scheduler: upscaleSettings.scheduler,
-            denoise: upscaleSettings.denoise
-          })
-        ) {
-          return { error: 'Workflow node not found: KSampler (Upscale)' }
-        }
-
-        // Connect KSampler output to VAE Decode
-        const upscaleSampler = findNodeByTitle(workflow, 'KSampler (Upscale)')?.nodeId
-        if (upscaleSampler && workflow[vaeDecodeNode.nodeId]) {
-          workflow[vaeDecodeNode.nodeId].inputs.samples = [upscaleSampler, 0]
-        }
+      const upscaleSampler = findNodeByTitle(workflow, 'KSampler (Upscale)')?.nodeId
+      if (upscaleSampler && workflow[vaeDecodeNode.nodeId]) {
+        workflow[vaeDecodeNode.nodeId].inputs.samples = [upscaleSampler, 0]
       }
     }
 
     if (promptsData.useFaceDetailer) {
-      // Configure FaceDetailer with per-model settings
-      const effectiveModel = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
-      const faceDetailerSettings = effectiveModel?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
+      const effectiveModelSettings = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
+      const faceDetailerSettings = effectiveModelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
 
-      // Validate FaceDetailer checkpoint is configured
-      if (
-        !faceDetailerSettings.checkpoint ||
-        faceDetailerSettings.checkpoint === 'model.safetensors'
-      ) {
+      if (!faceDetailerSettings.checkpoint || faceDetailerSettings.checkpoint === 'model.safetensors') {
         return { error: 'FaceDetailer checkpoint not configured in model settings' }
       }
 
-      // Set FaceDetailer checkpoint model
-      if (
-        !setNodeCheckpoint(workflow, 'FaceDetailer Checkpoint Loader', faceDetailerSettings.checkpoint)
-      ) {
+      if (!setNodeCheckpoint(workflow, 'FaceDetailer Checkpoint Loader', faceDetailerSettings.checkpoint)) {
         return { error: 'Workflow node not found: FaceDetailer Checkpoint Loader' }
       }
 
-      // Configure FaceDetailer generation settings
       if (
         !setNodeSampler(workflow, 'FaceDetailer', {
           steps: faceDetailerSettings.steps,
@@ -713,7 +633,6 @@ function configureWorkflow(
         return { error: 'Workflow node not found: FaceDetailer' }
       }
 
-      // Configure VAE
       const fdNodeEntry = findNodeByTitle(workflow, 'FaceDetailer')
       const fdNodeId = fdNodeEntry?.nodeId
       if (faceDetailerSettings.selectedVae === '__embedded__') {
@@ -731,7 +650,6 @@ function configureWorkflow(
         workflow[fdNodeId].inputs.vae = [fdVaeNode.nodeId, 0]
       }
 
-      // Set FaceDetailer input image based on upscale usage
       if (fdNodeId && workflow[fdNodeId]) {
         const upDecode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')?.nodeId
         const baseDecode = findNodeByTitle(workflow, 'VAE Decode')?.nodeId

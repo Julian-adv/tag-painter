@@ -1,6 +1,7 @@
 <!-- Main component for generating images from prompts -->
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte'
+  import { get } from 'svelte/store'
   import ImageViewer from './ImageViewer.svelte'
   import GenerationControls from './GenerationControls.svelte'
   import CompositionSelector from './CompositionSelector.svelte'
@@ -11,13 +12,13 @@
   import { m } from '$lib/paraglide/messages'
   import NoCheckpointsDialog from './NoCheckpointsDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
-  import { loadSettings, saveSettings as saveSettingsToFile, saveMaskData } from './utils/fileIO'
-  import { fetchCheckpoints } from './generation/comfyui'
+  import { loadSettings, saveSettings as saveSettingsToFile, saveMaskData, saveImage } from './utils/fileIO'
+  import { fetchCheckpoints, connectWebSocket, normalizeBaseUrl } from './generation/comfyui'
   import { ArrowPath } from 'svelte-heros-v2'
   import { generateImage } from './generation/imageGeneration'
-  import type { WildcardZoneOverrides } from './generation/imageGeneration'
-  import { getEffectiveModelSettings } from './generation/generationCommon'
   import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY, DEFAULT_SETTINGS } from '$lib/constants'
+  import { submitWorkflowForPrompts } from './generation/workflowBuilder'
+  import { FINAL_SAVE_NODE_ID } from './generation/workflow'
   import Toasts from './Toasts.svelte'
   import { baseLocale, setLocale, getLocale, isLocale } from '$lib/paraglide/runtime.js'
   import {
@@ -30,7 +31,6 @@
     updateFaceDetailer,
     updateComposition
   } from './stores/promptsStore'
-  import { readWildcardZones, writeWildcardZones } from './utils/wildcardZones'
 
   // Component state
   let isLoading = $state(false)
@@ -71,11 +71,9 @@
     inpainting: {}
   })
   let disabledZones = $state<Set<string>>(new Set())
-  let pendingWildcardOverrides: WildcardZoneOverrides | null = $state(null)
   type TagZonesHandle = {
     saveTags: () => Promise<void>
     refreshSelectedTags: () => Promise<void>
-    applyZoneOverrides: (overrides: WildcardZoneOverrides) => void
   }
   let tagZonesRef: TagZonesHandle | undefined = $state()
 
@@ -254,8 +252,7 @@
 
     const isRegeneration = seedToUse !== null
 
-    let currentPromptsData: PromptsData
-    promptsData.subscribe((data: PromptsData) => (currentPromptsData = data))()
+    const currentPromptsData = get(promptsData)
 
     // Get mask data from ImageViewer if available and save it
     let maskFilePath: string | null = null
@@ -271,9 +268,8 @@
       }
     }
 
-    const overridesToApply = pendingWildcardOverrides
     const result = await generateImage({
-      promptsData: currentPromptsData!,
+      promptsData: currentPromptsData,
       settings,
       seed: seedToUse,
       maskFilePath,
@@ -300,8 +296,7 @@
         if (imageViewer?.updateFileList) {
           await imageViewer.updateFileList()
         }
-      },
-      wildcardOverrides: overridesToApply
+      }
     })
 
     // Store the results
@@ -323,10 +318,9 @@
       return
     }
     // Check if inpainting tags exist
-    let currentPromptsData: PromptsData
-    promptsData.subscribe((data: PromptsData) => (currentPromptsData = data))()
+    const currentPromptsData = get(promptsData)
 
-    if (!currentPromptsData!.tags.inpainting || currentPromptsData!.tags.inpainting.length === 0) {
+    if (!currentPromptsData.tags.inpainting || currentPromptsData.tags.inpainting.length === 0) {
       alert(m['imageGenerator.missingInpaintingAlert']())
       return
     }
@@ -348,8 +342,7 @@
     // Save prompts before generating
     await savePromptsData()
 
-    let currentPromptsData: PromptsData
-    promptsData.subscribe((data: PromptsData) => (currentPromptsData = data))()
+    const currentPromptsData = get(promptsData)
 
     // Get mask data from ImageViewer if available and save it
     let maskFilePath: string | null = null
@@ -375,7 +368,7 @@
     // If no custom mask but inpainting is requested, use composition mask
     if (!maskFilePath) {
       const maskResponse = await fetch(
-        `/api/mask-path?composition=${encodeURIComponent(currentPromptsData!.selectedComposition)}`
+        `/api/mask-path?composition=${encodeURIComponent(currentPromptsData.selectedComposition)}`
       )
       if (maskResponse.ok) {
         const { maskImagePath } = await maskResponse.json()
@@ -384,9 +377,8 @@
       }
     }
 
-    const overridesToApply = pendingWildcardOverrides
     const result = await generateImage({
-      promptsData: currentPromptsData!,
+      promptsData: currentPromptsData,
       settings,
       seed: null,
       maskFilePath,
@@ -414,8 +406,7 @@
         if (imageViewer?.updateFileList) {
           await imageViewer.updateFileList()
         }
-      },
-      wildcardOverrides: overridesToApply
+      }
     })
 
     // Store the results
@@ -480,41 +471,66 @@
     if (!text) {
       return
     }
-    const overrides: WildcardZoneOverrides = {
+    const currentPromptsData = get(promptsData)
+    const negativePrompt = (currentPromptsData.tags?.negative || []).join(', ')
+    const checkpointKey = currentPromptsData.selectedCheckpoint || 'Default'
+    const useUpscaleFlag = currentPromptsData.useUpscale ?? false
+    const useFaceDetailerFlag = currentPromptsData.useFaceDetailer ?? false
+    const promptsForSaving = {
       all: text,
       zone1: '',
       zone2: '',
-      negative: null,
-      inpainting: null
+      negative: negativePrompt
     }
-    pendingWildcardOverrides = overrides
-    if (tagZonesRef) {
-      tagZonesRef.applyZoneOverrides(overrides)
-    }
-    const checkpointKey = $promptsData.selectedCheckpoint || 'Default'
     try {
-      const modelSettings = getEffectiveModelSettings(settings, checkpointKey)
-      const wildcardsFile = modelSettings?.wildcardsFile
-      const zones = await readWildcardZones(wildcardsFile)
-      await writeWildcardZones(
-        {
-          all: text,
-          zone1: '',
-          zone2: '',
-          negative: zones.negative,
-          inpainting: zones.inpainting
-        },
-        wildcardsFile
+      isLoading = true
+      progressData = { value: 0, max: 100, currentNode: '' }
+      const submission = await submitWorkflowForPrompts(
+        text,
+        negativePrompt,
+        settings,
+        checkpointKey,
+        useUpscaleFlag,
+        useFaceDetailerFlag
       )
-      if (tagZonesRef && typeof tagZonesRef.refreshSelectedTags === 'function') {
-        await tagZonesRef.refreshSelectedTags()
-      }
-      await handleGenerate(null)
+      const comfyBase = normalizeBaseUrl(settings.comfyUrl)
+      connectWebSocket(
+        submission.promptId,
+        submission.clientId,
+        FINAL_SAVE_NODE_ID,
+        submission.workflow,
+        {
+          onLoadingChange: (loading) => {
+            isLoading = loading
+          },
+          onProgressUpdate: (progress) => {
+            progressData = progress
+          },
+          onImageReceived: async (imageBlob: Blob) => {
+            const filePath =
+              (await saveImage(
+                imageBlob,
+                promptsForSaving,
+                settings.outputDirectory,
+                submission.workflow,
+                settings.seed ?? 0
+              )) || `chat_${Date.now()}.png`
+            if (imageUrl && imageUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(imageUrl)
+            }
+            imageUrl = URL.createObjectURL(imageBlob)
+            currentImageFileName = filePath
+            if (imageViewer?.updateFileList) {
+              await imageViewer.updateFileList()
+            }
+          }
+        },
+        comfyBase
+      )
     } catch (error) {
       console.error('Failed to generate image from chat prompt', error)
       toastsRef?.error('Failed to generate image from chat prompt.')
-    } finally {
-      pendingWildcardOverrides = null
+      isLoading = false
     }
   }
 
