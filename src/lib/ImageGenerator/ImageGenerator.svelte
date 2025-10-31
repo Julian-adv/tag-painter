@@ -2,29 +2,29 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte'
   import { get } from 'svelte/store'
-  import ImageViewer from './ImageViewer.svelte'
-  import GenerationControls from './GenerationControls.svelte'
+  import ImageViewer from '$lib/ImageViewer.svelte'
+  import GenerationControls from '$lib/GenerationControls.svelte'
   import CompositionSelector from './CompositionSelector.svelte'
   import TagZones from './TagZones.svelte'
   import TabNavigation from './TabNavigation.svelte'
-  import ChatInterface from './Chat/ChatInterface.svelte'
+  import ChatInterface from '$lib/Chat/ChatInterface.svelte'
   import ModelControls from './ModelControls.svelte'
   import { dev } from '$app/environment'
   import { m } from '$lib/paraglide/messages'
-  import NoCheckpointsDialog from './NoCheckpointsDialog.svelte'
+  import NoCheckpointsDialog from '$lib/NoCheckpointsDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import {
     loadSettings,
     saveSettings as saveSettingsToFile,
     saveMaskData,
     saveImage
-  } from './utils/fileIO'
-  import { fetchCheckpoints, connectWebSocket, normalizeBaseUrl } from './generation/comfyui'
-  import { generateImage } from './generation/imageGeneration'
+  } from '$lib/utils/fileIO'
+  import { fetchCheckpoints, connectWebSocket, normalizeBaseUrl } from '$lib/generation/comfyui'
+  import { generateImage } from '$lib/generation/imageGeneration'
   import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY, DEFAULT_SETTINGS } from '$lib/constants'
-  import { submitWorkflowForPrompts } from './generation/workflowBuilder'
-  import { FINAL_SAVE_NODE_ID } from './generation/workflow'
-  import Toasts from './Toasts.svelte'
+  import { submitWorkflowForPrompts } from '$lib/generation/workflowBuilder'
+  import { FINAL_SAVE_NODE_ID } from '$lib/generation/workflow'
+  import Toasts from '$lib/Toasts.svelte'
   import { baseLocale, setLocale, getLocale, isLocale } from '$lib/paraglide/runtime.js'
   import {
     promptsData,
@@ -32,7 +32,7 @@
     savePromptsData,
     autoSaveCurrentValues,
     updateComposition
-  } from './stores/promptsStore'
+  } from '$lib/stores/promptsStore'
 
   // Component state
   let isLoading = $state(false)

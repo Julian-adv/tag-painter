@@ -2,7 +2,7 @@
 <script lang="ts">
   import { ArrowPath } from 'svelte-heros-v2'
   import { m } from '$lib/paraglide/messages'
-  import { promptsData, updateCheckpoint, updateUpscale, updateFaceDetailer } from './stores/promptsStore'
+  import { promptsData, updateCheckpoint, updateUpscale, updateFaceDetailer } from '$lib/stores/promptsStore'
 
   interface Props {
     availableCheckpoints: string[]

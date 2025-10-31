@@ -1,15 +1,15 @@
 <!-- Component for tag input zones -->
 <script lang="ts">
-  import ChipEditor from './placeholder/ChipEditor.svelte'
-  import WildcardsEditorDialog from './TreeEdit/WildcardsEditorDialog.svelte'
-  import { promptsData } from './stores/promptsStore'
-  import { wildcardTagType } from './stores/tagsStore'
-  import { readWildcardZones, writeWildcardZones } from './utils/wildcardZones'
-  import { testModeStore, clearAllPins as clearAllPinsStore } from './stores/testModeStore.svelte'
+  import ChipEditor from '$lib/placeholder/ChipEditor.svelte'
+  import WildcardsEditorDialog from '$lib/TreeEdit/WildcardsEditorDialog.svelte'
+  import { promptsData } from '$lib/stores/promptsStore'
+  import { wildcardTagType } from '$lib/stores/tagsStore'
+  import { readWildcardZones, writeWildcardZones } from '$lib/utils/wildcardZones'
+  import { testModeStore, clearAllPins as clearAllPinsStore } from '$lib/stores/testModeStore.svelte'
   import { Tag, LockOpen } from 'svelte-heros-v2'
-  import type { Settings } from './types'
+  import type { Settings } from '$lib/types'
   import { m } from '$lib/paraglide/messages'
-import { getEffectiveModelSettings } from './generation/generationCommon'
+  import { getEffectiveModelSettings } from '$lib/generation/generationCommon'
   // Use callback prop instead of deprecated createEventDispatcher
 
   interface Props {

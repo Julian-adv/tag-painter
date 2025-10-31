@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ImageGenerator from '$lib/ImageGenerator.svelte'
+  import ImageGenerator from '$lib/ImageGenerator/ImageGenerator.svelte'
 </script>
 
 <svelte:head>

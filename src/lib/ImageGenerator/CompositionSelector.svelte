@@ -1,8 +1,8 @@
 <!-- Component for selecting image composition layouts -->
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { promptsData, updateComposition } from './stores/promptsStore'
-  import { maskOverlay } from './stores/maskOverlayStore'
+  import { promptsData, updateComposition } from '$lib/stores/promptsStore'
+  import { maskOverlay } from '$lib/stores/maskOverlayStore'
   import { m } from '$lib/paraglide/messages'
 
   let tempMaskTimestamp = $state(0)
