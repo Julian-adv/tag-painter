@@ -471,18 +471,28 @@
     currentImageFileName = filePath
   }
 
-  async function handleChatGeneratePrompt(promptText: string) {
+  async function handleChatGeneratePrompt(promptText: string, options?: { isRedraw?: boolean }) {
     const text = promptText.trim()
     if (!text) {
       return
     }
+    let promptForSubmission = text
+
+    if (options?.isRedraw) {
+      if (text.endsWith('.')) {
+        promptForSubmission = text.replace(/\.+$/, '').trimEnd()
+      } else {
+        promptForSubmission = `${text}.`
+      }
+    }
+
     const currentPromptsData = get(promptsData)
     const negativePrompt = (currentPromptsData.tags?.negative || []).join(', ')
     const checkpointKey = currentPromptsData.selectedCheckpoint || ''
     const useUpscaleFlag = currentPromptsData.useUpscale ?? false
     const useFaceDetailerFlag = currentPromptsData.useFaceDetailer ?? false
     const promptsForSaving = {
-      all: text,
+      all: promptForSubmission,
       zone1: '',
       zone2: '',
       negative: negativePrompt
@@ -491,7 +501,7 @@
       isLoading = true
       progressData = { value: 0, max: 100, currentNode: '' }
       const submission = await submitWorkflowForPrompts(
-        text,
+        promptForSubmission,
         negativePrompt,
         settings,
         checkpointKey,
