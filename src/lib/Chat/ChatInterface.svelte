@@ -1,10 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { Cog8Tooth, ArrowPath } from 'svelte-heros-v2'
+  import SettingsDialog from '$lib/SettingsDialog.svelte'
+  import type { Settings } from '$lib/types'
 
   interface Props {
     apiKey: string
     promptLanguage: 'english' | 'chinese'
     onGeneratePrompt?: (prompt: string) => void
+    settings?: Settings
+    onSettingsChange?: (settings: Settings) => void
   }
 
   type Message = {
@@ -13,7 +18,13 @@
     content: string
   }
 
-  let { apiKey = '', promptLanguage = 'english', onGeneratePrompt }: Props = $props()
+  let {
+    apiKey = '',
+    promptLanguage = 'english',
+    onGeneratePrompt,
+    settings,
+    onSettingsChange
+  }: Props = $props()
 
   let messages = $state<Message[]>([])
   let inputMessage = $state('')
@@ -21,6 +32,7 @@
   let errorMessage = $state('')
   let chatContainer: HTMLDivElement | undefined
   let systemPrompt = $state('')
+  let showSettings = $state(false)
 
   const GEMINI_MODEL_ID = 'gemini-2.5-pro'
 
@@ -111,6 +123,12 @@
     if (!match) return null
     const prompt = match[1].trim()
     return prompt || null
+  }
+
+  function removeUnusedLanguageTag(text: string, language: 'english' | 'chinese'): string {
+    const unusedTag = language === 'chinese' ? 'english' : 'chinese'
+    const regex = new RegExp(`<${unusedTag}>[\\s\\S]*?</${unusedTag}>`, 'gi')
+    return text.replace(regex, '').trim()
   }
 
   async function requestGemini(history: Message[], key: string): Promise<string> {
@@ -219,10 +237,11 @@
       const replyText = await requestGemini(conversation, trimmedKey)
       const content = replyText || 'Gemini returned an empty response.'
       const extractedPrompt = extractPrompt(content, promptLanguage)
+      const cleanedContent = removeUnusedLanguageTag(content, promptLanguage)
       const assistantMessage: Message = {
         id: createId(),
         role: 'assistant',
-        content: content
+        content: cleanedContent
       }
       messages = [...conversation, assistantMessage]
       if (extractedPrompt) {
@@ -242,6 +261,20 @@
     }
   }
 
+  function findLatestPrompt(): string | null {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const candidate = messages[index]
+      if (candidate.role === 'assistant') {
+        const content = candidate.content ?? ''
+        const prompt = extractPrompt(content, promptLanguage)
+        if (prompt) {
+          return prompt
+        }
+      }
+    }
+    return null
+  }
+
   function handleKeydown(event: KeyboardEvent) {
     if (event.isComposing) return
     if (isLoading) return
@@ -249,6 +282,17 @@
       event.preventDefault()
       void handleSendMessage()
     }
+  }
+
+  function handleRedraw() {
+    const latestPrompt = findLatestPrompt()
+    if (!latestPrompt) return
+    onGeneratePrompt?.(latestPrompt)
+  }
+
+  function handleSettingsSave(newSettings: Settings) {
+    onSettingsChange?.(newSettings)
+    showSettings = false
   }
 </script>
 
@@ -274,7 +318,7 @@
         {/each}
         {#if isLoading}
           <div class="flex justify-start">
-            <div class="max-w-full rounded-lg bg-gray-100 p-3 text-gray-900">
+            <div class="max-w-full rounded-lg bg-gray-100 p-2 text-gray-900">
               <p class="text-sm">Thinking...</p>
             </div>
           </div>
@@ -285,23 +329,23 @@
 
   <!-- Input area -->
   <div class="p-1">
-    <div class="flex gap-1">
+    <div class="flex flex-col gap-1">
       <textarea
         bind:value={inputMessage}
         onkeydown={handleKeydown}
         oninput={() => (errorMessage = '')}
         placeholder="Type a message..."
-        class="flex-1 resize-none rounded-lg border border-gray-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
+        class="w-full resize-none rounded-lg border border-gray-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
         rows="3"
         disabled={isLoading}
       ></textarea>
-      <div class="flex flex-col gap-1">
+      <div class="flex gap-1">
         <button
           type="button"
           onclick={() => {
             messages = []
           }}
-          class="rounded-lg bg-red-500 px-4 py-1 text-sm font-medium text-white transition hover:bg-red-600"
+          class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
         >
           New
         </button>
@@ -309,9 +353,26 @@
           type="button"
           onclick={handleSendMessage}
           disabled={!inputMessage.trim() || isLoading}
-          class="rounded-lg bg-blue-500 px-4 py-1 text-sm font-medium text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+          class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1 text-sm font-medium text-gray-600 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Send
+        </button>
+        <button
+          type="button"
+          onclick={handleRedraw}
+          disabled={!findLatestPrompt()}
+          class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-gray-100 text-gray-600 transition-all duration-200 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label="Redraw"
+        >
+          <ArrowPath size="20" />
+        </button>
+        <button
+          type="button"
+          onclick={() => (showSettings = !showSettings)}
+          class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-gray-100 text-gray-600 transition-all duration-200 hover:bg-gray-200"
+          aria-label="Settings"
+        >
+          <Cog8Tooth size="20" />
         </button>
       </div>
     </div>
@@ -320,3 +381,13 @@
     {/if}
   </div>
 </div>
+
+{#if settings}
+  <SettingsDialog
+    show={showSettings}
+    {settings}
+    initialFocus={null}
+    onClose={() => (showSettings = false)}
+    onSave={handleSettingsSave}
+  />
+{/if}

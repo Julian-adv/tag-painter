@@ -597,6 +597,8 @@
                   apiKey={settings.geminiApiKey}
                   promptLanguage={settings.chatPromptLanguage}
                   onGeneratePrompt={handleChatGeneratePrompt}
+                  {settings}
+                  onSettingsChange={handleSettingsChange}
                 />
               </div>
             </div>
