@@ -164,6 +164,10 @@ export async function loadSettings(): Promise<Settings | null> {
         settings.geminiApiKey = ''
       }
 
+      if (settings.chatPromptLanguage !== 'english' && settings.chatPromptLanguage !== 'chinese') {
+        settings.chatPromptLanguage = 'english'
+      }
+
       return settings
     } else {
       console.error('Failed to fetch settings')

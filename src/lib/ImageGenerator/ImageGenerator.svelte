@@ -130,6 +130,7 @@
     comfyUrl: DEFAULT_COMFY_URL,
     outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
     geminiApiKey: DEFAULT_SETTINGS.geminiApiKey,
+    chatPromptLanguage: DEFAULT_SETTINGS.chatPromptLanguage,
     selectedVae: '__embedded__',
     clipSkip: DEFAULT_SETTINGS.clipSkip,
     locale: baseLocale,
@@ -141,6 +142,8 @@
       ...input,
       comfyUrl: input.comfyUrl || DEFAULT_COMFY_URL,
       geminiApiKey: input.geminiApiKey || '',
+      chatPromptLanguage:
+        input.chatPromptLanguage === 'chinese' ? 'chinese' : DEFAULT_SETTINGS.chatPromptLanguage,
       selectedVae: input.selectedVae || '__embedded__',
       scheduler: input.scheduler || DEFAULT_SETTINGS.scheduler,
       perModel: input.perModel || {},
@@ -592,6 +595,7 @@
               <div class="flex-1 overflow-auto">
                 <ChatInterface
                   apiKey={settings.geminiApiKey}
+                  promptLanguage={settings.chatPromptLanguage}
                   onGeneratePrompt={handleChatGeneratePrompt}
                 />
               </div>

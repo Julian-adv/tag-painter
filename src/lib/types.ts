@@ -82,6 +82,7 @@ export interface Settings {
   comfyUrl: string
   outputDirectory: string
   geminiApiKey: string
+  chatPromptLanguage: 'english' | 'chinese'
   // VAE selection: '__embedded__' means use checkpoint's embedded VAE
   selectedVae: string
   clipSkip: number

@@ -14,7 +14,8 @@ export const DEFAULT_SETTINGS = {
   sampler: 'euler_ancestral',
   scheduler: 'simple',
   clipSkip: 2,
-  geminiApiKey: ''
+  geminiApiKey: '',
+  chatPromptLanguage: 'english'
 } as const
 
 // Default FaceDetailer settings

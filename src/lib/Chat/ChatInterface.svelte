@@ -3,6 +3,7 @@
 
   interface Props {
     apiKey: string
+    promptLanguage: 'english' | 'chinese'
     onGeneratePrompt?: (prompt: string) => void
   }
 
@@ -12,7 +13,7 @@
     content: string
   }
 
-  let { apiKey = '', onGeneratePrompt }: Props = $props()
+  let { apiKey = '', promptLanguage = 'english', onGeneratePrompt }: Props = $props()
 
   let messages = $state<Message[]>([])
   let inputMessage = $state('')
@@ -103,8 +104,10 @@
     }))
   }
 
-  function extractEnglishPrompt(text: string): string | null {
-    const match = text.match(/<english>([\s\S]*?)<\/english>/i)
+  function extractPrompt(text: string, language: 'english' | 'chinese'): string | null {
+    const tag = language === 'chinese' ? 'chinese' : 'english'
+    const regex = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i')
+    const match = text.match(regex)
     if (!match) return null
     const prompt = match[1].trim()
     return prompt || null
@@ -215,7 +218,7 @@
     try {
       const replyText = await requestGemini(conversation, trimmedKey)
       const content = replyText || 'Gemini returned an empty response.'
-      const extractedPrompt = extractEnglishPrompt(content)
+      const extractedPrompt = extractPrompt(content, promptLanguage)
       const assistantMessage: Message = {
         id: createId(),
         role: 'assistant',

@@ -29,6 +29,7 @@ export async function GET() {
           comfyUrl: DEFAULT_COMFY_URL,
           outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
           geminiApiKey: '',
+          chatPromptLanguage: 'english',
           selectedVae: '__embedded__',
           clipSkip: 2,
           locale: baseLocale,
@@ -57,6 +58,10 @@ export async function GET() {
 
     if (typeof settings.geminiApiKey !== 'string') {
       settings.geminiApiKey = ''
+    }
+
+    if (settings.chatPromptLanguage !== 'english' && settings.chatPromptLanguage !== 'chinese') {
+      settings.chatPromptLanguage = 'english'
     }
 
     if (settings.customWorkflowPath == null) {

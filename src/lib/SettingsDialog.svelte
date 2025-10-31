@@ -34,6 +34,7 @@
     comfyUrl: settings.comfyUrl,
     outputDirectory: settings.outputDirectory,
     geminiApiKey: settings.geminiApiKey || '',
+    chatPromptLanguage: settings.chatPromptLanguage || 'english',
     selectedVae: settings.selectedVae,
     clipSkip: settings.clipSkip,
     locale: settings.locale || baseLocale,
@@ -53,6 +54,7 @@
     comfyUrl: '',
     outputDirectory: '',
     geminiApiKey: '',
+    chatPromptLanguage: 'english',
     selectedVae: '',
     clipSkip: 0,
     locale: baseLocale,
@@ -91,6 +93,9 @@
       }
       if (!cloned.geminiApiKey) {
         cloned.geminiApiKey = ''
+      }
+      if (cloned.chatPromptLanguage !== 'english' && cloned.chatPromptLanguage !== 'chinese') {
+        cloned.chatPromptLanguage = 'english'
       }
       localSettings = cloned
       // Reset session init so we can capture a fresh baseline below
@@ -365,6 +370,18 @@
           class="output-dir-input"
           autocomplete="off"
         />
+
+        <label for="chat-prompt-language" class="output-dir-label">
+          {m['settingsDialog.chatPromptLanguage']()}
+        </label>
+        <select
+          id="chat-prompt-language"
+          class="output-dir-input"
+          bind:value={localSettings.chatPromptLanguage}
+        >
+          <option value="english">{m['settingsDialog.chatPromptLanguageEnglish']()}</option>
+          <option value="chinese">{m['settingsDialog.chatPromptLanguageChinese']()}</option>
+        </select>
 
         <label for="global-workflow" class="output-dir-label">Global Workflow</label>
         <select
