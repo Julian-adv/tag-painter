@@ -586,45 +586,49 @@
                   onOpenSettings={openSettingsFromTagZones}
                 />
               </div>
-
-              <ModelControls {availableCheckpoints} onRefreshModels={refreshModels} />
-
-              <GenerationControls
-                bind:this={generationControlsRef}
-                {isLoading}
-                {progressData}
-                {settings}
-                {isGeneratingForever}
-                {lastSeed}
-                {toastsRef}
-                onGenerate={() => handleGenerate(null)}
-                onInpaint={handleInpaint}
-                onRegenerate={() => handleGenerate(lastSeed)}
-                onGenerateForever={handleGenerateForever}
-                onStopGeneration={handleStopGeneration}
-                onSettingsChange={handleSettingsChange}
-                disableInpaint={isQwenModel}
-              />
-
-              {#if dev}
-                <button
-                  type="button"
-                  class="flex h-6 w-6 items-center justify-center self-start rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
-                  onclick={openNoCheckpointsDialog}
-                  aria-label={m['imageGenerator.devShowDialog']()}
-                  title={m['imageGenerator.devShowDialog']()}
-                >
-                  !
-                </button>
-              {/if}
             </div>
           {:else if activeTabId === 'chat'}
-            <div class="h-full">
-              <ChatInterface
-                apiKey={settings.geminiApiKey}
-                onGeneratePrompt={handleChatGeneratePrompt}
-              />
+            <div class="flex h-full flex-col gap-2 p-2">
+              <div class="flex-1 overflow-auto">
+                <ChatInterface
+                  apiKey={settings.geminiApiKey}
+                  onGeneratePrompt={handleChatGeneratePrompt}
+                />
+              </div>
             </div>
+          {/if}
+        </div>
+
+        <div class="flex flex-shrink-0 flex-col gap-2 p-2 pt-0">
+          <ModelControls {availableCheckpoints} onRefreshModels={refreshModels} />
+
+          <GenerationControls
+            bind:this={generationControlsRef}
+            {isLoading}
+            {progressData}
+            {settings}
+            {isGeneratingForever}
+            {lastSeed}
+            {toastsRef}
+            onGenerate={() => handleGenerate(null)}
+            onInpaint={handleInpaint}
+            onRegenerate={() => handleGenerate(lastSeed)}
+            onGenerateForever={handleGenerateForever}
+            onStopGeneration={handleStopGeneration}
+            onSettingsChange={handleSettingsChange}
+            disableInpaint={isQwenModel}
+          />
+
+          {#if dev}
+            <button
+              type="button"
+              class="flex h-6 w-6 items-center justify-center self-start rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
+              onclick={openNoCheckpointsDialog}
+              aria-label={m['imageGenerator.devShowDialog']()}
+              title={m['imageGenerator.devShowDialog']()}
+            >
+              !
+            </button>
           {/if}
         </div>
       </section>
