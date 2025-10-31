@@ -2,13 +2,15 @@
   import { onMount } from 'svelte'
   import { Cog8Tooth, ArrowPath } from 'svelte-heros-v2'
   import SettingsDialog from '$lib/SettingsDialog.svelte'
+  import { getEffectiveModelSettings } from '$lib/generation/generationCommon'
+  import { promptsData } from '$lib/stores/promptsStore'
   import type { Settings } from '$lib/types'
 
   interface Props {
     apiKey: string
     promptLanguage: 'english' | 'chinese'
     onGeneratePrompt?: (prompt: string, options?: { isRedraw?: boolean }) => void
-    settings?: Settings
+    settings: Settings
     onSettingsChange?: (settings: Settings) => void
   }
 
@@ -33,8 +35,25 @@
   let chatContainer: HTMLDivElement | undefined
   let systemPrompt = $state('')
   let showSettings = $state(false)
+  let lastLoadedPromptFile = $state('')
+  let hasLoadedHistory = $state(false)
+  let loadingPromptFile = $state('')
 
   const GEMINI_MODEL_ID = 'gemini-2.5-pro'
+
+  let activeModelType = $derived.by(() => {
+    const checkpoint = $promptsData.selectedCheckpoint || 'Default'
+    const effectiveModel = getEffectiveModelSettings(settings, checkpoint)
+    return effectiveModel?.modelType || 'sdxl'
+  })
+
+  let systemPromptFilename = $derived.by(() => {
+    return activeModelType === 'qwen' ||
+      activeModelType === 'chroma' ||
+      activeModelType === 'flux1_krea'
+      ? 'system_prompt.qwen.txt'
+      : 'system_prompt.sdxl.txt'
+  })
 
   // Scroll to bottom when new messages arrive
   $effect(() => {
@@ -68,15 +87,23 @@
 
   async function loadChatHistory() {
     try {
-      const response = await fetch('/api/chat-history')
+      const response = await fetch('/api/chat-history', { cache: 'no-store' })
       if (!response.ok) return
       const data: unknown = await response.json()
-      const loadedMessages = (data as { messages?: Message[] })?.messages
-      if (Array.isArray(loadedMessages)) {
-        messages = loadedMessages
-      }
+      const rawMessages = (data as { messages?: unknown })?.messages
+      const loadedMessages: unknown[] = Array.isArray(rawMessages) ? rawMessages : []
+      messages = loadedMessages.map((item) => {
+        const entry = item as { id?: unknown; role?: unknown; content?: unknown }
+        return {
+          id: typeof entry.id === 'string' && entry.id ? entry.id : createId(),
+          role: entry.role === 'assistant' ? 'assistant' : 'user',
+          content: typeof entry.content === 'string' ? entry.content : ''
+        }
+      })
     } catch (error) {
       console.error('Failed to load chat history', error)
+    } finally {
+      hasLoadedHistory = true
     }
   }
 
@@ -92,20 +119,48 @@
     }
   }
 
-  onMount(async () => {
+  async function loadSystemPromptFile(filename: string) {
     try {
-      const response = await fetch('/api/system-prompt')
-      if (!response.ok) return
-      const data: unknown = await response.json()
-      const prompt = (data as { prompt?: string })?.prompt
+      const response = await fetch(`/api/wildcard-file?name=${encodeURIComponent(filename)}`)
+      if (!response.ok) {
+        if (loadingPromptFile === filename) {
+          lastLoadedPromptFile = ''
+        }
+        return
+      }
+      if (loadingPromptFile !== filename) {
+        return
+      }
+      const prompt = await response.text()
       if (typeof prompt === 'string') {
         systemPrompt = prompt.trim()
+        lastLoadedPromptFile = filename
+      } else {
+        lastLoadedPromptFile = ''
       }
     } catch (error) {
       console.error('Failed to load system prompt', error)
+      if (loadingPromptFile === filename) {
+        lastLoadedPromptFile = ''
+      }
+    } finally {
+      if (loadingPromptFile === filename) {
+        loadingPromptFile = ''
+      }
     }
+  }
 
-    // Load chat history
+  $effect(() => {
+    const filename = systemPromptFilename
+    if (!filename) return
+    if (filename === lastLoadedPromptFile) return
+    if (filename === loadingPromptFile) return
+    loadingPromptFile = filename
+    systemPrompt = ''
+    void loadSystemPromptFile(filename)
+  })
+
+  onMount(async () => {
     await loadChatHistory()
   })
 
@@ -299,7 +354,11 @@
 <div class="flex h-full flex-col bg-white">
   <!-- Chat messages area -->
   <div bind:this={chatContainer} class="flex-1 overflow-y-auto p-1" aria-live="polite">
-    {#if messages.length === 0}
+    {#if !hasLoadedHistory}
+      <div class="flex h-full items-center justify-center text-gray-400">
+        <p>Loading chat history...</p>
+      </div>
+    {:else if messages.length === 0}
       <div class="flex h-full items-center justify-center text-gray-400">
         <p>Start a conversation...</p>
       </div>
