@@ -588,7 +588,7 @@
               </div>
             </div>
           {:else if activeTabId === 'chat'}
-            <div class="flex h-full flex-col gap-2 p-2">
+            <div class="flex h-full flex-col gap-2 p-0">
               <div class="flex-1 overflow-auto">
                 <ChatInterface
                   apiKey={settings.geminiApiKey}

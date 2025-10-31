@@ -32,6 +32,13 @@
     }
   })
 
+  // Save chat history when messages change
+  $effect(() => {
+    if (messages.length > 0) {
+      saveChatHistory()
+    }
+  })
+
   function createId(): string {
     const globalCrypto =
       typeof globalThis !== 'undefined' ? (globalThis.crypto as Crypto | undefined) : undefined
@@ -46,6 +53,32 @@
     return `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`
   }
 
+  async function loadChatHistory() {
+    try {
+      const response = await fetch('/api/chat-history')
+      if (!response.ok) return
+      const data: unknown = await response.json()
+      const loadedMessages = (data as { messages?: Message[] })?.messages
+      if (Array.isArray(loadedMessages)) {
+        messages = loadedMessages
+      }
+    } catch (error) {
+      console.error('Failed to load chat history', error)
+    }
+  }
+
+  async function saveChatHistory() {
+    try {
+      await fetch('/api/chat-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages })
+      })
+    } catch (error) {
+      console.error('Failed to save chat history', error)
+    }
+  }
+
   onMount(async () => {
     try {
       const response = await fetch('/api/system-prompt')
@@ -58,6 +91,9 @@
     } catch (error) {
       console.error('Failed to load system prompt', error)
     }
+
+    // Load chat history
+    await loadChatHistory()
   })
 
   function toGeminiContents(history: Message[]) {
@@ -215,17 +251,17 @@
 
 <div class="flex h-full flex-col bg-white">
   <!-- Chat messages area -->
-  <div bind:this={chatContainer} class="flex-1 overflow-y-auto p-4" aria-live="polite">
+  <div bind:this={chatContainer} class="flex-1 overflow-y-auto p-1" aria-live="polite">
     {#if messages.length === 0}
       <div class="flex h-full items-center justify-center text-gray-400">
         <p>Start a conversation...</p>
       </div>
     {:else}
-      <div class="flex flex-col gap-4">
+      <div class="flex flex-col gap-2">
         {#each messages as message (message.id)}
           <div class="flex {message.role === 'user' ? 'justify-end' : 'justify-start'}">
             <div
-              class="max-w-full rounded-lg p-3 text-left {message.role === 'user'
+              class="max-w-full rounded-lg p-2 text-left {message.role === 'user'
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-100 text-gray-900'}"
             >
@@ -245,8 +281,8 @@
   </div>
 
   <!-- Input area -->
-  <div class="border-t border-gray-200 p-4">
-    <div class="flex gap-2">
+  <div class="p-1">
+    <div class="flex gap-1">
       <textarea
         bind:value={inputMessage}
         onkeydown={handleKeydown}
@@ -256,14 +292,25 @@
         rows="3"
         disabled={isLoading}
       ></textarea>
-      <button
-        type="button"
-        onclick={handleSendMessage}
-        disabled={!inputMessage.trim() || isLoading}
-        class="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        Send
-      </button>
+      <div class="flex flex-col gap-1">
+        <button
+          type="button"
+          onclick={() => {
+            messages = []
+          }}
+          class="rounded-lg bg-red-500 px-4 py-1 text-sm font-medium text-white transition hover:bg-red-600"
+        >
+          New
+        </button>
+        <button
+          type="button"
+          onclick={handleSendMessage}
+          disabled={!inputMessage.trim() || isLoading}
+          class="rounded-lg bg-blue-500 px-4 py-1 text-sm font-medium text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Send
+        </button>
+      </div>
     </div>
     {#if errorMessage}
       <p class="mt-2 text-sm text-red-600">{errorMessage}</p>
