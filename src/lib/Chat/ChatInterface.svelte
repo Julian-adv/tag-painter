@@ -20,6 +20,11 @@
     content: string
   }
 
+  type GeminiContent = {
+    role: 'model' | 'user' | 'assistant'
+    parts: { text: string }[]
+  }
+
   let {
     apiKey = '',
     promptLanguage = 'english',
@@ -33,7 +38,7 @@
   let isLoading = $state(false)
   let errorMessage = $state('')
   let chatContainer: HTMLDivElement | undefined
-  let systemPrompt = $state('')
+  let systemPrompt = $state<GeminiContent[]>([])
   let showSettings = $state(false)
   let lastLoadedPromptFile = $state('')
   let hasLoadedHistory = $state(false)
@@ -51,8 +56,16 @@
     return activeModelType === 'qwen' ||
       activeModelType === 'chroma' ||
       activeModelType === 'flux1_krea'
-      ? 'system_prompt.qwen.txt'
-      : 'system_prompt.sdxl.txt'
+      ? 'system_prompt.qwen.json'
+      : 'system_prompt.sdxl.json'
+  })
+
+  let canResendLastMessage = $derived.by(() => {
+    if (messages.length < 2) return false
+    return (
+      messages[messages.length - 1].role === 'assistant' &&
+      messages[messages.length - 2].role === 'user'
+    )
   })
 
   // Scroll to bottom when new messages arrive
@@ -126,23 +139,21 @@
         if (loadingPromptFile === filename) {
           lastLoadedPromptFile = ''
         }
+        systemPrompt = []
         return
       }
       if (loadingPromptFile !== filename) {
         return
       }
-      const prompt = await response.text()
-      if (typeof prompt === 'string') {
-        systemPrompt = prompt.trim()
-        lastLoadedPromptFile = filename
-      } else {
-        lastLoadedPromptFile = ''
-      }
+      const raw = await response.text()
+      systemPrompt = JSON.parse(raw)
+      lastLoadedPromptFile = filename
     } catch (error) {
       console.error('Failed to load system prompt', error)
       if (loadingPromptFile === filename) {
         lastLoadedPromptFile = ''
       }
+      systemPrompt = []
     } finally {
       if (loadingPromptFile === filename) {
         loadingPromptFile = ''
@@ -156,7 +167,7 @@
     if (filename === lastLoadedPromptFile) return
     if (filename === loadingPromptFile) return
     loadingPromptFile = filename
-    systemPrompt = ''
+    systemPrompt = []
     void loadSystemPromptFile(filename)
   })
 
@@ -192,17 +203,7 @@
     )}`
 
     const body = {
-      contents: [
-        ...(systemPrompt
-          ? [
-              {
-                role: 'user',
-                parts: [{ text: systemPrompt }]
-              }
-            ]
-          : []),
-        ...toGeminiContents(history)
-      ]
+      contents: [...systemPrompt, ...toGeminiContents(history)]
     }
     console.log('Gemini request payload:', body)
     const response = await fetch(endpoint, {
@@ -288,6 +289,62 @@
     }
 
     isLoading = true
+    try {
+      const replyText = await requestGemini(conversation, trimmedKey)
+      const content = replyText || 'Gemini returned an empty response.'
+      const extractedPrompt = extractPrompt(content, promptLanguage)
+      const cleanedContent = removeUnusedLanguageTag(content, promptLanguage)
+      const assistantMessage: Message = {
+        id: createId(),
+        role: 'assistant',
+        content: cleanedContent
+      }
+      messages = [...conversation, assistantMessage]
+      if (extractedPrompt) {
+        onGeneratePrompt?.(extractedPrompt, { isRedraw: false })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to contact Gemini.'
+      errorMessage = message
+      const assistantMessage: Message = {
+        id: createId(),
+        role: 'assistant',
+        content: `Error: ${message}`
+      }
+      messages = [...conversation, assistantMessage]
+    } finally {
+      isLoading = false
+    }
+  }
+
+  async function handleResendLast(): Promise<void> {
+    if (isLoading) return
+    if (!canResendLastMessage) return
+
+    const trimmedKey = apiKey.trim()
+    if (!trimmedKey) {
+      const warning = 'Add your Gemini API key in Settings to enable chat.'
+      errorMessage = warning
+      return
+    }
+
+    const lastAssistantIndex = messages.length - 1
+    let lastUserIndex = -1
+    for (let index = lastAssistantIndex - 1; index >= 0; index -= 1) {
+      if (messages[index].role === 'user') {
+        lastUserIndex = index
+        break
+      }
+    }
+    if (lastAssistantIndex < 0 || lastUserIndex === -1) return
+
+    const updatedMessages = messages.slice(0, lastAssistantIndex)
+    messages = updatedMessages
+    errorMessage = ''
+    isLoading = true
+
+    const conversation = [...updatedMessages]
+
     try {
       const replyText = await requestGemini(conversation, trimmedKey)
       const content = replyText || 'Gemini returned an empty response.'
@@ -415,6 +472,14 @@
           class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1 text-sm font-medium text-gray-600 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Send
+        </button>
+        <button
+          type="button"
+          onclick={handleResendLast}
+          disabled={!canResendLastMessage || isLoading}
+          class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1 text-sm font-medium text-gray-600 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Resend
         </button>
         <button
           type="button"
