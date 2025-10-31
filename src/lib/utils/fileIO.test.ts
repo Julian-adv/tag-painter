@@ -286,6 +286,7 @@ describe('fileIO utilities', () => {
         scheduler: 'simple',
         comfyUrl: 'http://127.0.0.1:8188',
         outputDirectory: '/test/output',
+        geminiApiKey: '',
         selectedVae: '__embedded__',
         clipSkip: 2,
         locale: 'en',
