@@ -7,7 +7,7 @@
   interface Props {
     apiKey: string
     promptLanguage: 'english' | 'chinese'
-    onGeneratePrompt?: (prompt: string) => void
+    onGeneratePrompt?: (prompt: string, options?: { isRedraw?: boolean }) => void
     settings?: Settings
     onSettingsChange?: (settings: Settings) => void
   }
@@ -245,7 +245,7 @@
       }
       messages = [...conversation, assistantMessage]
       if (extractedPrompt) {
-        onGeneratePrompt?.(extractedPrompt)
+        onGeneratePrompt?.(extractedPrompt, { isRedraw: false })
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to contact Gemini.'
@@ -287,7 +287,7 @@
   function handleRedraw() {
     const latestPrompt = findLatestPrompt()
     if (!latestPrompt) return
-    onGeneratePrompt?.(latestPrompt)
+    onGeneratePrompt?.(latestPrompt, { isRedraw: true })
   }
 
   function handleSettingsSave(newSettings: Settings) {

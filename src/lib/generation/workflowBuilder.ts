@@ -444,6 +444,12 @@ async function buildQwenWorkflow(
       delete workflow[nodeId]
     }
   }
+  let mainSeed = typeof settings.seed === 'number' ? settings.seed : null
+  if (mainSeed == null || mainSeed < 0) {
+    mainSeed = Math.floor(Math.random() * 1000000000000000)
+  }
+  const faceDetailerSeed = mainSeed + 1
+  const upscaleSeed = mainSeed + 2
   const appliedSettings = applyPerModelOverrides(settings, checkpoint)
   const effectiveLoras = getEffectiveLoras(settings, checkpoint, [])
   const loraError = applyQwenLoraChain(workflow, effectiveLoras)
@@ -464,6 +470,7 @@ async function buildQwenWorkflow(
   const scheduler = modelSettings?.scheduler || 'simple'
   if (
     !setNodeSampler(workflow, 'KSampler', {
+      seed: mainSeed,
       steps: appliedSettings.steps,
       cfg: appliedSettings.cfgScale,
       sampler_name: appliedSettings.sampler,
@@ -590,8 +597,7 @@ async function buildQwenWorkflow(
       workflow[fdNeg.nodeId].inputs.text = negativeText
     }
 
-    const baseSeed = typeof settings.seed === 'number' ? settings.seed : 0
-    workflow[fdNode.nodeId].inputs.seed = baseSeed + 1
+    workflow[fdNode.nodeId].inputs.seed = faceDetailerSeed
     workflow[fdNode.nodeId].inputs.steps = faceDetailerSettings.steps
     workflow[fdNode.nodeId].inputs.cfg = faceDetailerSettings.cfgScale
     workflow[fdNode.nodeId].inputs.sampler_name = faceDetailerSettings.sampler
@@ -763,6 +769,7 @@ async function buildQwenWorkflow(
 
     if (
       !setNodeSampler(workflow, 'KSampler (Upscale)', {
+        seed: upscaleSeed,
         steps: upscaleSettings.steps,
         cfg: upscaleSettings.cfgScale,
         sampler_name: upscaleSettings.sampler,
