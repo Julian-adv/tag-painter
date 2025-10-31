@@ -125,6 +125,10 @@ export function connectWebSocket(
   ws.binaryType = 'arraybuffer'
 
   let lastExecutingNode: string | null = null
+  let finalNodeActive = false
+  let promptFinished = false
+  let imageReceived = false
+  let pendingCloseTimer: ReturnType<typeof setTimeout> | null = null
 
   // Function to get node title from workflow
   function getNodeTitle(nodeId: string): string {
@@ -132,6 +136,27 @@ export function connectWebSocket(
       return workflow[nodeId]._meta.title
     }
     return nodeId // Fallback to node ID if no title
+  }
+
+  const scheduleCloseIfNeeded = () => {
+    if (promptFinished && imageReceived) {
+      if (pendingCloseTimer) {
+        clearTimeout(pendingCloseTimer)
+        pendingCloseTimer = null
+      }
+      ws.close()
+    } else if (promptFinished && !imageReceived && !pendingCloseTimer) {
+      pendingCloseTimer = setTimeout(() => {
+        pendingCloseTimer = null
+        if (!imageReceived) {
+          console.warn(
+            'ComfyUI prompt finished without delivering final image payload; closing WebSocket.'
+          )
+          callbacks.onLoadingChange(false)
+          ws.close()
+        }
+      }, 750)
+    }
   }
 
   ws.onopen = () => {
@@ -145,12 +170,13 @@ export function connectWebSocket(
         const data = message.data
         if (data.prompt_id === promptId) {
           lastExecutingNode = data.node
+          if (data.node === finalSaveNodeId) {
+            finalNodeActive = true
+          }
           if (data.node === null) {
-            // Execution is done for this prompt
-            callbacks.onLoadingChange(false)
-            ws.close()
+            promptFinished = true
+            scheduleCloseIfNeeded()
           } else {
-            // Update progress with current node info
             callbacks.onProgressUpdate({
               value: 0,
               max: 100,
@@ -159,12 +185,11 @@ export function connectWebSocket(
           }
         }
       } else if (message.type === 'executed') {
-        // Potentially useful for knowing when a specific node finished
-        // if (message.data.node === SAVE_IMAGE_WEBSOCKET_NODE_ID && message.data.prompt_id === promptId) {
-        //  // This means the SaveImageWebsocket node has finished sending its data.
-        // }
+        const data = message.data
+        if (data.prompt_id === promptId && data.node === finalSaveNodeId) {
+          finalNodeActive = false
+        }
       } else if (message.type === 'progress') {
-        // Handle progress updates
         callbacks.onProgressUpdate({
           value: message.data.value,
           max: message.data.max,
@@ -172,14 +197,13 @@ export function connectWebSocket(
         })
       }
     } else if (event.data instanceof ArrayBuffer) {
-      // Check if the last executing node was our SaveImageWebsocket node
-      // AND that the current prompt ID matches.
-      if (lastExecutingNode === finalSaveNodeId && promptId /* && execution prompt_id matches */) {
+      if ((finalNodeActive || lastExecutingNode === finalSaveNodeId) && promptId) {
         const imageBlob = new Blob([event.data.slice(8)], { type: 'image/png' })
         callbacks.onImageReceived(imageBlob)
         callbacks.onLoadingChange(false)
-        ws.close()
+        imageReceived = true
         lastExecutingNode = null
+        scheduleCloseIfNeeded()
       }
     }
   }
@@ -190,6 +214,12 @@ export function connectWebSocket(
   }
 
   ws.onclose = () => {
-    // WebSocket connection closed
+    if (pendingCloseTimer) {
+      clearTimeout(pendingCloseTimer)
+      pendingCloseTimer = null
+    }
+    if (!imageReceived) {
+      callbacks.onLoadingChange(false)
+    }
   }
 }
