@@ -617,6 +617,7 @@
             onStopGeneration={handleStopGeneration}
             onSettingsChange={handleSettingsChange}
             disableInpaint={isQwenModel}
+            showOnlyProgress={activeTabId === 'chat'}
           />
 
           {#if dev}

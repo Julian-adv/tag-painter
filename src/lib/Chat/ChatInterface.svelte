@@ -10,7 +10,6 @@
     id: string
     role: 'user' | 'assistant'
     content: string
-    timestamp: Date
   }
 
   let { apiKey = '', onGeneratePrompt }: Props = $props()
@@ -73,10 +72,6 @@
     if (!match) return null
     const prompt = match[1].trim()
     return prompt || null
-  }
-
-  function stripEnglishTags(text: string): string {
-    return text.replace(/<english>([\s\S]*?)<\/english>/gi, (_match, inner) => inner.trim())
   }
 
   async function requestGemini(history: Message[], key: string): Promise<string> {
@@ -157,8 +152,7 @@
     const userMessage: Message = {
       id: createId(),
       role: 'user',
-      content: trimmed,
-      timestamp: new Date()
+      content: trimmed
     }
 
     const updatedMessages = [...messages, userMessage]
@@ -175,8 +169,7 @@
       const assistantMessage: Message = {
         id: createId(),
         role: 'assistant',
-        content: warning,
-        timestamp: new Date()
+        content: warning
       }
       messages = [...conversation, assistantMessage]
       return
@@ -187,13 +180,10 @@
       const replyText = await requestGemini(conversation, trimmedKey)
       const content = replyText || 'Gemini returned an empty response.'
       const extractedPrompt = extractEnglishPrompt(content)
-      const stripped = stripEnglishTags(content).trim()
-      const finalContent = stripped || content
       const assistantMessage: Message = {
         id: createId(),
         role: 'assistant',
-        content: finalContent,
-        timestamp: new Date()
+        content: content
       }
       messages = [...conversation, assistantMessage]
       if (extractedPrompt) {
@@ -205,8 +195,7 @@
       const assistantMessage: Message = {
         id: createId(),
         role: 'assistant',
-        content: `Error: ${message}`,
-        timestamp: new Date()
+        content: `Error: ${message}`
       }
       messages = [...conversation, assistantMessage]
     } finally {
@@ -236,20 +225,17 @@
         {#each messages as message (message.id)}
           <div class="flex {message.role === 'user' ? 'justify-end' : 'justify-start'}">
             <div
-              class="max-w-[80%] rounded-lg p-3 {message.role === 'user'
+              class="max-w-full rounded-lg p-3 text-left {message.role === 'user'
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-100 text-gray-900'}"
             >
               <p class="text-sm whitespace-pre-wrap">{message.content}</p>
-              <p class="mt-1 text-xs opacity-70">
-                {message.timestamp.toLocaleTimeString()}
-              </p>
             </div>
           </div>
         {/each}
         {#if isLoading}
           <div class="flex justify-start">
-            <div class="max-w-[80%] rounded-lg bg-gray-100 p-3 text-gray-900">
+            <div class="max-w-full rounded-lg bg-gray-100 p-3 text-gray-900">
               <p class="text-sm">Thinking...</p>
             </div>
           </div>
