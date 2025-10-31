@@ -17,6 +17,9 @@ export function generateLoraChain(
   // Find the base checkpoint loader node
   const checkpointNode = findNodeByTitle(workflow, 'Load Checkpoint')
   if (!checkpointNode) {
+    if (selectedLoras.length === 0) {
+      return {}
+    }
     return { error: 'Workflow node not found: Load Checkpoint' }
   }
 
@@ -25,6 +28,9 @@ export function generateLoraChain(
   // Find existing CLIP skip node in workflow
   let clipSkipNode = findNodeByTitle(workflow, 'CLIP Set Last Layer')
   if (!clipSkipNode) {
+    if (selectedLoras.length === 0) {
+      return {}
+    }
     return { error: 'Workflow node not found: CLIP Set Last Layer' }
   }
 

@@ -12,7 +12,12 @@
   import { m } from '$lib/paraglide/messages'
   import NoCheckpointsDialog from './NoCheckpointsDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
-  import { loadSettings, saveSettings as saveSettingsToFile, saveMaskData, saveImage } from './utils/fileIO'
+  import {
+    loadSettings,
+    saveSettings as saveSettingsToFile,
+    saveMaskData,
+    saveImage
+  } from './utils/fileIO'
   import { fetchCheckpoints, connectWebSocket, normalizeBaseUrl } from './generation/comfyui'
   import { ArrowPath } from 'svelte-heros-v2'
   import { generateImage } from './generation/imageGeneration'
@@ -473,7 +478,7 @@
     }
     const currentPromptsData = get(promptsData)
     const negativePrompt = (currentPromptsData.tags?.negative || []).join(', ')
-    const checkpointKey = currentPromptsData.selectedCheckpoint || 'Default'
+    const checkpointKey = currentPromptsData.selectedCheckpoint || ''
     const useUpscaleFlag = currentPromptsData.useUpscale ?? false
     const useFaceDetailerFlag = currentPromptsData.useFaceDetailer ?? false
     const promptsForSaving = {

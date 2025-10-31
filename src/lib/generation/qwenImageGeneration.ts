@@ -32,7 +32,7 @@ import {
 import type { ComfyUIWorkflow, ModelSettings } from '$lib/types'
 import type { GenerationOptions } from './imageGeneration'
 
-function applyQwenLoraChain(
+export function applyQwenLoraChain(
   workflow: ComfyUIWorkflow,
   loras: { name: string; weight: number }[]
 ): string | null {
