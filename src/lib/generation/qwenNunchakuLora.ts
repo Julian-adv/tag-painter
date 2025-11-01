@@ -10,10 +10,16 @@ export function applyQwenNunchakuLoraChain(workflow: ComfyUIWorkflow, loras: Lor
 	const nodeId = nunchakuNode.nodeId
 	workflow[nodeId].inputs.lora_count = loras.length
 
-	for (let i = 0; i < loras.length; i++) {
-		const lora = loras[i]
-		workflow[nodeId].inputs[`lora_name_${i + 1}`] = lora.name
-		workflow[nodeId].inputs[`lora_strength_${i + 1}`] = lora.weight
+	for (let i = 0; i < 10; i++) {
+    if (i < loras.length) {
+      const lora = loras[i]
+      workflow[nodeId].inputs[`lora_name_${i + 1}`] = lora.name
+      workflow[nodeId].inputs[`lora_strength_${i + 1}`] = lora.weight
+    } else {
+      // Clear out any unused lora slots up to 10
+      workflow[nodeId].inputs[`lora_name_${i + 1}`] = 'None'
+      workflow[nodeId].inputs[`lora_strength_${i + 1}`] = 0
+    }
 	}
 
 	return null

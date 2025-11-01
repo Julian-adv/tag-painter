@@ -311,7 +311,7 @@ export async function submitWorkflowForPrompts(
     useUpscale,
     useFaceDetailer
   )
-
+  console.log('Submitting workflow:', workflow)
   const resolvedClientId = clientId ?? generateClientId()
   const comfyBase = normalizeBaseUrl(settings.comfyUrl)
   const response = await fetch(buildComfyHttpUrl(comfyBase, 'prompt'), {
