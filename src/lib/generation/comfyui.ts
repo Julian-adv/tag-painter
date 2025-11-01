@@ -9,6 +9,8 @@
 import { DEFAULT_COMFY_URL } from '$lib/constants'
 import type { ProgressData } from '$lib/types'
 
+const FINAL_PAYLOAD_TIMEOUT_MS = 15000
+
 export function normalizeBaseUrl(baseUrl: string): string {
   const candidate = baseUrl ? baseUrl.trim() : ''
   if (!candidate) {
@@ -150,12 +152,12 @@ export function connectWebSocket(
         pendingCloseTimer = null
         if (!imageReceived) {
           console.warn(
-            'ComfyUI prompt finished without delivering final image payload; closing WebSocket.'
+            `ComfyUI prompt finished without delivering final image payload; closing WebSocket after ${FINAL_PAYLOAD_TIMEOUT_MS}ms.`
           )
           callbacks.onLoadingChange(false)
           ws.close()
         }
-      }, 750)
+      }, FINAL_PAYLOAD_TIMEOUT_MS)
     }
   }
 

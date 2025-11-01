@@ -13,6 +13,7 @@ import {
 import { applyQwenLoraChain } from './qwenImageGeneration'
 import { applyPerModelOverrides, getEffectiveLoras } from './generationCommon'
 import { getDefaultWorkflowForModelType } from './workflowBuilder'
+import { FINAL_SAVE_NODE_ID } from './workflow'
 
 function setRequiredNodeInput(
   workflow: ComfyUIWorkflow,
@@ -72,7 +73,6 @@ function attachSaveImageNode(
   useUpscale: boolean,
   useFaceDetailer: boolean
 ): void {
-  const FINAL_SAVE_NODE_ID = '999'
   let imageSourceNodeId: string
 
   if (useUpscale) {

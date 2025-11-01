@@ -160,14 +160,10 @@ export async function submitToComfyUI(
     onLoadingChange: callbacks.onLoadingChange,
     onProgressUpdate: callbacks.onProgressUpdate,
     onImageReceived: async (imageBlob: Blob) => {
-      const filePath = await saveImage(imageBlob, prompts, settings.outputDirectory, workflow, seed)
-      if (filePath) {
-        callbacks.onImageReceived(imageBlob, filePath)
-      } else {
-        // If saving returns null, use fallback path
-        const fallbackPath = `unsaved_${Date.now()}.png`
-        callbacks.onImageReceived(imageBlob, fallbackPath)
-      }
+      const filePath =
+        (await saveImage(imageBlob, prompts, settings.outputDirectory, workflow, seed)) ||
+        `unsaved_${Date.now()}.png`
+      callbacks.onImageReceived(imageBlob, filePath)
     }
   }
 
