@@ -435,7 +435,7 @@ function copyInput(workflow: ComfyUIWorkflow, source: string, inputName: string,
   }
 }
 
-async function buildQwenWorkflow(
+export async function buildQwenWorkflow(
   positiveText: string,
   negativeText: string,
   settings: Settings,
