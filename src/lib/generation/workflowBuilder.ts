@@ -42,15 +42,25 @@ export function getDefaultWorkflowForModelType(modelType: string | undefined): s
   }
 }
 
+function setRequiredNodeInput(workflow: ComfyUIWorkflow, title: string, inputKey: string, value: any): void {
+  const node = findNodeByTitle(workflow, title)
+  if (node) {
+    if (workflow[node.nodeId].inputs && (inputKey in workflow[node.nodeId].inputs)) {
+      workflow[node.nodeId].inputs[inputKey] = value
+    } else {
+      throw new Error(`Workflow node "${title}" missing input key: "${inputKey}"`)
+    }
+  } else {
+    throw new Error(`Workflow node not found: "${title}"`)
+  }
+}
+
 function setRequiredNodeText(
   workflow: ComfyUIWorkflow,
   title: string,
   text: string
 ): void {
-  if (setNodeTextInput(workflow, title, text)) {
-    return
-  }
-  throw new Error(`Workflow node not found: "${title}"`)
+  setRequiredNodeInput(workflow, title, 'text', text)
 }
 
 function configureWorkflowForPrompts(
@@ -405,6 +415,26 @@ async function buildSdxlWorkflow(
   return workflow
 }
 
+function setInput(workflow: ComfyUIWorkflow, sourceTitle: string, sourceOutputIndex: number, targetTitle: string, targetInputName: string): void {
+  const sourceNode = findNodeByTitle(workflow, sourceTitle)
+  const targetNode = findNodeByTitle(workflow, targetTitle)
+  if (sourceNode && targetNode) {
+    workflow[targetNode.nodeId].inputs[targetInputName] = [sourceNode.nodeId, sourceOutputIndex]
+  } else {
+    throw new Error(`Failed to assign input from ${sourceTitle} to ${targetTitle}: node not found`)
+  }
+}
+
+function copyInput(workflow: ComfyUIWorkflow, source: string, inputName: string, target: string): void {
+  const sourceNode = findNodeByTitle(workflow, source)
+  const targetNode = findNodeByTitle(workflow, target)
+  if (sourceNode && targetNode) {
+    workflow[targetNode.nodeId].inputs[inputName] = workflow[sourceNode.nodeId].inputs[inputName]
+  } else {
+    throw new Error(`Failed to copy input from ${source} to ${target}: node not found`)
+  }
+}
+
 async function buildQwenWorkflow(
   positiveText: string,
   negativeText: string,
@@ -423,7 +453,7 @@ async function buildQwenWorkflow(
   try {
     workflow = await loadCustomWorkflow(workflowPath)
   } catch {
-    workflow = JSON.parse(JSON.stringify(qwenWorkflowPrompt))
+    throw new Error(`Failed to load ${workflowPath}`)
   }
 
   setRequiredNodeText(workflow, 'CLIP Text Encode (Positive)', positiveText)
@@ -482,21 +512,20 @@ async function buildQwenWorkflow(
 
   if (checkpoint) {
     const unetNode = findNodeByTitle(workflow, 'Load Qwen UNet')
-    if (!unetNode) {
-      throw new Error('Load Qwen UNet node not found in workflow')
-    }
-    workflow[unetNode.nodeId].inputs.unet_name = checkpoint
+    if (unetNode) {
+      workflow[unetNode.nodeId].inputs.unet_name = checkpoint
+    } else {
+      const nunchakuNode = findNodeByTitle(workflow, 'Nunchaku Qwen-Image DiT Loader')
+      if (nunchakuNode) {
+        workflow[nunchakuNode.nodeId].inputs.model_name = checkpoint
+      } else {
+        throw new Error('Load Qwen UNet node not found in workflow')
+      }
+    } 
   }
 
-  const vaeNode = findNodeByTitle(workflow, 'Load Qwen VAE')
-  if (vaeNode && workflow[vaeNode.nodeId]) {
-    const selectedVae =
-      appliedSettings.selectedVae && appliedSettings.selectedVae !== '__embedded__'
-        ? appliedSettings.selectedVae
-        : workflow[vaeNode.nodeId].inputs.vae_name
-    if (selectedVae) {
-      workflow[vaeNode.nodeId].inputs.vae_name = selectedVae
-    }
+  if (appliedSettings.selectedVae && appliedSettings.selectedVae !== '__embedded__') {
+    setRequiredNodeInput(workflow, 'Load Qwen VAE', 'vae_name', appliedSettings.selectedVae)
   }
 
   if (useFaceDetailer) {
@@ -514,87 +543,39 @@ async function buildQwenWorkflow(
           ? faceDetailerSettings.checkpoint
           : checkpoint || 'qwen_image_fp8_e4m3fn.safetensors'
 
-      const fdUnet = findNodeByTitle(workflow, 'FaceDetailer UNet Loader (Qwen)')
-      if (!fdUnet) {
-        throw new Error('FaceDetailer UNet Loader (Qwen) node not found in Qwen workflow')
+      if (resolvedFdUnet === checkpoint) {
+        // Re-use base model
+        copyInput(workflow, 'KSampler', 'model', 'FaceDetailer')
+        setInput(workflow, 'VAE Decode', 0, 'FaceDetailer', 'image')
+        setInput(workflow, 'Load CLIP', 0, 'FaceDetailer', 'clip')
+        setInput(workflow, 'Load Qwen VAE', 0, 'FaceDetailer', 'vae')
+        setInput(workflow, 'CLIP Text Encode (Positive)', 0, 'FaceDetailer', 'positive')
+        setInput(workflow, 'CLIP Text Encode (Negative)', 0, 'FaceDetailer', 'negative')
+      } else {
+        // different model, not supported yet
+        throw new Error('Qwen FaceDetailer with different model not yet implemented')
       }
-      workflow[fdUnet.nodeId].inputs.unet_name = resolvedFdUnet
-
-      const fdModelSampling = findNodeByTitle(workflow, 'FaceDetailer Model Sampling Aura Flow (Qwen)')
-      if (!fdModelSampling) {
-        throw new Error('FaceDetailer Model Sampling Aura Flow (Qwen) node not found in Qwen workflow')
-      }
-
-      const fdClipLoader = findNodeByTitle(workflow, 'FaceDetailer CLIP Loader (Qwen)')
-      if (!fdClipLoader) {
-        throw new Error('FaceDetailer CLIP Loader (Qwen) node not found in Qwen workflow')
-      }
-
-      workflow[fdNode.nodeId].inputs.model = [fdModelSampling.nodeId, 0]
-      workflow[fdNode.nodeId].inputs.clip = [fdClipLoader.nodeId, 0]
-
-      const fdVaeLoaderQwen = findNodeByTitle(workflow, 'FaceDetailer VAE Loader (Qwen)')
-      if (!fdVaeLoaderQwen) {
-        throw new Error('FaceDetailer VAE Loader (Qwen) node not found in Qwen workflow')
-      }
-      const fdVaeName = faceDetailerSettings.selectedVae || 'qwen_image_vae.safetensors'
-      workflow[fdNode.nodeId].inputs.vae = [fdVaeLoaderQwen.nodeId, 0]
-      workflow[fdVaeLoaderQwen.nodeId].inputs.vae_name = fdVaeName
-
-      const fdPos = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Positive)')
-      if (!fdPos) {
-        throw new Error('FaceDetailer CLIP Text Encode (Positive) node not found in Qwen workflow')
-      }
-      workflow[fdPos.nodeId].inputs.clip = [fdClipLoader.nodeId, 0]
-      workflow[fdPos.nodeId].inputs.text = positiveText
-
-      const fdNeg = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Negative)')
-      if (!fdNeg) {
-        throw new Error('FaceDetailer CLIP Text Encode (Negative) node not found in Qwen workflow')
-      }
-      workflow[fdNeg.nodeId].inputs.clip = [fdClipLoader.nodeId, 0]
-      workflow[fdNeg.nodeId].inputs.text = negativeText
-    } else {
+    } else if (fdModelType === 'sdxl') {
       const resolvedFdCkpt =
         faceDetailerSettings.checkpoint && faceDetailerSettings.checkpoint !== 'model.safetensors'
           ? faceDetailerSettings.checkpoint
           : checkpoint || faceDetailerSettings.checkpoint
 
-      const fdCkpt = findNodeByTitle(workflow, 'FaceDetailer Checkpoint Loader (SDXL)')
-      if (!fdCkpt) {
-        throw new Error('FaceDetailer Checkpoint Loader (SDXL) node not found in Qwen workflow')
-      }
-      workflow[fdCkpt.nodeId].inputs.ckpt_name = resolvedFdCkpt
-
-      workflow[fdNode.nodeId].inputs.model = [fdCkpt.nodeId, 0]
-      workflow[fdNode.nodeId].inputs.clip = [fdCkpt.nodeId, 1]
+      setRequiredNodeInput(workflow, 'FaceDetailer Checkpoint Loader (SDXL)', 'ckpt_name', resolvedFdCkpt)
+      setInput(workflow, 'FaceDetailer Checkpoint Loader (SDXL)', 0, 'FaceDetailer', 'model')
+      setInput(workflow, 'FaceDetailer Checkpoint Loader (SDXL)', 1, 'FaceDetailer', 'clip')
 
       if (faceDetailerSettings.selectedVae === '__embedded__') {
-        workflow[fdNode.nodeId].inputs.vae = [fdCkpt.nodeId, 2]
+        setInput(workflow, 'FaceDetailer Checkpoint Loader (SDXL)', 2, 'FaceDetailer', 'vae')
       } else {
-        const fdVaeLoader = findNodeByTitle(workflow, 'FaceDetailer VAE Loader (SDXL)')
-        if (!fdVaeLoader) {
-          throw new Error('FaceDetailer VAE Loader (SDXL) node not found in Qwen workflow')
-        }
-        workflow[fdNode.nodeId].inputs.vae = [fdVaeLoader.nodeId, 0]
+        setInput(workflow, 'FaceDetailer VAE Loader (SDXL)', 0, 'FaceDetailer', 'vae')
         const fdVaeName =
           faceDetailerSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
-        workflow[fdVaeLoader.nodeId].inputs.vae_name = fdVaeName
+        setRequiredNodeInput(workflow, 'FaceDetailer VAE Loader (SDXL)', 'vae_name', fdVaeName)
       }
 
-      const fdPos = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Positive)')
-      if (!fdPos) {
-        throw new Error('FaceDetailer CLIP Text Encode (Positive) node not found in Qwen workflow')
-      }
-      workflow[fdPos.nodeId].inputs.clip = [fdCkpt.nodeId, 1]
-      workflow[fdPos.nodeId].inputs.text = positiveText
-
-      const fdNeg = findNodeByTitle(workflow, 'FaceDetailer CLIP Text Encode (Negative)')
-      if (!fdNeg) {
-        throw new Error('FaceDetailer CLIP Text Encode (Negative) node not found in Qwen workflow')
-      }
-      workflow[fdNeg.nodeId].inputs.clip = [fdCkpt.nodeId, 1]
-      workflow[fdNeg.nodeId].inputs.text = negativeText
+      setInput(workflow, 'FaceDetailer CLIP Text Encode (Positive)', 0, 'FaceDetailer', 'positive')
+      setInput(workflow, 'FaceDetailer CLIP Text Encode (Negative)', 0, 'FaceDetailer', 'negative')
     }
 
     workflow[fdNode.nodeId].inputs.seed = faceDetailerSeed
@@ -632,139 +613,38 @@ async function buildQwenWorkflow(
       throw new Error('KSampler (Upscale) node not found in Qwen workflow')
     }
 
+    const resolvedUpscaleUnet =
+      upscaleSettings.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors'
+        ? upscaleSettings.checkpoint
+        : checkpoint || 'qwen_image_fp8_e4m3fn.safetensors'
     if (upscaleModelType === 'qwen') {
-      const resolvedUpscaleUnet =
-        upscaleSettings.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors'
-          ? upscaleSettings.checkpoint
-          : checkpoint || 'qwen_image_fp8_e4m3fn.safetensors'
-
-      const reuseBaseModel = resolvedUpscaleUnet === checkpoint
-
-      if (reuseBaseModel) {
-        const baseModelSampling = findNodeByTitle(workflow, 'Model Sampling Aura Flow')
-        if (!baseModelSampling) {
-          throw new Error('Model Sampling Aura Flow node not found in Qwen workflow')
-        }
-        workflow[upscaleSampler.nodeId].inputs.model = [baseModelSampling.nodeId, 0]
-
-        const basePositive = findNodeByTitle(workflow, 'CLIP Text Encode (Positive)')
-        if (!basePositive) {
-          throw new Error('CLIP Text Encode (Positive) node not found in Qwen workflow')
-        }
-        workflow[upscaleSampler.nodeId].inputs.positive = [basePositive.nodeId, 0]
-
-        const baseNegative = findNodeByTitle(workflow, 'CLIP Text Encode (Negative)')
-        if (!baseNegative) {
-          throw new Error('CLIP Text Encode (Negative) node not found in Qwen workflow')
-        }
-        workflow[upscaleSampler.nodeId].inputs.negative = [baseNegative.nodeId, 0]
+      if (resolvedUpscaleUnet === checkpoint) {
+        // Re-use base model
+        copyInput(workflow, 'KSampler', 'model', 'KSampler (Upscale)')
+        setInput(workflow, 'Load Qwen VAE', 0, 'VAE Encode (Tiled)', 'vae')
+        setInput(workflow, 'Load Qwen VAE', 0, 'VAE Decode (Tiled)', 'vae')
+        setInput(workflow, 'CLIP Text Encode (Positive)', 0, 'KSampler (Upscale)', 'positive')
+        setInput(workflow, 'CLIP Text Encode (Negative)', 0, 'KSampler (Upscale)', 'negative')
       } else {
-        const upscaleUnet = findNodeByTitle(workflow, 'Upscale UNet Loader (Qwen)')
-        if (!upscaleUnet) {
-          throw new Error('Upscale UNet Loader (Qwen) node not found in Qwen workflow')
-        }
-        workflow[upscaleUnet.nodeId].inputs.unet_name = resolvedUpscaleUnet
-
-        const upscaleModelSampling = findNodeByTitle(
-          workflow,
-          'Upscale Model Sampling Aura Flow (Qwen)'
-        )
-        if (!upscaleModelSampling) {
-          throw new Error('Upscale Model Sampling Aura Flow (Qwen) node not found in Qwen workflow')
-        }
-        workflow[upscaleSampler.nodeId].inputs.model = [upscaleModelSampling.nodeId, 0]
-
-        const upscaleClipLoader = findNodeByTitle(workflow, 'Upscale CLIP Loader (Qwen)')
-        if (!upscaleClipLoader) {
-          throw new Error('Upscale CLIP Loader (Qwen) node not found in Qwen workflow')
-        }
-
-        const upscalePositive = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Positive)')
-        if (!upscalePositive) {
-          throw new Error('Upscale CLIP Text Encode (Positive) node not found in Qwen workflow')
-        }
-        workflow[upscalePositive.nodeId].inputs.clip = [upscaleClipLoader.nodeId, 0]
-        workflow[upscalePositive.nodeId].inputs.text = positiveText
-
-        const upscaleNegative = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Negative)')
-        if (!upscaleNegative) {
-          throw new Error('Upscale CLIP Text Encode (Negative) node not found in Qwen workflow')
-        }
-        workflow[upscaleNegative.nodeId].inputs.clip = [upscaleClipLoader.nodeId, 0]
-        workflow[upscaleNegative.nodeId].inputs.text = negativeText
+        throw new Error('Qwen Upscale with different model not yet implemented')
       }
-
-      const upscaleVaeLoader = findNodeByTitle(workflow, 'Upscale VAE Loader (Qwen)')
-      if (!upscaleVaeLoader) {
-        throw new Error('Upscale VAE Loader (Qwen) node not found in Qwen workflow')
-      }
-      const resolvedUpscaleVae = upscaleSettings.selectedVae || 'qwen_image_vae.safetensors'
-      workflow[upscaleVaeLoader.nodeId].inputs.vae_name = resolvedUpscaleVae
-
-      const upscaleEncode = findNodeByTitle(workflow, 'VAE Encode (Tiled)')
-      if (!upscaleEncode) {
-        throw new Error('VAE Encode (Tiled) node not found in Qwen workflow')
-      }
-      workflow[upscaleEncode.nodeId].inputs.vae = [upscaleVaeLoader.nodeId, 0]
-
-      const upscaleDecode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')
-      if (!upscaleDecode) {
-        throw new Error('VAE Decode (Tiled) node not found in Qwen workflow')
-      }
-      workflow[upscaleDecode.nodeId].inputs.vae = [upscaleVaeLoader.nodeId, 0]
-    } else {
-      const resolvedUpscaleCheckpoint =
-        upscaleSettings.checkpoint && upscaleSettings.checkpoint !== 'model.safetensors'
-          ? upscaleSettings.checkpoint
-          : checkpoint || upscaleSettings.checkpoint
-
-      const upscaleCheckpointLoader = findNodeByTitle(
-        workflow,
-        'Upscale Checkpoint Loader (SDXL)'
-      )
-      if (!upscaleCheckpointLoader) {
-        throw new Error('Upscale Checkpoint Loader (SDXL) node not found in Qwen workflow')
-      }
-      workflow[upscaleCheckpointLoader.nodeId].inputs.ckpt_name = resolvedUpscaleCheckpoint
-      workflow[upscaleSampler.nodeId].inputs.model = [upscaleCheckpointLoader.nodeId, 0]
-
-      const upscaleEncode = findNodeByTitle(workflow, 'VAE Encode (Tiled)')
-      if (!upscaleEncode) {
-        throw new Error('VAE Encode (Tiled) node not found in Qwen workflow')
-      }
-
+    } else if (upscaleModelType === 'sdxl') {
       if (upscaleSettings.selectedVae === '__embedded__') {
-        workflow[upscaleEncode.nodeId].inputs.vae = [upscaleCheckpointLoader.nodeId, 2]
+        setInput(workflow, 'Upscale Checkpoint Loader (SDXL)', 2, 'VAE Encode (Tiled)', 'model')
+        setInput(workflow, 'Upscale Checkpoint Loader (SDXL)', 2, 'VAE Decode (Tiled)', 'model')
       } else {
-        const upscaleVaeLoader = findNodeByTitle(workflow, 'Upscale VAE Loader (SDXL)')
-        if (!upscaleVaeLoader) {
-          throw new Error('Upscale VAE Loader (SDXL) node not found in Qwen workflow')
-        }
-        workflow[upscaleEncode.nodeId].inputs.vae = [upscaleVaeLoader.nodeId, 0]
+        setInput(workflow, 'Upscale VAE Loader (SDXL)', 0, 'VAE Encode (Tiled)', 'vae')
+        setInput(workflow, 'Upscale VAE Loader (SDXL)', 0, 'VAE Decode (Tiled)', 'vae')
         const resolvedUpscaleVae =
           upscaleSettings.selectedVae || 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
-        workflow[upscaleVaeLoader.nodeId].inputs.vae_name = resolvedUpscaleVae
+        setRequiredNodeInput(workflow, 'Upscale VAE Loader (SDXL)', 'vae_name', resolvedUpscaleVae)
       }
-
-      const upscaleDecode = findNodeByTitle(workflow, 'VAE Decode (Tiled)')
-      if (!upscaleDecode) {
-        throw new Error('VAE Decode (Tiled) node not found in Qwen workflow')
-      }
-      workflow[upscaleDecode.nodeId].inputs.vae = [upscaleCheckpointLoader.nodeId, 2]
-
-      const upscalePositive = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Positive)')
-      if (!upscalePositive) {
-        throw new Error('Upscale CLIP Text Encode (Positive) node not found in Qwen workflow')
-      }
-      workflow[upscalePositive.nodeId].inputs.clip = [upscaleCheckpointLoader.nodeId, 1]
-      workflow[upscalePositive.nodeId].inputs.text = positiveText
-
-      const upscaleNegative = findNodeByTitle(workflow, 'Upscale CLIP Text Encode (Negative)')
-      if (!upscaleNegative) {
-        throw new Error('Upscale CLIP Text Encode (Negative) node not found in Qwen workflow')
-      }
-      workflow[upscaleNegative.nodeId].inputs.clip = [upscaleCheckpointLoader.nodeId, 1]
-      workflow[upscaleNegative.nodeId].inputs.text = negativeText
+      setRequiredNodeInput(workflow, 'Upscale Checkpoint Loader (SDXL)', 'ckpt_name', resolvedUpscaleUnet)
+      setInput(workflow, 'Upscale Checkpoint Loader (SDXL)', 0, 'KSampler (Upscale)', 'model')
+      setInput(workflow, 'Upscale CLIP Text Encode (Positive)', 0, 'KSampler (Upscale)', 'positive')
+      setInput(workflow, 'Upscale CLIP Text Encode (Negative)', 0, 'KSampler (Upscale)', 'negative')
+    } else {
+      throw new Error('Unsupported upscale model type for Qwen workflow')
     }
 
     if (

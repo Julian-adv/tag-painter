@@ -137,7 +137,7 @@ export function setNodeSampler(
     if (settings.cfg !== undefined) nodeInputs.cfg = settings.cfg
     if (settings.sampler_name !== undefined) nodeInputs.sampler_name = settings.sampler_name
     if (settings.scheduler !== undefined) nodeInputs.scheduler = settings.scheduler
-    if (settings.denoise !== undefined) nodeInputs.denoise = settings.denoise
+    if (settings.denoise !== undefined && ('denoise' in nodeInputs)) nodeInputs.denoise = settings.denoise
     if (settings.seed !== undefined) {
       // Support both 'seed' and 'noise_seed' input keys
       if ('seed' in nodeInputs) nodeInputs.seed = settings.seed

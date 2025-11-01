@@ -31,6 +31,8 @@ import {
 } from './generationCommon'
 import type { ComfyUIWorkflow, ModelSettings } from '$lib/types'
 import type { GenerationOptions } from './imageGeneration'
+import { applyQwenNunchakuLoraChain } from './qwenNunchakuLora'
+
 
 export function applyQwenLoraChain(
   workflow: ComfyUIWorkflow,
@@ -38,7 +40,11 @@ export function applyQwenLoraChain(
 ): string | null {
   const baseUnetNode = findNodeByTitle(workflow, 'Load Qwen UNet')
   if (!baseUnetNode) {
-    return 'Missing required node: "Load Qwen UNet"'
+    const baseNunchakuNode = findNodeByTitle(workflow, 'Nunchaku Qwen-Image DiT Loader')
+    if (baseNunchakuNode) {
+      return applyQwenNunchakuLoraChain(workflow, loras)
+    }
+    return 'Missing required node: "Load Qwen UNet" or "Nunchaku Qwen-Image DiT Loader"'
   }
   const baseUnet = baseUnetNode.nodeId
 
@@ -295,18 +301,27 @@ export async function generateQwenImage(
     }
 
     // Model Sampling
-    const modelSamplingNode = findNodeByTitle(workflow, 'Model Sampling Aura Flow')
+    let modelSamplingNode = findNodeByTitle(workflow, 'Model Sampling Aura Flow')
     if (!modelSamplingNode) {
-      return { error: 'Missing required node: "Model Sampling Aura Flow"' }
+      modelSamplingNode = findNodeByTitle(workflow, 'Nunchaku Qwen Image LoRA Stack')
+      if (!modelSamplingNode) {
+        return { error: 'Missing required node: "Model Sampling Aura Flow" or "Nunchaku Qwen Image LoRA Stack"' }
+      }
     }
 
     // UNet checkpoint (Qwen)
     if (promptsData.selectedCheckpoint) {
       const unetNode = findNodeByTitle(workflow, 'Load Qwen UNet')
-      if (!unetNode) {
-        return { error: 'Missing required node: "Load Qwen UNet"' }
+      if (unetNode) {
+        workflow[unetNode.nodeId].inputs.unet_name = promptsData.selectedCheckpoint
+      } else {
+        const nunchakuNode = findNodeByTitle(workflow, 'Nunchaku Qwen-Image DiT Loader')
+        if (nunchakuNode) {
+          workflow[nunchakuNode.nodeId].inputs.model_name = promptsData.selectedCheckpoint
+        } else {
+          return { error: 'Missing required node: "Load Qwen UNet" or "Nunchaku Qwen-Image DiT Loader"' }
+        }
       }
-      workflow[unetNode.nodeId].inputs.unet_name = promptsData.selectedCheckpoint
     }
 
     // VAE selection (use explicit selection or keep existing/default)
