@@ -3,7 +3,7 @@
 // This module handles Qwen model image generation workflows
 
 import { findNodeByTitle } from './workflowMapping'
-import { buildQwenWorkflow } from './workflowBuilder'
+import { buildQwenWorkflow } from './qwenWorkflowBuilder'
 import {
   expandCustomTags,
   detectCompositionFromTags,
