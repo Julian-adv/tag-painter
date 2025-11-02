@@ -24,3 +24,60 @@ export function applyQwenNunchakuLoraChain(workflow: ComfyUIWorkflow, loras: Lor
 
 	return null
 }
+
+export function attachLoraChainBetweenNodes(
+  workflow: ComfyUIWorkflow,
+  sourceTitle: string,
+  sourceIndex: number,
+  destTitle: string,
+  destInput: string,
+  loras: LoraWithWeight[],
+  loadLoraNodeClass: string,
+  loadLoraWeightName: string,
+  startNodeId: number
+): void {
+  const sourceNode = findNodeByTitle(workflow, sourceTitle)
+  if (!sourceNode) {
+    throw new Error(`Workflow node not found: ${sourceTitle}`)
+  }
+
+  const destNode = findNodeByTitle(workflow, destTitle)
+  if (!destNode) {
+    throw new Error(`Workflow node not found: ${destTitle}`)
+  }
+
+  const destNodeData = workflow[destNode.nodeId]
+  if (!destNodeData || !destNodeData.inputs || !(destInput in destNodeData.inputs)) {
+    throw new Error(`Input "${destInput}" not found on node: ${destTitle}`)
+  }
+
+  if (!Array.isArray(loras) || loras.length === 0) {
+    destNodeData.inputs[destInput] = [sourceNode.nodeId, sourceIndex]
+    return
+  }
+
+  let previousOutput: [string, number] = [sourceNode.nodeId, sourceIndex]
+
+  loras.forEach((lora, index) => {
+    const nodeId = String(startNodeId + index)
+    if (workflow[nodeId]) {
+      throw new Error(`Workflow already contains node with id: ${nodeId}`)
+    }
+
+    workflow[nodeId] = {
+      inputs: {
+        model: previousOutput,
+        lora_name: lora.name,
+      },
+      class_type: loadLoraNodeClass,
+      _meta: {
+        title: `Load LoRA ${index + 1}`
+      }
+    }
+    workflow[nodeId].inputs[loadLoraWeightName] = lora.weight
+
+    previousOutput = [nodeId, 0]
+  })
+
+  destNodeData.inputs[destInput] = previousOutput
+}

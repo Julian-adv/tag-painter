@@ -20,72 +20,24 @@ import {
 } from './generationCommon'
 import type { ComfyUIWorkflow, ModelSettings } from '$lib/types'
 import type { GenerationOptions } from './imageGeneration'
-import { applyQwenNunchakuLoraChain } from './qwenNunchakuLora'
+import { attachLoraChainBetweenNodes } from './qwenNunchakuLora'
 
 
 export function applyQwenLoraChain(
   workflow: ComfyUIWorkflow,
   loras: { name: string; weight: number }[]
-): string | null {
+): void {
   const baseUnetNode = findNodeByTitle(workflow, 'Load Qwen UNet')
-  if (!baseUnetNode) {
+  if (baseUnetNode) {
+    attachLoraChainBetweenNodes(workflow, 'Load Qwen UNet', 0, 'Model Sampling Aura Flow', 'model', loras, 'LoraLoaderModelOnly', 'strength_model', 200)
+  } else {
     const baseNunchakuNode = findNodeByTitle(workflow, 'Nunchaku Qwen-Image DiT Loader')
     if (baseNunchakuNode) {
-      return applyQwenNunchakuLoraChain(workflow, loras)
+      attachLoraChainBetweenNodes(workflow, 'Nunchaku Qwen-Image DiT Loader', 0, 'KSampler', 'model', loras, 'NunchakuQwenImageLoraLoader', 'lora_strength', 200)
+    } else {
+      throw new Error('Workflow must contain either "Load Qwen UNet" or "Nunchaku Qwen-Image DiT Loader" node')
     }
-    return 'Missing required node: "Load Qwen UNet" or "Nunchaku Qwen-Image DiT Loader"'
   }
-  const baseUnet = baseUnetNode.nodeId
-
-  const modelSamplingNode = findNodeByTitle(workflow, 'Model Sampling Aura Flow')
-  if (!modelSamplingNode) {
-    return 'Missing required node: "Model Sampling Aura Flow"'
-  }
-  const modelSampling = modelSamplingNode.nodeId
-
-  const mainSamplerNode = findNodeByTitle(workflow, 'KSampler')
-  if (!mainSamplerNode) {
-    return 'Missing required node: "KSampler"'
-  }
-  const mainSampler = mainSamplerNode.nodeId
-
-  if (!Array.isArray(loras) || loras.length === 0) {
-    if (workflow[modelSampling]) {
-      workflow[modelSampling].inputs.model = [baseUnet, 0]
-    }
-    if (workflow[mainSampler]) {
-      workflow[mainSampler].inputs.model = [modelSampling, 0]
-    }
-    return null
-  }
-
-  let previousNodeId = baseUnet
-
-  loras.forEach((lora, index) => {
-    const nodeId = (200 + index).toString()
-    workflow[nodeId] = {
-      inputs: {
-        model: [previousNodeId, 0],
-        lora_name: lora.name,
-        strength_model: lora.weight
-      },
-      class_type: 'LoraLoaderModelOnly',
-      _meta: {
-        title: `Load Qwen LoRA ${index + 1}`
-      }
-    }
-
-    previousNodeId = nodeId
-  })
-
-  if (workflow[modelSampling]) {
-    workflow[modelSampling].inputs.model = [previousNodeId, 0]
-  }
-  if (workflow[mainSampler]) {
-    workflow[mainSampler].inputs.model = [modelSampling, 0]
-  }
-
-  return null
 }
 
 export async function generateQwenImage(

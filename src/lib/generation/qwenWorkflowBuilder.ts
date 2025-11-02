@@ -129,7 +129,7 @@ export async function buildQwenWorkflow(
   }
 
   for (const [nodeId, node] of Object.entries(workflow)) {
-    if (node.class_type === 'LoraLoaderModelOnly' || node.class_type === 'PreviewImage') {
+    if (node.class_type === 'LoraLoaderModelOnly' || node.class_type === 'PreviewImage' || node.class_type === 'NunchakuQwenImageLoraStack') {
       delete workflow[nodeId]
     }
   }
@@ -141,10 +141,7 @@ export async function buildQwenWorkflow(
   const upscaleSeed = mainSeed + 2
   const appliedSettings = applyPerModelOverrides(settings, checkpoint)
   const effectiveLoras = getEffectiveLoras(settings, checkpoint, [])
-  const loraError = applyQwenLoraChain(workflow, effectiveLoras)
-  if (loraError) {
-    throw new Error(loraError)
-  }
+  applyQwenLoraChain(workflow, effectiveLoras)
   if (
     !setNodeImageSize(
       workflow,
