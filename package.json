@@ -53,6 +53,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
+    "fflate": "^0.8.2",
     "png-chunk-text": "^1.0.0",
     "png-chunks-encode": "^1.0.0",
     "png-chunks-extract": "^1.0.0",
