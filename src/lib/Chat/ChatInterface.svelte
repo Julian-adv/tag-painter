@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { Cog8Tooth, ArrowPath } from 'svelte-heros-v2'
   import SettingsDialog from '$lib/SettingsDialog.svelte'
+  import CharacterManagerDialog from './CharacterManagerDialog.svelte'
   import { getEffectiveModelSettings } from '$lib/generation/generationCommon'
   import { promptsData } from '$lib/stores/promptsStore'
   import type { Settings } from '$lib/types'
@@ -40,6 +41,8 @@
   let isLoading = $state(false)
   let errorMessage = $state('')
   let chatContainer: HTMLDivElement | undefined
+  let showCharacterDialog = $state(false)
+  let selectedCharacter: { name: string; path: string } | null = $state(null)
   let systemPrompt = $state<GeminiContent[]>([])
   let showSettings = $state(false)
   let lastLoadedPromptFile = $state('')
@@ -461,6 +464,12 @@
 </script>
 
 <div class="flex h-full flex-col bg-white">
+  {#if selectedCharacter}
+    <div class="flex items-center gap-2 border-b px-2 py-1">
+      <img src={`/api/image?path=${encodeURIComponent(selectedCharacter.path)}`} alt={selectedCharacter.name} class="h-6 w-6 rounded object-cover" />
+      <div class="text-xs text-gray-700">{selectedCharacter.name}</div>
+    </div>
+  {/if}
   <!-- Chat messages area -->
   <div bind:this={chatContainer} class="flex-1 overflow-y-auto p-1" aria-live="polite">
     {#if !hasLoadedHistory}
@@ -544,6 +553,13 @@
         </button>
         <button
           type="button"
+          class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
+          onclick={() => (showCharacterDialog = true)}
+        >
+          Characters
+        </button>
+        <button
+          type="button"
           onclick={() => (showSettings = !showSettings)}
           class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-gray-100 text-gray-600 transition-all duration-200 hover:bg-gray-200"
           aria-label="Settings"
@@ -557,6 +573,14 @@
     {/if}
   </div>
 </div>
+
+<CharacterManagerDialog
+  bind:isOpen={showCharacterDialog}
+  on:select={(e) => {
+    selectedCharacter = { name: e.detail.item.name, path: e.detail.item.path }
+    showCharacterDialog = false
+  }}
+/>
 
 {#if settings}
   <SettingsDialog
