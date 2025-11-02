@@ -71,12 +71,10 @@
     )
   })
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom when new messages arrive (instant, no smooth)
   $effect(() => {
     if (messages.length > 0 && chatContainer) {
-      setTimeout(() => {
-        chatContainer?.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' })
-      }, 100)
+      chatContainer.scrollTop = chatContainer.scrollHeight
     }
   })
 
