@@ -24,6 +24,7 @@
   let newFile = $state<File | null>(null)
   let draggedIndex = $state<number | null>(null)
   let dragOverIndex = $state<number | null>(null)
+  let selectedItem = $state<CharacterItem | null>(null)
 
   async function fetchList() {
     loading = true
@@ -134,13 +135,20 @@
   })
 
   $effect(() => {
-    if (isOpen) void fetchList()
+    if (isOpen) {
+      void fetchList()
+      selectedItem = null
+    }
   })
+
+  function handleCardClick(item: CharacterItem) {
+    selectedItem = item
+  }
 </script>
 
 {#if isOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div class="flex max-h-[80vh] w-[820px] flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+    <div class="flex h-[80vh] w-[1200px] flex-col overflow-hidden rounded-lg bg-white shadow-xl">
       <div class="flex items-center justify-between border-b border-gray-300 p-4">
         <h2 class="text-lg font-semibold text-gray-900">Characters</h2>
         <button
@@ -152,9 +160,10 @@
         </button>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-4">
-        <div class="mb-3 grid grid-cols-[1fr_auto] items-end gap-2">
-          <div class="grid grid-cols-2 gap-2">
+      <div class="flex flex-1 overflow-hidden">
+        <!-- Left: Character Grid -->
+        <div class="flex w-[600px] flex-col border-r border-gray-200 p-4">
+          <div class="mb-3 flex flex-col gap-2">
             <div class="flex flex-col">
               <label class="text-xs text-gray-600" for="char-name-input">Name</label>
               <input id="char-name-input" class="rounded border p-1 text-sm" bind:value={newName} placeholder="Name" />
@@ -163,45 +172,71 @@
               <label class="text-xs text-gray-600" for="char-jpeg-input">JPEG</label>
               <input id="char-jpeg-input" class="rounded border p-1 text-sm" type="file" accept="image/jpeg,image/jpg" onchange={onFileChange} />
             </div>
+            <button class="rounded-md bg-blue-500 px-3 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-default disabled:opacity-50" onclick={createNew} disabled={!newName || !newFile}>
+              New Character
+            </button>
           </div>
-          <button class="rounded-md bg-blue-500 px-3 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-default disabled:opacity-50" onclick={createNew} disabled={!newName || !newFile}>
-            New
-          </button>
+
+          {#if loading}
+            <div class="p-2 text-sm text-gray-500">Loading...</div>
+          {:else if error}
+            <div class="p-2 text-sm text-red-600">{error}</div>
+          {:else}
+            <div class="flex-1 overflow-y-auto">
+              <div class="grid grid-cols-3 gap-2">
+                {#each items as item, i (item.filename)}
+                  <div
+                    role="button"
+                    tabindex="0"
+                    class="flex cursor-pointer flex-col items-center gap-2 rounded border border-gray-200 p-2 transition-colors {selectedItem?.filename === item.filename ? 'border-blue-500 bg-blue-50' : ''} {dragOverIndex === i ? 'border-blue-300 bg-blue-50' : 'hover:border-gray-300 hover:bg-gray-50'}"
+                    draggable="true"
+                    ondragstart={(e) => handleDragStart(e, i)}
+                    ondragover={(e) => handleDragOver(e, i)}
+                    ondragleave={handleDragLeave}
+                    ondrop={(e) => handleDrop(e, i)}
+                    ondragend={handleDragEnd}
+                    onclick={() => handleCardClick(item)}
+                    onkeydown={(e) => e.key === 'Enter' && handleCardClick(item)}
+                  >
+                    <img src={`/api/image?path=${encodeURIComponent('character/' + item.filename)}`} alt={item.name} class="h-32 w-24 rounded object-cover" />
+                    <div class="w-full truncate text-center text-xs font-medium">{item.name}</div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
         </div>
 
-        {#if loading}
-          <div class="p-2 text-sm text-gray-500">Loading...</div>
-        {:else if error}
-          <div class="p-2 text-sm text-red-600">{error}</div>
-        {:else}
-          <div class="grid grid-cols-2 gap-2">
-            {#each items as item, i (item.filename)}
-              <div
-                role="button"
-                tabindex="0"
-                class="flex items-center gap-2 rounded border border-gray-200 p-2 cursor-move transition-colors {dragOverIndex === i ? 'bg-blue-50 border-blue-300' : ''}"
-                draggable="true"
-                ondragstart={(e) => handleDragStart(e, i)}
-                ondragover={(e) => handleDragOver(e, i)}
-                ondragleave={handleDragLeave}
-                ondrop={(e) => handleDrop(e, i)}
-                ondragend={handleDragEnd}
-              >
-                <img src={`/api/image?path=${encodeURIComponent('character/' + item.filename)}`} alt={item.name} class="h-32 w-24 rounded object-cover" />
-                <div class="min-w-0 flex-1">
-                  <div class="truncate text-sm font-medium">{item.name}</div>
-                  <div class="text-xs text-gray-500">{item.filename}</div>
-                </div>
-                <div class="flex flex-col gap-1">
-                  <button class="rounded border px-2 py-1 text-xs transition-colors hover:bg-gray-100" onclick={() => onSelect?.({ item })}>Select</button>
-                  <button class="flex items-center justify-center rounded-md bg-red-100 p-1.5 text-red-700 transition-colors hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500" onclick={() => remove(item)} title="Delete character">
-                    <Trash class="h-4 w-4" />
-                  </button>
+        <!-- Right: Detail Panel -->
+        <div class="flex flex-1 flex-col p-4">
+          {#if selectedItem}
+            <div class="flex flex-col gap-4">
+              <div class="flex items-start gap-4">
+                <img src={`/api/image?path=${encodeURIComponent('character/' + selectedItem.filename)}`} alt={selectedItem.name} class="h-64 w-48 rounded object-cover" />
+                <div class="flex-1">
+                  <h3 class="mb-2 text-xl font-semibold">{selectedItem.name}</h3>
+                  <div class="mb-4 space-y-1 text-sm text-gray-600">
+                    <div><span class="font-medium">Filename:</span> {selectedItem.filename}</div>
+                    <div><span class="font-medium">Size:</span> {(selectedItem.size / 1024).toFixed(1)} KB</div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500" onclick={() => selectedItem && onSelect?.({ item: selectedItem })}>
+                      Select
+                    </button>
+                    <button class="flex items-center gap-2 rounded-md bg-red-100 px-4 py-2 text-sm text-red-700 transition-colors hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500" onclick={() => selectedItem && remove(selectedItem)} title="Delete character">
+                      <Trash class="h-4 w-4" />
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
-            {/each}
-          </div>
-        {/if}
+            </div>
+          {:else}
+            <div class="flex h-full items-center justify-center text-gray-400">
+              Select a character to view details
+            </div>
+          {/if}
+        </div>
       </div>
     </div>
   </div>
