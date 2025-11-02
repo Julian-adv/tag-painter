@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount } from 'svelte'
+  import { onMount } from 'svelte'
 
   type CharacterItem = {
     filename: string
@@ -8,15 +8,19 @@
     size: number
   }
 
-  export let isOpen = false
+  interface Props {
+    isOpen: boolean
+    onSelect?: (payload: { item: CharacterItem }) => void
+  }
+  let { isOpen = $bindable(false), onSelect }: Props = $props()
 
-  const dispatch = createEventDispatcher<{ select: { item: CharacterItem } }>()
+  // use callback prop instead of deprecated createEventDispatcher
 
-  let items: CharacterItem[] = []
-  let loading = false
-  let error = ''
-  let newName = ''
-  let newFile: File | null = null
+  let items = $state<CharacterItem[]>([])
+  let loading = $state(false)
+  let error = $state('')
+  let newName = $state('')
+  let newFile = $state<File | null>(null)
 
   async function fetchList() {
     loading = true
@@ -112,12 +116,12 @@
       <div class="mb-3 grid grid-cols-[1fr_auto] items-end gap-2">
         <div class="grid grid-cols-2 gap-2">
           <div class="flex flex-col">
-            <label class="text-xs text-gray-600">Name</label>
-            <input class="rounded border p-1 text-sm" bind:value={newName} placeholder="Name" />
+            <label class="text-xs text-gray-600" for="char-name-input">Name</label>
+            <input id="char-name-input" class="rounded border p-1 text-sm" bind:value={newName} placeholder="Name" />
           </div>
           <div class="flex flex-col">
-            <label class="text-xs text-gray-600">JPEG</label>
-            <input class="rounded border p-1 text-sm" type="file" accept="image/jpeg,image/jpg" on:change={onFileChange} />
+            <label class="text-xs text-gray-600" for="char-jpeg-input">JPEG</label>
+            <input id="char-jpeg-input" class="rounded border p-1 text-sm" type="file" accept="image/jpeg,image/jpg" onchange={onFileChange} />
           </div>
         </div>
         <button class="rounded bg-blue-600 px-3 py-1 text-sm text-white" onclick={createNew} disabled={!newName || !newFile}>
@@ -133,13 +137,13 @@
         <div class="grid grid-cols-2 gap-2">
           {#each items as item, i (item.filename)}
             <div class="flex items-center gap-2 rounded border p-2">
-              <img src={`/api/image?path=${encodeURIComponent(item.path)}`} alt={item.name} class="h-12 w-12 rounded object-cover" />
+              <img src={`/api/image?path=${encodeURIComponent('character/' + item.filename)}`} alt={item.name} class="h-12 w-12 rounded object-cover" />
               <div class="min-w-0 flex-1">
                 <div class="truncate text-sm font-medium">{item.name}</div>
                 <div class="text-xs text-gray-500">{item.filename}</div>
               </div>
               <div class="flex flex-col gap-1">
-                <button class="rounded border px-2 py-1 text-xs" onclick={() => dispatch('select', { item })}>Select</button>
+                <button class="rounded border px-2 py-1 text-xs" onclick={() => onSelect?.({ item })}>Select</button>
                 <button class="rounded border px-2 py-1 text-xs" onclick={() => remove(item)}>Delete</button>
                 <div class="flex gap-1">
                   <button class="rounded border px-2 py-0 text-xs" onclick={() => move(i, -1)}>↑</button>

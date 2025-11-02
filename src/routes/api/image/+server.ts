@@ -53,12 +53,20 @@ export async function GET({ url }) {
       return json({ error: 'Image path is required' }, { status: 400 })
     }
 
-    // Use the full path directly
-    const fullPath = path.resolve(imagePath)
-
-    // Security: ensure the path is a real file and contains no directory traversal
-    if (imagePath.includes('..') || !path.isAbsolute(imagePath)) {
-      return json({ error: 'Invalid image path' }, { status: 403 })
+    // Resolve target path:
+    // - Absolute paths are used as-is
+    // - Relative paths are treated as relative to the data/ directory
+    let fullPath = ''
+    if (path.isAbsolute(imagePath)) {
+      fullPath = path.resolve(imagePath)
+    } else {
+      const dataRoot = path.resolve(process.cwd(), 'data')
+      fullPath = path.resolve(dataRoot, imagePath)
+      // Ensure resolved path stays under dataRoot
+      const rel = path.relative(dataRoot, fullPath)
+      if (rel.startsWith('..') || path.isAbsolute(rel)) {
+        return json({ error: 'Invalid image path' }, { status: 403 })
+      }
     }
 
     // Check if file exists

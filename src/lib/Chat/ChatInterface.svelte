@@ -42,7 +42,7 @@
   let errorMessage = $state('')
   let chatContainer: HTMLDivElement | undefined
   let showCharacterDialog = $state(false)
-  let selectedCharacter: { name: string; path: string } | null = $state(null)
+  let selectedCharacter: { name: string; filename: string } | null = $state(null)
   let systemPrompt = $state<GeminiContent[]>([])
   let showSettings = $state(false)
   let lastLoadedPromptFile = $state('')
@@ -466,7 +466,7 @@
 <div class="flex h-full flex-col bg-white">
   {#if selectedCharacter}
     <div class="flex items-center gap-2 border-b px-2 py-1">
-      <img src={`/api/image?path=${encodeURIComponent(selectedCharacter.path)}`} alt={selectedCharacter.name} class="h-6 w-6 rounded object-cover" />
+      <img src={`/api/image?path=${encodeURIComponent('character/' + selectedCharacter.filename)}`} alt={selectedCharacter.name} class="h-6 w-6 rounded object-cover" />
       <div class="text-xs text-gray-700">{selectedCharacter.name}</div>
     </div>
   {/if}
@@ -576,8 +576,8 @@
 
 <CharacterManagerDialog
   bind:isOpen={showCharacterDialog}
-  on:select={(e) => {
-    selectedCharacter = { name: e.detail.item.name, path: e.detail.item.path }
+  onSelect={(payload) => {
+    selectedCharacter = { name: payload.item.name, filename: payload.item.filename }
     showCharacterDialog = false
   }}
 />
