@@ -13,7 +13,7 @@
     onGeneratePrompt?: (prompt: string, options?: { isRedraw?: boolean }) => void
     settings: Settings
     onSettingsChange?: (settings: Settings) => void
-    onShowToast: (message: string) => void
+    onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void
   }
 
   type Message = {
@@ -576,9 +576,17 @@
 
 <CharacterManagerDialog
   bind:isOpen={showCharacterDialog}
+  selectedCharacterFilename={selectedCharacter?.filename}
   onSelect={(payload) => {
-    selectedCharacter = { name: payload.item.name, filename: payload.item.filename }
-    showCharacterDialog = false
+    // Toggle selection: unselect if clicking on already selected character
+    if (selectedCharacter?.filename === payload.item.filename) {
+      selectedCharacter = null
+    } else {
+      selectedCharacter = { name: payload.item.name, filename: payload.item.filename }
+    }
+  }}
+  onShowToast={(message, type) => {
+    onShowToast(message, type)
   }}
 />
 

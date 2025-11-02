@@ -62,3 +62,33 @@ export const GET: RequestHandler = async () => {
   }
 }
 
+export const POST: RequestHandler = async ({ request }) => {
+  try {
+    const { filename } = await request.json()
+    if (!filename) {
+      return new Response(JSON.stringify({ error: 'Filename required' }), { status: 400 })
+    }
+
+    const full = join(CHAR_DIR, filename)
+    const buf = new Uint8Array(await readFile(full))
+    const parsed = readCharxJpegCompat(buf)
+    console.log('parsed charx jpeg:', parsed)
+    const cardText = parsed.getText('card.json')
+
+    if (!cardText) {
+      return new Response(JSON.stringify({ error: 'No card.json found' }), { status: 404 })
+    }
+
+    const card = JSON.parse(cardText)
+
+    return new Response(JSON.stringify({ card }), {
+      headers: { 'Content-Type': 'application/json' }
+    })
+  } catch (e) {
+    console.error('Failed to read character info:', e)
+    return new Response(JSON.stringify({ error: 'Failed to read character info' }), {
+      status: 500
+    })
+  }
+}
+

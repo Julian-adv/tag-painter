@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { Trash } from 'svelte-heros-v2'
+  import { Trash, CheckCircle } from 'svelte-heros-v2'
 
   type CharacterItem = {
     filename: string
@@ -9,11 +9,39 @@
     size: number
   }
 
+  type CharacterCard = {
+    spec: string
+    spec_version: string
+    data: {
+      name: string
+      description?: string
+      personality?: string
+      scenario?: string
+      first_mes?: string
+      mes_example?: string
+      creator_notes?: string
+      system_prompt?: string
+      post_history_instructions?: string
+      alternate_greetings?: string[]
+      tags?: string[]
+      creator?: string
+      character_version?: string
+      [key: string]: unknown
+    }
+  }
+
   interface Props {
     isOpen: boolean
+    selectedCharacterFilename?: string
     onSelect?: (payload: { item: CharacterItem }) => void
+    onShowToast?: (message: string, type?: 'success' | 'error') => void
   }
-  let { isOpen = $bindable(false), onSelect }: Props = $props()
+  let {
+    isOpen = $bindable(false),
+    selectedCharacterFilename,
+    onSelect,
+    onShowToast
+  }: Props = $props()
 
   // use callback prop instead of deprecated createEventDispatcher
 
@@ -25,6 +53,10 @@
   let draggedIndex = $state<number | null>(null)
   let dragOverIndex = $state<number | null>(null)
   let selectedItem = $state<CharacterItem | null>(null)
+  let selectedCard = $state<CharacterCard | null>(null)
+  let loadingCard = $state(false)
+  let editedCard = $state<CharacterCard | null>(null)
+  let savingCard = $state(false)
 
   async function fetchList() {
     loading = true
@@ -141,14 +173,86 @@
     }
   })
 
+  // Select the character when dialog opens if there's a selected character
+  $effect(() => {
+    if (isOpen && selectedCharacterFilename && items.length > 0) {
+      const matchedItem = items.find((item) => item.filename === selectedCharacterFilename)
+      if (matchedItem) {
+        selectedItem = matchedItem
+        void fetchCardInfo(matchedItem.filename)
+      }
+    }
+  })
+
+  async function fetchCardInfo(filename: string) {
+    loadingCard = true
+    selectedCard = null
+    editedCard = null
+    try {
+      const res = await fetch('/api/characters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename })
+      })
+      const data = await res.json()
+      selectedCard = data.card
+      editedCard = JSON.parse(JSON.stringify(data.card)) // Deep clone for editing
+    } catch (e) {
+      console.error('Failed to load character card:', e)
+    } finally {
+      loadingCard = false
+    }
+  }
+
   function handleCardClick(item: CharacterItem) {
     selectedItem = item
+    void fetchCardInfo(item.filename)
+  }
+
+  async function saveCardChanges() {
+    if (!selectedItem || !editedCard) return
+    savingCard = true
+    try {
+      const res = await fetch('/api/characters/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: selectedItem.filename, card: editedCard })
+      })
+      if (res.ok) {
+        selectedCard = JSON.parse(JSON.stringify(editedCard)) // Update original
+        onShowToast?.('Character saved successfully!', 'success')
+      } else {
+        onShowToast?.('Failed to save character', 'error')
+      }
+    } catch (e) {
+      console.error('Failed to save character:', e)
+      onShowToast?.('Failed to save character', 'error')
+    } finally {
+      savingCard = false
+    }
+  }
+
+  const hasUnsavedChanges = $derived(
+    editedCard && selectedCard && JSON.stringify(editedCard) !== JSON.stringify(selectedCard)
+  )
+
+  function autoResize(textarea: HTMLTextAreaElement) {
+    textarea.style.height = 'auto'
+    const scrollHeight = textarea.scrollHeight
+    const lineHeight = parseInt(getComputedStyle(textarea).lineHeight)
+    const maxHeight = lineHeight * 15 // 15 lines max
+    textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`
+  }
+
+  function handleTextareaInput(e: Event) {
+    const textarea = e.target as HTMLTextAreaElement
+    autoResize(textarea)
   }
 </script>
 
 {#if isOpen}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div class="flex h-[80vh] w-[1200px] flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+    <div class="flex h-[80vh] w-[1100px] flex-col overflow-hidden rounded-lg bg-white shadow-xl">
       <div class="flex items-center justify-between border-b border-gray-300 p-4">
         <h2 class="text-lg font-semibold text-gray-900">Characters</h2>
         <button
@@ -166,13 +270,28 @@
           <div class="mb-3 flex flex-col gap-2">
             <div class="flex flex-col">
               <label class="text-xs text-gray-600" for="char-name-input">Name</label>
-              <input id="char-name-input" class="rounded border p-1 text-sm" bind:value={newName} placeholder="Name" />
+              <input
+                id="char-name-input"
+                class="rounded border p-1 text-sm"
+                bind:value={newName}
+                placeholder="Name"
+              />
             </div>
             <div class="flex flex-col">
               <label class="text-xs text-gray-600" for="char-jpeg-input">JPEG</label>
-              <input id="char-jpeg-input" class="rounded border p-1 text-sm" type="file" accept="image/jpeg,image/jpg" onchange={onFileChange} />
+              <input
+                id="char-jpeg-input"
+                class="rounded border p-1 text-sm"
+                type="file"
+                accept="image/jpeg,image/jpg"
+                onchange={onFileChange}
+              />
             </div>
-            <button class="rounded-md bg-blue-500 px-3 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-default disabled:opacity-50" onclick={createNew} disabled={!newName || !newFile}>
+            <button
+              class="rounded-md bg-blue-500 px-3 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-default disabled:opacity-50"
+              onclick={createNew}
+              disabled={!newName || !newFile}
+            >
               New Character
             </button>
           </div>
@@ -183,12 +302,22 @@
             <div class="p-2 text-sm text-red-600">{error}</div>
           {:else}
             <div class="flex-1 overflow-y-auto">
-              <div class="grid grid-cols-3 gap-2">
+              <div class="grid grid-cols-4 gap-2">
                 {#each items as item, i (item.filename)}
                   <div
                     role="button"
                     tabindex="0"
-                    class="flex cursor-pointer flex-col items-center gap-2 rounded border border-gray-200 p-2 transition-colors {selectedItem?.filename === item.filename ? 'border-blue-500 bg-blue-50' : ''} {dragOverIndex === i ? 'border-blue-300 bg-blue-50' : 'hover:border-gray-300 hover:bg-gray-50'}"
+                    class="relative flex cursor-pointer flex-col items-center gap-2 rounded border p-2 transition-colors {selectedCharacterFilename ===
+                    item.filename
+                      ? 'border-green-500 bg-green-50'
+                      : selectedItem?.filename === item.filename
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200'} {dragOverIndex === i
+                      ? 'border-blue-300 bg-blue-50'
+                      : selectedCharacterFilename !== item.filename &&
+                          selectedItem?.filename !== item.filename
+                        ? 'hover:border-gray-300 hover:bg-gray-50'
+                        : ''}"
                     draggable="true"
                     ondragstart={(e) => handleDragStart(e, i)}
                     ondragover={(e) => handleDragOver(e, i)}
@@ -198,7 +327,16 @@
                     onclick={() => handleCardClick(item)}
                     onkeydown={(e) => e.key === 'Enter' && handleCardClick(item)}
                   >
-                    <img src={`/api/image?path=${encodeURIComponent('character/' + item.filename)}`} alt={item.name} class="h-32 w-24 rounded object-cover" />
+                    {#if selectedCharacterFilename === item.filename}
+                      <div class="absolute top-1 right-1 rounded-full bg-white p-0.5 shadow">
+                        <CheckCircle class="h-5 w-5 text-green-600" />
+                      </div>
+                    {/if}
+                    <img
+                      src={`/api/image?path=${encodeURIComponent('character/' + item.filename)}`}
+                      alt={item.name}
+                      class="h-32 w-24 rounded object-cover"
+                    />
                     <div class="w-full truncate text-center text-xs font-medium">{item.name}</div>
                   </div>
                 {/each}
@@ -208,28 +346,182 @@
         </div>
 
         <!-- Right: Detail Panel -->
-        <div class="flex flex-1 flex-col p-4">
+        <div class="flex flex-1 flex-col overflow-hidden p-4">
           {#if selectedItem}
-            <div class="flex flex-col gap-4">
+            <div class="flex h-full flex-col gap-4 overflow-hidden">
               <div class="flex items-start gap-4">
-                <img src={`/api/image?path=${encodeURIComponent('character/' + selectedItem.filename)}`} alt={selectedItem.name} class="h-64 w-48 rounded object-cover" />
-                <div class="flex-1">
+                <img
+                  src={`/api/image?path=${encodeURIComponent('character/' + selectedItem.filename)}`}
+                  alt={selectedItem.name}
+                  class="h-64 w-48 flex-shrink-0 rounded object-cover"
+                />
+                <div class="flex-1 text-left">
                   <h3 class="mb-2 text-xl font-semibold">{selectedItem.name}</h3>
                   <div class="mb-4 space-y-1 text-sm text-gray-600">
                     <div><span class="font-medium">Filename:</span> {selectedItem.filename}</div>
-                    <div><span class="font-medium">Size:</span> {(selectedItem.size / 1024).toFixed(1)} KB</div>
+                    <div>
+                      <span class="font-medium">Size:</span>
+                      {(selectedItem.size / 1024).toFixed(1)} KB
+                    </div>
                   </div>
                   <div class="flex gap-2">
-                    <button class="rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500" onclick={() => selectedItem && onSelect?.({ item: selectedItem })}>
-                      Select
-                    </button>
-                    <button class="flex items-center gap-2 rounded-md bg-red-100 px-4 py-2 text-sm text-red-700 transition-colors hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500" onclick={() => selectedItem && remove(selectedItem)} title="Delete character">
+                    {#if selectedCharacterFilename === selectedItem.filename}
+                      <button
+                        class="rounded-md bg-gray-300 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-400 focus:ring-2 focus:ring-gray-400 focus:outline-none"
+                        onclick={() => selectedItem && onSelect?.({ item: selectedItem })}
+                      >
+                        Unselect
+                      </button>
+                    {:else}
+                      <button
+                        class="rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        onclick={() => selectedItem && onSelect?.({ item: selectedItem })}
+                      >
+                        Select
+                      </button>
+                    {/if}
+                    <button
+                      class="flex items-center gap-2 rounded-md bg-red-100 px-4 py-2 text-sm text-red-700 transition-colors hover:bg-red-200 focus:ring-2 focus:ring-red-500 focus:outline-none"
+                      onclick={() => selectedItem && remove(selectedItem)}
+                      title="Delete character"
+                    >
                       <Trash class="h-4 w-4" />
                       Delete
                     </button>
                   </div>
                 </div>
               </div>
+
+              {#if loadingCard}
+                <div class="flex items-center justify-center p-4 text-sm text-gray-500">
+                  Loading character data...
+                </div>
+              {:else if editedCard}
+                <div class="flex-1 overflow-y-auto">
+                  <div class="space-y-4 text-left text-sm">
+                    {#if editedCard.data.description !== undefined}
+                      <div>
+                        <h4 class="mb-1 font-semibold text-gray-900">Description</h4>
+                        <textarea
+                          class="w-full resize-none overflow-y-auto rounded border border-gray-300 p-2 text-sm text-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                          rows="2"
+                          bind:value={editedCard.data.description}
+                          oninput={handleTextareaInput}
+                          use:autoResize
+                        ></textarea>
+                      </div>
+                    {/if}
+
+                    {#if editedCard.data.personality !== undefined}
+                      <div>
+                        <h4 class="mb-1 font-semibold text-gray-900">Personality</h4>
+                        <textarea
+                          class="w-full resize-none overflow-y-auto rounded border border-gray-300 p-2 text-sm text-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                          rows="2"
+                          bind:value={editedCard.data.personality}
+                          oninput={handleTextareaInput}
+                          use:autoResize
+                        ></textarea>
+                      </div>
+                    {/if}
+
+                    {#if editedCard.data.scenario !== undefined}
+                      <div>
+                        <h4 class="mb-1 font-semibold text-gray-900">Scenario</h4>
+                        <textarea
+                          class="w-full resize-none overflow-y-auto rounded border border-gray-300 p-2 text-sm text-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                          rows="2"
+                          bind:value={editedCard.data.scenario}
+                          oninput={handleTextareaInput}
+                          use:autoResize
+                        ></textarea>
+                      </div>
+                    {/if}
+
+                    {#if editedCard.data.first_mes !== undefined}
+                      <div>
+                        <h4 class="mb-1 font-semibold text-gray-900">First Message</h4>
+                        <textarea
+                          class="w-full resize-none overflow-y-auto rounded border border-gray-300 p-2 text-sm text-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                          rows="2"
+                          bind:value={editedCard.data.first_mes}
+                          oninput={handleTextareaInput}
+                          use:autoResize
+                        ></textarea>
+                      </div>
+                    {/if}
+
+                    {#if editedCard.data.mes_example !== undefined}
+                      <div>
+                        <h4 class="mb-1 font-semibold text-gray-900">Message Examples</h4>
+                        <textarea
+                          class="w-full resize-none overflow-y-auto rounded border border-gray-300 p-2 text-sm text-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                          rows="2"
+                          bind:value={editedCard.data.mes_example}
+                          oninput={handleTextareaInput}
+                          use:autoResize
+                        ></textarea>
+                      </div>
+                    {/if}
+
+                    {#if editedCard.data.system_prompt !== undefined}
+                      <div>
+                        <h4 class="mb-1 font-semibold text-gray-900">System Prompt</h4>
+                        <textarea
+                          class="w-full resize-none overflow-y-auto rounded border border-gray-300 p-2 text-sm text-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                          rows="2"
+                          bind:value={editedCard.data.system_prompt}
+                          oninput={handleTextareaInput}
+                          use:autoResize
+                        ></textarea>
+                      </div>
+                    {/if}
+
+                    {#if editedCard.data.post_history_instructions !== undefined}
+                      <div>
+                        <h4 class="mb-1 font-semibold text-gray-900">Post-History Instructions</h4>
+                        <textarea
+                          class="w-full resize-none overflow-y-auto rounded border border-gray-300 p-2 text-sm text-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                          rows="2"
+                          bind:value={editedCard.data.post_history_instructions}
+                          oninput={handleTextareaInput}
+                          use:autoResize
+                        ></textarea>
+                      </div>
+                    {/if}
+
+                    {#if editedCard.data.tags && editedCard.data.tags.length > 0}
+                      <div>
+                        <h4 class="mb-1 font-semibold text-gray-900">Tags</h4>
+                        <div class="flex flex-wrap gap-1">
+                          {#each editedCard.data.tags as tag}
+                            <span class="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700"
+                              >{tag}</span
+                            >
+                          {/each}
+                        </div>
+                      </div>
+                    {/if}
+
+                    {#if editedCard.data.creator || editedCard.data.character_version}
+                      <div class="space-y-1 text-xs text-gray-500">
+                        {#if editedCard.data.creator}
+                          <div>
+                            <span class="font-medium">Creator:</span>
+                            {editedCard.data.creator}
+                          </div>
+                        {/if}
+                        {#if editedCard.data.character_version}
+                          <div>
+                            <span class="font-medium">Version:</span>
+                            {editedCard.data.character_version}
+                          </div>
+                        {/if}
+                      </div>
+                    {/if}
+                  </div>
+                </div>
+              {/if}
             </div>
           {:else}
             <div class="flex h-full items-center justify-center text-gray-400">
@@ -237,6 +529,23 @@
             </div>
           {/if}
         </div>
+      </div>
+
+      <!-- Footer with Save and Close buttons -->
+      <div class="flex items-center justify-end gap-2 border-t border-gray-300 p-4">
+        <button
+          class="rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-default disabled:opacity-50"
+          onclick={saveCardChanges}
+          disabled={!hasUnsavedChanges || savingCard}
+        >
+          {savingCard ? 'Saving...' : 'Save'}
+        </button>
+        <button
+          class="rounded-md bg-gray-200 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+          onclick={() => (isOpen = false)}
+        >
+          Close
+        </button>
       </div>
     </div>
   </div>

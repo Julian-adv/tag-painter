@@ -4,13 +4,14 @@
   let toasts: Toast[] = $state([])
   let counter = 0
   const AUTO_DISMISS_MS = 60000
+  const SUCCESS_DISMISS_MS = 5000
 
-  function push(message: string, type: Toast['type']) {
+  function push(message: string, type: Toast['type'], duration = AUTO_DISMISS_MS) {
     const id = ++counter
     toasts = [...toasts, { id, message, type }]
     setTimeout(() => {
       toasts = toasts.filter((t) => t.id !== id)
-    }, AUTO_DISMISS_MS)
+    }, duration)
   }
 
   function dismiss(id: number) {
@@ -24,7 +25,7 @@
     push(message, 'info')
   }
   export function success(message: string) {
-    push(message, 'success')
+    push(message, 'success', SUCCESS_DISMISS_MS)
   }
 
   export function clear() {

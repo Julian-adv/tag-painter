@@ -609,7 +609,15 @@
                   onGeneratePrompt={handleChatGeneratePrompt}
                   {settings}
                   onSettingsChange={handleSettingsChange}
-                  onShowToast={(message) => toastsRef?.error(message)}
+                  onShowToast={(message, type) => {
+                    if (type === 'success') {
+                      toastsRef?.success(message)
+                    } else if (type === 'error') {
+                      toastsRef?.error(message)
+                    } else {
+                      toastsRef?.info(message)
+                    }
+                  }}
                 />
               </div>
             </div>
