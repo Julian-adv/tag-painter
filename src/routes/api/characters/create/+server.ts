@@ -1,58 +1,89 @@
 import type { RequestHandler } from '@sveltejs/kit'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { writeCharxJpegWithCard } from '$lib/charx/charx'
 
 const CHAR_DIR = join(process.cwd(), 'data', 'character')
 
-function sanitizeName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9-_]+/g, '_').slice(0, 64)
+// Create a minimal 1x1 white JPEG image
+function createMinimalJpeg(): Uint8Array {
+  return new Uint8Array([
+    0xff, 0xd8, // SOI
+    0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00,
+    0x01, 0x00, 0x00, // APP0
+    0xff, 0xdb, 0x00, 0x43, 0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08, 0x07, 0x07, 0x07,
+    0x09, 0x09, 0x08, 0x0a, 0x0c, 0x14, 0x0d, 0x0c, 0x0b, 0x0b, 0x0c, 0x19, 0x12, 0x13, 0x0f,
+    0x14, 0x1d, 0x1a, 0x1f, 0x1e, 0x1d, 0x1a, 0x1c, 0x1c, 0x20, 0x24, 0x2e, 0x27, 0x20, 0x22,
+    0x2c, 0x23, 0x1c, 0x1c, 0x28, 0x37, 0x29, 0x2c, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1f, 0x27,
+    0x39, 0x3d, 0x38, 0x32, 0x3c, 0x2e, 0x33, 0x34, 0x32, // DQT
+    0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00, // SOF0
+    0xff, 0xc4, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, // DHT
+    0xff, 0xc4, 0x00, 0x14, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // DHT
+    0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0xd2, 0xcf, 0x20, // SOS
+    0xff, 0xd9 // EOI
+  ])
+}
+
+async function getUniqueFilename(baseName: string): Promise<string> {
+  // Sanitize the name for filename usage
+  const sanitized = baseName
+    .replace(/[^a-zA-Z0-9가-힣\s-]/g, '')
+    .replace(/\s+/g, '_')
+    .trim()
+
+  if (!sanitized) {
+    return getUniqueFilename('character')
+  }
+
+  const baseFilename = `${sanitized}.jpeg`
+  const existingFiles = await readdir(CHAR_DIR)
+
+  // Check if base filename exists
+  if (!existingFiles.includes(baseFilename)) {
+    return baseFilename
+  }
+
+  // Try with numbers
+  let counter = 1
+  while (true) {
+    const filename = `${sanitized}_${counter}.jpeg`
+    if (!existingFiles.includes(filename)) {
+      return filename
+    }
+    counter++
+  }
 }
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
     const body = await request.json()
     const name = (body?.name || '').toString().trim()
-    const jpegBase64 = (body?.jpegBase64 || '').toString()
-    if (!name || !jpegBase64) {
-      return new Response(JSON.stringify({ error: 'name and jpegBase64 are required' }), {
+    const card = body?.card
+
+    if (!name || !card) {
+      return new Response(JSON.stringify({ error: 'name and card are required' }), {
         status: 400
       })
     }
 
-    const baseJpeg = Uint8Array.from(Buffer.from(jpegBase64, 'base64'))
+    // Use minimal JPEG
+    const baseJpeg = createMinimalJpeg()
 
-    const card = {
-      spec: 'chara_card_v3',
-      spec_version: '3.0',
-      data: {
-        name,
-        description: '',
-        personality: '',
-        scenario: '',
-        first_mes: '',
-        mes_example: '',
-        creator_notes: '',
-        system_prompt: '',
-        post_history_instructions: '',
-        alternate_greetings: [],
-        character_book: { extensions: {}, entries: [] },
-        tags: [],
-        creator: '',
-        character_version: '',
-        extensions: { risuai: { viewScreen: 'none', utilityBot: false } }
-      }
-    }
+    // Generate unique filename from name
+    const filename = await getUniqueFilename(name)
 
     const outBytes = writeCharxJpegWithCard(baseJpeg, card)
     await mkdir(CHAR_DIR, { recursive: true })
-    const filename = `${sanitizeName(name)}_${Date.now()}.jpeg`
     const full = join(CHAR_DIR, filename)
     await writeFile(full, outBytes)
+
     return new Response(JSON.stringify({ ok: true, filename }), {
       headers: { 'Content-Type': 'application/json' }
     })
   } catch (e) {
+    console.error('Failed to create character:', e)
     return new Response(JSON.stringify({ error: 'Failed to create character' }), { status: 500 })
   }
 }

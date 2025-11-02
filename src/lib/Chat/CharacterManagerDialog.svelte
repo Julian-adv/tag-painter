@@ -48,8 +48,6 @@
   let items = $state<CharacterItem[]>([])
   let loading = $state(false)
   let error = $state('')
-  let newName = $state('')
-  let newFile = $state<File | null>(null)
   let draggedIndex = $state<number | null>(null)
   let dragOverIndex = $state<number | null>(null)
   let selectedItem = $state<CharacterItem | null>(null)
@@ -57,6 +55,7 @@
   let loadingCard = $state(false)
   let editedCard = $state<CharacterCard | null>(null)
   let savingCard = $state(false)
+  let isNewCharacter = $state(false)
 
   async function fetchList() {
     loading = true
@@ -121,33 +120,37 @@
     })
   }
 
-  function onFileChange(e: Event) {
-    const input = e.target as HTMLInputElement
-    newFile = input.files && input.files[0] ? input.files[0] : null
-  }
-
-  function abToBase64(ab: ArrayBuffer): string {
-    let binary = ''
-    const bytes = new Uint8Array(ab)
-    const len = bytes.byteLength
-    for (let i = 0; i < len; i++) binary += String.fromCharCode(bytes[i])
-    return btoa(binary)
-  }
-
-  async function createNew() {
-    if (!newName || !newFile) return
-    const ab = await newFile.arrayBuffer()
-    const jpegBase64 = abToBase64(ab)
-    const res = await fetch('/api/characters/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName, jpegBase64 })
-    })
-    if (res.ok) {
-      newName = ''
-      newFile = null
-      await fetchList()
+  function createNewCharacter() {
+    // Create empty card in memory only
+    const emptyCard: CharacterCard = {
+      spec: 'chara_card_v3',
+      spec_version: '3.0',
+      data: {
+        name: '',
+        description: '',
+        personality: '',
+        scenario: '',
+        first_mes: '',
+        mes_example: '',
+        creator_notes: '',
+        system_prompt: '',
+        post_history_instructions: '',
+        tags: [],
+        creator: '',
+        character_version: '1.0'
+      }
     }
+
+    // Create a temporary item for display
+    selectedItem = {
+      filename: 'new_character.jpeg', // temporary, will be replaced on save
+      path: '',
+      name: 'New Character',
+      size: 0
+    }
+    selectedCard = emptyCard
+    editedCard = JSON.parse(JSON.stringify(emptyCard))
+    isNewCharacter = true
   }
 
   async function remove(item: CharacterItem) {
@@ -206,23 +209,61 @@
 
   function handleCardClick(item: CharacterItem) {
     selectedItem = item
+    isNewCharacter = false
     void fetchCardInfo(item.filename)
   }
 
   async function saveCardChanges() {
     if (!selectedItem || !editedCard) return
+    if (!editedCard.data.name || !editedCard.data.name.trim()) {
+      onShowToast?.('Name is required', 'error')
+      return
+    }
+
     savingCard = true
     try {
-      const res = await fetch('/api/characters/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: selectedItem.filename, card: editedCard })
-      })
-      if (res.ok) {
-        selectedCard = JSON.parse(JSON.stringify(editedCard)) // Update original
-        onShowToast?.('Character saved successfully!', 'success')
+      if (isNewCharacter) {
+        // Create new character file
+        const res = await fetch('/api/characters/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: editedCard.data.name,
+            card: editedCard
+          })
+        })
+        const data = await res.json()
+        if (res.ok && data.filename) {
+          selectedCard = JSON.parse(JSON.stringify(editedCard))
+          isNewCharacter = false
+          await fetchList()
+          // Select the newly created item
+          const newItem = items.find((item) => item.filename === data.filename)
+          if (newItem) {
+            selectedItem = newItem
+          }
+          onShowToast?.('Character created successfully!', 'success')
+        } else {
+          onShowToast?.('Failed to create character', 'error')
+        }
       } else {
-        onShowToast?.('Failed to save character', 'error')
+        // Update existing character
+        const res = await fetch('/api/characters/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: selectedItem.filename,
+            card: editedCard
+          })
+        })
+        const data = await res.json()
+        if (res.ok) {
+          selectedCard = JSON.parse(JSON.stringify(editedCard))
+          await fetchList()
+          onShowToast?.('Character saved successfully!', 'success')
+        } else {
+          onShowToast?.('Failed to save character', 'error')
+        }
       }
     } catch (e) {
       console.error('Failed to save character:', e)
@@ -234,6 +275,13 @@
 
   const hasUnsavedChanges = $derived(
     editedCard && selectedCard && JSON.stringify(editedCard) !== JSON.stringify(selectedCard)
+  )
+
+  const canSave = $derived(
+    editedCard &&
+      editedCard.data.name &&
+      editedCard.data.name.trim().length > 0 &&
+      (hasUnsavedChanges || isNewCharacter)
   )
 
   function autoResize(textarea: HTMLTextAreaElement) {
@@ -267,35 +315,6 @@
       <div class="flex flex-1 overflow-hidden">
         <!-- Left: Character Grid -->
         <div class="flex w-[600px] flex-col border-r border-gray-200 p-4">
-          <div class="mb-3 flex flex-col gap-2">
-            <div class="flex flex-col">
-              <label class="text-xs text-gray-600" for="char-name-input">Name</label>
-              <input
-                id="char-name-input"
-                class="rounded border p-1 text-sm"
-                bind:value={newName}
-                placeholder="Name"
-              />
-            </div>
-            <div class="flex flex-col">
-              <label class="text-xs text-gray-600" for="char-jpeg-input">JPEG</label>
-              <input
-                id="char-jpeg-input"
-                class="rounded border p-1 text-sm"
-                type="file"
-                accept="image/jpeg,image/jpg"
-                onchange={onFileChange}
-              />
-            </div>
-            <button
-              class="rounded-md bg-blue-500 px-3 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-default disabled:opacity-50"
-              onclick={createNew}
-              disabled={!newName || !newFile}
-            >
-              New Character
-            </button>
-          </div>
-
           {#if loading}
             <div class="p-2 text-sm text-gray-500">Loading...</div>
           {:else if error}
@@ -356,7 +375,18 @@
                   class="h-64 w-48 flex-shrink-0 rounded object-cover"
                 />
                 <div class="flex-1 text-left">
-                  <h3 class="mb-2 text-xl font-semibold">{selectedItem.name}</h3>
+                  {#if editedCard}
+                    <div class="mb-2">
+                      <input
+                        type="text"
+                        class="w-full rounded border border-gray-300 px-2 py-1 text-xl font-semibold focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        bind:value={editedCard.data.name}
+                        placeholder="Character Name"
+                      />
+                    </div>
+                  {:else}
+                    <h3 class="mb-2 text-xl font-semibold">{selectedItem.name}</h3>
+                  {/if}
                   <div class="mb-4 space-y-1 text-sm text-gray-600">
                     <div><span class="font-medium">Filename:</span> {selectedItem.filename}</div>
                     <div>
@@ -531,21 +561,29 @@
         </div>
       </div>
 
-      <!-- Footer with Save and Close buttons -->
-      <div class="flex items-center justify-end gap-2 border-t border-gray-300 p-4">
+      <!-- Footer with New Character, Save and Close buttons -->
+      <div class="flex items-center justify-between border-t border-gray-300 p-4">
         <button
-          class="rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-default disabled:opacity-50"
-          onclick={saveCardChanges}
-          disabled={!hasUnsavedChanges || savingCard}
+          class="rounded-md bg-green-500 px-4 py-2 text-sm text-white transition-colors hover:bg-green-600 focus:ring-2 focus:ring-green-500 focus:outline-none"
+          onclick={createNewCharacter}
         >
-          {savingCard ? 'Saving...' : 'Save'}
+          New Character
         </button>
-        <button
-          class="rounded-md bg-gray-200 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:outline-none"
-          onclick={() => (isOpen = false)}
-        >
-          Close
-        </button>
+        <div class="flex gap-2">
+          <button
+            class="rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-default disabled:opacity-50"
+            onclick={saveCardChanges}
+            disabled={!canSave || savingCard}
+          >
+            {savingCard ? 'Saving...' : 'Save'}
+          </button>
+          <button
+            class="rounded-md bg-gray-200 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+            onclick={() => (isOpen = false)}
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   </div>
