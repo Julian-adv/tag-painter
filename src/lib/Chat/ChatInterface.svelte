@@ -14,6 +14,7 @@
     settings: Settings
     onSettingsChange?: (settings: Settings) => void
     onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void
+    currentImagePath?: string | null
   }
 
   type Message = {
@@ -33,7 +34,8 @@
     onGeneratePrompt,
     settings,
     onSettingsChange,
-    onShowToast
+    onShowToast,
+    currentImagePath = null
   }: Props = $props()
 
   let messages = $state<Message[]>([])
@@ -442,6 +444,38 @@
     return null
   }
 
+  // Extract the latest <character>...</character> block from assistant messages
+  function findLatestCharacterBlock(): string | null {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const candidate = messages[index]
+      if (candidate.role !== 'assistant') continue
+      const content = candidate.content ?? ''
+      const m = content.match(/<character>([\s\S]*?)<\/character>/i)
+      if (m && m[1]) {
+        const block = m[1].trim()
+        if (block) return block
+      }
+    }
+    return null
+  }
+
+  function extractCharacterName(text: string): string | null {
+    // Find a line like "Name: value"
+    const match = text.match(/(?:^|\n)\s*Name:\s*(.+?)(?:\r?\n|$)/i)
+    if (match && match[1]) {
+      return match[1].trim()
+    }
+    return null
+  }
+
+  let latestCharacterText = $derived.by(() => {
+    return findLatestCharacterBlock() || ''
+  })
+
+  let latestCharacterName = $derived.by(() => {
+    return latestCharacterText ? extractCharacterName(latestCharacterText) || '' : ''
+  })
+
   function handleKeydown(event: KeyboardEvent) {
     if (event.isComposing) return
     if (isLoading) return
@@ -577,6 +611,9 @@
 <CharacterManagerDialog
   bind:isOpen={showCharacterDialog}
   selectedCharacterFilename={selectedCharacter?.filename}
+  latestCharacterText={latestCharacterText}
+  latestCharacterName={latestCharacterName}
+  currentImagePath={currentImagePath}
   onSelect={(payload) => {
     // Toggle selection: unselect if clicking on already selected character
     if (selectedCharacter?.filename === payload.item.filename) {

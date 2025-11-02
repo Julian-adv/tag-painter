@@ -22,7 +22,7 @@
     push(message, 'error')
   }
   export function info(message: string) {
-    push(message, 'info')
+    push(message, 'info', SUCCESS_DISMISS_MS)
   }
   export function success(message: string) {
     push(message, 'success', SUCCESS_DISMISS_MS)
@@ -35,7 +35,7 @@
   function bgClass(type?: string): string {
     if (type === 'error') return 'bg-red-600'
     if (type === 'success') return 'bg-green-600'
-    return 'bg-gray-800'
+    return 'bg-gray-600'
   }
 </script>
 

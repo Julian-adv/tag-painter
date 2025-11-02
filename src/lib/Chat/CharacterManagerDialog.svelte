@@ -34,13 +34,19 @@
     isOpen: boolean
     selectedCharacterFilename?: string
     onSelect?: (payload: { item: CharacterItem }) => void
-    onShowToast?: (message: string, type?: 'success' | 'error') => void
+    onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void
+    latestCharacterText?: string
+    latestCharacterName?: string
+    currentImagePath?: string | null
   }
   let {
     isOpen = $bindable(false),
     selectedCharacterFilename,
     onSelect,
-    onShowToast
+    onShowToast,
+    latestCharacterText = '',
+    latestCharacterName = '',
+    currentImagePath = null
   }: Props = $props()
 
   // use callback prop instead of deprecated createEventDispatcher
@@ -56,6 +62,7 @@
   let editedCard = $state<CharacterCard | null>(null)
   let savingCard = $state(false)
   let isNewCharacter = $state(false)
+  let newCharacterImagePath = $state<string | null>(null)
 
   async function fetchList() {
     loading = true
@@ -120,6 +127,10 @@
     })
   }
 
+  // Minimal 1x1 white JPEG as base64 data URL
+  const PLACEHOLDER_IMAGE =
+    'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAA//EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AH//Z'
+
   function createNewCharacter() {
     // Create empty card in memory only
     const emptyCard: CharacterCard = {
@@ -143,14 +154,15 @@
 
     // Create a temporary item for display
     selectedItem = {
-      filename: 'new_character.jpeg', // temporary, will be replaced on save
-      path: '',
+      filename: '__new__', // special marker for new character
+      path: PLACEHOLDER_IMAGE,
       name: 'New Character',
       size: 0
     }
     selectedCard = emptyCard
     editedCard = JSON.parse(JSON.stringify(emptyCard))
     isNewCharacter = true
+    newCharacterImagePath = null
   }
 
   async function remove(item: CharacterItem) {
@@ -229,13 +241,15 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: editedCard.data.name,
-            card: editedCard
+            card: editedCard,
+            imagePath: newCharacterImagePath || ''
           })
         })
         const data = await res.json()
         if (res.ok && data.filename) {
           selectedCard = JSON.parse(JSON.stringify(editedCard))
           isNewCharacter = false
+          newCharacterImagePath = null
           await fetchList()
           // Select the newly created item
           const newItem = items.find((item) => item.filename === data.filename)
@@ -295,6 +309,68 @@
   function handleTextareaInput(e: Event) {
     const textarea = e.target as HTMLTextAreaElement
     autoResize(textarea)
+  }
+
+  // Create a new character using the latest image and character block
+  async function createFromCurrent(): Promise<void> {
+    try {
+      // Prefer current image path from viewer; fallback to latest in list
+      let imagePath = currentImagePath || ''
+      if (!imagePath) {
+        const listRes = await fetch('/api/image-list', { cache: 'no-store' })
+        if (!listRes.ok) {
+          onShowToast?.('Failed to get image list', 'error')
+          return
+        }
+        const listData: any = await listRes.json()
+        const files: string[] = Array.isArray(listData?.files) ? listData.files : []
+        if (files.length === 0) {
+          onShowToast?.('No image found to import', 'error')
+          return
+        }
+        imagePath = files[files.length - 1]
+      }
+
+      // Determine name and description from latestCharacterText/name
+      const name = (latestCharacterName || 'New Character').trim()
+      const description = (latestCharacterText || '').trim()
+
+      const card: CharacterCard = {
+        spec: 'chara_card_v3',
+        spec_version: '3.0',
+        data: {
+          name,
+          description,
+          personality: '',
+          scenario: '',
+          first_mes: '',
+          mes_example: '',
+          creator_notes: '',
+          system_prompt: '',
+          post_history_instructions: '',
+          tags: [],
+          creator: '',
+          character_version: '1.0'
+        }
+      }
+
+      // Prepare in-memory new character; do not save yet
+      const previewUrl = `/api/image?path=${encodeURIComponent(imagePath)}`
+      selectedItem = {
+        filename: '__new__',
+        path: previewUrl,
+        name,
+        size: 0
+      }
+      selectedCard = card
+      editedCard = JSON.parse(JSON.stringify(card))
+      isNewCharacter = true
+      newCharacterImagePath = imagePath
+      onShowToast?.('Prepared new character (not saved yet).', 'info')
+    } catch (e) {
+      console.error('Failed to create from current image', e)
+      onShowToast?.('Failed to create from current image', 'error')
+    }
   }
 </script>
 
@@ -370,7 +446,9 @@
             <div class="flex h-full flex-col gap-4 overflow-hidden">
               <div class="flex items-start gap-4">
                 <img
-                  src={`/api/image?path=${encodeURIComponent('character/' + selectedItem.filename)}`}
+                  src={selectedItem.filename === '__new__'
+                    ? (selectedItem.path || PLACEHOLDER_IMAGE)
+                    : `/api/image?path=${encodeURIComponent('character/' + selectedItem.filename)}`}
                   alt={selectedItem.name}
                   class="h-64 w-48 flex-shrink-0 rounded object-cover"
                 />
@@ -563,12 +641,21 @@
 
       <!-- Footer with New Character, Save and Close buttons -->
       <div class="flex items-center justify-between border-t border-gray-300 p-4">
-        <button
-          class="rounded-md bg-green-500 px-4 py-2 text-sm text-white transition-colors hover:bg-green-600 focus:ring-2 focus:ring-green-500 focus:outline-none"
-          onclick={createNewCharacter}
-        >
-          New Character
-        </button>
+        <div class="flex items-center">
+          <button
+            class="rounded-md bg-green-500 px-4 py-2 text-sm text-white transition-colors hover:bg-green-600 focus:ring-2 focus:ring-green-500 focus:outline-none"
+            onclick={createNewCharacter}
+          >
+            New Character
+          </button>
+          <button
+            class="ml-2 rounded-md bg-emerald-500 px-4 py-2 text-sm text-white transition-colors hover:bg-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            onclick={createFromCurrent}
+            title="Create new character from current image and last Gemini <character> block"
+          >
+            New From Current
+          </button>
+        </div>
         <div class="flex gap-2">
           <button
             class="rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-default disabled:opacity-50"

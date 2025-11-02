@@ -1,6 +1,7 @@
 import type { RequestHandler } from '@sveltejs/kit'
-import { mkdir, writeFile, readdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, writeFile, readdir, access, readFile } from 'node:fs/promises'
+import path, { join } from 'node:path'
+import sharp from 'sharp'
 import { writeCharxJpegWithCard } from '$lib/charx/charx'
 
 const CHAR_DIR = join(process.cwd(), 'data', 'character')
@@ -61,6 +62,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const body = await request.json()
     const name = (body?.name || '').toString().trim()
     const card = body?.card
+    const imagePathRaw = (body?.imagePath || '').toString().trim()
 
     if (!name || !card) {
       return new Response(JSON.stringify({ error: 'name and card are required' }), {
@@ -68,8 +70,46 @@ export const POST: RequestHandler = async ({ request }) => {
       })
     }
 
-    // Use minimal JPEG
-    const baseJpeg = createMinimalJpeg()
+    // Decide base JPEG: optional provided image path or minimal placeholder
+    async function resolveImagePath(input: string): Promise<string | null> {
+      if (!input) return null
+      let fullPath = ''
+      if (path.isAbsolute(input)) {
+        fullPath = path.resolve(input)
+      } else {
+        const dataRoot = path.resolve(process.cwd(), 'data')
+        fullPath = path.resolve(dataRoot, input)
+        const rel = path.relative(dataRoot, fullPath)
+        if (rel.startsWith('..') || path.isAbsolute(rel)) {
+          return null
+        }
+      }
+      try {
+        await access(fullPath)
+        return fullPath
+      } catch {
+        return null
+      }
+    }
+
+    let baseJpeg = createMinimalJpeg()
+    const resolved = await resolveImagePath(imagePathRaw)
+    if (resolved) {
+      try {
+        const ext = path.extname(resolved).toLowerCase()
+        if (ext === '.jpg' || ext === '.jpeg') {
+          // Keep original JPEG bytes to avoid recompression
+          const buf = await readFile(resolved)
+          baseJpeg = new Uint8Array(buf)
+        } else {
+          // Convert non-JPEG to high-quality JPEG to minimize artifacts
+          const jpegBuffer = await sharp(resolved).jpeg({ quality: 100 }).toBuffer()
+          baseJpeg = new Uint8Array(jpegBuffer)
+        }
+      } catch {
+        // Keep minimal JPEG on failure
+      }
+    }
 
     // Generate unique filename from name
     const filename = await getUniqueFilename(name)
@@ -87,4 +127,3 @@ export const POST: RequestHandler = async ({ request }) => {
     return new Response(JSON.stringify({ error: 'Failed to create character' }), { status: 500 })
   }
 }
-

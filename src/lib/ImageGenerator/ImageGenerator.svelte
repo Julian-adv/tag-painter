@@ -609,6 +609,7 @@
                   onGeneratePrompt={handleChatGeneratePrompt}
                   {settings}
                   onSettingsChange={handleSettingsChange}
+                  currentImagePath={currentImageFileName}
                   onShowToast={(message, type) => {
                     if (type === 'success') {
                       toastsRef?.success(message)
