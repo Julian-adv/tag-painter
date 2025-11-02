@@ -252,6 +252,16 @@ export async function buildQwenWorkflow(
     } else if (!useUpscale && baseDecodeNodeId) {
       workflow[fdNode.nodeId].inputs.image = [baseDecodeNodeId, 0]
     }
+
+    // Ensure detector uses the same image branch to avoid triggering unused upscale path
+    const detectorNode = findNodeByTitle(workflow, 'Simple Detector (SEGS)')
+    if (detectorNode && workflow[detectorNode.nodeId]) {
+      if (useUpscale && upscaleDecodeNodeId) {
+        workflow[detectorNode.nodeId].inputs.image = [upscaleDecodeNodeId, 0]
+      } else if (!useUpscale && baseDecodeNodeId) {
+        workflow[detectorNode.nodeId].inputs.image = [baseDecodeNodeId, 0]
+      }
+    }
   }
 
   if (useUpscale) {
