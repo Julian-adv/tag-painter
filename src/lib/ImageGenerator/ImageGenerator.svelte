@@ -609,6 +609,7 @@
                   onGeneratePrompt={handleChatGeneratePrompt}
                   {settings}
                   onSettingsChange={handleSettingsChange}
+                  onShowToast={(message) => toastsRef?.error(message)}
                 />
               </div>
             </div>

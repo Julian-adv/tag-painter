@@ -12,6 +12,7 @@
     onGeneratePrompt?: (prompt: string, options?: { isRedraw?: boolean }) => void
     settings: Settings
     onSettingsChange?: (settings: Settings) => void
+    onShowToast: (message: string) => void
   }
 
   type Message = {
@@ -30,7 +31,8 @@
     promptLanguage = 'english',
     onGeneratePrompt,
     settings,
-    onSettingsChange
+    onSettingsChange,
+    onShowToast
   }: Props = $props()
 
   let messages = $state<Message[]>([])
@@ -43,6 +45,7 @@
   let lastLoadedPromptFile = $state('')
   let hasLoadedHistory = $state(false)
   let loadingPromptFile = $state('')
+  let failedPromptFilename = $state<string | null>(null)
 
   const GEMINI_MODEL_ID = 'gemini-2.5-pro'
 
@@ -132,43 +135,94 @@
     }
   }
 
-  async function loadSystemPromptFile(filename: string) {
+  function notifyToastOnce(message: string, filename: string) {
+    if (failedPromptFilename !== filename) {
+      onShowToast(message)
+    }
+  }
+
+  async function loadSystemPromptFile(jsonFilename: string, txtFilename: string) {
     try {
-      const response = await fetch(`/api/wildcard-file?name=${encodeURIComponent(filename)}`)
+      const response = await fetch(`/api/wildcard-file?name=${encodeURIComponent(jsonFilename)}`)
       if (!response.ok) {
-        if (loadingPromptFile === filename) {
-          lastLoadedPromptFile = ''
-        }
+        notifyToastOnce('Failed to load system prompt.', jsonFilename)
+        failedPromptFilename = jsonFilename
         systemPrompt = []
         return
       }
-      if (loadingPromptFile !== filename) {
+      if (loadingPromptFile !== jsonFilename) {
         return
       }
+
       const raw = await response.text()
-      systemPrompt = JSON.parse(raw)
-      lastLoadedPromptFile = filename
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(raw)
+      } catch (parseError) {
+        notifyToastOnce('Failed to parse system prompt JSON.', jsonFilename)
+        failedPromptFilename = jsonFilename
+        systemPrompt = []
+        return
+      }
+
+      let promptEntries: GeminiContent[] = Array.isArray(parsed) ? (parsed as GeminiContent[]) : []
+
+      let injectedText = ''
+      let textLoadFailed = false
+      try {
+        const txtResponse = await fetch(
+          `/api/wildcard-file?name=${encodeURIComponent(txtFilename)}`
+        )
+        if (txtResponse.ok) {
+          injectedText = await txtResponse.text()
+        } else {
+          textLoadFailed = true
+        }
+      } catch (textError) {
+        textLoadFailed = true
+      }
+
+      if (textLoadFailed) {
+        notifyToastOnce(`Failed to load system prompt text file: ${txtFilename}`, jsonFilename)
+        failedPromptFilename = jsonFilename
+      }
+
+      if (promptEntries.length === 0) {
+        promptEntries = [{ role: 'model', parts: [{ text: injectedText }] }]
+      } else {
+        promptEntries[0] = { role: 'model', parts: [{ text: injectedText }] }
+      }
+
+      systemPrompt = promptEntries
+      lastLoadedPromptFile = jsonFilename
+      if (!textLoadFailed) {
+        failedPromptFilename = null
+      }
     } catch (error) {
       console.error('Failed to load system prompt', error)
-      if (loadingPromptFile === filename) {
-        lastLoadedPromptFile = ''
-      }
+      notifyToastOnce('Failed to load system prompt.', jsonFilename)
+      failedPromptFilename = jsonFilename
       systemPrompt = []
     } finally {
-      if (loadingPromptFile === filename) {
+      if (loadingPromptFile === jsonFilename) {
         loadingPromptFile = ''
       }
     }
   }
 
   $effect(() => {
-    const filename = systemPromptFilename
-    if (!filename) return
-    if (filename === lastLoadedPromptFile) return
-    if (filename === loadingPromptFile) return
-    loadingPromptFile = filename
+    const jsonFilename = systemPromptFilename
+    if (!jsonFilename) return
+    if (failedPromptFilename && failedPromptFilename !== jsonFilename) {
+      failedPromptFilename = null
+    }
+    if (jsonFilename === failedPromptFilename) return
+    if (jsonFilename === lastLoadedPromptFile) return
+    if (jsonFilename === loadingPromptFile) return
+    const txtFilename = jsonFilename.replace(/\.json$/i, '.txt')
+    loadingPromptFile = jsonFilename
     systemPrompt = []
-    void loadSystemPromptFile(filename)
+    void loadSystemPromptFile(jsonFilename, txtFilename)
   })
 
   onMount(async () => {
