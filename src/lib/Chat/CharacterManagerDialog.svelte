@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { Trash } from 'svelte-heros-v2'
 
   type CharacterItem = {
     filename: string
@@ -21,6 +22,8 @@
   let error = $state('')
   let newName = $state('')
   let newFile = $state<File | null>(null)
+  let draggedIndex = $state<number | null>(null)
+  let dragOverIndex = $state<number | null>(null)
 
   async function fetchList() {
     loading = true
@@ -36,13 +39,45 @@
     }
   }
 
-  async function move(idx: number, dir: -1 | 1) {
-    const j = idx + dir
-    if (j < 0 || j >= items.length) return
+  function handleDragStart(e: DragEvent, index: number) {
+    draggedIndex = index
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move'
+    }
+  }
+
+  function handleDragOver(e: DragEvent, index: number) {
+    e.preventDefault()
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move'
+    }
+    dragOverIndex = index
+  }
+
+  function handleDragLeave() {
+    dragOverIndex = null
+  }
+
+  async function handleDrop(e: DragEvent, dropIndex: number) {
+    e.preventDefault()
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      draggedIndex = null
+      dragOverIndex = null
+      return
+    }
+
     const copy = items.slice()
-    ;[copy[idx], copy[j]] = [copy[j], copy[idx]]
+    const [draggedItem] = copy.splice(draggedIndex, 1)
+    copy.splice(dropIndex, 0, draggedItem)
     items = copy
+    draggedIndex = null
+    dragOverIndex = null
     await saveOrder()
+  }
+
+  function handleDragEnd() {
+    draggedIndex = null
+    dragOverIndex = null
   }
 
   async function saveOrder() {
@@ -104,62 +139,70 @@
 </script>
 
 {#if isOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-    <div class="max-h-[80vh] w-[820px] overflow-auto rounded-md bg-white p-3 shadow">
-      <div class="mb-2 flex items-center justify-between">
-        <h2 class="text-base font-semibold">Characters</h2>
-        <button class="rounded border px-2 py-1 text-sm" onclick={() => (isOpen = false)}>
-          Close
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div class="flex max-h-[80vh] w-[820px] flex-col overflow-hidden rounded-lg bg-white shadow-xl">
+      <div class="flex items-center justify-between border-b border-gray-300 p-4">
+        <h2 class="text-lg font-semibold text-gray-900">Characters</h2>
+        <button
+          class="flex h-7 w-7 items-center justify-center rounded-full text-2xl text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          onclick={() => (isOpen = false)}
+          aria-label="Close"
+        >
+          ×
         </button>
       </div>
 
-      <div class="mb-3 grid grid-cols-[1fr_auto] items-end gap-2">
-        <div class="grid grid-cols-2 gap-2">
-          <div class="flex flex-col">
-            <label class="text-xs text-gray-600" for="char-name-input">Name</label>
-            <input id="char-name-input" class="rounded border p-1 text-sm" bind:value={newName} placeholder="Name" />
+      <div class="flex-1 overflow-y-auto p-4">
+        <div class="mb-3 grid grid-cols-[1fr_auto] items-end gap-2">
+          <div class="grid grid-cols-2 gap-2">
+            <div class="flex flex-col">
+              <label class="text-xs text-gray-600" for="char-name-input">Name</label>
+              <input id="char-name-input" class="rounded border p-1 text-sm" bind:value={newName} placeholder="Name" />
+            </div>
+            <div class="flex flex-col">
+              <label class="text-xs text-gray-600" for="char-jpeg-input">JPEG</label>
+              <input id="char-jpeg-input" class="rounded border p-1 text-sm" type="file" accept="image/jpeg,image/jpg" onchange={onFileChange} />
+            </div>
           </div>
-          <div class="flex flex-col">
-            <label class="text-xs text-gray-600" for="char-jpeg-input">JPEG</label>
-            <input id="char-jpeg-input" class="rounded border p-1 text-sm" type="file" accept="image/jpeg,image/jpg" onchange={onFileChange} />
-          </div>
+          <button class="rounded-md bg-blue-500 px-3 py-2 text-sm text-white transition-colors hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-default disabled:opacity-50" onclick={createNew} disabled={!newName || !newFile}>
+            New
+          </button>
         </div>
-        <button class="rounded bg-blue-600 px-3 py-1 text-sm text-white" onclick={createNew} disabled={!newName || !newFile}>
-          New
-        </button>
-      </div>
 
-      {#if loading}
-        <div class="p-2 text-sm text-gray-500">Loading...</div>
-      {:else if error}
-        <div class="p-2 text-sm text-red-600">{error}</div>
-      {:else}
-        <div class="grid grid-cols-2 gap-2">
-          {#each items as item, i (item.filename)}
-            <div class="flex items-center gap-2 rounded border p-2">
-              <img src={`/api/image?path=${encodeURIComponent('character/' + item.filename)}`} alt={item.name} class="h-12 w-12 rounded object-cover" />
-              <div class="min-w-0 flex-1">
-                <div class="truncate text-sm font-medium">{item.name}</div>
-                <div class="text-xs text-gray-500">{item.filename}</div>
-              </div>
-              <div class="flex flex-col gap-1">
-                <button class="rounded border px-2 py-1 text-xs" onclick={() => onSelect?.({ item })}>Select</button>
-                <button class="rounded border px-2 py-1 text-xs" onclick={() => remove(item)}>Delete</button>
-                <div class="flex gap-1">
-                  <button class="rounded border px-2 py-0 text-xs" onclick={() => move(i, -1)}>↑</button>
-                  <button class="rounded border px-2 py-0 text-xs" onclick={() => move(i, 1)}>↓</button>
+        {#if loading}
+          <div class="p-2 text-sm text-gray-500">Loading...</div>
+        {:else if error}
+          <div class="p-2 text-sm text-red-600">{error}</div>
+        {:else}
+          <div class="grid grid-cols-2 gap-2">
+            {#each items as item, i (item.filename)}
+              <div
+                role="button"
+                tabindex="0"
+                class="flex items-center gap-2 rounded border border-gray-200 p-2 cursor-move transition-colors {dragOverIndex === i ? 'bg-blue-50 border-blue-300' : ''}"
+                draggable="true"
+                ondragstart={(e) => handleDragStart(e, i)}
+                ondragover={(e) => handleDragOver(e, i)}
+                ondragleave={handleDragLeave}
+                ondrop={(e) => handleDrop(e, i)}
+                ondragend={handleDragEnd}
+              >
+                <img src={`/api/image?path=${encodeURIComponent('character/' + item.filename)}`} alt={item.name} class="h-32 w-24 rounded object-cover" />
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-sm font-medium">{item.name}</div>
+                  <div class="text-xs text-gray-500">{item.filename}</div>
+                </div>
+                <div class="flex flex-col gap-1">
+                  <button class="rounded border px-2 py-1 text-xs transition-colors hover:bg-gray-100" onclick={() => onSelect?.({ item })}>Select</button>
+                  <button class="flex items-center justify-center rounded-md bg-red-100 p-1.5 text-red-700 transition-colors hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500" onclick={() => remove(item)} title="Delete character">
+                    <Trash class="h-4 w-4" />
+                  </button>
                 </div>
               </div>
-            </div>
-          {/each}
-        </div>
-      {/if}
+            {/each}
+          </div>
+        {/if}
+      </div>
     </div>
   </div>
 {/if}
-
-<style>
-  .fixed {
-    position: fixed;
-  }
-</style>
