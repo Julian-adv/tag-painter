@@ -1,6 +1,9 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages'
   type DownloadItem = { label: string; filename: string; urls: string[]; dest: string }
+  type DownloadResultItem = { filename: string }
+  type DownloadFailedItem = { filename: string; error: string | null }
+  type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: DownloadFailedItem[] }
 
   interface Props {
     isOpen: boolean
@@ -10,7 +13,7 @@
   let items = $state<DownloadItem[]>([])
   let loading = $state(false)
   let downloading = $state(false)
-  let lastResult: { success: boolean; ok: { filename: string }[]; failed: { filename: string; error?: string }[] } | null = $state(null)
+  let lastResult: DownloadSummary | null = $state(null)
   let downloadProgress = $state({ total: 0, completed: 0, current: '' })
   const progressPercent = $derived(
     downloadProgress.total === 0
@@ -48,14 +51,14 @@
   async function downloadAll() {
     if (downloading) return
     if (items.length === 0) {
-      lastResult = { success: true, ok: [], failed: [] }
+    lastResult = { success: true, ok: [], failed: [] }
       return
     }
     downloading = true
     lastResult = null
     downloadProgress = { total: items.length, completed: 0, current: '' }
-    const ok: { filename: string }[] = []
-    const failed: { filename: string; error?: string }[] = []
+    const ok: DownloadResultItem[] = []
+    const failed: DownloadFailedItem[] = []
 
     for (const item of items) {
       downloadProgress.current = item.filename
@@ -72,10 +75,30 @@
           data = null
         }
         const record = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
-        const resOk = Array.isArray(record['ok']) ? (record['ok'] as { filename: string }[]) : []
-        const resFailed = Array.isArray(record['failed'])
-          ? (record['failed'] as { filename: string; error?: string }[])
-          : []
+        const resOk: DownloadResultItem[] = []
+        if (Array.isArray(record['ok'])) {
+          for (const entry of record['ok'] as unknown[]) {
+            if (entry && typeof entry === 'object') {
+              const value = (entry as Record<string, unknown>)['filename']
+              if (typeof value === 'string' && value.length > 0) {
+                resOk.push({ filename: value })
+              }
+            }
+          }
+        }
+        const resFailed: DownloadFailedItem[] = []
+        if (Array.isArray(record['failed'])) {
+          for (const entry of record['failed'] as unknown[]) {
+            if (entry && typeof entry === 'object') {
+              const v = entry as Record<string, unknown>
+              const nameValue = v['filename']
+              if (typeof nameValue === 'string' && nameValue.length > 0) {
+                const errValue = typeof v['error'] === 'string' ? v['error'] : null
+                resFailed.push({ filename: nameValue, error: errValue })
+              }
+            }
+          }
+        }
         if (resOk.length > 0) ok.push(...resOk)
         if (resFailed.length > 0) {
           failed.push(...resFailed)

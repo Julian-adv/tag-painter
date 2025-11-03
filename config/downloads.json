@@ -1,0 +1,123 @@
+{
+  "items": [
+    {
+      "label": "NMKD UpgifLite 2x (ESRGAN)",
+      "filename": "2x_NMKD-UpgifLiteV2_210k.pth",
+      "urls": [
+        "https://huggingface.co/utnah/esrgan/resolve/dc83465df24b219350e452750e881656f91d1d8b/2x_NMKD-UpgifLiteV2_210k.pth"
+      ],
+      "destRelativeToComfy": "models/upscale_models/2x_NMKD-UpgifLiteV2_210k.pth",
+      "category": "upscale"
+    },
+    {
+      "label": "ADetailer person_yolov8m-seg.pt",
+      "filename": "person_yolov8m-seg.pt",
+      "urls": [
+        "https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt"
+      ],
+      "destRelativeToComfy": "models/ultralytics/segm/person_yolov8m-seg.pt",
+      "category": "annotator"
+    },
+    {
+      "label": "ADetailer face_yolov8m.pt",
+      "filename": "face_yolov8m.pt",
+      "urls": [
+        "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt"
+      ],
+      "destRelativeToComfy": "models/ultralytics/bbox/face_yolov8m.pt",
+      "category": "annotator"
+    },
+    {
+      "label": "VAE fixFP16ErrorsSDXLLowerMemoryUse v1.0",
+      "filename": "fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors",
+      "urls": [
+        "https://huggingface.co/moonshotmillion/VAEfixFP16ErrorsSDXLLowerMemoryUse_v10/resolve/main/fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors"
+      ],
+      "destRelativeToComfy": "models/vae/fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors",
+      "category": "vae"
+    },
+    {
+      "label": "LoRA MoriiMee Gothic Niji Style r1",
+      "filename": "MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors",
+      "urls": [
+        "https://huggingface.co/NeigeSnowflake/neigeworkflow/resolve/main/MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors"
+      ],
+      "destRelativeToComfy": "models/loras/MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors",
+      "category": "lora"
+    },
+    {
+      "label": "LoRA spo_sdxl_10ep_4k-data_lora_webui",
+      "filename": "spo_sdxl_10ep_4k-data_lora_webui.safetensors",
+      "urls": [
+        "https://civitai.com/api/download/models/567119"
+      ],
+      "destRelativeToComfy": "models/loras/spo_sdxl_10ep_4k-data_lora_webui.safetensors",
+      "category": "lora"
+    },
+    {
+      "label": "LoRA Sinozick Style XL Pony",
+      "filename": "Sinozick_Style_XL_Pony.safetensors",
+      "urls": [
+        "https://civitai.com/api/download/models/481798"
+      ],
+      "destRelativeToComfy": "models/loras/Sinozick_Style_XL_Pony.safetensors",
+      "category": "lora"
+    },
+    {
+      "label": "LoRA Fant5yP0ny",
+      "filename": "Fant5yP0ny.safetensors",
+      "urls": [
+        "https://huggingface.co/LyliaEngine/Fant5yP0ny/resolve/main/Fant5yP0ny.safetensors?download=true"
+      ],
+      "destRelativeToComfy": "models/loras/Fant5yP0ny.safetensors",
+      "category": "lora"
+    },
+    {
+      "label": "SAM ViT-B checkpoint",
+      "filename": "sam_vit_b_01ec64.pth",
+      "urls": [
+        "https://huggingface.co/datasets/Gourieff/ReActor/resolve/main/models/sams/sam_vit_b_01ec64.pth"
+      ],
+      "destRelativeToComfy": "models/sams/sam_vit_b_01ec64.pth",
+      "category": "sam"
+    },
+    {
+      "label": "ControlNet OpenPose XL2",
+      "filename": "OpenPoseXL2.safetensors",
+      "urls": [
+        "https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0/resolve/main/OpenPoseXL2.safetensors",
+        "https://huggingface.co/SteezyAI/ControlNet-OpenPose-SDXL/resolve/main/OpenPoseXL2.safetensors"
+      ],
+      "destRelativeToComfy": "models/controlnet/OpenPoseXL2.safetensors",
+      "category": "controlnet"
+    },
+    {
+      "label": "ControlNet Aux body_pose_model.pth",
+      "filename": "body_pose_model.pth",
+      "urls": [
+        "https://huggingface.co/lllyasviel/Annotators/resolve/main/body_pose_model.pth"
+      ],
+      "destRelativeToComfy": "custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators/body_pose_model.pth",
+      "category": "annotator"
+    },
+    {
+      "label": "ControlNet Aux hand_pose_model.pth",
+      "filename": "hand_pose_model.pth",
+      "urls": [
+        "https://huggingface.co/lllyasviel/Annotators/resolve/main/hand_pose_model.pth"
+      ],
+      "destRelativeToComfy": "custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators/hand_pose_model.pth",
+      "category": "annotator"
+    },
+    {
+      "label": "ControlNet Aux facenet.pth",
+      "filename": "facenet.pth",
+      "urls": [
+        "https://huggingface.co/lllyasviel/Annotators/resolve/main/facenet.pth"
+      ],
+      "destRelativeToComfy": "custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators/facenet.pth",
+      "category": "annotator"
+    }
+  ]
+}
+

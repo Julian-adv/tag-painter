@@ -195,6 +195,35 @@ function Get-ModelIfMissing($url, $destPath) {
   Write-Host "Please download manually and place in: $destPath" -ForegroundColor Yellow
 }
 
+# Load and ensure downloads listed in config/downloads.json
+function Ensure-Downloads($comfyDir) {
+  $jsonPath = Join-Path (Resolve-Path ".") "config/downloads.json"
+  if (-not (Test-Path $jsonPath)) { return }
+  try {
+    $raw = Get-Content -Path $jsonPath -Raw
+    $parsed = $raw | ConvertFrom-Json
+    $items = @()
+    if ($parsed.items) { $items = $parsed.items } elseif ($parsed -is [array]) { $items = $parsed }
+    foreach ($it in $items) {
+      $dest = Join-Path $comfyDir $it.destRelativeToComfy
+      if ($it.urls -and $it.urls.Count -gt 0) {
+        $done = $false
+        foreach ($u in $it.urls) {
+          try {
+            Get-ModelIfMissing -url $u -destPath $dest
+            if (Test-Path $dest) { $done = $true; break }
+          } catch {}
+        }
+        if (-not $done) {
+          Write-Host "Failed to download: $($it.filename)" -ForegroundColor Yellow
+        }
+      }
+    }
+  } catch {
+    Write-Host "Failed to read downloads.json: $jsonPath" -ForegroundColor Yellow
+  }
+}
+
 function Test-ComfyUIIntegrity($comfyDir) {
   if (-not (Test-Path $comfyDir)) { return $false }
   
@@ -468,70 +497,9 @@ try {
       }
     }
 
-    # Download essential models for Impact Subpack
-    if (Test-Path (Join-Path $ComfyDir "custom_nodes\\ComfyUI-Impact-Subpack")) {
-      Write-Host "Downloading essential models for Impact Subpack..." -ForegroundColor DarkCyan
-      $personYoloModel = Join-Path $ComfyDir "models\\ultralytics\\segm\\person_yolov8m-seg.pt"
-      Get-ModelIfMissing -url "https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt" -destPath $personYoloModel
-
-      $faceYoloModel = Join-Path $ComfyDir "models\\ultralytics\\bbox\\face_yolov8m.pt"
-      Get-ModelIfMissing -url "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt" -destPath $faceYoloModel
-    }
-
-    # Download essential VAE model
-    Write-Host "Downloading essential VAE model..." -ForegroundColor DarkCyan
-    $vaeModel = Join-Path $ComfyDir "models\\vae\\fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors"
-    Get-ModelIfMissing -url "https://huggingface.co/moonshotmillion/VAEfixFP16ErrorsSDXLLowerMemoryUse_v10/resolve/main/fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors" -destPath $vaeModel
-
-    # Download LoRA models
-    Write-Host "Downloading LoRA models..." -ForegroundColor DarkCyan
-    $loraModel1 = Join-Path $ComfyDir "models\\loras\\MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors"
-    Get-ModelIfMissing -url "https://huggingface.co/NeigeSnowflake/neigeworkflow/resolve/main/MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors" -destPath $loraModel1
-
-    $loraModel2 = Join-Path $ComfyDir "models\\loras\\spo_sdxl_10ep_4k-data_lora_webui.safetensors"
-    Get-ModelIfMissing -url "https://civitai.com/api/download/models/567119" -destPath $loraModel2
-
-    $loraModel3 = Join-Path $ComfyDir "models\\loras\\Sinozick_Style_XL_Pony.safetensors"
-    Get-ModelIfMissing -url "https://civitai.com/api/download/models/481798" -destPath $loraModel3
-
-    $loraModel4 = Join-Path $ComfyDir "models\\loras\\Fant5yP0ny.safetensors"
-    Get-ModelIfMissing -url "https://huggingface.co/LyliaEngine/Fant5yP0ny/resolve/main/Fant5yP0ny.safetensors?download=true" -destPath $loraModel4
-
-    # Download SAM model
-    Write-Host "Downloading SAM model..." -ForegroundColor DarkCyan
-    $samModel = Join-Path $ComfyDir "models\\sams\\sam_vit_b_01ec64.pth"
-    Get-ModelIfMissing -url "https://huggingface.co/datasets/Gourieff/ReActor/resolve/main/models/sams/sam_vit_b_01ec64.pth" -destPath $samModel
-
-    # Download ControlNet model used by OpenPose (inpainting workflow)
-    Write-Host "Ensuring ControlNet OpenPose XL model..." -ForegroundColor DarkCyan
-    $cnDir = Join-Path $ComfyDir "models\\controlnet"
-    New-DirectoryIfMissing $cnDir
-    $openposeXl2 = Join-Path $cnDir "OpenPoseXL2.safetensors"
-    if (-not (Test-Path $openposeXl2)) {
-      # Try multiple candidate sources
-      $tried = $false
-      try { Get-ModelIfMissing -url "https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0/resolve/main/OpenPoseXL2.safetensors" -destPath $openposeXl2; $tried = $true } catch {}
-      if (-not (Test-Path $openposeXl2)) {
-        try { Get-ModelIfMissing -url "https://huggingface.co/SteezyAI/ControlNet-OpenPose-SDXL/resolve/main/OpenPoseXL2.safetensors" -destPath $openposeXl2; $tried = $true } catch {}
-      }
-      if (-not (Test-Path $openposeXl2)) {
-        Write-Host "Warning: Could not auto-download OpenPoseXL2.safetensors. Place it at: $openposeXl2" -ForegroundColor Yellow
-      }
-    }
-
-    # Download ControlNet Aux annotator models required by comfyui_controlnet_aux
-    if (Test-Path (Join-Path $ComfyDir "custom_nodes\\comfyui_controlnet_aux")) {
-      Write-Host "Ensuring ControlNet Aux annotator models..." -ForegroundColor DarkCyan
-      $auxAnnotatorsDir = Join-Path $ComfyDir "custom_nodes\\comfyui_controlnet_aux\\ckpts\\lllyasviel\\Annotators"
-      $bodyPose = Join-Path $auxAnnotatorsDir "body_pose_model.pth"
-      Get-ModelIfMissing -url "https://huggingface.co/lllyasviel/Annotators/resolve/main/body_pose_model.pth" -destPath $bodyPose
-
-      $handPose = Join-Path $auxAnnotatorsDir "hand_pose_model.pth"
-      Get-ModelIfMissing -url "https://huggingface.co/lllyasviel/Annotators/resolve/main/hand_pose_model.pth" -destPath $handPose
-
-      $faceNet = Join-Path $auxAnnotatorsDir "facenet.pth"
-      Get-ModelIfMissing -url "https://huggingface.co/lllyasviel/Annotators/resolve/main/facenet.pth" -destPath $faceNet
-    }
+    # Ensure assets listed in downloads.json
+    Write-Host "Ensuring required models and assets (downloads.json)..." -ForegroundColor DarkCyan
+    Ensure-Downloads -comfyDir $ComfyDir
 
     Write-Header "Start ComfyUI"
     $comfy = Start-ComfyUI -dir $ComfyDir -Cpu:$useCpu

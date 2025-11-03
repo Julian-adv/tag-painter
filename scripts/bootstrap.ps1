@@ -62,12 +62,13 @@ function Save-UrlIfMissing($url, $destPath) {
   } catch {}
   try {
     if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-      & curl.exe -L "$url" -o "$destPath"
+      & curl.exe -A "Mozilla/5.0" -L "$url" -o "$destPath"
       if ((Test-Path $destPath) -and (Get-Item $destPath).Length -gt 0) { return }
     }
   } catch {}
   throw "Failed to download $url"
 }
+
 
 function Get-7ZipPath() {
   try {
@@ -100,6 +101,60 @@ function Expand-Zip-To($archivePath, $destDir) {
     return
   }
   throw "Unsupported archive extension: $ext"
+}
+
+# Resolve latest MinGit 64-bit URL from GitHub API (fallback to static URL)
+function Get-LatestGitMinGitUrl() {
+  $api = 'https://api.github.com/repos/git-for-windows/git/releases/latest'
+  try {
+    $resp = Invoke-WebRequest -Uri $api -Headers @{ 'User-Agent' = 'pwsh' } -UseBasicParsing
+    $json = $resp.Content | ConvertFrom-Json
+    if ($json.assets) {
+      $asset = $json.assets | Where-Object { $_.name -match '^MinGit-.*-64-bit\.zip$' } | Select-Object -First 1
+      if ($asset -and $asset.browser_download_url) { return $asset.browser_download_url }
+    }
+  } catch {}
+  return 'https://github.com/git-for-windows/git/releases/latest/download/MinGit-64-bit.zip'
+}
+
+# Ensure a portable Git is available under vendor\git when system git is missing.
+function Install-Git($vendorDir) {
+  Write-Header "Git"
+
+  $gitZipUrl = Get-LatestGitMinGitUrl
+  $gitZip = Join-Path $vendorDir "git.zip"
+  $gitExtractDir = Join-Path $vendorDir "git-extract"
+  $gitHome = Join-Path $vendorDir "git"
+
+  if (-not (Test-Path (Join-Path $gitHome "cmd\git.exe"))) {
+    Write-Host "Installing portable Git to $gitHome" -ForegroundColor DarkCyan
+    Save-UrlIfMissing $gitZipUrl $gitZip
+    # If the download appears invalid (very small), retry via API-selected URL
+    try {
+      if (-not (Test-Path $gitZip) -or (Get-Item $gitZip).Length -lt 100000) {
+        $altUrl = Get-LatestGitMinGitUrl
+        if ($altUrl -ne $gitZipUrl) {
+          Write-Host "Retrying Git download from: $altUrl" -ForegroundColor DarkCyan
+          Save-UrlIfMissing $altUrl $gitZip
+        }
+      }
+    } catch {}
+    Expand-Zip-To $gitZip $gitExtractDir
+
+    if (Test-Path $gitHome) { Remove-Item -Recurse -Force $gitHome }
+    $sub = Get-ChildItem -Path $gitExtractDir | Where-Object { $_.PSIsContainer } | Select-Object -First 1
+    if (-not $sub) { throw "Could not locate extracted Git folder under $gitExtractDir" }
+    Move-Item -Path $sub.FullName -Destination $gitHome
+    Remove-Item -Recurse -Force $gitExtractDir -ErrorAction SilentlyContinue
+    Remove-Item $gitZip -ErrorAction SilentlyContinue
+  } else {
+    Write-Host "Using vendor Git at $gitHome" -ForegroundColor Green
+  }
+
+  # Prepend vendor Git to PATH for this session (always prefer vendor Git)
+  $env:PATH = (Join-Path $gitHome 'cmd') + ';' + (Join-Path $gitHome 'bin') + ';' + (Join-Path $gitHome 'usr\\bin') + ';' + $env:PATH
+  Write-Host "Vendor Git ready: $((Join-Path $gitHome 'cmd\git.exe'))" -ForegroundColor Green
+  return $gitHome
 }
 
 function Get-LatestComfyZipUrl() {
@@ -655,12 +710,43 @@ function Install-UpscaleModel($comfyDir) {
   Write-Host "Upscale model downloaded to: $modelPath" -ForegroundColor Green
 }
 
+# Ensure assets listed in config/downloads.json are present
+function Ensure-Downloads($comfyDir) {
+  $jsonPath = Join-Path (Resolve-Path ".") "config/downloads.json"
+  if (-not (Test-Path $jsonPath)) { return }
+  try {
+    $raw = Get-Content -Path $jsonPath -Raw
+    $parsed = $raw | ConvertFrom-Json
+    $items = @()
+    if ($parsed.items) { $items = $parsed.items } elseif ($parsed -is [array]) { $items = $parsed }
+    foreach ($it in $items) {
+      if (-not $it.destRelativeToComfy -or -not $it.urls) { continue }
+      $dest = Join-Path $comfyDir $it.destRelativeToComfy
+      if (Test-Path $dest) { continue }
+      New-DirectoryIfMissing (Split-Path $dest -Parent)
+      $ok = $false
+      foreach ($u in $it.urls) {
+        try { Save-UrlIfMissing $u $dest; if (Test-Path $dest) { $ok = $true; break } } catch {}
+      }
+      if ($ok) {
+        Write-Host "Downloaded: $dest" -ForegroundColor Green
+      } else {
+        Write-Host "Failed to download: $($it.filename)" -ForegroundColor Yellow
+      }
+    }
+  } catch {
+    Write-Host "Failed to read downloads.json" -ForegroundColor Yellow
+  }
+}
+
 # Main
 Push-Location (Resolve-Path (Join-Path $PSScriptRoot ".."))
 try {
   New-DirectoryIfMissing "vendor"
 
   $nodeHome = Install-Node -vendorDir (Resolve-Path "vendor")
+  # Ensure Git availability (installs portable MinGit under vendor if system Git not found)
+  Install-Git -vendorDir (Resolve-Path "vendor") | Out-Null
   $uv = $null
   $venvPy = $null
 
@@ -680,7 +766,7 @@ try {
     Install-ImpactSubpack -comfyDir $ComfyDir -repoUrl $ImpactSubpackRepo -branch $ImpactSubpackBranch -venvPy $venvPy -uv $uv
     Install-Essentials -comfyDir $ComfyDir -repoUrl $EssentialsRepo -branch $EssentialsBranch -venvPy $venvPy -uv $uv
     Install-ControlNetAux -comfyDir $ComfyDir -repoUrl $ControlNetAuxRepo -branch $ControlNetAuxBranch -venvPy $venvPy -uv $uv
-    Install-UpscaleModel -comfyDir $ComfyDir
+    Ensure-Downloads -comfyDir $ComfyDir
     # Common extras used by some custom nodes (e.g., matplotlib for cgem156-ComfyUI)
     if (Test-Path $venvPy) {
       # onnxruntime-gpu for DWpose if NVIDIA is present; fallback to CPU onnxruntime
@@ -713,3 +799,4 @@ try {
 } finally {
   Pop-Location
 }
+ 
