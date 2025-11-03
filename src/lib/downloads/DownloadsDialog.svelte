@@ -1,15 +1,22 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages'
-  type DownloadItem = { label: string; filename: string; urls: string[]; dest: string }
+  type DownloadItem = {
+    label: string
+    filename: string
+    urls: string[]
+    dest: string
+    category?: string | null
+  }
   type DownloadResultItem = { filename: string; url?: string | null }
-  type DownloadFailedItem = { filename: string; error: string | null }
-  type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: DownloadFailedItem[] }
+type DownloadFailedItem = { filename: string; error: string | null }
+type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: DownloadFailedItem[] }
 
   interface Props {
     isOpen: boolean
+    onClose?: (result: { success: boolean }) => void
   }
 
-  let { isOpen = $bindable() }: Props = $props()
+  let { isOpen = $bindable(), onClose }: Props = $props()
   let items = $state<DownloadItem[]>([])
   let loading = $state(false)
   let downloading = $state(false)
@@ -17,6 +24,11 @@
   let downloadProgress = $state({ total: 0, completed: 0, current: '', currentLabel: '' })
   let currentFile = $state({ filename: '', label: '', received: 0, total: 0 })
   let currentMessage = $state('')
+  function isDownloadSuccess(value: DownloadSummary | null): value is DownloadSummary {
+    return value !== null && value.success && value.failed.length === 0
+  }
+
+  const downloadsSuccessful = $derived(isDownloadSuccess(lastResult))
   const progressPercent = $derived(
     downloadProgress.total === 0
       ? 0
@@ -30,6 +42,16 @@
         : 0
   )
 
+  function closeDialog() {
+    if (!isOpen) {
+      return
+    }
+    isOpen = false
+    if (onClose) {
+      onClose({ success: isDownloadSuccess(lastResult) })
+    }
+  }
+
   function formatBytes(bytes: number): string {
     if (bytes <= 0) return '0 B'
     const units = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -42,12 +64,12 @@
   function handleBackdropClick(event: MouseEvent) {
     // Only close if clicking exactly on the backdrop (not bubbled from children)
     if (event.target === event.currentTarget) {
-      isOpen = false
+      closeDialog()
     }
   }
 
   function handleClose() {
-    isOpen = false
+    closeDialog()
   }
 
   // External links removed per simplified flow
@@ -58,7 +80,13 @@
     try {
       const res = await fetch('/api/downloads')
       const data = await res.json()
-      items = Array.isArray(data?.items) ? (data.items as DownloadItem[]) : []
+      if (Array.isArray(data?.items)) {
+        items = (data.items as DownloadItem[]).filter(
+          (entry) => entry.category !== 'custom-node'
+        )
+      } else {
+        items = []
+      }
     } catch (e) {
       items = []
     } finally {
@@ -282,7 +310,7 @@
     >
       <div class="mb-4 flex items-center justify-between">
         <h2 id="no-checkpoints-title" class="text-xl font-semibold text-gray-900 dark:text-white">
-          필요한 파일들을 다운로드하겠습니다.
+          {downloadsSuccessful ? 'Downloads completed.' : 'We will download the required files.'}
         </h2>
         <button
           type="button"
@@ -302,8 +330,18 @@
       </div>
 
       <div class="space-y-4">
-        <div class="rounded-lg bg-gray-50 p-3 text-sm text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-          <p>아래 목록의 파일들을 자동으로 다운로드합니다.</p>
+        <div
+          class={`rounded-lg p-3 text-sm ${
+            downloadsSuccessful
+              ? 'bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-200'
+              : 'bg-gray-50 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
+          }`}
+        >
+          <p>
+            {downloadsSuccessful
+              ? 'Downloads completed.'
+              : 'The files listed below will be downloaded automatically.'}
+          </p>
         </div>
 
         {#if loading}
@@ -388,11 +426,15 @@
         <div class="flex gap-2">
           <button
             type="button"
-            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            class={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              downloadsSuccessful
+                ? 'bg-blue-200 text-blue-700 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            } disabled:opacity-50`}
             onclick={downloadAll}
-            disabled={downloading || loading}
+            disabled={downloading || loading || downloadsSuccessful}
           >
-            {downloading ? 'Downloading...' : 'Download'}
+            {downloadsSuccessful ? 'Download' : downloading ? 'Downloading...' : 'Download'}
           </button>
           <button
             type="button"

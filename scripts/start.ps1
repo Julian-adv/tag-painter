@@ -195,51 +195,6 @@ function Get-ModelIfMissing($url, $destPath) {
   Write-Host "Please download manually and place in: $destPath" -ForegroundColor Yellow
 }
 
-function Test-ComfyUIIntegrity($comfyDir) {
-  if (-not (Test-Path $comfyDir)) { return $false }
-  
-  # Check essential ComfyUI files
-  $essentialFiles = @(
-    "main.py",
-    "requirements.txt",
-    "nodes.py"
-  )
-  
-  foreach ($file in $essentialFiles) {
-    $fullPath = Join-Path $comfyDir $file
-    if (-not (Test-Path $fullPath)) {
-      Write-Host "Missing essential ComfyUI file: $file" -ForegroundColor Yellow
-      return $false
-    }
-  }
-  
-  # Check custom nodes
-  $customNodesDir = Join-Path $comfyDir "custom_nodes"
-  $expectedNodes = @(
-    "cgem156-ComfyUI",
-    "ComfyUI-Custom-Scripts", 
-    "ComfyUI-Impact-Pack",
-    "ComfyUI-Impact-Subpack",
-    "ComfyUI_essentials",
-    "comfyui_controlnet_aux"
-  )
-  
-  $missingNodes = @()
-  foreach ($node in $expectedNodes) {
-    $nodePath = Join-Path $customNodesDir $node
-    if (-not (Test-Path $nodePath)) {
-      $missingNodes += $node
-    }
-  }
-  
-  if ($missingNodes.Count -gt 0) {
-    Write-Host "Missing custom nodes: $($missingNodes -join ', ')" -ForegroundColor Yellow
-    return $false
-  }
-  
-  return $true
-}
-
 function Install-TorchCudaIfNeeded($venvPy) {
   # If NVIDIA GPU present but torch lacks CUDA, install CUDA-enabled torch
   $hasNvidia = $false
@@ -421,9 +376,6 @@ try {
     if (-not (Test-Path $ComfyDir) -or -not (Test-Path $venvPy)) {
       $needsBootstrap = $true
       Write-Host "ComfyUI or Python venv missing. Running bootstrap..." -ForegroundColor DarkCyan
-    } elseif (-not (Test-ComfyUIIntegrity -comfyDir $ComfyDir)) {
-      $needsBootstrap = $true
-      Write-Host "ComfyUI installation incomplete or corrupted. Running bootstrap to repair..." -ForegroundColor DarkCyan
     }
 
     if ($needsBootstrap) {

@@ -133,9 +133,12 @@
 
   // Reload model list from ComfyUI and refresh UI options
   async function refreshModels(event: MouseEvent) {
-    // Prevent click from bubbling and default focus/selection behaviors
     event.stopPropagation()
     event.preventDefault()
+    await reloadCheckpoints()
+  }
+
+  async function reloadCheckpoints() {
     try {
       // Re-fetch checkpoints (ComfyUI updates lists on demand)
       const checkpoints = await fetchCheckpoints(settings.comfyUrl)
@@ -156,6 +159,12 @@
       }
     } catch (e) {
       console.error('Failed to reload checkpoint list', e)
+    }
+  }
+
+  function handleDownloadsDialogClosed(result: { success: boolean }) {
+    if (result?.success) {
+      void reloadCheckpoints()
     }
   }
 
@@ -726,7 +735,7 @@
 <Toasts bind:this={toastsRef} />
 
 <!-- No Checkpoints Dialog -->
-<DownloadsDialog bind:isOpen={showDownloadsDialog} />
+<DownloadsDialog bind:isOpen={showDownloadsDialog} onClose={handleDownloadsDialogClosed} />
 <CustomNodesDialog bind:isOpen={showCustomNodesDialog} on:closed={handleCustomNodesClosed} />
 
 <style>

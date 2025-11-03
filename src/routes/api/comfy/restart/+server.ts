@@ -70,10 +70,13 @@ export const POST: RequestHandler = async () => {
     const args = buildArgs()
     const child = spawn(python, args, {
       cwd: comfyDir,
-      detached: true,
-      stdio: 'ignore'
+      stdio: ['ignore', 'inherit', 'inherit']
     })
-    child.unref()
+
+    await new Promise<void>((resolve, reject) => {
+      child.once('spawn', () => resolve())
+      child.once('error', (err) => reject(err))
+    })
 
     const started = await waitForComfyToStart()
     if (!started) {

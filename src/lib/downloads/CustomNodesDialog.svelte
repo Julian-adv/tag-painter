@@ -250,22 +250,15 @@
               <div class="rounded border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
                 Restart ComfyUI to load the newly installed nodes.
               </div>
-              <div class="flex items-center gap-2">
-                <button
-                  type="button"
-                  class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-                  onclick={restartComfy}
-                  disabled={restarting}
-                >
-                  {restarting ? 'Restarting...' : 'Restart ComfyUI'}
-                </button>
-                {#if restartSuccess}
-                  <span class="text-sm text-green-700 dark:text-green-300">ComfyUI restarted successfully.</span>
-                {/if}
-                {#if restartError}
-                  <span class="text-sm text-red-600 dark:text-red-400">{restartError}</span>
-                {/if}
-              </div>
+              {#if restartSuccess}
+                <div class="rounded border border-green-200 bg-green-50 p-2 text-xs text-green-700 dark:border-green-500/40 dark:bg-green-900/40 dark:text-green-200">
+                  ComfyUI restarted successfully.
+                </div>
+              {:else if restartError}
+                <div class="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700 dark:border-red-500/40 dark:bg-red-900/40 dark:text-red-200">
+                  {restartError}
+                </div>
+              {/if}
             </div>
           {:else}
             <div class="max-h-64 overflow-auto rounded border border-gray-200">
@@ -331,10 +324,17 @@
         {:else}
           <button
             type="button"
-            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-            onclick={continueToDownloads}
+            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            onclick={restartSuccess ? continueToDownloads : restartComfy}
+            disabled={restarting}
           >
-            Continue to downloads
+            {#if restartSuccess}
+              Continue to downloads
+            {:else if restarting}
+              Restarting...
+            {:else}
+              Restart ComfyUI
+            {/if}
           </button>
         {/if}
         <button
