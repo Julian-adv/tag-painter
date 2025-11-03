@@ -12,6 +12,7 @@
   import { dev } from '$app/environment'
   import { m } from '$lib/paraglide/messages'
   import NoCheckpointsDialog from '$lib/NoCheckpointsDialog.svelte'
+  import CustomNodesDialog from '$lib/CustomNodesDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import {
     loadSettings,
@@ -57,6 +58,10 @@
   let shouldStopGeneration = $state(false)
   let lastSeed: number | null = $state(null)
   let showNoCheckpointsDialog = $state(false)
+  let showCustomNodesDialog = $state(false)
+  let customNodePromptChecked = $state(false)
+  let pendingNoCheckpoints = $state(false)
+  let awaitingCustomNodeFinish = $state(false)
   let localeVersion = $state(0)
   let isQwenModel = $state(false)
   let currentRandomTagResolutions: {
@@ -87,7 +92,43 @@
 
   // Show dialog when no checkpoints are found
   function openNoCheckpointsDialog() {
+    if (showCustomNodesDialog || awaitingCustomNodeFinish) {
+      pendingNoCheckpoints = true
+      return
+    }
+    pendingNoCheckpoints = false
     showNoCheckpointsDialog = true
+  }
+
+  function openCustomNodesDialog() {
+    showCustomNodesDialog = true
+  }
+
+  async function checkMissingCustomNodes() {
+    if (customNodePromptChecked) return
+    customNodePromptChecked = true
+    try {
+      const res = await fetch('/api/downloads?category=custom-node&onlyMissing=1')
+      const data = await res.json()
+      if (Array.isArray(data?.items) && data.items.length > 0) {
+        pendingNoCheckpoints = true
+        if (showNoCheckpointsDialog) {
+          showNoCheckpointsDialog = false
+        }
+        awaitingCustomNodeFinish = true
+        showCustomNodesDialog = true
+      }
+    } catch (err) {
+      console.debug('Failed to check custom nodes', err)
+    }
+  }
+
+  function handleCustomNodesClosed(event: CustomEvent<{ pending: boolean; advance: boolean }>) {
+    awaitingCustomNodeFinish = event.detail.pending
+    if (event.detail.advance || (pendingNoCheckpoints && !awaitingCustomNodeFinish)) {
+      pendingNoCheckpoints = false
+      showNoCheckpointsDialog = true
+    }
   }
 
   // Reload model list from ComfyUI and refresh UI options
@@ -204,6 +245,8 @@
       // Show dialog when no checkpoints are found
       openNoCheckpointsDialog()
     }
+
+    await checkMissingCustomNodes()
   })
 
   let wasQwenModel = false
@@ -657,6 +700,13 @@
               !
             </button>
           {/if}
+          <button
+            type="button"
+            class="self-start rounded px-2 py-1 text-xs font-medium text-blue-600 underline transition hover:text-blue-700"
+            onclick={openCustomNodesDialog}
+          >
+            커스텀 노드 설치
+          </button>
         </div>
       </section>
     {/key}
@@ -677,6 +727,7 @@
 
 <!-- No Checkpoints Dialog -->
 <NoCheckpointsDialog bind:isOpen={showNoCheckpointsDialog} />
+<CustomNodesDialog bind:isOpen={showCustomNodesDialog} on:closed={handleCustomNodesClosed} />
 
 <style>
   :global(html, body) {

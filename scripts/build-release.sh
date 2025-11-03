@@ -173,13 +173,14 @@ try {
   const data = JSON.parse(raw);
   data.outputDirectory = '';
   data.comfyUrl = 'http://127.0.0.1:8188';
+  data.geminiApiKey = '';
   fs.writeFileSync(path, JSON.stringify(data, null, 2));
 } catch (err) {
   console.error(err.message);
   process.exit(1);
 }
 NODE
-      echo "Release settings.json: comfyUrl and outputDirectory reset"
+      echo "Release settings.json: comfyUrl, outputDirectory, geminiApiKey reset"
     else
       echo "Warning: failed to process settings.json for release." >&2
     fi

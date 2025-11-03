@@ -710,35 +710,6 @@ function Install-UpscaleModel($comfyDir) {
   Write-Host "Upscale model downloaded to: $modelPath" -ForegroundColor Green
 }
 
-# Ensure assets listed in config/downloads.json are present
-function Ensure-Downloads($comfyDir) {
-  $jsonPath = Join-Path (Resolve-Path ".") "config/downloads.json"
-  if (-not (Test-Path $jsonPath)) { return }
-  try {
-    $raw = Get-Content -Path $jsonPath -Raw
-    $parsed = $raw | ConvertFrom-Json
-    $items = @()
-    if ($parsed.items) { $items = $parsed.items } elseif ($parsed -is [array]) { $items = $parsed }
-    foreach ($it in $items) {
-      if (-not $it.destRelativeToComfy -or -not $it.urls) { continue }
-      $dest = Join-Path $comfyDir $it.destRelativeToComfy
-      if (Test-Path $dest) { continue }
-      New-DirectoryIfMissing (Split-Path $dest -Parent)
-      $ok = $false
-      foreach ($u in $it.urls) {
-        try { Save-UrlIfMissing $u $dest; if (Test-Path $dest) { $ok = $true; break } } catch {}
-      }
-      if ($ok) {
-        Write-Host "Downloaded: $dest" -ForegroundColor Green
-      } else {
-        Write-Host "Failed to download: $($it.filename)" -ForegroundColor Yellow
-      }
-    }
-  } catch {
-    Write-Host "Failed to read downloads.json" -ForegroundColor Yellow
-  }
-}
-
 # Main
 Push-Location (Resolve-Path (Join-Path $PSScriptRoot ".."))
 try {
@@ -760,13 +731,7 @@ try {
 
     $uv = Install-Uv (Resolve-Path "vendor")
     $venvPy = Join-Path (Resolve-Path "vendor") "comfy-venv\Scripts\python.exe"
-    Install-CustomNode -comfyDir $ComfyDir -repoUrl $CustomNodeRepo -branch $CustomNodeBranch -venvPy $venvPy -uv $uv
-    Install-CustomScripts -comfyDir $ComfyDir -repoUrl $CustomScriptsRepo -branch $CustomScriptsBranch -venvPy $venvPy -uv $uv
-    Install-ImpactPack -comfyDir $ComfyDir -repoUrl $ImpactPackRepo -branch $ImpactPackBranch -venvPy $venvPy -uv $uv
-    Install-ImpactSubpack -comfyDir $ComfyDir -repoUrl $ImpactSubpackRepo -branch $ImpactSubpackBranch -venvPy $venvPy -uv $uv
-    Install-Essentials -comfyDir $ComfyDir -repoUrl $EssentialsRepo -branch $EssentialsBranch -venvPy $venvPy -uv $uv
-    Install-ControlNetAux -comfyDir $ComfyDir -repoUrl $ControlNetAuxRepo -branch $ControlNetAuxBranch -venvPy $venvPy -uv $uv
-    Ensure-Downloads -comfyDir $ComfyDir
+    Write-Host "Install the required custom nodes from Tag Painter after launch via the in-app dialog." -ForegroundColor Yellow
     # Common extras used by some custom nodes (e.g., matplotlib for cgem156-ComfyUI)
     if (Test-Path $venvPy) {
       # onnxruntime-gpu for DWpose if NVIDIA is present; fallback to CPU onnxruntime

@@ -1,6 +1,11 @@
 import type { RequestHandler } from '@sveltejs/kit'
-import { readFile, writeFile, mkdir, stat } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, rm, open, rename } from 'node:fs/promises'
 import path from 'node:path'
+import { unzipSync } from 'fflate'
+import { spawn } from 'node:child_process'
+import { fileExists, findComfyPython, getComfyDir } from '$lib/server/comfy'
+
+type DownloadKind = 'file' | 'archive' | 'git'
 
 type DownloadItem = {
   label: string
@@ -8,6 +13,8 @@ type DownloadItem = {
   urls: string[]
   destRelativeToComfy: string
   category: string | null
+  kind: DownloadKind
+  branch: string | null
 }
 
 type DownloadsConfig = {
@@ -21,21 +28,32 @@ type ResultEntry = {
   error: string | null
 }
 
+type StreamEvent =
+  | { type: 'file-start'; filename: string; label: string; kind: DownloadKind }
+  | { type: 'file-progress'; filename: string; receivedBytes: number; totalBytes: number | null; message?: string }
+  | { type: 'file-attempt-error'; filename: string; error: string; url: string }
+  | { type: 'file-complete'; filename: string; url: string | null }
+  | { type: 'file-error'; filename: string; error: string }
+  | { type: 'overall'; completed: number; total: number }
+  | { type: 'all-complete'; success: boolean; ok: ResultEntry[]; failed: ResultEntry[] }
+  | { type: 'error'; error: string }
+
+const JSONL_HEADER = { 'Content-Type': 'application/x-ndjson' }
+
 function normalizeCategory(value: unknown): string | null {
-  return typeof value === 'string' && value.length > 0 ? value : null
-}
-
-function getComfyDir(): string {
-  return path.resolve(process.cwd(), 'vendor', 'ComfyUI')
-}
-
-async function fileExists(p: string): Promise<boolean> {
-  try {
-    await stat(p)
-    return true
-  } catch {
-    return false
+  if (typeof value === 'string' && value.length > 0) {
+    return value
   }
+  return null
+}
+
+function parseKind(value: unknown): DownloadKind {
+  if (typeof value === 'string') {
+    const lowered = value.toLowerCase()
+    if (lowered === 'archive') return 'archive'
+    if (lowered === 'git') return 'git'
+  }
+  return 'file'
 }
 
 async function loadConfig(): Promise<DownloadsConfig> {
@@ -57,13 +75,219 @@ async function loadConfig(): Promise<DownloadsConfig> {
       )
       const dest = typeof record.destRelativeToComfy === 'string' ? record.destRelativeToComfy : ''
       const category = normalizeCategory(record.category)
+      const kind = parseKind(record.kind)
+      const branch =
+        typeof record.branch === 'string' && record.branch.length > 0 ? record.branch : null
       if (!label || !filename || urls.length === 0 || !dest) {
         return null
       }
-      return { label, filename, urls, destRelativeToComfy: dest, category }
+      return { label, filename, urls, destRelativeToComfy: dest, category, kind, branch }
     })
     .filter((entry): entry is DownloadItem => entry !== null)
   return { items }
+}
+
+async function ensureParentDir(targetPath: string): Promise<void> {
+  await mkdir(path.dirname(targetPath), { recursive: true })
+}
+
+async function extractArchive(buffer: Buffer, destDir: string): Promise<void> {
+  const entries = unzipSync(buffer)
+  const names = Object.keys(entries)
+  if (names.length === 0) return
+  const rootCandidates = new Set<string>()
+  for (const name of names) {
+    const normalized = name.replace(/\\/g, '/')
+    if (!normalized) continue
+    const parts = normalized.split('/')
+    if (parts.length > 1 && parts[0].length > 0) {
+      rootCandidates.add(parts[0])
+    }
+  }
+  const rootPrefix = rootCandidates.size === 1 ? `${Array.from(rootCandidates)[0]}/` : ''
+  for (const name of names) {
+    const entry = entries[name]
+    let normalized = name.replace(/\\/g, '/')
+    if (rootPrefix && normalized.startsWith(rootPrefix)) {
+      normalized = normalized.slice(rootPrefix.length)
+    }
+    normalized = normalized.replace(/^\/+/, '')
+    if (!normalized) continue
+    const fullPath = path.join(destDir, normalized)
+    if (normalized.endsWith('/')) {
+      await mkdir(fullPath, { recursive: true })
+      continue
+    }
+    await mkdir(path.dirname(fullPath), { recursive: true })
+    await writeFile(fullPath, Buffer.from(entry))
+  }
+}
+
+async function findGitExecutable(): Promise<string> {
+  const candidates: string[] = []
+  const isWindows = process.platform === 'win32'
+  candidates.push('git')
+
+  const vendorGit = path.resolve(process.cwd(), 'vendor', 'git')
+  if (isWindows) {
+    candidates.push(
+      path.join(vendorGit, 'cmd', 'git.exe'),
+      path.join(vendorGit, 'bin', 'git.exe'),
+      path.join(vendorGit, 'usr', 'bin', 'git.exe')
+    )
+  } else {
+    candidates.push(
+      path.join(vendorGit, 'bin', 'git'),
+      path.join(vendorGit, 'usr', 'bin', 'git')
+    )
+  }
+
+  for (const candidate of candidates) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const proc = spawn(candidate, ['--version'])
+        proc.on('error', reject)
+        proc.on('close', (code) => {
+          if (code === 0) resolve()
+          else reject(new Error(`git exited with code ${code}`))
+        })
+      })
+      return candidate
+    } catch {
+      // Try next candidate.
+    }
+  }
+  throw new Error('git executable not found. Run bootstrap to install vendor git.')
+}
+
+async function installRequirementsIfPresent(destDir: string): Promise<void> {
+  const requirementsPath = path.join(destDir, 'requirements.txt')
+  if (!(await fileExists(requirementsPath))) return
+  const python = await findComfyPython()
+  if (!python) {
+    throw new Error('Python environment not found (expected vendor/comfy-venv)')
+  }
+  await new Promise<void>((resolve, reject) => {
+    const proc = spawn(python, ['-m', 'pip', 'install', '-r', requirementsPath], {
+      stdio: 'inherit'
+    })
+    proc.on('error', (err) => reject(err))
+    proc.on('close', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`pip exited with code ${code}`))
+    })
+  })
+}
+
+async function cloneGitRepository(
+  item: DownloadItem & { dest: string },
+  repoUrl: string,
+  send: (event: StreamEvent) => void
+): Promise<void> {
+  const git = await findGitExecutable()
+  await rm(item.dest, { recursive: true, force: true })
+  await ensureParentDir(item.dest)
+  send({
+    type: 'file-progress',
+    filename: item.filename,
+    receivedBytes: 0,
+    totalBytes: null,
+    message: `Cloning ${repoUrl}`
+  })
+  const args = ['clone', '--depth', '1']
+  if (item.branch) {
+    args.push('--branch', item.branch)
+  }
+  args.push(repoUrl, item.dest)
+  await new Promise<void>((resolve, reject) => {
+    const proc = spawn(git, args, { stdio: 'inherit' })
+    proc.on('error', reject)
+    proc.on('close', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`git clone exited with code ${code}`))
+    })
+  })
+  await installRequirementsIfPresent(item.dest)
+}
+
+async function downloadAndHandle(
+  item: DownloadItem & { dest: string },
+  url: string,
+  send: (event: StreamEvent) => void
+): Promise<{ url: string }> {
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { 'User-Agent': 'TagPainter/0.5 (download)' },
+    redirect: 'follow'
+  })
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+  const lengthHeader = response.headers.get('content-length')
+  let totalBytes: number | null = null
+  if (lengthHeader) {
+    const parsed = Number(lengthHeader)
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      totalBytes = parsed
+    }
+  }
+
+  await ensureParentDir(item.dest)
+  const tempPath = `${item.dest}.download`
+  const fileHandle = await open(tempPath, 'w')
+  let received = 0
+  try {
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new Error('No response body received')
+    }
+    send({
+      type: 'file-progress',
+      filename: item.filename,
+      receivedBytes: 0,
+      totalBytes,
+      message: undefined
+    })
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      if (value && value.length > 0) {
+        received += value.length
+        await fileHandle.write(value)
+        send({
+          type: 'file-progress',
+          filename: item.filename,
+          receivedBytes: received,
+          totalBytes,
+          message: undefined
+        })
+      }
+    }
+    await fileHandle.close()
+    if (item.kind === 'file') {
+      await rm(item.dest, { force: true })
+      await rename(tempPath, item.dest)
+    } else if (item.kind === 'archive') {
+      const buffer = await readFile(tempPath)
+      await rm(tempPath, { force: true })
+      await rm(item.dest, { recursive: true, force: true })
+      await mkdir(item.dest, { recursive: true })
+      await extractArchive(buffer, item.dest)
+      await installRequirementsIfPresent(item.dest)
+    } else {
+      await rm(tempPath, { force: true })
+      throw new Error(`Unsupported download kind: ${item.kind}`)
+    }
+    return { url }
+  } catch (err) {
+    try {
+      await fileHandle.close()
+    } catch {
+      // ignore
+    }
+    await rm(tempPath, { force: true })
+    throw err
+  }
 }
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -71,22 +295,40 @@ export const GET: RequestHandler = async ({ url }) => {
     const cfg = await loadConfig()
     const comfyDir = getComfyDir()
     const requestedCategory = normalizeCategory(url.searchParams.get('category'))
+    const onlyMissing =
+      (url.searchParams.has('onlyMissing') && url.searchParams.get('onlyMissing') !== '0') ||
+      false
+
     const filtered =
       requestedCategory === null
         ? cfg.items
         : cfg.items.filter((it) => it.category === requestedCategory)
-    const items = filtered.map((it) => ({
-      label: it.label,
-      filename: it.filename,
-      urls: it.urls,
-      category: it.category,
-      dest: path.join(comfyDir, it.destRelativeToComfy)
-    }))
+
+    const items = []
+    for (const item of filtered) {
+      const dest = path.join(comfyDir, item.destRelativeToComfy)
+      const exists = await fileExists(dest)
+      if (onlyMissing && exists) {
+        continue
+      }
+      items.push({
+        label: item.label,
+        filename: item.filename,
+        urls: item.urls,
+        category: item.category,
+        kind: item.kind,
+        branch: item.branch,
+        dest,
+        exists
+      })
+    }
+
     return new Response(JSON.stringify({ items }), {
       headers: { 'Content-Type': 'application/json' }
     })
-  } catch {
-    return new Response(JSON.stringify({ error: 'Failed to read downloads config' }), {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to read downloads config'
+    return new Response(JSON.stringify({ error: message }), {
       status: 500
     })
   }
@@ -113,67 +355,119 @@ export const POST: RequestHandler = async ({ request }) => {
       .filter((it) => (nameSet === null ? true : nameSet.has(it.filename)))
       .map((it) => ({ ...it, dest: path.join(comfyDir, it.destRelativeToComfy) }))
 
-    const results: ResultEntry[] = []
-
-    for (const item of targets) {
-      try {
-        if (onlyMissing && (await fileExists(item.dest))) {
-          results.push({ filename: item.filename, ok: true, url: null, error: null })
-          continue
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder()
+        const send = (event: StreamEvent) => {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`))
         }
-        await mkdir(path.dirname(item.dest), { recursive: true })
 
-        let success = false
-        let lastErr = ''
-        for (const u of item.urls) {
-          try {
-            const res = await fetch(u, {
-              method: 'GET',
-              headers: { 'User-Agent': 'TagPainter/0.5 (download)' },
-              redirect: 'follow'
-            })
-            if (!res.ok) {
-              lastErr = `HTTP ${res.status}`
+        ;(async () => {
+          const ok: ResultEntry[] = []
+          const failed: ResultEntry[] = []
+          let completed = 0
+
+          for (const item of targets) {
+            send({ type: 'file-start', filename: item.filename, label: item.label, kind: item.kind })
+
+            if (onlyMissing && (await fileExists(item.dest))) {
+              ok.push({ filename: item.filename, ok: true, url: null, error: null })
+              send({ type: 'file-complete', filename: item.filename, url: null })
+              completed += 1
+              send({ type: 'overall', completed, total: targets.length })
               continue
             }
-            const buf = Buffer.from(await res.arrayBuffer())
-            const ct = res.headers.get('content-type') || ''
-            if (buf.length < 100_000 && ct.includes('text/')) {
-              lastErr = 'Response looks like HTML/text'
-              continue
+
+            try {
+              await ensureParentDir(item.dest)
+              if (item.kind === 'git') {
+                let success = false
+                let lastErr = ''
+                for (const repo of item.urls) {
+                  try {
+                    await cloneGitRepository(item, repo, send)
+                    ok.push({ filename: item.filename, ok: true, url: repo, error: null })
+                    send({ type: 'file-complete', filename: item.filename, url: repo })
+                    success = true
+                    break
+                  } catch (err) {
+                    lastErr = err instanceof Error ? err.message : String(err)
+                    send({ type: 'file-attempt-error', filename: item.filename, error: lastErr, url: repo })
+                  }
+                }
+                if (!success) {
+                  failed.push({
+                    filename: item.filename,
+                    ok: false,
+                    url: null,
+                    error: lastErr || 'Git clone failed'
+                  })
+                  send({
+                    type: 'file-error',
+                    filename: item.filename,
+                    error: lastErr || 'Git clone failed'
+                  })
+                }
+              } else {
+                let success = false
+                let lastErr = ''
+                for (const url of item.urls) {
+                  try {
+                    const info = await downloadAndHandle(item, url, send)
+                    ok.push({ filename: item.filename, ok: true, url: info.url, error: null })
+                    send({ type: 'file-complete', filename: item.filename, url: info.url })
+                    success = true
+                    break
+                  } catch (err) {
+                    lastErr = err instanceof Error ? err.message : String(err)
+                    send({ type: 'file-attempt-error', filename: item.filename, error: lastErr, url })
+                  }
+                }
+                if (!success) {
+                  failed.push({
+                    filename: item.filename,
+                    ok: false,
+                    url: null,
+                    error: lastErr || 'Download failed'
+                  })
+                  send({
+                    type: 'file-error',
+                    filename: item.filename,
+                    error: lastErr || 'Download failed'
+                  })
+                }
+              }
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err)
+              failed.push({ filename: item.filename, ok: false, url: null, error: message })
+              send({ type: 'file-error', filename: item.filename, error: message })
             }
-            await writeFile(item.dest, buf)
-            success = true
-            results.push({ filename: item.filename, ok: true, url: u, error: null })
-            break
-          } catch (err: unknown) {
-            lastErr = err instanceof Error ? err.message : String(err)
+
+            completed += 1
+            send({ type: 'overall', completed, total: targets.length })
           }
-        }
-        if (!success) {
-          results.push({
-            filename: item.filename,
-            ok: false,
-            url: null,
-            error: lastErr.length > 0 ? lastErr : null
-          })
-        }
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err)
-        results.push({ filename: item.filename, ok: false, url: null, error: message })
-      }
-    }
 
-    const failed = results.filter((entry) => !entry.ok)
-    const ok = results.filter((entry) => entry.ok)
-    const status = failed.length > 0 ? 207 : 200
-    return new Response(JSON.stringify({ success: failed.length === 0, ok, failed }), {
-      status,
-      headers: { 'Content-Type': 'application/json' }
+          send({
+            type: 'all-complete',
+            success: failed.length === 0,
+            ok,
+            failed
+          })
+          controller.close()
+        })().catch((err) => {
+          const message = err instanceof Error ? err.message : String(err)
+          controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'error', error: message })}\n`))
+          controller.close()
+        })
+      }
     })
-  } catch {
-    return new Response(JSON.stringify({ error: 'Failed to process download request' }), {
-      status: 500
+
+    return new Response(stream, { headers: JSONL_HEADER })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to process download request'
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
     })
   }
 }

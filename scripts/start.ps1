@@ -195,35 +195,6 @@ function Get-ModelIfMissing($url, $destPath) {
   Write-Host "Please download manually and place in: $destPath" -ForegroundColor Yellow
 }
 
-# Load and ensure downloads listed in config/downloads.json
-function Ensure-Downloads($comfyDir) {
-  $jsonPath = Join-Path (Resolve-Path ".") "config/downloads.json"
-  if (-not (Test-Path $jsonPath)) { return }
-  try {
-    $raw = Get-Content -Path $jsonPath -Raw
-    $parsed = $raw | ConvertFrom-Json
-    $items = @()
-    if ($parsed.items) { $items = $parsed.items } elseif ($parsed -is [array]) { $items = $parsed }
-    foreach ($it in $items) {
-      $dest = Join-Path $comfyDir $it.destRelativeToComfy
-      if ($it.urls -and $it.urls.Count -gt 0) {
-        $done = $false
-        foreach ($u in $it.urls) {
-          try {
-            Get-ModelIfMissing -url $u -destPath $dest
-            if (Test-Path $dest) { $done = $true; break }
-          } catch {}
-        }
-        if (-not $done) {
-          Write-Host "Failed to download: $($it.filename)" -ForegroundColor Yellow
-        }
-      }
-    }
-  } catch {
-    Write-Host "Failed to read downloads.json: $jsonPath" -ForegroundColor Yellow
-  }
-}
-
 function Test-ComfyUIIntegrity($comfyDir) {
   if (-not (Test-Path $comfyDir)) { return $false }
   
@@ -496,10 +467,6 @@ try {
         }
       }
     }
-
-    # Ensure assets listed in downloads.json
-    Write-Host "Ensuring required models and assets (downloads.json)..." -ForegroundColor DarkCyan
-    Ensure-Downloads -comfyDir $ComfyDir
 
     Write-Header "Start ComfyUI"
     $comfy = Start-ComfyUI -dir $ComfyDir -Cpu:$useCpu
