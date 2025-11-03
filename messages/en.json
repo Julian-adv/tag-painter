@@ -183,5 +183,7 @@
   "tagDisplay.pinnedToLabel": "Pinned to:",
   "settingsDialog.sampler": "Sampler:",
   "tabs.wildcards": "Wildcards",
-  "tabs.chat": "Chat"
+  "tabs.chat": "Chat",
+  "customNodes.installRequired": "Install Required Custom Nodes",
+  "customNodes.install": "Install Custom Nodes"
 }

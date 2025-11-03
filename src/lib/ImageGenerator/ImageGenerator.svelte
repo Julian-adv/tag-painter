@@ -123,9 +123,9 @@
     }
   }
 
-  function handleCustomNodesClosed(event: CustomEvent<{ pending: boolean; advance: boolean }>) {
-    awaitingCustomNodeFinish = event.detail.pending
-    if (event.detail.advance || (pendingDownloads && !awaitingCustomNodeFinish)) {
+  function handleCustomNodesClosed(event: { pending: boolean; advance: boolean }) {
+    awaitingCustomNodeFinish = event.pending
+    if (event.advance || (pendingDownloads && !awaitingCustomNodeFinish)) {
       pendingDownloads = false
       showDownloadsDialog = true
     }
@@ -714,7 +714,7 @@
             class="self-start rounded px-2 py-1 text-xs font-medium text-blue-600 underline transition hover:text-blue-700"
             onclick={openCustomNodesDialog}
           >
-            커스텀 노드 설치
+            {m['customNodes.install']()}
           </button>
         </div>
       </section>
@@ -736,7 +736,7 @@
 
 <!-- No Checkpoints Dialog -->
 <DownloadsDialog bind:isOpen={showDownloadsDialog} onClose={handleDownloadsDialogClosed} />
-<CustomNodesDialog bind:isOpen={showCustomNodesDialog} on:closed={handleCustomNodesClosed} />
+<CustomNodesDialog bind:isOpen={showCustomNodesDialog} onclosed={handleCustomNodesClosed} />
 
 <style>
   :global(html, body) {

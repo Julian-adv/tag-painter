@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte'
+  import { m } from '$lib/paraglide/messages'
   interface Props {
     isOpen: boolean
+    onclosed?: (event: { pending: boolean; advance: boolean }) => void
   }
 
   type DownloadItem = {
@@ -22,7 +23,7 @@
     failed: DownloadFailedItem[]
   }
 
-  let { isOpen = $bindable() }: Props = $props()
+  let { isOpen = $bindable(), onclosed }: Props = $props()
   let items = $state<DownloadItem[]>([])
   let loading = $state(false)
   let installing = $state(false)
@@ -36,7 +37,6 @@
   let restarting = $state(false)
   let restartError = $state('')
   let restartSuccess = $state(false)
-  const dispatch = createEventDispatcher<{ closed: { pending: boolean; advance: boolean } }>()
 
   function handleBackdropClick(event: MouseEvent) {
     if (event.target === event.currentTarget) {
@@ -53,7 +53,7 @@
       return
     }
     isOpen = false
-    dispatch('closed', { pending: items.length > 0, advance })
+    onclosed?.({ pending: items.length > 0, advance })
   }
 
   async function loadItems() {
@@ -217,7 +217,7 @@
     <div class="mx-4 w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
       <div class="mb-4 flex items-center justify-between">
         <h2 id="custom-nodes-title" class="text-xl font-semibold text-gray-900 dark:text-white">
-          필수 커스텀 노드 설치
+          {m['customNodes.installRequired']()}
         </h2>
         <button
           type="button"

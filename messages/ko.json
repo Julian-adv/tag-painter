@@ -183,5 +183,7 @@
   "tagDisplay.pinnedToLabel": "고정 대상:",
   "settingsDialog.sampler": "샘플러:",
   "tabs.wildcards": "와일드카드",
-  "tabs.chat": "채팅"
+  "tabs.chat": "채팅",
+  "customNodes.installRequired": "필수 커스텀 노드 설치",
+  "customNodes.install": "커스텀 노드 설치"
 }
