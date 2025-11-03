@@ -73,12 +73,22 @@ try {
   # Copy specific data files only
   $dataDir = Join-Path $payloadRoot "data"
   New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
-  $dataFiles = @("prompts.json", "settings.json", "wildcards.yaml", "outfits.txt", "lights.txt")
+  $dataFiles = @("prompts.json", "settings.json", "wildcards.yaml")
   foreach ($file in $dataFiles) {
     $srcPath = Join-Path "data" $file
     if (Test-Path $srcPath) {
       Copy-Item $srcPath -Destination $dataDir -Force
     }
+  }
+
+  $characterDir = Join-Path $dataDir "character"
+  if (Test-Path $characterDir) {
+    Remove-Item $characterDir -Recurse -Force -ErrorAction SilentlyContinue
+  }
+
+  $chatHistoryPath = Join-Path $dataDir "chat_history.json"
+  if (Test-Path $chatHistoryPath) {
+    Remove-Item $chatHistoryPath -Force -ErrorAction SilentlyContinue
   }
 
   # For packaged settings.json, blank out outputDirectory

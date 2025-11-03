@@ -121,6 +121,9 @@ for path in "${copy_paths[@]}"; do
   fi
 done
 
+CHARACTER_DIR="$PAYLOAD_ROOT/data/character"
+rm -rf "$CHARACTER_DIR" 2>/dev/null || true
+
 DATA_DIR="$PAYLOAD_ROOT/data"
 mkdir -p "$DATA_DIR"
 data_files=(
@@ -129,8 +132,6 @@ data_files=(
   "wildcards.yaml"
   "wildcards.qwen.yaml"
   "Vision2.1.yaml"
-  "outfits.txt"
-  "lights.txt"
 )
 for data_file in "${data_files[@]}"; do
   src_path="data/$data_file"
@@ -138,6 +139,8 @@ for data_file in "${data_files[@]}"; do
     cp "$src_path" "$DATA_DIR/"
   fi
 done
+
+rm -f "$DATA_DIR/chat_history.json" 2>/dev/null || true
 
 data_dirs=(
   "wildcards"

@@ -62,7 +62,7 @@ The application follows a modular component architecture located in `src/lib/`:
 - **ComboBox.svelte**: Filtering and selection component with dropdown
 - **WheelAdjustableInput.svelte**: Numeric input with mouse wheel adjustment support
 - **ActionButton.svelte**: Reusable button component with consistent styling
-- **NoCheckpointsDialog.svelte**: Warning dialog when no checkpoint models are detected
+- **DownloadsDialog.svelte**: Dialog for managing required downloads when assets are missing
 
 ### Utility Modules
 

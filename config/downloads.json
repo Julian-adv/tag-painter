@@ -37,6 +37,15 @@
       "category": "vae"
     },
     {
+      "label": "Qwen Image VAE",
+      "filename": "qwen_image_vae.safetensors",
+      "urls": [
+        "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/vae/qwen_image_vae.safetensors"
+      ],
+      "destRelativeToComfy": "models/vae/qwen_image_vae.safetensors",
+      "category": "vae"
+    },
+    {
       "label": "LoRA MoriiMee Gothic Niji Style r1",
       "filename": "MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors",
       "urls": [

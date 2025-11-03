@@ -11,8 +11,8 @@
   import ModelControls from './ModelControls.svelte'
   import { dev } from '$app/environment'
   import { m } from '$lib/paraglide/messages'
-  import NoCheckpointsDialog from '$lib/NoCheckpointsDialog.svelte'
-  import CustomNodesDialog from '$lib/CustomNodesDialog.svelte'
+  import DownloadsDialog from '$lib/downloads/DownloadsDialog.svelte'
+  import CustomNodesDialog from '$lib/downloads/CustomNodesDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import {
     loadSettings,
@@ -57,10 +57,10 @@
   let isGeneratingForever = $state(false)
   let shouldStopGeneration = $state(false)
   let lastSeed: number | null = $state(null)
-  let showNoCheckpointsDialog = $state(false)
+  let showDownloadsDialog = $state(false)
   let showCustomNodesDialog = $state(false)
   let customNodePromptChecked = $state(false)
-  let pendingNoCheckpoints = $state(false)
+  let pendingDownloads = $state(false)
   let awaitingCustomNodeFinish = $state(false)
   let localeVersion = $state(0)
   let isQwenModel = $state(false)
@@ -91,13 +91,13 @@
   let activeTabId = $state('generator')
 
   // Show dialog when no checkpoints are found
-  function openNoCheckpointsDialog() {
+  function openDownloadsDialog() {
     if (showCustomNodesDialog || awaitingCustomNodeFinish) {
-      pendingNoCheckpoints = true
+      pendingDownloads = true
       return
     }
-    pendingNoCheckpoints = false
-    showNoCheckpointsDialog = true
+    pendingDownloads = false
+    showDownloadsDialog = true
   }
 
   function openCustomNodesDialog() {
@@ -111,9 +111,9 @@
       const res = await fetch('/api/downloads?category=custom-node&onlyMissing=1')
       const data = await res.json()
       if (Array.isArray(data?.items) && data.items.length > 0) {
-        pendingNoCheckpoints = true
-        if (showNoCheckpointsDialog) {
-          showNoCheckpointsDialog = false
+        pendingDownloads = true
+        if (showDownloadsDialog) {
+          showDownloadsDialog = false
         }
         awaitingCustomNodeFinish = true
         showCustomNodesDialog = true
@@ -125,9 +125,9 @@
 
   function handleCustomNodesClosed(event: CustomEvent<{ pending: boolean; advance: boolean }>) {
     awaitingCustomNodeFinish = event.detail.pending
-    if (event.detail.advance || (pendingNoCheckpoints && !awaitingCustomNodeFinish)) {
-      pendingNoCheckpoints = false
-      showNoCheckpointsDialog = true
+    if (event.detail.advance || (pendingDownloads && !awaitingCustomNodeFinish)) {
+      pendingDownloads = false
+      showDownloadsDialog = true
     }
   }
 
@@ -152,7 +152,7 @@
         }
       } else {
         availableCheckpoints = []
-        openNoCheckpointsDialog()
+        openDownloadsDialog()
       }
     } catch (e) {
       console.error('Failed to reload checkpoint list', e)
@@ -243,7 +243,7 @@
       })
     } else {
       // Show dialog when no checkpoints are found
-      openNoCheckpointsDialog()
+      openDownloadsDialog()
     }
 
     await checkMissingCustomNodes()
@@ -283,7 +283,7 @@
 
     // Check if checkpoints are available before generating
     if (!availableCheckpoints || availableCheckpoints.length === 0) {
-      openNoCheckpointsDialog()
+      openDownloadsDialog()
       return
     }
 
@@ -693,7 +693,7 @@
             <button
               type="button"
               class="flex h-6 w-6 items-center justify-center self-start rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
-              onclick={openNoCheckpointsDialog}
+              onclick={openDownloadsDialog}
               aria-label={m['imageGenerator.devShowDialog']()}
               title={m['imageGenerator.devShowDialog']()}
             >
@@ -726,7 +726,7 @@
 <Toasts bind:this={toastsRef} />
 
 <!-- No Checkpoints Dialog -->
-<NoCheckpointsDialog bind:isOpen={showNoCheckpointsDialog} />
+<DownloadsDialog bind:isOpen={showDownloadsDialog} />
 <CustomNodesDialog bind:isOpen={showCustomNodesDialog} on:closed={handleCustomNodesClosed} />
 
 <style>
