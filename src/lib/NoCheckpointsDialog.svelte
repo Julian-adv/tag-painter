@@ -1,11 +1,22 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages'
+  type DownloadItem = { label: string; filename: string; urls: string[]; dest: string }
 
   interface Props {
     isOpen: boolean
   }
 
   let { isOpen = $bindable() }: Props = $props()
+  let items = $state<DownloadItem[]>([])
+  let loading = $state(false)
+  let downloading = $state(false)
+  let lastResult: { success: boolean; ok: { filename: string }[]; failed: { filename: string; error?: string }[] } | null = $state(null)
+  let downloadProgress = $state({ total: 0, completed: 0, current: '' })
+  const progressPercent = $derived(
+    downloadProgress.total === 0
+      ? 0
+      : Math.round((downloadProgress.completed / downloadProgress.total) * 100)
+  )
 
   function handleBackdropClick(event: MouseEvent) {
     // Only close if clicking exactly on the backdrop (not bubbled from children)
@@ -18,37 +29,86 @@
     isOpen = false
   }
 
-  function openHuggingFace() {
-    window.open('https://huggingface.co/models?pipeline_tag=text-to-image&sort=trending', '_blank')
-  }
+  // External links removed per simplified flow
 
-  function openCivitai() {
-    window.open('https://civitai.com/models?type=Checkpoint', '_blank')
-  }
-
-  async function openCheckpointsFolder() {
+  async function loadItems() {
+    loading = true
+    lastResult = null
     try {
-      const response = await fetch('/api/open-folder', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          folderPath: 'vendor/ComfyUI/models/checkpoints'
-        })
-      })
-
-      if (response.ok) {
-        console.log('Folder opened successfully')
-      } else {
-        const result = await response.json()
-        console.warn('API returned error but folder may have opened:', result.error)
-      }
-    } catch (error) {
-      console.warn('API call failed but this is expected:', error)
-      // Don't call fallback since the folder likely opened anyway
+      const res = await fetch('/api/downloads')
+      const data = await res.json()
+      items = Array.isArray(data?.items) ? (data.items as DownloadItem[]) : []
+    } catch (e) {
+      items = []
+    } finally {
+      loading = false
     }
   }
+
+  async function downloadAll() {
+    if (downloading) return
+    if (items.length === 0) {
+      lastResult = { success: true, ok: [], failed: [] }
+      return
+    }
+    downloading = true
+    lastResult = null
+    downloadProgress = { total: items.length, completed: 0, current: '' }
+    const ok: { filename: string }[] = []
+    const failed: { filename: string; error?: string }[] = []
+
+    for (const item of items) {
+      downloadProgress.current = item.filename
+      try {
+        const res = await fetch('/api/downloads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ onlyMissing: true, filenames: [item.filename] })
+        })
+        let data: unknown = null
+        try {
+          data = await res.json()
+        } catch {
+          data = null
+        }
+        const record = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+        const resOk = Array.isArray(record['ok']) ? (record['ok'] as { filename: string }[]) : []
+        const resFailed = Array.isArray(record['failed'])
+          ? (record['failed'] as { filename: string; error?: string }[])
+          : []
+        if (resOk.length > 0) ok.push(...resOk)
+        if (resFailed.length > 0) {
+          failed.push(...resFailed)
+        } else if (!res.ok) {
+          failed.push({ filename: item.filename, error: `HTTP ${res.status}` })
+        } else if (resOk.length === 0) {
+          ok.push({ filename: item.filename })
+        }
+      } catch (err: unknown) {
+        failed.push({
+          filename: item.filename,
+          error: err instanceof Error ? err.message : String(err)
+        })
+      } finally {
+        downloadProgress.completed += 1
+      }
+    }
+
+    lastResult = {
+      success: failed.length === 0,
+      ok,
+      failed
+    }
+
+    downloadProgress.current = ''
+    downloading = false
+  }
+
+  $effect(() => {
+    if (isOpen) void loadItems()
+  })
+
+  // Folder open flow removed
 </script>
 
 {#if isOpen}
@@ -67,7 +127,7 @@
     >
       <div class="mb-4 flex items-center justify-between">
         <h2 id="no-checkpoints-title" class="text-xl font-semibold text-gray-900 dark:text-white">
-          {m['noCheckpoints.title']()}
+          필요한 파일들을 다운로드하겠습니다.
         </h2>
         <button
           type="button"
@@ -87,74 +147,88 @@
       </div>
 
       <div class="space-y-4">
-        <p class="text-gray-700 dark:text-gray-300">
-          {m['noCheckpoints.body']()}
-        </p>
+        <div class="rounded-lg bg-gray-50 p-3 text-sm text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+          <p>아래 목록의 파일들을 자동으로 다운로드합니다.</p>
+        </div>
 
-        <div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-700">
-          <div class="mb-2 flex items-center justify-between">
-            <p class="text-sm font-medium text-gray-900 dark:text-white">
-              {m['noCheckpoints.installationPath']()}
-            </p>
-            <button
-              type="button"
-              class="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
-              onclick={openCheckpointsFolder}
-              title={m['noCheckpoints.openFolderTitle']()}
-            >
-              <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-              </svg>
-              {m['noCheckpoints.openButton']()}
-            </button>
+        {#if loading}
+          <div class="text-sm text-gray-500">Loading download list...</div>
+        {:else}
+          <div class="max-h-60 overflow-auto rounded border border-gray-200">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-gray-100 text-gray-700">
+                <tr>
+                  <th class="px-2 py-1">File</th>
+                  <th class="px-2 py-1">URL</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each items as it}
+                  <tr class="border-t">
+                    <td class="px-2 py-1 whitespace-nowrap">{it.filename}</td>
+                    <td class="px-2 py-1 truncate text-blue-600"><a href={it.urls?.[0]} target="_blank" rel="noreferrer">{it.urls?.[0]}</a></td>
+                  </tr>
+                {/each}
+                {#if items.length === 0}
+                  <tr>
+                    <td class="px-2 py-2 text-gray-500" colspan="2">No items.</td>
+                  </tr>
+                {/if}
+              </tbody>
+            </table>
           </div>
-          <code
-            class="rounded bg-gray-100 px-2 py-1 text-sm text-gray-800 dark:bg-gray-600 dark:text-gray-200"
-          >
-            vendor/ComfyUI/models/checkpoints/
-          </code>
-        </div>
+        {/if}
 
-        <div>
-          <p class="mb-3 text-sm font-medium text-gray-900 dark:text-white">
-            {m['noCheckpoints.downloadFrom']()}
-          </p>
-          <div class="flex gap-2">
-            <button
-              type="button"
-              class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-              onclick={openHuggingFace}
-            >
-              🤗 Hugging Face
-            </button>
-            <button
-              type="button"
-              class="flex-1 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
-              onclick={openCivitai}
-            >
-              🎨 Civitai
-            </button>
+        {#if downloading}
+          <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
+            <div class="flex items-center justify-between">
+              <span>{downloadProgress.current || 'Preparing download...'}</span>
+              <span>{progressPercent}%</span>
+            </div>
+            <div class="mt-2 h-2 rounded bg-blue-100 dark:bg-blue-800">
+              <div class="h-full rounded bg-blue-600 transition-all" style={`width: ${progressPercent}%`}></div>
+            </div>
+            <div class="mt-1 text-right text-[11px] text-blue-700 dark:text-blue-200">
+              {downloadProgress.completed} / {downloadProgress.total}
+            </div>
           </div>
-        </div>
+        {/if}
+        <!-- Removed installation path and other guidance per simplified dialog -->
 
-        <div
-          class="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20"
-        >
-          <p class="text-sm text-amber-800 dark:text-amber-200">
-            <strong>{m['noCheckpoints.nextStepsLabel']()}</strong>{' '}
-            {m['noCheckpoints.nextStepsBody']()}
-          </p>
-        </div>
+        {#if lastResult}
+          <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+            <div>Downloaded: {lastResult.ok.length}, Failed: {lastResult.failed.length}</div>
+            {#if lastResult.failed.length > 0}
+              <ul class="mt-1 list-disc pl-5 text-red-600">
+                {#each lastResult.failed as f}
+                  <li>{f.filename}{f.error ? ` - ${f.error}` : ''}</li>
+                {/each}
+              </ul>
+            {/if}
+          </div>
+        {/if}
+
+        <!-- Removed next steps warning block -->
       </div>
 
       <div class="mt-6 flex justify-end">
-        <button
-          type="button"
-          class="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
-          onclick={handleClose}
-        >
-          {m['noCheckpoints.gotIt']()}
-        </button>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            onclick={downloadAll}
+            disabled={downloading || loading}
+          >
+            {downloading ? 'Downloading...' : 'Download'}
+          </button>
+          <button
+            type="button"
+            class="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+            onclick={handleClose}
+          >
+            {m['noCheckpoints.gotIt']()}
+          </button>
+        </div>
       </div>
     </div>
   </div>

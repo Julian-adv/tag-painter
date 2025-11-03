@@ -86,6 +86,7 @@ copy_paths=(
   "project.inlang"
   "messages"
   "danbooru_tags.txt"
+  "config"
   "src"
   "static"
   "docs"
