@@ -42,6 +42,50 @@ export const DEFAULT_UPSCALE_SETTINGS = {
   selectedVae: '__embedded__'
 } as const
 
+// Model type specific defaults
+export const MODEL_TYPE_DEFAULTS = {
+  sdxl: {
+    cfgScale: 4.5,
+    steps: 20,
+    sampler: 'euler_ancestral',
+    scheduler: 'simple',
+    clipSkip: 2,
+    qualityPrefix: '',
+    negativePrefix: '',
+    wildcardsFile: 'wildcards.yaml'
+  },
+  qwen: {
+    cfgScale: 1.0,
+    steps: 20,
+    sampler: 'euler',
+    scheduler: 'simple',
+    clipSkip: 1,
+    qualityPrefix: '',
+    negativePrefix: '',
+    wildcardsFile: 'wildcards_qwen.yaml'
+  },
+  chroma: {
+    cfgScale: 3.5,
+    steps: 20,
+    sampler: 'euler',
+    scheduler: 'simple',
+    clipSkip: 2,
+    qualityPrefix: '',
+    negativePrefix: '',
+    wildcardsFile: 'wildcards.yaml'
+  },
+  flux1_krea: {
+    cfgScale: 1.0,
+    steps: 20,
+    sampler: 'euler',
+    scheduler: 'simple',
+    clipSkip: 1,
+    qualityPrefix: '',
+    negativePrefix: '',
+    wildcardsFile: 'wildcards.yaml'
+  }
+} as const
+
 // Placeholder pattern used for __name__ style tags (non-greedy to avoid merging adjacent placeholders)
 // Whitespace is intentionally excluded so markers like "__ __" are treated as plain text.
 export const PLACEHOLDER_RE_SOURCE = '__([\\p{L}\\p{N}_\\-/]+?)__'

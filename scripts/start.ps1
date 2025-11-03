@@ -348,7 +348,7 @@ try {
       Write-Host "Running bootstrap to prepare environment (Node, ComfyUI)..." -ForegroundColor DarkCyan
     }
 
-    $bootstrapArgs = @('-SkipBuild')
+    $bootstrapArgs = @()
     if ($NoComfy) { $bootstrapArgs += '-SkipComfy' }
     Invoke-Bootstrap -bootstrapArgs $bootstrapArgs
 
@@ -380,7 +380,7 @@ try {
 
     if ($needsBootstrap) {
       Write-Header "Setting up ComfyUI (latest source)"
-      Invoke-Bootstrap -bootstrapArgs @('-SkipBuild')
+      Invoke-Bootstrap -bootstrapArgs @()
     }
 
     # Ensure CUDA-enabled torch is installed when NVIDIA is present; decide CPU fallback

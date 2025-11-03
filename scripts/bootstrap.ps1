@@ -3,43 +3,29 @@ param(
   [string]$NodeZipUrl = "https://nodejs.org/dist/v22.19.0/node-v22.19.0-win-x64.zip",
   [string]$ComfyPortableUrl = "",
   [string]$ComfyDir = "vendor\\ComfyUI",
-  [string]$CustomNodeRepo = "https://github.com/laksjdjf/cgem156-ComfyUI",
-  [string]$CustomNodeBranch = "main",
-  [string]$CustomScriptsRepo = "https://github.com/pythongosssss/ComfyUI-Custom-Scripts",
-  [string]$CustomScriptsBranch = "main",
-  [string]$ImpactPackRepo = "https://github.com/ltdrdata/ComfyUI-Impact-Pack",
-  [string]$ImpactPackBranch = "Main",
-  [string]$ImpactSubpackRepo = "https://github.com/ltdrdata/ComfyUI-Impact-Subpack",
-  [string]$ImpactSubpackBranch = "main",
-  [string]$ControlNetAuxRepo = "https://github.com/Fannovel16/comfyui_controlnet_aux",
-  [string]$ControlNetAuxBranch = "main",
-  [string]$EssentialsRepo = "https://github.com/cubiq/ComfyUI_essentials",
-  [string]$EssentialsBranch = "main",
   [string]$PythonVersion = "3.12",
   [switch]$SkipNode,
-  [switch]$SkipComfy,
-  [switch]$SkipBuild
+  [switch]$SkipComfy
 )
 
 <#
   Windows bootstrap script
+  - Installs portable Git (MinGit) if system Git is not available
   - Installs Node v$NodeVersion locally (portable) if not available
-  - Installs JS deps and builds the app with adapter-node
-  - Installs ComfyUI from latest release source ZIP by default (no 7-Zip or Git needed)
+  - Installs ComfyUI from latest release tag via git clone (shallow clone for speed)
   - (Optional) If -ComfyPortableUrl is provided, installs ComfyUI Portable instead
   - Creates Python venv via uv and installs ComfyUI requirements + Torch
-  - Installs custom node cgem156-ComfyUI into ComfyUI/custom_nodes
-  - Installs ComfyUI-Impact-Pack into ComfyUI/custom_nodes
-  - Installs ComfyUI-Impact-Subpack into ComfyUI/custom_nodes
-  - Installs cubiq/ComfyUI_essentials into ComfyUI/custom_nodes
+  - Custom nodes should be installed via in-app dialog after first launch
 
   Usage examples:
+    pwsh -File scripts/bootstrap.ps1
     pwsh -File scripts/bootstrap.ps1 -ComfyPortableUrl "<portable_zip_url>"
     pwsh -File scripts/bootstrap.ps1 -SkipComfy
 
   Notes:
   - If you prefer your system Node, pass -SkipNode
   - For ComfyUI Portable, pass a direct downloadable URL to its zip/7z
+  - Node dependencies and app build should be handled by start.ps1 or manually
 #>
 
 Set-StrictMode -Version Latest
@@ -157,16 +143,6 @@ function Install-Git($vendorDir) {
   return $gitHome
 }
 
-function Get-LatestComfyZipUrl() {
-  $api = 'https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest'
-  Write-Host "Fetching latest release metadata..." -ForegroundColor DarkCyan
-  $resp = Invoke-WebRequest -Uri $api -Headers @{ 'User-Agent' = 'pwsh' } -UseBasicParsing
-  $json = $resp.Content | ConvertFrom-Json
-  if ($json.zipball_url) { return $json.zipball_url }
-  # Fallback to main branch archive
-  return 'https://github.com/comfyanonymous/ComfyUI/archive/refs/heads/master.zip'
-}
-
 function Install-Node($vendorDir) {
   if ($SkipNode) {
     Write-Host "Skipping Node setup (SkipNode)." -ForegroundColor Yellow
@@ -201,30 +177,6 @@ function Install-Node($vendorDir) {
   Remove-Item -Recurse -Force $nodeExtractDir
 
   return $nodeHome
-}
-
-function Invoke-Npm {
-  param(
-    [string]$nodeHome,
-    [string[]]$npmArgs
-  )
-  if ($nodeHome) {
-    & (Join-Path $nodeHome "npm.cmd") @npmArgs
-  } else {
-    & npm @npmArgs
-  }
-}
-
-function Invoke-AppBuild($nodeHome) {
-  Write-Header "Install deps + Build"
-  Invoke-Npm -nodeHome $nodeHome -npmArgs @("ci")
-  if ($LASTEXITCODE -ne 0) {
-    Write-Host "npm ci failed. Falling back to 'npm install' to update lockfile." -ForegroundColor Yellow
-    Invoke-Npm -nodeHome $nodeHome -npmArgs @("install")
-    if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
-  }
-  Invoke-Npm -nodeHome $nodeHome -npmArgs @("run", "build")
-  if ($LASTEXITCODE -ne 0) { throw "npm run build failed" }
 }
 
 function Install-ComfyUIPortable($vendorDir, $comfyDir, $portableUrl) {
@@ -277,19 +229,34 @@ function Install-ComfyUISource($vendorDir, $comfyDir) {
     Write-Host "ComfyUI already present at $comfyDir" -ForegroundColor Green
     return
   }
-  Write-Header "ComfyUI (latest source ZIP)"
-  $tmp = Join-Path $vendorDir "comfy-src"
-  New-DirectoryIfMissing $tmp
-  $zipUrl = Get-LatestComfyZipUrl
-  $zipPath = Join-Path $tmp "comfyui-source.zip"
-  Save-UrlIfMissing $zipUrl $zipPath
-  $extractDir = Join-Path $tmp "extract"
-  Expand-Zip-To $zipPath $extractDir
-  $first = Get-ChildItem -Path $extractDir | Where-Object { $_.PSIsContainer } | Select-Object -First 1
-  if (-not $first) { throw "Failed to extract ComfyUI source archive" }
-  Move-Item -Path $first.FullName -Destination $comfyDir
-  Remove-Item -Recurse -Force $tmp
-  Write-Host "ComfyUI extracted to: $comfyDir" -ForegroundColor Green
+  Write-Header "ComfyUI (latest release via git)"
+
+  # Fetch latest release tag from GitHub API
+  $latestTag = $null
+  try {
+    Write-Host "Fetching latest release tag..." -ForegroundColor DarkCyan
+    $api = 'https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest'
+    $resp = Invoke-WebRequest -Uri $api -Headers @{ 'User-Agent' = 'pwsh' } -UseBasicParsing
+    $json = $resp.Content | ConvertFrom-Json
+    if ($json.tag_name) {
+      $latestTag = $json.tag_name
+      Write-Host "Latest release tag: $latestTag" -ForegroundColor Green
+    }
+  } catch {
+    Write-Host "Failed to fetch latest release tag, falling back to master branch" -ForegroundColor Yellow
+  }
+
+  Write-Host "Cloning ComfyUI repository..." -ForegroundColor DarkCyan
+  if ($latestTag) {
+    git clone --depth 1 --branch $latestTag https://github.com/comfyanonymous/ComfyUI.git $comfyDir
+  } else {
+    git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git $comfyDir
+  }
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "Failed to clone ComfyUI repository"
+  }
+  Write-Host "ComfyUI cloned to: $comfyDir" -ForegroundColor Green
 }
 
 function Install-Uv($vendorDir) {
@@ -435,281 +402,6 @@ else:
   }
 }
 
-function Install-CustomNode($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
-  $dest = Join-Path $comfyDir "custom_nodes\\cgem156-ComfyUI"
-  if (-not (Test-Path $comfyDir)) {
-    Write-Host "ComfyUI not found at $comfyDir; skipping custom node install." -ForegroundColor Yellow
-    return
-  }
-  if (Test-Path $dest) {
-    Write-Host "Custom node already present: $dest" -ForegroundColor Green
-    Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
-    return
-  }
-
-  Write-Header "Install custom node: cgem156-ComfyUI"
-
-  try {
-    git --version *> $null
-    $useGit = $true
-  } catch { $useGit = $false }
-
-  New-DirectoryIfMissing (Join-Path $comfyDir "custom_nodes")
-  if ($useGit) {
-    Write-Host "Cloning via git..." -ForegroundColor DarkCyan
-    git clone --depth 1 --branch $branch $repoUrl $dest
-  } else {
-    $zipUrl = "$repoUrl/archive/refs/heads/$branch.zip"
-    $tmp = Join-Path $comfyDir "custom_nodes\\.tmp_cgem156"
-    New-DirectoryIfMissing $tmp
-    $zipPath = Join-Path $tmp "cgem156.zip"
-    Save-UrlIfMissing $zipUrl $zipPath
-    Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
-    $extracted = Get-ChildItem -Path $tmp | Where-Object { $_.PSIsContainer -and $_.Name -like "cgem156-ComfyUI*" } | Select-Object -First 1
-    if (-not $extracted) { throw "Failed to extract custom node archive" }
-    Move-Item -Path $extracted.FullName -Destination $dest
-    Remove-Item -Recurse -Force $tmp
-  }
-  
-  # Install dependencies if requirements.txt exists
-  Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
-}
-
-function Install-CustomScripts($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
-  $dest = Join-Path $comfyDir "custom_nodes\\ComfyUI-Custom-Scripts"
-  if (-not (Test-Path $comfyDir)) {
-    Write-Host "ComfyUI not found at $comfyDir; skipping custom scripts install." -ForegroundColor Yellow
-    return
-  }
-  if (Test-Path $dest) {
-    Write-Host "Custom scripts already present: $dest" -ForegroundColor Green
-    Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
-    return
-  }
-
-  Write-Header "Install custom scripts: ComfyUI-Custom-Scripts"
-
-  try {
-    git --version *> $null
-    $useGit = $true
-  } catch { $useGit = $false }
-
-  New-DirectoryIfMissing (Join-Path $comfyDir "custom_nodes")
-  if ($useGit) {
-    Write-Host "Cloning via git..." -ForegroundColor DarkCyan
-    git clone --depth 1 --branch $branch $repoUrl $dest
-  } else {
-    $zipUrl = "$repoUrl/archive/refs/heads/$branch.zip"
-    $tmp = Join-Path $comfyDir "custom_nodes\\.tmp_custom_scripts"
-    New-DirectoryIfMissing $tmp
-    $zipPath = Join-Path $tmp "custom_scripts.zip"
-    Save-UrlIfMissing $zipUrl $zipPath
-    Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
-    $extracted = Get-ChildItem -Path $tmp | Where-Object { $_.PSIsContainer -and $_.Name -like "ComfyUI-Custom-Scripts*" } | Select-Object -First 1
-    if (-not $extracted) { throw "Failed to extract custom scripts archive" }
-    Move-Item -Path $extracted.FullName -Destination $dest
-    Remove-Item -Recurse -Force $tmp
-  }
-  
-  # Install dependencies if requirements.txt exists
-  Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
-}
-
-function Install-CustomNodeDependencies($nodePath, $venvPy, $uv) {
-  $requirementsFile = Join-Path $nodePath "requirements.txt"
-  if (Test-Path $requirementsFile) {
-    $nodeName = Split-Path $nodePath -Leaf
-    Write-Host "Installing dependencies for $nodeName..." -ForegroundColor DarkCyan
-    
-    try { & $venvPy -m ensurepip --upgrade } catch {}
-    $pipOk = $false
-    try { & $venvPy -m pip --version | Out-Null; if ($LASTEXITCODE -eq 0) { $pipOk = $true } } catch {}
-    
-    if ($pipOk) {
-      & $venvPy -m pip install -r $requirementsFile
-    } else {
-      & $uv pip install -p $venvPy -r $requirementsFile
-    }
-  }
-}
-
-function Install-ImpactPack($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
-  $dest = Join-Path $comfyDir "custom_nodes\\ComfyUI-Impact-Pack"
-  if (-not (Test-Path $comfyDir)) {
-    Write-Host "ComfyUI not found at $comfyDir; skipping Impact Pack install." -ForegroundColor Yellow
-    return
-  }
-  if (Test-Path $dest) {
-    Write-Host "Impact Pack already present: $dest" -ForegroundColor Green
-    Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
-    return
-  }
-
-  Write-Header "Install ComfyUI-Impact-Pack"
-
-  try {
-    git --version *> $null
-    $useGit = $true
-  } catch { $useGit = $false }
-
-  New-DirectoryIfMissing (Join-Path $comfyDir "custom_nodes")
-  if ($useGit) {
-    Write-Host "Cloning via git..." -ForegroundColor DarkCyan
-    git clone --depth 1 --branch $branch $repoUrl $dest
-  } else {
-    $zipUrl = "$repoUrl/archive/refs/heads/$branch.zip"
-    $tmp = Join-Path $comfyDir "custom_nodes\\.tmp_impact_pack"
-    New-DirectoryIfMissing $tmp
-    $zipPath = Join-Path $tmp "impact_pack.zip"
-    Save-UrlIfMissing $zipUrl $zipPath
-    Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
-    $extracted = Get-ChildItem -Path $tmp | Where-Object { $_.PSIsContainer -and $_.Name -like "ComfyUI-Impact-Pack*" } | Select-Object -First 1
-    if (-not $extracted) { throw "Failed to extract Impact Pack archive" }
-    Move-Item -Path $extracted.FullName -Destination $dest
-    Remove-Item -Recurse -Force $tmp
-  }
-  
-  # Install dependencies if requirements.txt exists
-  Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
-}
-
-function Install-ImpactSubpack($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
-  $dest = Join-Path $comfyDir "custom_nodes\\ComfyUI-Impact-Subpack"
-  if (-not (Test-Path $comfyDir)) {
-    Write-Host "ComfyUI not found at $comfyDir; skipping Impact Subpack install." -ForegroundColor Yellow
-    return
-  }
-  if (Test-Path $dest) {
-    Write-Host "Impact Subpack already present: $dest" -ForegroundColor Green
-    Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
-    return
-  }
-
-  Write-Header "Install ComfyUI-Impact-Subpack"
-
-  try {
-    git --version *> $null
-    $useGit = $true
-  } catch { $useGit = $false }
-
-  New-DirectoryIfMissing (Join-Path $comfyDir "custom_nodes")
-  if ($useGit) {
-    Write-Host "Cloning via git..." -ForegroundColor DarkCyan
-    git clone --depth 1 --branch $branch $repoUrl $dest
-  } else {
-    $zipUrl = "$repoUrl/archive/refs/heads/$branch.zip"
-    $tmp = Join-Path $comfyDir "custom_nodes\\.tmp_impact_subpack"
-    New-DirectoryIfMissing $tmp
-    $zipPath = Join-Path $tmp "impact_subpack.zip"
-    Save-UrlIfMissing $zipUrl $zipPath
-    Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
-    $extracted = Get-ChildItem -Path $tmp | Where-Object { $_.PSIsContainer -and $_.Name -like "ComfyUI-Impact-Subpack*" } | Select-Object -First 1
-    if (-not $extracted) { throw "Failed to extract Impact Subpack archive" }
-    Move-Item -Path $extracted.FullName -Destination $dest
-    Remove-Item -Recurse -Force $tmp
-  }
-  
-  # Install dependencies if requirements.txt exists
-  Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
-}
-
-function Install-Essentials($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
-  $dest = Join-Path $comfyDir "custom_nodes\\ComfyUI_essentials"
-  if (-not (Test-Path $comfyDir)) {
-    Write-Host "ComfyUI not found at $comfyDir; skipping ComfyUI_essentials install." -ForegroundColor Yellow
-    return
-  }
-  if (Test-Path $dest) {
-    Write-Host "ComfyUI_essentials already present: $dest" -ForegroundColor Green
-    Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
-    return
-  }
-
-  Write-Header "Install ComfyUI_essentials"
-
-  try { git --version *> $null; $useGit = $true } catch { $useGit = $false }
-  New-DirectoryIfMissing (Join-Path $comfyDir "custom_nodes")
-  if ($useGit) {
-    Write-Host "Cloning via git..." -ForegroundColor DarkCyan
-    git clone --depth 1 --branch $branch $repoUrl $dest
-  } else {
-    $zipUrl = "$repoUrl/archive/refs/heads/$branch.zip"
-    $tmp = Join-Path $comfyDir "custom_nodes\\.tmp_comfyui_essentials"
-    New-DirectoryIfMissing $tmp
-    $zipPath = Join-Path $tmp "comfyui_essentials.zip"
-    Save-UrlIfMissing $zipUrl $zipPath
-    Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
-    $extracted = Get-ChildItem -Path $tmp | Where-Object { $_.PSIsContainer -and $_.Name -like "ComfyUI_essentials*" } | Select-Object -First 1
-    if (-not $extracted) { throw "Failed to extract ComfyUI_essentials archive" }
-    Move-Item -Path $extracted.FullName -Destination $dest
-    Remove-Item -Recurse -Force $tmp
-  }
-
-  Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
-}
-
-function Install-ControlNetAux($comfyDir, $repoUrl, $branch, $venvPy, $uv) {
-  $dest = Join-Path $comfyDir "custom_nodes\comfyui_controlnet_aux"
-  if (-not (Test-Path $comfyDir)) {
-    Write-Host "ComfyUI not found at $comfyDir; skipping ControlNet Aux install." -ForegroundColor Yellow
-    return
-  }
-  if (Test-Path $dest) {
-    Write-Host "ControlNet Aux already present: $dest" -ForegroundColor Green
-    Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
-    return
-  }
-
-  Write-Header "Install comfyui_controlnet_aux"
-
-  try { git --version *> $null; $useGit = $true } catch { $useGit = $false }
-  New-DirectoryIfMissing (Join-Path $comfyDir "custom_nodes")
-  if ($useGit) {
-    Write-Host "Cloning via git..." -ForegroundColor DarkCyan
-    git clone --depth 1 --branch $branch $repoUrl $dest
-  } else {
-    $zipUrl = "$repoUrl/archive/refs/heads/$branch.zip"
-    $tmp = Join-Path $comfyDir "custom_nodes\.tmp_controlnet_aux"
-    New-DirectoryIfMissing $tmp
-    $zipPath = Join-Path $tmp "controlnet_aux.zip"
-    Save-UrlIfMissing $zipUrl $zipPath
-    Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
-    $extracted = Get-ChildItem -Path $tmp | Where-Object { $_.PSIsContainer -and $_.Name -like "comfyui_controlnet_aux*" } | Select-Object -First 1
-    if (-not $extracted) { throw "Failed to extract comfyui_controlnet_aux archive" }
-    Move-Item -Path $extracted.FullName -Destination $dest
-    Remove-Item -Recurse -Force $tmp
-  }
-
-  # Install node requirements
-  Install-CustomNodeDependencies -nodePath $dest -venvPy $venvPy -uv $uv
-}
-
-function Install-UpscaleModel($comfyDir) {
-  if (-not (Test-Path $comfyDir)) {
-    Write-Host "ComfyUI not found at $comfyDir; skipping upscale model install." -ForegroundColor Yellow
-    return
-  }
-
-  $upscaleDir = Join-Path $comfyDir "models\upscale_models"
-  New-DirectoryIfMissing $upscaleDir
-
-  $modelName = "2x_NMKD-UpgifLiteV2_210k.pth"
-  $modelPath = Join-Path $upscaleDir $modelName
-
-  if (Test-Path $modelPath) {
-    Write-Host "Upscale model already present: $modelPath" -ForegroundColor Green
-    return
-  }
-
-  Write-Header "Download upscale model: $modelName"
-
-  # Use resolve URL for direct download from Hugging Face
-  $modelUrl = "https://huggingface.co/utnah/esrgan/resolve/dc83465df24b219350e452750e881656f91d1d8b/2x_NMKD-UpgifLiteV2_210k.pth"
-  Save-UrlIfMissing $modelUrl $modelPath
-
-  Write-Host "Upscale model downloaded to: $modelPath" -ForegroundColor Green
-}
-
 # Main
 Push-Location (Resolve-Path (Join-Path $PSScriptRoot ".."))
 try {
@@ -745,21 +437,6 @@ try {
     }
   } else {
     Write-Host "Skipping ComfyUI environment setup (SkipComfy)." -ForegroundColor Yellow
-  }
-
-  if (-not $SkipBuild) {
-    Invoke-AppBuild -nodeHome $nodeHome
-  } else {
-    Write-Header "Skip build"
-    Write-Host "Skipping app build as requested (-SkipBuild)." -ForegroundColor Yellow
-  }
-
-  Write-Header "Done"
-  Write-Host "Next: run scripts\\start.ps1 to launch ComfyUI + app server." -ForegroundColor Green
-  if (-not $SkipComfy) {
-    Write-Host "Installed ComfyUI from latest source ZIP (or Portable if URL provided)." -ForegroundColor Yellow
-  } else {
-    Write-Host "ComfyUI installation was skipped (SkipComfy)." -ForegroundColor Yellow
   }
 } finally {
   Pop-Location

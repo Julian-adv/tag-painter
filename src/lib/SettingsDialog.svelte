@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Settings, LoraWithWeight } from '$lib/types'
+  import type { Settings, LoraWithWeight, ModelType } from '$lib/types'
   import { fetchVaeModels, fetchCheckpoints } from './generation/comfyui'
   import LoraSelector from './LoraSelector.svelte'
   import { promptsData } from './stores/promptsStore'
@@ -9,7 +9,11 @@
   import CustomSelect from './CustomSelect.svelte'
   import { m } from '$lib/paraglide/messages'
   import { locales, baseLocale } from '$lib/paraglide/runtime.js'
-  import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
+  import {
+    DEFAULT_FACE_DETAILER_SETTINGS,
+    DEFAULT_UPSCALE_SETTINGS,
+    MODEL_TYPE_DEFAULTS
+  } from '$lib/constants'
 
   interface Props {
     show: boolean
@@ -69,6 +73,7 @@
   let originalSelectedModelKey: string = $state('Default')
   let selectedModelDirty: boolean = $state(false)
   let lastSelectedModelKey: string = $state('Default')
+  let previousModelType: ModelType | null = $state(null)
 
   function deepClone<T>(obj: T): T {
     return JSON.parse(JSON.stringify(obj))
@@ -130,6 +135,7 @@
       selectedModelDirty = false
       originalSelectedModelKey = 'Default'
       lastSelectedModelKey = 'Default'
+      previousModelType = null
     }
   })
 
@@ -222,6 +228,51 @@
       selectedModelDirty = true
     }
     lastSelectedModelKey = nextKey
+    // Reset previousModelType when switching models to track the new model's type
+    previousModelType = localSettings.perModel[nextKey]?.modelType || null
+  })
+
+  // Reset settings to model type defaults when model type changes
+  $effect(() => {
+    if (!show || !sessionInitialized) {
+      return
+    }
+    const currentSettings = localSettings.perModel[selectedModelKey]
+    if (!currentSettings) {
+      return
+    }
+    const currentModelType = currentSettings.modelType
+    if (previousModelType === null) {
+      // Initialize on first render
+      previousModelType = currentModelType
+      return
+    }
+    if (currentModelType === previousModelType) {
+      return
+    }
+    // Model type changed - apply defaults for the new type
+    const defaults = MODEL_TYPE_DEFAULTS[currentModelType]
+    if (defaults) {
+      localSettings = {
+        ...localSettings,
+        perModel: {
+          ...localSettings.perModel,
+          [selectedModelKey]: {
+            ...currentSettings,
+            cfgScale: defaults.cfgScale,
+            steps: defaults.steps,
+            sampler: defaults.sampler,
+            scheduler: defaults.scheduler,
+            clipSkip: defaults.clipSkip,
+            qualityPrefix: defaults.qualityPrefix,
+            negativePrefix: defaults.negativePrefix,
+            wildcardsFile: defaults.wildcardsFile,
+            selectedVae: '__embedded__'
+          }
+        }
+      }
+    }
+    previousModelType = currentModelType
   })
 
   // Focus requested field when dialog opens or when initialFocus changes
