@@ -199,6 +199,7 @@
   "customNodes.starting": "Starting...",
   "customNodes.close": "Close",
   "customNodes.continue": "Continue to downloads",
+  "customNodes.downloadPrompt": "Would you like to continue by downloading the required model files?",
   "customNodes.successCount": "Success: {ok}, Failed: {failed}",
   "downloads.title": "Download Required Files",
   "downloads.titleCompleted": "Downloads Completed",

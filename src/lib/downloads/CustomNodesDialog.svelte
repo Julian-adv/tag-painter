@@ -250,8 +250,13 @@
                 {m['customNodes.startPrompt']()}
               </div>
               {#if startSuccess}
-                <div class="rounded border border-green-200 bg-green-50 p-2 text-xs text-green-700 dark:border-green-500/40 dark:bg-green-900/40 dark:text-green-200">
-                  {m['customNodes.startSuccess']()}
+                <div class="space-y-2">
+                  <div class="rounded border border-green-200 bg-green-50 p-2 text-xs text-green-700 dark:border-green-500/40 dark:bg-green-900/40 dark:text-green-200">
+                    {m['customNodes.startSuccess']()}
+                  </div>
+                  <div class="rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
+                    {m['customNodes.downloadPrompt']()}
+                  </div>
                 </div>
               {:else if startError}
                 <div class="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700 dark:border-red-500/40 dark:bg-red-900/40 dark:text-red-200">
