@@ -12,18 +12,14 @@
     {
       "label": "ADetailer person_yolov8m-seg.pt",
       "filename": "person_yolov8m-seg.pt",
-      "urls": [
-        "https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt"
-      ],
+      "urls": ["https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt"],
       "destRelativeToComfy": "models/ultralytics/segm/person_yolov8m-seg.pt",
       "category": "annotator"
     },
     {
       "label": "ADetailer face_yolov8m.pt",
       "filename": "face_yolov8m.pt",
-      "urls": [
-        "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt"
-      ],
+      "urls": ["https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt"],
       "destRelativeToComfy": "models/ultralytics/bbox/face_yolov8m.pt",
       "category": "annotator"
     },
@@ -46,6 +42,15 @@
       "category": "vae"
     },
     {
+      "label": "Qwen 2.5 VL 7B Text Encoder (FP8 scaled)",
+      "filename": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "urls": [
+        "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors"
+      ],
+      "destRelativeToComfy": "models/text_encoderes/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "category": "text-encoder"
+    },
+    {
       "label": "LoRA MoriiMee Gothic Niji Style r1",
       "filename": "MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors",
       "urls": [
@@ -57,19 +62,24 @@
     {
       "label": "LoRA spo_sdxl_10ep_4k-data_lora_webui",
       "filename": "spo_sdxl_10ep_4k-data_lora_webui.safetensors",
-      "urls": [
-        "https://civitai.com/api/download/models/567119"
-      ],
+      "urls": ["https://civitai.com/api/download/models/567119"],
       "destRelativeToComfy": "models/loras/spo_sdxl_10ep_4k-data_lora_webui.safetensors",
       "category": "lora"
     },
     {
       "label": "LoRA Sinozick Style XL Pony",
       "filename": "Sinozick_Style_XL_Pony.safetensors",
-      "urls": [
-        "https://civitai.com/api/download/models/481798"
-      ],
+      "urls": ["https://civitai.com/api/download/models/481798"],
       "destRelativeToComfy": "models/loras/Sinozick_Style_XL_Pony.safetensors",
+      "category": "lora"
+    },
+    {
+      "label": "Qwen Image Lightning 8steps V1.1 LoRA",
+      "filename": "Qwen-Image-Lightning-8steps-V1.1.safetensors",
+      "urls": [
+        "https://huggingface.co/lightx2v/Qwen-Image-Lightning/resolve/main/Qwen-Image-Lightning-8steps-V1.1.safetensors"
+      ],
+      "destRelativeToComfy": "models/loras/qwen/Qwen-Image-Lightning-8steps-V1.1.safetensors",
       "category": "lora"
     },
     {
@@ -103,27 +113,21 @@
     {
       "label": "ControlNet Aux body_pose_model.pth",
       "filename": "body_pose_model.pth",
-      "urls": [
-        "https://huggingface.co/lllyasviel/Annotators/resolve/main/body_pose_model.pth"
-      ],
+      "urls": ["https://huggingface.co/lllyasviel/Annotators/resolve/main/body_pose_model.pth"],
       "destRelativeToComfy": "custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators/body_pose_model.pth",
       "category": "annotator"
     },
     {
       "label": "ControlNet Aux hand_pose_model.pth",
       "filename": "hand_pose_model.pth",
-      "urls": [
-        "https://huggingface.co/lllyasviel/Annotators/resolve/main/hand_pose_model.pth"
-      ],
+      "urls": ["https://huggingface.co/lllyasviel/Annotators/resolve/main/hand_pose_model.pth"],
       "destRelativeToComfy": "custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators/hand_pose_model.pth",
       "category": "annotator"
     },
     {
       "label": "ControlNet Aux facenet.pth",
       "filename": "facenet.pth",
-      "urls": [
-        "https://huggingface.co/lllyasviel/Annotators/resolve/main/facenet.pth"
-      ],
+      "urls": ["https://huggingface.co/lllyasviel/Annotators/resolve/main/facenet.pth"],
       "destRelativeToComfy": "custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators/facenet.pth",
       "category": "annotator"
     },
@@ -139,9 +143,7 @@
     {
       "label": "Custom Node cgem156-ComfyUI",
       "filename": "cgem156-ComfyUI",
-      "urls": [
-        "https://github.com/laksjdjf/cgem156-ComfyUI.git"
-      ],
+      "urls": ["https://github.com/laksjdjf/cgem156-ComfyUI.git"],
       "destRelativeToComfy": "custom_nodes/cgem156-ComfyUI",
       "category": "custom-node",
       "kind": "git",
@@ -150,9 +152,7 @@
     {
       "label": "Custom Node ComfyUI-Custom-Scripts",
       "filename": "ComfyUI-Custom-Scripts",
-      "urls": [
-        "https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git"
-      ],
+      "urls": ["https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git"],
       "destRelativeToComfy": "custom_nodes/ComfyUI-Custom-Scripts",
       "category": "custom-node",
       "kind": "git",
@@ -161,9 +161,7 @@
     {
       "label": "Custom Node ComfyUI-Impact-Pack",
       "filename": "ComfyUI-Impact-Pack",
-      "urls": [
-        "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git"
-      ],
+      "urls": ["https://github.com/ltdrdata/ComfyUI-Impact-Pack.git"],
       "destRelativeToComfy": "custom_nodes/ComfyUI-Impact-Pack",
       "category": "custom-node",
       "kind": "git",
@@ -172,9 +170,7 @@
     {
       "label": "Custom Node ComfyUI-Impact-Subpack",
       "filename": "ComfyUI-Impact-Subpack",
-      "urls": [
-        "https://github.com/ltdrdata/ComfyUI-Impact-Subpack.git"
-      ],
+      "urls": ["https://github.com/ltdrdata/ComfyUI-Impact-Subpack.git"],
       "destRelativeToComfy": "custom_nodes/ComfyUI-Impact-Subpack",
       "category": "custom-node",
       "kind": "git",
@@ -183,9 +179,7 @@
     {
       "label": "Custom Node ComfyUI_essentials",
       "filename": "ComfyUI_essentials",
-      "urls": [
-        "https://github.com/cubiq/ComfyUI_essentials.git"
-      ],
+      "urls": ["https://github.com/cubiq/ComfyUI_essentials.git"],
       "destRelativeToComfy": "custom_nodes/ComfyUI_essentials",
       "category": "custom-node",
       "kind": "git",
@@ -194,9 +188,7 @@
     {
       "label": "Custom Node comfyui_controlnet_aux",
       "filename": "comfyui_controlnet_aux",
-      "urls": [
-        "https://github.com/Fannovel16/comfyui_controlnet_aux.git"
-      ],
+      "urls": ["https://github.com/Fannovel16/comfyui_controlnet_aux.git"],
       "destRelativeToComfy": "custom_nodes/comfyui_controlnet_aux",
       "category": "custom-node",
       "kind": "git",

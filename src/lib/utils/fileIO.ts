@@ -145,18 +145,38 @@ export async function loadSettings(): Promise<Settings | null> {
       // Ensure all per-model entries have faceDetailer settings
       if (settings.perModel) {
         for (const [key, modelSettings] of Object.entries(settings.perModel)) {
-          if (!modelSettings.faceDetailer) {
-            settings.perModel[key] = {
-              ...modelSettings,
+          let updatedModel = { ...modelSettings }
+
+          if (!updatedModel.faceDetailer) {
+            updatedModel = {
+              ...updatedModel,
               faceDetailer: { ...DEFAULT_FACE_DETAILER_SETTINGS }
             }
           }
-          if (!modelSettings.upscale) {
-            settings.perModel[key] = {
-              ...modelSettings,
+
+          if (!updatedModel.upscale) {
+            updatedModel = {
+              ...updatedModel,
               upscale: { ...DEFAULT_UPSCALE_SETTINGS }
             }
           }
+
+          if (Array.isArray(updatedModel.loras)) {
+            updatedModel = {
+              ...updatedModel,
+              loras: updatedModel.loras
+                .filter(
+                  (entry): entry is { name: string; weight: number } =>
+                    entry != null && typeof entry.name === 'string'
+                )
+                .map((entry) => ({
+                  ...entry,
+                  name: entry.name.replace(/\\/g, '/')
+                }))
+            }
+          }
+
+          settings.perModel[key] = updatedModel
         }
       }
 

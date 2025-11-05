@@ -1,5 +1,6 @@
 import { findNodeByTitle } from './workflowMapping'
 import type { ComfyUIWorkflow, LoraWithWeight } from '$lib/types'
+import { resolveLoraNameForComfy } from '$lib/stores/loraStore'
 
 export function applyQwenNunchakuLoraChain(workflow: ComfyUIWorkflow, loras: LoraWithWeight[]): string | null {
 	const nunchakuNode = findNodeByTitle(workflow, 'Nunchaku Qwen Image LoRA Stack')
@@ -13,7 +14,8 @@ export function applyQwenNunchakuLoraChain(workflow: ComfyUIWorkflow, loras: Lor
 	for (let i = 0; i < 10; i++) {
     if (i < loras.length) {
       const lora = loras[i]
-      workflow[nodeId].inputs[`lora_name_${i + 1}`] = lora.name
+      const resolvedName = resolveLoraNameForComfy(lora.name)
+      workflow[nodeId].inputs[`lora_name_${i + 1}`] = resolvedName
       workflow[nodeId].inputs[`lora_strength_${i + 1}`] = lora.weight
     } else {
       // Clear out any unused lora slots up to 10
@@ -64,10 +66,12 @@ export function attachLoraChainBetweenNodes(
       throw new Error(`Workflow already contains node with id: ${nodeId}`)
     }
 
+    const resolvedName = resolveLoraNameForComfy(lora.name)
+
     workflow[nodeId] = {
       inputs: {
         model: previousOutput,
-        lora_name: lora.name,
+        lora_name: resolvedName
       },
       class_type: loadLoraNodeClass,
       _meta: {

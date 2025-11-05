@@ -372,6 +372,7 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
         {:else}
           <!-- Step 1: Essential Files -->
           {#if !step1Complete || step1Items.length > 0}
+          {#if !step1Complete}
           <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
             <div class="mb-2 flex items-center justify-between">
               <h3 class="text-base font-semibold text-gray-900 dark:text-white">
@@ -471,6 +472,7 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
               {step1Complete ? m['downloads.completed']() : currentStep === 1 ? m['downloads.downloading']() : m['downloads.downloadStep1']()}
             </button>
           </div>
+          {/if}
           {/if}
 
           <!-- Step 2: Model Files -->

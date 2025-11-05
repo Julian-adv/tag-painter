@@ -708,14 +708,14 @@
             >
               !
             </button>
+            <button
+              type="button"
+              class="self-start rounded px-2 py-1 text-xs font-medium text-blue-600 underline transition hover:text-blue-700"
+              onclick={openCustomNodesDialog}
+            >
+              {m['customNodes.install']()}
+            </button>
           {/if}
-          <button
-            type="button"
-            class="self-start rounded px-2 py-1 text-xs font-medium text-blue-600 underline transition hover:text-blue-700"
-            onclick={openCustomNodesDialog}
-          >
-            {m['customNodes.install']()}
-          </button>
         </div>
       </section>
     {/key}

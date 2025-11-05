@@ -4,6 +4,7 @@ export const FINAL_SAVE_NODE_ID = 'final_save_output' // Consistent ID for our d
 
 import type { ComfyUIWorkflow } from '$lib/types'
 import { deleteNodesByTitlePattern, findNodeByTitle } from './workflowMapping'
+import { resolveLoraNameForComfy } from '$lib/stores/loraStore'
 
 // Dynamic LoRA chain generation
 export function generateLoraChain(
@@ -51,10 +52,11 @@ export function generateLoraChain(
 
   selectedLoras.forEach((loraData, index) => {
     const nodeId = `lora_${index}_${Date.now()}`
+    const resolvedName = resolveLoraNameForComfy(loraData.name)
 
     workflow[nodeId] = {
       inputs: {
-        lora_name: loraData.name,
+        lora_name: resolvedName,
         strength_model: loraData.weight,
         strength_clip: loraData.weight,
         model: [previousModelNode, 0],

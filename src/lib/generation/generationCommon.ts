@@ -74,9 +74,13 @@ export function getEffectiveLoras(
   const seen = new Set<string>()
   const merged: { name: string; weight: number }[] = []
   for (const l of [...primary, ...secondary]) {
-    if (!seen.has(l.name)) {
-      seen.add(l.name)
-      merged.push({ name: l.name, weight: l.weight })
+    if (!l || typeof l.name !== 'string') {
+      continue
+    }
+    const normalizedName = l.name.replace(/\\/g, '/')
+    if (!seen.has(normalizedName)) {
+      seen.add(normalizedName)
+      merged.push({ name: normalizedName, weight: l.weight })
     }
   }
   return merged

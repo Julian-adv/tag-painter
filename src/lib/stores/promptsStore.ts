@@ -114,7 +114,13 @@ export function updateFaceDetailer(enabled: boolean) {
 }
 
 export function updateSelectedLoras(loras: { name: string; weight: number }[]) {
-  promptsData.update((data) => ({ ...data, selectedLoras: loras }))
+  const normalized = Array.isArray(loras)
+    ? loras.map((entry) => ({
+        ...entry,
+        name: typeof entry.name === 'string' ? entry.name.replace(/\\/g, '/') : entry.name
+      }))
+    : []
+  promptsData.update((data) => ({ ...data, selectedLoras: normalized }))
 }
 
 export function updateTags(
