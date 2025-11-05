@@ -120,7 +120,8 @@ If auto-download of `OpenPoseXL2.safetensors` fails, download it manually and pl
 ### Run Options
 
 - `-NoComfy`: Use your existing ComfyUI; skip install/start.
-- `-ComfyOnly`: Start only ComfyUI; do not launch Tag Painter.
+
+ComfyUI no longer starts automatically when running `scripts/start.ps1`; launch it from the in-app Custom Nodes dialog after installations finish.
 
 ## License
 

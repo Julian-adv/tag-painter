@@ -3,17 +3,15 @@ param(
   [string]$ComfyDir = "vendor\\ComfyUI",
   [switch]$OpenBrowser,
   [switch]$ForceCPU,
-  [switch]$ComfyOnly,
   [switch]$NoComfy,
   [switch]$Help
 )
 
 <#
-  Start ComfyUI + Node server
+  Prepare ComfyUI + start Node server
   - Detects NVIDIA GPU and picks run_nvidia_gpu.bat or run_cpu.bat for ComfyUI Portable
-  - Starts ComfyUI, waits for port 8188 to respond
+  - Ensures ComfyUI dependencies are installed (no automatic start)
   - Starts Node server (adapter-node build) on -Port (default 3000)
-  - Use -ComfyOnly flag to start only ComfyUI without the Node server
   - Use -NoComfy flag to skip ComfyUI installation and assume it's already running
 #>
 
@@ -34,7 +32,7 @@ trap {
 
 function Show-Help {
   Write-Host "Tag Painter - Start Script" -ForegroundColor Cyan
-  Write-Host "Starts ComfyUI and/or the Tag Painter web application" -ForegroundColor White
+  Write-Host "Prepares ComfyUI and starts the Tag Painter web application" -ForegroundColor White
   Write-Host ""
   Write-Host "USAGE:" -ForegroundColor Yellow
   Write-Host "  .\scripts\start.ps1 [OPTIONS]" -ForegroundColor White
@@ -44,14 +42,12 @@ function Show-Help {
   Write-Host "  -ComfyDir <path>   ComfyUI directory path (default: vendor\ComfyUI)" -ForegroundColor White
   Write-Host "  -OpenBrowser       Open browser automatically after starting" -ForegroundColor White
   Write-Host "  -ForceCPU          Force CPU mode for ComfyUI (disable GPU)" -ForegroundColor White
-  Write-Host "  -ComfyOnly         Start only ComfyUI without the web server" -ForegroundColor White
   Write-Host "  -NoComfy           Skip ComfyUI installation/startup (assume already running)" -ForegroundColor White
   Write-Host "  -Help              Show this help message" -ForegroundColor White
   Write-Host ""
   Write-Host "EXAMPLES:" -ForegroundColor Yellow
-  Write-Host "  .\scripts\start.ps1                    # Start both ComfyUI and web server" -ForegroundColor Gray
+  Write-Host "  .\scripts\start.ps1                    # Prepare ComfyUI and start web server" -ForegroundColor Gray
   Write-Host "  .\scripts\start.ps1 -Port 8080         # Use port 8080 for web server" -ForegroundColor Gray
-  Write-Host "  .\scripts\start.ps1 -ComfyOnly         # Start only ComfyUI" -ForegroundColor Gray
   Write-Host "  .\scripts\start.ps1 -NoComfy           # Skip ComfyUI, start only web server" -ForegroundColor Gray
   Write-Host "  .\scripts\start.ps1 -ForceCPU          # Use CPU mode for ComfyUI" -ForegroundColor Gray
   Write-Host ""
@@ -70,13 +66,6 @@ function Write-Header($text) {
 
 function New-DirectoryIfMissing($path) {
   if (-not (Test-Path $path)) { New-Item -ItemType Directory -Path $path | Out-Null }
-}
-
-function Test-Http($url) {
-  try {
-    $resp = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 2
-    return $resp.StatusCode -ge 200
-  } catch { return $false }
 }
 
 function Invoke-Bootstrap {
@@ -245,43 +234,6 @@ function Install-TorchCudaIfNeeded($venvPy) {
   return $cudaOk2
 }
 
-function Start-ComfyUI($dir, [switch]$Cpu) {
-  if (-not (Test-Path $dir)) {
-    Write-Host "ComfyUI not found at $dir" -ForegroundColor Yellow
-    return $null
-  }
-
-  # Try source install path using venv Python
-  $venvPy = Join-Path (Resolve-Path "vendor") "comfy-venv\\Scripts\\python.exe"
-  if (Test-Path $venvPy) {
-    Write-Host "Starting ComfyUI via venv python..." -ForegroundColor DarkCyan
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $venvPy
-    $extra = if ($Cpu) { " --cpu" } else { "" }
-        # Prevent ComfyUI from auto-opening a browser (windows-standalone-build enables it by default)
-        $psi.Arguments = ("-s main.py --windows-standalone-build --disable-auto-launch --listen 0.0.0.0 --enable-cors-header `"*`"" + $extra)
-    $psi.WorkingDirectory = (Resolve-Path $dir)
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardOutput = $false
-    $psi.RedirectStandardError = $false
-    $p = [System.Diagnostics.Process]::Start($psi)
-    return $p
-  }
-
-  Write-Host "No embedded or venv Python found for ComfyUI. Run scripts\\bootstrap.ps1 first." -ForegroundColor Yellow
-  return $null
-}
-
-function Wait-For-Port8188() {
-  Write-Host "Waiting for ComfyUI on http://127.0.0.1:8188 ..." -ForegroundColor DarkCyan
-  $max = 90
-  for ($i=0; $i -lt $max; $i++) {
-    if (Test-Http "http://127.0.0.1:8188/") { return $true }
-    Start-Sleep -Seconds 2
-  }
-  return $false
-}
-
 function Start-NodeServer($port) {
   $env:PORT = "$port"
   # Increase SvelteKit request body size limit (bytes) to allow PNG uploads
@@ -315,14 +267,6 @@ try {
   if ($Help) {
     Show-Help
     exit 0
-  }
-
-  # Validate conflicting parameters
-  if ($ComfyOnly -and $NoComfy) {
-    Write-Host "ERROR: -ComfyOnly and -NoComfy cannot be used together." -ForegroundColor Red
-    Write-Host ""
-    Show-Help
-    exit 1
   }
 
   Write-Header "Prerequisite check"
@@ -366,9 +310,9 @@ try {
 
   # Configure ComfyUI (source install only)
   $useCpu = $ForceCPU
-  $comfy = $null
 
   if (-not $NoComfy) {
+    Write-Header "Prepare ComfyUI"
     # Ensure ComfyUI + venv exist; run bootstrap (without building app) if missing
     $venvPy = Join-Path (Resolve-Path "vendor") "comfy-venv\\Scripts\\python.exe"
     $needsBootstrap = $false
@@ -379,7 +323,6 @@ try {
     }
 
     if ($needsBootstrap) {
-      Write-Header "Setting up ComfyUI (latest source)"
       Invoke-Bootstrap -bootstrapArgs @()
     }
 
@@ -420,48 +363,23 @@ try {
       }
     }
 
-    Write-Header "Start ComfyUI"
-    $comfy = Start-ComfyUI -dir $ComfyDir -Cpu:$useCpu
-    if (-not (Wait-For-Port8188)) {
-      Write-Host "ComfyUI did not respond on 8188 in time. You may still continue if starting manually." -ForegroundColor Yellow
-    }
+    Write-Host "ComfyUI environment ready. Install custom nodes and start ComfyUI from the application once downloads finish." -ForegroundColor Green
   } else {
     # NoComfy mode - assume ComfyUI is already running
     Write-Host "Skipping ComfyUI setup (NoComfy mode). Assuming ComfyUI is already running at http://127.0.0.1:8188" -ForegroundColor Yellow
   }
 
-  if ($ComfyOnly) {
-    # ComfyUI-only mode
-    if ($NoComfy) {
-      Write-Host "ComfyUI-only mode with NoComfy option. Assuming ComfyUI is already running at http://127.0.0.1:8188" -ForegroundColor Green
-    } elseif ($comfy) {
-      Write-Host "ComfyUI PID: $($comfy.Id)" -ForegroundColor Green
-      Write-Host "ComfyUI is running at http://127.0.0.1:8188" -ForegroundColor Cyan
-    } else {
-      Write-Host "ComfyUI not started (portable scripts or venv python missing)" -ForegroundColor Yellow
-    }
-    Write-Host "Press Ctrl+C to stop ComfyUI (or close the console)." -ForegroundColor Yellow
+  Write-Header "Start App Server"
+  $app = Start-NodeServer -port $Port
+
+  Start-Process "http://127.0.0.1:$Port"
+
+  if ($app) {
+    Write-Host "App server PID: $($app.Id)" -ForegroundColor Green
   } else {
-    # Full mode with app server
-    Write-Header "Start App Server"
-    $app = Start-NodeServer -port $Port
-
-    Start-Process "http://127.0.0.1:$Port"
-
-    if ($NoComfy) {
-      Write-Host "ComfyUI: Assuming already running at http://127.0.0.1:8188" -ForegroundColor Green
-    } elseif ($comfy) {
-      Write-Host "ComfyUI PID: $($comfy.Id)" -ForegroundColor Green
-    } else {
-      Write-Host "ComfyUI not started (portable scripts or venv python missing)" -ForegroundColor Yellow
-    }
-    if ($app) {
-      Write-Host "App server PID: $($app.Id)" -ForegroundColor Green
-    } else {
-      Write-Host "App server not started" -ForegroundColor Yellow
-    }
-    Write-Host "Press Ctrl+C to stop (or close the console)." -ForegroundColor Yellow
+    Write-Host "App server not started" -ForegroundColor Yellow
   }
+  Write-Host "Press Ctrl+C to stop (or close the console)." -ForegroundColor Yellow
 
   # Keep foreground process alive while children run
   while ($true) { Start-Sleep -Seconds 3600 }

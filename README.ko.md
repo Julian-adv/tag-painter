@@ -120,7 +120,8 @@ Tag Painter는 ComfyUI와 연동되는 SvelteKit 기반 웹 애플리케이션�
 ### 실행 옵션
 
 - `-NoComfy`: 사용자가 이미 설치/실행 중인 ComfyUI를 그대로 사용합니다. ComfyUI 설치/시작을 건너뜁니다.
-- `-ComfyOnly`: Tag Painter는 실행하지 않고 ComfyUI만 실행합니다.
+
+`scripts/start.ps1` 실행 시 ComfyUI는 자동으로 시작되지 않습니다. 커스텀 노드 설치를 마친 뒤 애플리케이션 내 커스텀 노드 대화상자에서 ComfyUI를 시작해주세요.
 
 ## Chroma 워크플로 타이틀
 
