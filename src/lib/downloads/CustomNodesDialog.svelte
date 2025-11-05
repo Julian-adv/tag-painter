@@ -34,9 +34,9 @@
       ? 0
       : Math.round((installProgress.completed / installProgress.total) * 100)
   )
-  let restarting = $state(false)
-  let restartError = $state('')
-  let restartSuccess = $state(false)
+  let starting = $state(false)
+  let startError = $state('')
+  let startSuccess = $state(false)
 
   function handleBackdropClick(event: MouseEvent) {
     if (event.target === event.currentTarget) {
@@ -59,8 +59,8 @@
   async function loadItems() {
     loading = true
     lastResult = null
-    restartError = ''
-    restartSuccess = false
+    startError = ''
+    startSuccess = false
     try {
       const res = await fetch('/api/downloads?category=custom-node&onlyMissing=1')
       const data = await res.json()
@@ -92,8 +92,8 @@
 
     installing = true
     lastResult = null
-    restartError = ''
-    restartSuccess = false
+    startError = ''
+    startSuccess = false
     installProgress = { total: items.length, completed: 0, current: '' }
 
     const ok: DownloadResultItem[] = []
@@ -167,15 +167,15 @@
     await loadItems()
   }
 
-  async function restartComfy() {
-    if (restarting) {
+  async function startComfy() {
+    if (starting) {
       return
     }
-    restarting = true
-    restartError = ''
-    restartSuccess = false
+    starting = true
+    startError = ''
+    startSuccess = false
     try {
-      const res = await fetch('/api/comfy/restart', { method: 'POST' })
+      const res = await fetch('/api/comfy/start', { method: 'POST' })
       let data: unknown = null
       try {
         data = await res.json()
@@ -187,11 +187,11 @@
         const msg = typeof record['error'] === 'string' ? record['error'] : `HTTP ${res.status}`
         throw new Error(msg)
       }
-      restartSuccess = true
+      startSuccess = true
     } catch (err: unknown) {
-      restartError = err instanceof Error ? err.message : String(err)
+      startError = err instanceof Error ? err.message : String(err)
     } finally {
-      restarting = false
+      starting = false
     }
   }
 
@@ -214,7 +214,7 @@
     aria-labelledby="custom-nodes-title"
     tabindex="-1"
   >
-    <div class="mx-4 w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+    <div class="mx-4 w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
       <div class="mb-4 flex items-center justify-between">
         <h2 id="custom-nodes-title" class="text-xl font-semibold text-gray-900 dark:text-white">
           {m['customNodes.installRequired']()}
@@ -234,29 +234,28 @@
       <div class="space-y-4">
         <div class="rounded-lg bg-gray-50 p-3 text-sm text-gray-700 dark:bg-gray-700 dark:text-gray-200">
           <p>
-            Tag Painter requires the ComfyUI custom nodes listed below. Would you like to download and install them automatically?
-            Restart ComfyUI after installation finishes.
+            {m['customNodes.description']()}
           </p>
         </div>
 
         {#if loading}
-          <div class="text-sm text-gray-500">커스텀 노드 목록을 불러오는 중...</div>
+          <div class="text-sm text-gray-500">{m['customNodes.loading']()}</div>
         {:else}
           {#if items.length === 0}
             <div class="space-y-3">
               <div class="rounded border border-green-300 bg-green-50 p-3 text-sm text-green-800 dark:border-green-600/40 dark:bg-green-900/40 dark:text-green-100">
-                All required custom nodes are installed.
+                {m['customNodes.allInstalled']()}
               </div>
               <div class="rounded border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
-                Restart ComfyUI to load the newly installed nodes.
+                {m['customNodes.startPrompt']()}
               </div>
-              {#if restartSuccess}
+              {#if startSuccess}
                 <div class="rounded border border-green-200 bg-green-50 p-2 text-xs text-green-700 dark:border-green-500/40 dark:bg-green-900/40 dark:text-green-200">
-                  ComfyUI restarted successfully.
+                  {m['customNodes.startSuccess']()}
                 </div>
-              {:else if restartError}
+              {:else if startError}
                 <div class="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700 dark:border-red-500/40 dark:bg-red-900/40 dark:text-red-200">
-                  {restartError}
+                  {startError}
                 </div>
               {/if}
             </div>
@@ -265,15 +264,15 @@
               <table class="w-full text-left text-xs">
                 <thead class="bg-gray-100 text-gray-700">
                   <tr>
-                    <th class="px-2 py-1">이름</th>
-                    <th class="px-2 py-1">경로</th>
+                    <th class="px-2 py-1">{m['customNodes.nameHeader']()}</th>
+                    <th class="px-2 py-1">{m['customNodes.pathHeader']()}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {#each items as it}
                     <tr class="border-t">
                       <td class="px-2 py-1 whitespace-nowrap">{it.label || it.filename}</td>
-                      <td class="px-2 py-1 text-xs text-gray-600 dark:text-gray-300">{it.dest}</td>
+                      <td class="px-2 py-1 text-xs text-gray-600 dark:text-gray-300">{it.urls[0] || it.dest}</td>
                     </tr>
                   {/each}
                 </tbody>
@@ -285,7 +284,7 @@
         {#if installing}
           <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
             <div class="flex items-center justify-between">
-              <span>{installProgress.current || '설치 준비 중...'}</span>
+              <span>{installProgress.current || m['customNodes.installing']()}</span>
               <span>{progressPercent}%</span>
             </div>
             <div class="mt-2 h-2 rounded bg-blue-100 dark:bg-blue-800">
@@ -299,7 +298,7 @@
 
         {#if lastResult}
           <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
-            <div>성공: {lastResult.ok.length}, 실패: {lastResult.failed.length}</div>
+            <div>{m['customNodes.successCount']({ ok: lastResult.ok.length, failed: lastResult.failed.length })}</div>
             {#if lastResult.failed.length > 0}
               <ul class="mt-1 list-disc pl-5 text-red-600">
                 {#each lastResult.failed as f}
@@ -319,21 +318,21 @@
             onclick={installAll}
             disabled={installing || loading}
           >
-            {installing ? '설치 중...' : '자동 설치'}
+            {installing ? m['customNodes.installing']() : m['customNodes.autoInstall']()}
           </button>
         {:else}
           <button
             type="button"
             class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-            onclick={restartSuccess ? continueToDownloads : restartComfy}
-            disabled={restarting}
+            onclick={startSuccess ? continueToDownloads : startComfy}
+            disabled={starting}
           >
-            {#if restartSuccess}
-              Continue to downloads
-            {:else if restarting}
-              Restarting...
+            {#if startSuccess}
+              {m['customNodes.continue']()}
+            {:else if starting}
+              {m['customNodes.starting']()}
             {:else}
-              Restart ComfyUI
+              {m['customNodes.start']()}
             {/if}
           </button>
         {/if}
@@ -342,7 +341,7 @@
           class="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
           onclick={handleClose}
         >
-          닫기
+          {m['customNodes.close']()}
         </button>
       </div>
     </div>

@@ -3,7 +3,6 @@ import { spawn } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { findComfyPython, getComfyDir } from '$lib/server/comfy'
 
-const SHUTDOWN_WAIT_SECONDS = 20
 const STARTUP_WAIT_SECONDS = 45
 const COMFY_URL = 'http://127.0.0.1:8188/'
 
@@ -24,24 +23,6 @@ async function isComfyAvailable(): Promise<boolean> {
   }
 }
 
-async function requestShutdown(): Promise<void> {
-  try {
-    await fetch(`${COMFY_URL}shutdown`, { method: 'POST', signal: AbortSignal.timeout(3000) })
-  } catch {
-    // Ignore network errors; we'll continue with best-effort shutdown.
-  }
-}
-
-async function waitForComfyToStop(): Promise<void> {
-  for (let i = 0; i < SHUTDOWN_WAIT_SECONDS; i += 1) {
-    const alive = await isComfyAvailable()
-    if (!alive) {
-      return
-    }
-    await delay(1000)
-  }
-}
-
 async function waitForComfyToStart(): Promise<boolean> {
   for (let i = 0; i < STARTUP_WAIT_SECONDS; i += 1) {
     const alive = await isComfyAvailable()
@@ -55,8 +36,13 @@ async function waitForComfyToStart(): Promise<boolean> {
 
 export const POST: RequestHandler = async () => {
   try {
-    await requestShutdown()
-    await waitForComfyToStop()
+    // Check if ComfyUI is already running
+    const alreadyRunning = await isComfyAvailable()
+    if (alreadyRunning) {
+      return new Response(JSON.stringify({ success: true, message: 'ComfyUI is already running' }), {
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
 
     const python = await findComfyPython()
     if (!python) {
@@ -68,6 +54,7 @@ export const POST: RequestHandler = async () => {
 
     const comfyDir = getComfyDir()
     const args = buildArgs()
+    // Inherit stdout/stderr so ComfyUI logs surface in the existing console session
     const child = spawn(python, args, {
       cwd: comfyDir,
       stdio: ['ignore', 'inherit', 'inherit']

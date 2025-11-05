@@ -253,6 +253,7 @@
     // Model type changed - apply defaults for the new type
     const defaults = MODEL_TYPE_DEFAULTS[currentModelType]
     if (defaults) {
+      const nextLoras = defaults.loras ? defaults.loras.map((entry) => ({ ...entry })) : []
       localSettings = {
         ...localSettings,
         perModel: {
@@ -267,7 +268,9 @@
             qualityPrefix: defaults.qualityPrefix,
             negativePrefix: defaults.negativePrefix,
             wildcardsFile: defaults.wildcardsFile,
-            selectedVae: '__embedded__'
+            selectedVae: defaults.selectedVae ?? '__embedded__',
+            customWorkflowPath: defaults.customWorkflowPath ?? currentSettings.customWorkflowPath,
+            loras: nextLoras
           }
         }
       }

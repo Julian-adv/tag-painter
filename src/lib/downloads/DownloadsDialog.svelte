@@ -17,18 +17,34 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
   }
 
   let { isOpen = $bindable(), onClose }: Props = $props()
-  let items = $state<DownloadItem[]>([])
+  let allItems = $state<DownloadItem[]>([])
   let loading = $state(false)
   let downloading = $state(false)
-  let lastResult: DownloadSummary | null = $state(null)
+  let currentStep = $state<1 | 2 | null>(null)
+  let step1Result: DownloadSummary | null = $state(null)
+  let step2Result: DownloadSummary | null = $state(null)
   let downloadProgress = $state({ total: 0, completed: 0, current: '', currentLabel: '' })
   let currentFile = $state({ filename: '', label: '', received: 0, total: 0 })
   let currentMessage = $state('')
+
+  function isLargeModelFile(item: DownloadItem): boolean {
+    const dest = item.dest.toLowerCase().replace(/\\/g, '/')
+    return dest.includes('checkpoints/') ||
+           dest.includes('diffusion_models/') ||
+           dest.includes('loras/')
+  }
+
+  const step1Items = $derived(allItems.filter(item => !isLargeModelFile(item)))
+  const step2Items = $derived(allItems.filter(item => isLargeModelFile(item)))
+
   function isDownloadSuccess(value: DownloadSummary | null): value is DownloadSummary {
     return value !== null && value.success && value.failed.length === 0
   }
 
-  const downloadsSuccessful = $derived(isDownloadSuccess(lastResult))
+  const step1Complete = $derived(isDownloadSuccess(step1Result))
+  const step2Complete = $derived(isDownloadSuccess(step2Result))
+  const allComplete = $derived(step1Complete && step2Complete)
+
   const progressPercent = $derived(
     downloadProgress.total === 0
       ? 0
@@ -48,7 +64,7 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
     }
     isOpen = false
     if (onClose) {
-      onClose({ success: isDownloadSuccess(lastResult) })
+      onClose({ success: allComplete })
     }
   }
 
@@ -62,7 +78,6 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
   }
 
   function handleBackdropClick(event: MouseEvent) {
-    // Only close if clicking exactly on the backdrop (not bubbled from children)
     if (event.target === event.currentTarget) {
       closeDialog()
     }
@@ -72,42 +87,49 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
     closeDialog()
   }
 
-  // External links removed per simplified flow
-
   async function loadItems() {
     loading = true
-    lastResult = null
+    step1Result = null
+    step2Result = null
+    currentStep = null
     try {
       const res = await fetch('/api/downloads')
       const data = await res.json()
       if (Array.isArray(data?.items)) {
-        items = (data.items as DownloadItem[]).filter(
+        allItems = (data.items as DownloadItem[]).filter(
           (entry) => entry.category !== 'custom-node'
         )
       } else {
-        items = []
+        allItems = []
       }
     } catch (e) {
-      items = []
+      allItems = []
     } finally {
       loading = false
     }
   }
 
-  async function downloadAll() {
+  async function downloadStep(step: 1 | 2) {
     if (downloading) return
+    const items = step === 1 ? step1Items : step2Items
     if (items.length === 0) {
-      lastResult = { success: true, ok: [], failed: [] }
+      if (step === 1) {
+        step1Result = { success: true, ok: [], failed: [] }
+      } else {
+        step2Result = { success: true, ok: [], failed: [] }
+      }
       return
     }
+
     downloading = true
-    lastResult = null
+    currentStep = step
     downloadProgress = { total: items.length, completed: 0, current: '', currentLabel: '' }
     currentFile = { filename: '', label: '', received: 0, total: 0 }
     currentMessage = ''
     const ok: DownloadResultItem[] = []
     const failed: DownloadFailedItem[] = []
     let summary: DownloadSummary | null = null
+
     try {
       const targetFilenames = items.map((item) => item.filename)
       const res = await fetch('/api/downloads', {
@@ -119,7 +141,12 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         const message = typeof (data as any)?.error === 'string' ? (data as any).error : `HTTP ${res.status}`
-        lastResult = { success: false, ok: [], failed: [{ filename: '__request__', error: message }] }
+        const result = { success: false, ok: [], failed: [{ filename: '__request__', error: message }] }
+        if (step === 1) {
+          step1Result = result
+        } else {
+          step2Result = result
+        }
         return
       }
 
@@ -131,10 +158,15 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
         const resFailed = Array.isArray(record['failed'])
           ? (record['failed'] as DownloadFailedItem[])
           : []
-        lastResult = {
+        const result = {
           success: !!record['success'],
           ok: resOk,
           failed: resFailed
+        }
+        if (step === 1) {
+          step1Result = result
+        } else {
+          step2Result = result
         }
         downloadProgress.completed = resOk.length + resFailed.length
         return
@@ -267,19 +299,26 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
         }
       }
 
-      if (summary) {
-        lastResult = summary
+      const result = summary ? summary : { success: failed.length === 0, ok, failed }
+      if (step === 1) {
+        step1Result = result
       } else {
-        lastResult = { success: failed.length === 0, ok, failed }
+        step2Result = result
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
       if (failed.length === 0) {
         failed.push({ filename: '__request__', error: message })
       }
-      lastResult = { success: false, ok, failed }
+      const result = { success: false, ok, failed }
+      if (step === 1) {
+        step1Result = result
+      } else {
+        step2Result = result
+      }
     } finally {
       downloading = false
+      currentStep = null
       downloadProgress.current = ''
       downloadProgress.currentLabel = ''
       currentFile = { filename: '', label: '', received: 0, total: 0 }
@@ -290,8 +329,6 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
   $effect(() => {
     if (isOpen) void loadItems()
   })
-
-  // Folder open flow removed
 </script>
 
 {#if isOpen}
@@ -301,16 +338,16 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
     onkeydown={(e) => e.key === 'Escape' && handleClose()}
     role="dialog"
     aria-modal="true"
-    aria-labelledby="no-checkpoints-title"
+    aria-labelledby="downloads-title"
     tabindex="-1"
   >
     <div
-      class="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800"
+      class="mx-4 w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800"
       role="document"
     >
       <div class="mb-4 flex items-center justify-between">
-        <h2 id="no-checkpoints-title" class="text-xl font-semibold text-gray-900 dark:text-white">
-          {downloadsSuccessful ? 'Downloads completed.' : 'We will download the required files.'}
+        <h2 id="downloads-title" class="text-xl font-semibold text-gray-900 dark:text-white">
+          {allComplete ? m['downloads.titleCompleted']() : m['downloads.title']()}
         </h2>
         <button
           type="button"
@@ -330,120 +367,225 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
       </div>
 
       <div class="space-y-4">
-        <div
-          class={`rounded-lg p-3 text-sm ${
-            downloadsSuccessful
-              ? 'bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-200'
-              : 'bg-gray-50 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
-          }`}
-        >
-          <p>
-            {downloadsSuccessful
-              ? 'Downloads completed.'
-              : 'The files listed below will be downloaded automatically.'}
-          </p>
-        </div>
-
         {#if loading}
-          <div class="text-sm text-gray-500">Loading download list...</div>
+          <div class="text-sm text-gray-500">{m['downloads.loading']()}</div>
         {:else}
-          <div class="max-h-60 overflow-auto rounded border border-gray-200">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-gray-100 text-gray-700">
-                <tr>
-                  <th class="px-2 py-1">File</th>
-                  <th class="px-2 py-1">URL</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each items as it}
-                  <tr class="border-t">
-                    <td class="px-2 py-1 whitespace-nowrap">{it.filename}</td>
-                    <td class="px-2 py-1 truncate text-blue-600"><a href={it.urls?.[0]} target="_blank" rel="noreferrer">{it.urls?.[0]}</a></td>
-                  </tr>
-                {/each}
-                {#if items.length === 0}
-                  <tr>
-                    <td class="px-2 py-2 text-gray-500" colspan="2">No items.</td>
-                  </tr>
-                {/if}
-              </tbody>
-            </table>
-          </div>
-        {/if}
+          <!-- Step 1: Essential Files -->
+          {#if !step1Complete || step1Items.length > 0}
+          <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+                {m['downloads.step1Title']()}
+              </h3>
+              {#if step1Complete}
+                <span class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200">
+                  {m['downloads.completed']()}
+                </span>
+              {:else}
+                <span class="text-xs text-gray-500">
+                  {m['downloads.filesCount']({ count: step1Items.length })}
+                </span>
+              {/if}
+            </div>
+            <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+              {m['downloads.step1Description']()}
+            </p>
 
-        {#if downloading}
-          <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
-            <div class="flex items-center justify-between gap-3">
-              <span class="truncate">
-                {downloadProgress.currentLabel || 'Preparing download...'}
-              </span>
-              <span class="text-right text-[11px] text-blue-700 dark:text-blue-200">
-                {#if currentFile.total > 0}
-                  {formatBytes(currentFile.received)} / {formatBytes(currentFile.total)} ({currentFilePercent}%)
-                {:else if currentFile.received > 0}
-                  {formatBytes(currentFile.received)}
-                {:else}
-                  {progressPercent}%
-                {/if}
-              </span>
-            </div>
-            <div class="mt-2 h-2 rounded bg-blue-100 dark:bg-blue-800">
-              <div
-                class={`h-full rounded bg-blue-600 transition-all ${currentFile.total === 0 ? 'animate-pulse opacity-60' : ''}`}
-                style={`width: ${currentFile.total > 0 ? currentFilePercent : 100}%`}
-              ></div>
-            </div>
-            {#if currentMessage}
-              <div class="mt-2 text-[11px] text-blue-700 dark:text-blue-200">
-                {currentMessage}
+            {#if step1Items.length > 0}
+              <div class="mb-3 max-h-40 overflow-auto rounded border border-gray-200">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-gray-100 text-gray-700">
+                    <tr>
+                      <th class="px-2 py-1">{m['downloads.fileHeader']()}</th>
+                      <th class="px-2 py-1">{m['downloads.urlHeader']()}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each step1Items as it}
+                      <tr class="border-t">
+                        <td class="px-2 py-1 whitespace-nowrap">{it.filename}</td>
+                        <td class="px-2 py-1 truncate text-blue-600"><a href={it.urls?.[0]} target="_blank" rel="noreferrer">{it.urls?.[0]}</a></td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
               </div>
             {/if}
-            <div class="mt-1 text-right text-[11px] text-blue-700 dark:text-blue-200">
-              {downloadProgress.completed} / {downloadProgress.total}
-            </div>
-          </div>
-        {/if}
-        <!-- Removed installation path and other guidance per simplified dialog -->
 
-        {#if lastResult}
-          <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
-            <div>Downloaded: {lastResult.ok.length}, Failed: {lastResult.failed.length}</div>
-            {#if lastResult.failed.length > 0}
-              <ul class="mt-1 list-disc pl-5 text-red-600">
-                {#each lastResult.failed as f}
-                  <li>{f.filename}{f.error ? ` - ${f.error}` : ''}</li>
-                {/each}
-              </ul>
+            {#if currentStep === 1 && downloading}
+              <div class="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="truncate">
+                    {downloadProgress.currentLabel || 'Preparing download...'}
+                  </span>
+                  <span class="text-right text-[11px] text-blue-700 dark:text-blue-200">
+                    {#if currentFile.total > 0}
+                      {formatBytes(currentFile.received)} / {formatBytes(currentFile.total)} ({currentFilePercent}%)
+                    {:else if currentFile.received > 0}
+                      {formatBytes(currentFile.received)}
+                    {:else}
+                      {progressPercent}%
+                    {/if}
+                  </span>
+                </div>
+                <div class="mt-2 h-2 rounded bg-blue-100 dark:bg-blue-800">
+                  <div
+                    class={`h-full rounded bg-blue-600 transition-all ${currentFile.total === 0 ? 'animate-pulse opacity-60' : ''}`}
+                    style={`width: ${currentFile.total > 0 ? currentFilePercent : 100}%`}
+                  ></div>
+                </div>
+                {#if currentMessage}
+                  <div class="mt-2 text-[11px] text-blue-700 dark:text-blue-200">
+                    {currentMessage}
+                  </div>
+                {/if}
+                <div class="mt-1 text-right text-[11px] text-blue-700 dark:text-blue-200">
+                  {downloadProgress.completed} / {downloadProgress.total}
+                </div>
+              </div>
             {/if}
-          </div>
-        {/if}
 
-        <!-- Removed next steps warning block -->
+            {#if step1Result}
+              <div class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                <div>{m['downloads.successCount']({ ok: step1Result.ok.length, failed: step1Result.failed.length })}</div>
+                {#if step1Result.failed.length > 0}
+                  <ul class="mt-1 list-disc pl-5 text-red-600">
+                    {#each step1Result.failed as f}
+                      <li>{f.filename}{f.error ? ` - ${f.error}` : ''}</li>
+                    {/each}
+                  </ul>
+                {/if}
+              </div>
+            {/if}
+
+            <button
+              type="button"
+              class={`w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                step1Complete
+                  ? 'bg-green-200 text-green-700 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              } disabled:opacity-50`}
+              onclick={() => downloadStep(1)}
+              disabled={downloading || loading || step1Complete}
+            >
+              {step1Complete ? m['downloads.completed']() : currentStep === 1 ? m['downloads.downloading']() : m['downloads.downloadStep1']()}
+            </button>
+          </div>
+          {/if}
+
+          <!-- Step 2: Model Files -->
+          {#if step1Complete}
+          <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+            <div class="mb-2 flex items-center justify-between">
+              <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+                {m['downloads.step2Title']()}
+              </h3>
+              {#if step2Complete}
+                <span class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200">
+                  {m['downloads.completed']()}
+                </span>
+              {:else}
+                <span class="text-xs text-gray-500">
+                  {m['downloads.filesCount']({ count: step2Items.length })}
+                </span>
+              {/if}
+            </div>
+            <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+              {m['downloads.step2Description']()}
+            </p>
+
+            {#if step2Items.length > 0}
+              <div class="mb-3 max-h-40 overflow-auto rounded border border-gray-200">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-gray-100 text-gray-700">
+                    <tr>
+                      <th class="px-2 py-1">{m['downloads.fileHeader']()}</th>
+                      <th class="px-2 py-1">{m['downloads.urlHeader']()}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each step2Items as it}
+                      <tr class="border-t">
+                        <td class="px-2 py-1 whitespace-nowrap">{it.filename}</td>
+                        <td class="px-2 py-1 truncate text-blue-600"><a href={it.urls?.[0]} target="_blank" rel="noreferrer">{it.urls?.[0]}</a></td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+            {/if}
+
+            {#if currentStep === 2 && downloading}
+              <div class="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
+                <div class="flex items-center justify-between gap-3">
+                  <span class="truncate">
+                    {downloadProgress.currentLabel || 'Preparing download...'}
+                  </span>
+                  <span class="text-right text-[11px] text-blue-700 dark:text-blue-200">
+                    {#if currentFile.total > 0}
+                      {formatBytes(currentFile.received)} / {formatBytes(currentFile.total)} ({currentFilePercent}%)
+                    {:else if currentFile.received > 0}
+                      {formatBytes(currentFile.received)}
+                    {:else}
+                      {progressPercent}%
+                    {/if}
+                  </span>
+                </div>
+                <div class="mt-2 h-2 rounded bg-blue-100 dark:bg-blue-800">
+                  <div
+                    class={`h-full rounded bg-blue-600 transition-all ${currentFile.total === 0 ? 'animate-pulse opacity-60' : ''}`}
+                    style={`width: ${currentFile.total > 0 ? currentFilePercent : 100}%`}
+                  ></div>
+                </div>
+                {#if currentMessage}
+                  <div class="mt-2 text-[11px] text-blue-700 dark:text-blue-200">
+                    {currentMessage}
+                  </div>
+                {/if}
+                <div class="mt-1 text-right text-[11px] text-blue-700 dark:text-blue-200">
+                  {downloadProgress.completed} / {downloadProgress.total}
+                </div>
+              </div>
+            {/if}
+
+            {#if step2Result}
+              <div class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                <div>{m['downloads.successCount']({ ok: step2Result.ok.length, failed: step2Result.failed.length })}</div>
+                {#if step2Result.failed.length > 0}
+                  <ul class="mt-1 list-disc pl-5 text-red-600">
+                    {#each step2Result.failed as f}
+                      <li>{f.filename}{f.error ? ` - ${f.error}` : ''}</li>
+                    {/each}
+                  </ul>
+                {/if}
+              </div>
+            {/if}
+
+            <button
+              type="button"
+              class={`w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                step2Complete
+                  ? 'bg-green-200 text-green-700 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              } disabled:opacity-50`}
+              onclick={() => downloadStep(2)}
+              disabled={downloading || loading || step2Complete}
+            >
+              {step2Complete ? m['downloads.completed']() : currentStep === 2 ? m['downloads.downloading']() : m['downloads.downloadStep2']()}
+            </button>
+          </div>
+          {/if}
+        {/if}
       </div>
 
-      <div class="mt-6 flex justify-end">
-        <div class="flex gap-2">
-          <button
-            type="button"
-            class={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              downloadsSuccessful
-                ? 'bg-blue-200 text-blue-700 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            } disabled:opacity-50`}
-            onclick={downloadAll}
-            disabled={downloading || loading || downloadsSuccessful}
-          >
-            {downloadsSuccessful ? 'Download' : downloading ? 'Downloading...' : 'Download'}
-          </button>
-          <button
-            type="button"
-            class="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
-            onclick={handleClose}
-          >
-            {m['noCheckpoints.gotIt']()}
-          </button>
-        </div>
+      <div class="mt-6 flex justify-end gap-2">
+        <button
+          type="button"
+          class="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+          onclick={handleClose}
+        >
+          {m['downloads.close']()}
+        </button>
       </div>
     </div>
   </div>

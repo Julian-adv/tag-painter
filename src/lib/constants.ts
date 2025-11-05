@@ -50,39 +50,57 @@ export const MODEL_TYPE_DEFAULTS = {
     sampler: 'euler_ancestral',
     scheduler: 'simple',
     clipSkip: 2,
-    qualityPrefix: '',
-    negativePrefix: '',
-    wildcardsFile: 'wildcards.yaml'
+    qualityPrefix:
+      '(masterpiece, best quality, highres, photorealistic, cinematic tone, highly detailed, aesthetic, real skin, soft lighting, natural depth of field, film grain, glossy color grading, luxurious and upscale scene, elegant composition, korean fashion photography style, refined attitude, glamorous atmosphere, soft light leaks, cool tone)',
+    negativePrefix:
+      '(worst quality, low quality, 2d, anime, cartoon, illustration, 3d render, cgi, waxy skin, plastic texture, oily reflection, distorted body, deformed eyes, bad anatomy, extra fingers, text, logo, watermark)',
+    wildcardsFile: 'wildcards.yaml',
+    customWorkflowPath: 'sdxl.api.workflow.json',
+    selectedVae: 'fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors'
   },
   qwen: {
     cfgScale: 1.0,
-    steps: 20,
+    steps: 8,
     sampler: 'euler',
-    scheduler: 'simple',
+    scheduler: 'normal',
     clipSkip: 1,
-    qualityPrefix: '',
-    negativePrefix: '',
-    wildcardsFile: 'wildcards_qwen.yaml'
+    qualityPrefix:
+      'cinematic lighting, ray tracing reflections, depth of field, ultra detailed textures, 8k resolution, hyperrealistic, dramatic composition',
+    negativePrefix:
+      'paintings, cartoon, rendered, anime,embedding:SmoothNegative_Hands-neg, embedding:Smooth_Negative-neg,  sketches, (worst quality:2), (low quality:2), (normal quality:2),freckles, (facial wrinkles:1.4), (old girl:1.4),(Cleft Chin:1.4)',
+    wildcardsFile: 'wildcards.qwen.yaml',
+    customWorkflowPath: 'qwen-default.api.workflow.json',
+    selectedVae: 'qwen_image_vae.safetensors',
+    loras: [
+      {
+        name: 'qwen/Qwen-Image-Lightning-8steps-V1.1.safetensors',
+        weight: 1
+      }
+    ]
   },
   chroma: {
     cfgScale: 3.5,
     steps: 20,
     sampler: 'euler',
     scheduler: 'simple',
-    clipSkip: 2,
+    clipSkip: 1,
     qualityPrefix: '',
     negativePrefix: '',
-    wildcardsFile: 'wildcards.yaml'
+    wildcardsFile: 'wildcards.qwen.yaml',
+    customWorkflowPath: 'chroma.api.workflow.json',
+    selectedVae: 'ae.safetensors'
   },
   flux1_krea: {
     cfgScale: 1.0,
     steps: 20,
     sampler: 'euler',
-    scheduler: 'simple',
+    scheduler: 'beta',
     clipSkip: 1,
     qualityPrefix: '',
     negativePrefix: '',
-    wildcardsFile: 'wildcards.yaml'
+    wildcardsFile: 'wildcards.qwen.yaml',
+    customWorkflowPath: 'flux1_krea.api.workflow.json',
+    selectedVae: 'ae.safetensors'
   }
 } as const
 
