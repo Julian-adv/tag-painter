@@ -1,20 +1,23 @@
 import { findNodeByTitle } from './workflowMapping'
 import type { ComfyUIWorkflow, LoraWithWeight } from '$lib/types'
-import { resolveLoraNameForComfy } from '$lib/stores/loraStore'
+import { normalizeLoraPathForComfy } from '$lib/utils/loraPath'
 
-export function applyQwenNunchakuLoraChain(workflow: ComfyUIWorkflow, loras: LoraWithWeight[]): string | null {
-	const nunchakuNode = findNodeByTitle(workflow, 'Nunchaku Qwen Image LoRA Stack')
-	if (!nunchakuNode) {
-		return 'Nunchaku Qwen Image LoRA Stack node not found in workflow'
-	}
+export function applyQwenNunchakuLoraChain(
+  workflow: ComfyUIWorkflow,
+  loras: LoraWithWeight[]
+): string | null {
+  const nunchakuNode = findNodeByTitle(workflow, 'Nunchaku Qwen Image LoRA Stack')
+  if (!nunchakuNode) {
+    return 'Nunchaku Qwen Image LoRA Stack node not found in workflow'
+  }
 
-	const nodeId = nunchakuNode.nodeId
-	workflow[nodeId].inputs.lora_count = loras.length
+  const nodeId = nunchakuNode.nodeId
+  workflow[nodeId].inputs.lora_count = loras.length
 
-	for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 10; i++) {
     if (i < loras.length) {
       const lora = loras[i]
-      const resolvedName = resolveLoraNameForComfy(lora.name)
+      const resolvedName = normalizeLoraPathForComfy(lora.name)
       workflow[nodeId].inputs[`lora_name_${i + 1}`] = resolvedName
       workflow[nodeId].inputs[`lora_strength_${i + 1}`] = lora.weight
     } else {
@@ -22,9 +25,9 @@ export function applyQwenNunchakuLoraChain(workflow: ComfyUIWorkflow, loras: Lor
       workflow[nodeId].inputs[`lora_name_${i + 1}`] = 'None'
       workflow[nodeId].inputs[`lora_strength_${i + 1}`] = 0
     }
-	}
+  }
 
-	return null
+  return null
 }
 
 export function attachLoraChainBetweenNodes(
@@ -66,7 +69,7 @@ export function attachLoraChainBetweenNodes(
       throw new Error(`Workflow already contains node with id: ${nodeId}`)
     }
 
-    const resolvedName = resolveLoraNameForComfy(lora.name)
+    const resolvedName = normalizeLoraPathForComfy(lora.name)
 
     workflow[nodeId] = {
       inputs: {

@@ -26,6 +26,7 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
   let downloadProgress = $state({ total: 0, completed: 0, current: '', currentLabel: '' })
   let currentFile = $state({ filename: '', label: '', received: 0, total: 0 })
   let currentMessage = $state('')
+  let progressTransition = $state(true)
 
   function isLargeModelFile(item: DownloadItem): boolean {
     const dest = item.dest.toLowerCase().replace(/\\/g, '/')
@@ -184,8 +185,12 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
             const label = typeof event.label === 'string' && event.label.length > 0 ? event.label : filename
             downloadProgress.current = filename
             downloadProgress.currentLabel = label
+            // Disable transition temporarily when switching files
+            progressTransition = false
             currentFile = { filename, label, received: 0, total: 0 }
             currentMessage = ''
+            // Re-enable transition after a brief delay
+            setTimeout(() => { progressTransition = true }, 50)
             break
           }
           case 'file-progress': {
@@ -371,7 +376,6 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
           <div class="text-sm text-gray-500">{m['downloads.loading']()}</div>
         {:else}
           <!-- Step 1: Essential Files -->
-          {#if !step1Complete || step1Items.length > 0}
           {#if !step1Complete}
           <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
             <div class="mb-2 flex items-center justify-between">
@@ -431,7 +435,7 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
                 </div>
                 <div class="mt-2 h-2 rounded bg-blue-100 dark:bg-blue-800">
                   <div
-                    class={`h-full rounded bg-blue-600 transition-all ${currentFile.total === 0 ? 'animate-pulse opacity-60' : ''}`}
+                    class={`h-full rounded bg-blue-600 ${progressTransition ? 'transition-all' : ''} ${currentFile.total === 0 ? 'animate-pulse opacity-60' : ''}`}
                     style={`width: ${currentFile.total > 0 ? currentFilePercent : 100}%`}
                   ></div>
                 </div>
@@ -472,7 +476,6 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
               {step1Complete ? m['downloads.completed']() : currentStep === 1 ? m['downloads.downloading']() : m['downloads.downloadStep1']()}
             </button>
           </div>
-          {/if}
           {/if}
 
           <!-- Step 2: Model Files -->
@@ -535,7 +538,7 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
                 </div>
                 <div class="mt-2 h-2 rounded bg-blue-100 dark:bg-blue-800">
                   <div
-                    class={`h-full rounded bg-blue-600 transition-all ${currentFile.total === 0 ? 'animate-pulse opacity-60' : ''}`}
+                    class={`h-full rounded bg-blue-600 ${progressTransition ? 'transition-all' : ''} ${currentFile.total === 0 ? 'animate-pulse opacity-60' : ''}`}
                     style={`width: ${currentFile.total > 0 ? currentFilePercent : 100}%`}
                   ></div>
                 </div>

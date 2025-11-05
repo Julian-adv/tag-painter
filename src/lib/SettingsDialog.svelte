@@ -253,7 +253,7 @@
     // Model type changed - apply defaults for the new type
     const defaults = MODEL_TYPE_DEFAULTS[currentModelType]
     if (defaults) {
-      const nextLoras = defaults.loras ? defaults.loras.map((entry) => ({ ...entry })) : []
+      const nextLoras = 'loras' in defaults && defaults.loras ? defaults.loras.map((entry: { name: string; weight: number }) => ({ ...entry })) : []
       localSettings = {
         ...localSettings,
         perModel: {

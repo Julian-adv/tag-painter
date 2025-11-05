@@ -47,7 +47,7 @@
       "urls": [
         "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors"
       ],
-      "destRelativeToComfy": "models/text_encoderes/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "destRelativeToComfy": "models/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
       "category": "text-encoder"
     },
     {
@@ -132,13 +132,22 @@
       "category": "annotator"
     },
     {
-      "label": "ARAZmixQwen Diffusion Model",
-      "filename": "ARAZmixQwen007.safetensors",
+      "label": "Zeniji Mix Qwen V1 FP8 Diffusion Model",
+      "filename": "Zeniji_mix_qwen_v1_fp8.safetensors",
       "urls": [
-        "https://huggingface.co/ariaze/ARAZmixQwen/resolve/main/ARAZmixQwen007.safetensors?download=true"
+        "https://huggingface.co/zeniji/Zeniji_mix_Qwen_v1_fp8/resolve/main/Zeniji_mix_qwen_v1_fp8.safetensors?download=true"
       ],
-      "destRelativeToComfy": "models/diffusion_models/ARAZmixQwen007.safetensors",
+      "destRelativeToComfy": "models/diffusion_models/Zeniji_mix_qwen_v1_fp8.safetensors",
       "category": "diffusion"
+    },
+    {
+      "label": "Perfect Deliberate v2.0",
+      "filename": "perfectdeliberate_v20.safetensors",
+      "urls": [
+        "https://huggingface.co/Wanton/perfectdeliberate_v20/resolve/main/perfectdeliberate_v20.safetensors?download=true"
+      ],
+      "destRelativeToComfy": "models/checkpoints/perfectdeliberate_v20.safetensors",
+      "category": "checkpoint"
     },
     {
       "label": "Custom Node cgem156-ComfyUI",
