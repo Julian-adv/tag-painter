@@ -34,6 +34,7 @@
     autoSaveCurrentValues,
     updateComposition
   } from '$lib/stores/promptsStore'
+  import { detectPlatform } from '$lib/utils/loraPath'
 
   // Component state
   let isLoading = $state(false)
@@ -229,6 +230,9 @@
 
   // Initialize component
   onMount(async () => {
+    // Detect platform for LoRA path normalization
+    await detectPlatform()
+
     // Initialize prompts store
     await initializePromptsStore()
 

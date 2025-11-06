@@ -13,15 +13,10 @@ import {
 import { getWildcardModel } from '../stores/tagsStore'
 import { readWildcardZones } from '../utils/wildcardZones'
 import { updateComposition } from '../stores/promptsStore'
-import {
-  generateClientId,
-  applyPerModelOverrides,
-  submitToComfyUI
-} from './generationCommon'
+import { generateClientId, applyPerModelOverrides, submitToComfyUI } from './generationCommon'
 import type { ComfyUIWorkflow, ModelSettings } from '$lib/types'
 import type { GenerationOptions } from './imageGeneration'
 import { attachLoraChainBetweenNodes } from './qwenNunchakuLora'
-
 
 export function applyQwenLoraChain(
   workflow: ComfyUIWorkflow,
@@ -29,13 +24,35 @@ export function applyQwenLoraChain(
 ): void {
   const baseUnetNode = findNodeByTitle(workflow, 'Load Qwen UNet')
   if (baseUnetNode) {
-    attachLoraChainBetweenNodes(workflow, 'Load Qwen UNet', 0, 'Model Sampling Aura Flow', 'model', loras, 'LoraLoaderModelOnly', 'strength_model', 200)
+    attachLoraChainBetweenNodes(
+      workflow,
+      'Load Qwen UNet',
+      0,
+      'Model Sampling Aura Flow',
+      'model',
+      loras,
+      'LoraLoaderModelOnly',
+      'strength_model',
+      200
+    )
   } else {
     const baseNunchakuNode = findNodeByTitle(workflow, 'Nunchaku Qwen-Image DiT Loader')
     if (baseNunchakuNode) {
-      attachLoraChainBetweenNodes(workflow, 'Nunchaku Qwen-Image DiT Loader', 0, 'KSampler', 'model', loras, 'NunchakuQwenImageLoraLoader', 'lora_strength', 200)
+      attachLoraChainBetweenNodes(
+        workflow,
+        'Nunchaku Qwen-Image DiT Loader',
+        0,
+        'KSampler',
+        'model',
+        loras,
+        'NunchakuQwenImageLoraLoader',
+        'lora_strength',
+        200
+      )
     } else {
-      throw new Error('Workflow must contain either "Load Qwen UNet" or "Nunchaku Qwen-Image DiT Loader" node')
+      throw new Error(
+        'Workflow must contain either "Load Qwen UNet" or "Nunchaku Qwen-Image DiT Loader" node'
+      )
     }
   }
 }

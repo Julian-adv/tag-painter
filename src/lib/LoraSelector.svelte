@@ -4,10 +4,7 @@
   import LoraSelectionModal from './LoraSelectionModal.svelte'
   import { Plus } from 'svelte-heros-v2'
   import { m } from '$lib/paraglide/messages'
-  import {
-    normalizeLoraNameForDisplay,
-    updatePathSeparatorFromLoraList
-  } from '$lib/utils/loraPath'
+  import { normalizeLoraNameForDisplay } from '$lib/utils/loraPath'
 
   interface LoraWithWeight {
     name: string
@@ -36,7 +33,6 @@
 
       if (response.ok) {
         const rawLoras = Array.isArray(data?.loras) ? data.loras : []
-        updatePathSeparatorFromLoraList(rawLoras)
         availableLoras = rawLoras.map((name: string) => normalizeLoraNameForDisplay(name))
         error = ''
       } else {
