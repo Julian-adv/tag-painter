@@ -59,6 +59,7 @@
   let shouldStopGeneration = $state(false)
   let lastSeed: number | null = $state(null)
   let showDownloadsDialog = $state(false)
+  let missingStep1Filenames = $state<string[]>([])
   let showCustomNodesDialog = $state(false)
   let customNodePromptChecked = $state(false)
   let pendingDownloads = $state(false)
@@ -92,17 +93,55 @@
   let activeTabId = $state('generator')
 
   // Show dialog when no checkpoints are found
-  function openDownloadsDialog() {
+  async function openDownloadsDialog() {
     if (showCustomNodesDialog || awaitingCustomNodeFinish) {
       pendingDownloads = true
       return
     }
     pendingDownloads = false
+
+    // Check which Step 1 files are missing
+    try {
+      const res = await fetch('/api/downloads-check')
+      const data = await res.json()
+      if (data.allExist) {
+        // All Step 1 files exist, no need to show dialog
+        return
+      }
+      // Store missing filenames to filter downloads dialog
+      missingStep1Filenames = data.missingFilenames || []
+    } catch (err) {
+      console.error('Failed to check Step 1 files:', err)
+      // On error, show dialog with all files
+      missingStep1Filenames = []
+    }
+
+    if (showCustomNodesDialog || awaitingCustomNodeFinish) {
+      pendingDownloads = true
+      return
+    }
+
     showDownloadsDialog = true
   }
 
   function openCustomNodesDialog() {
     showCustomNodesDialog = true
+  }
+
+  async function startComfyUI() {
+    try {
+      const res = await fetch('/api/comfy/start', { method: 'POST' })
+      const data = await res.json()
+      if (data?.success) {
+        console.log('ComfyUI started successfully')
+      } else if (data?.alreadyRunning) {
+        console.log('ComfyUI is already running')
+      } else {
+        console.error('Failed to start ComfyUI:', data?.error || 'Unknown error')
+      }
+    } catch (err) {
+      console.error('Failed to start ComfyUI:', err)
+    }
   }
 
   async function checkMissingCustomNodes() {
@@ -118,6 +157,9 @@
         }
         awaitingCustomNodeFinish = true
         showCustomNodesDialog = true
+      } else {
+        // All custom nodes are installed, start ComfyUI
+        await startComfyUI()
       }
     } catch (err) {
       console.debug('Failed to check custom nodes', err)
@@ -128,7 +170,7 @@
     awaitingCustomNodeFinish = event.pending
     if (event.advance || (pendingDownloads && !awaitingCustomNodeFinish)) {
       pendingDownloads = false
-      showDownloadsDialog = true
+      void openDownloadsDialog()
     }
   }
 
@@ -732,7 +774,7 @@
 <Toasts bind:this={toastsRef} />
 
 <!-- No Checkpoints Dialog -->
-<DownloadsDialog bind:isOpen={showDownloadsDialog} onClose={handleDownloadsDialogClosed} />
+<DownloadsDialog bind:isOpen={showDownloadsDialog} onClose={handleDownloadsDialogClosed} missingStep1Filenames={missingStep1Filenames} />
 <CustomNodesDialog bind:isOpen={showCustomNodesDialog} onclosed={handleCustomNodesClosed} />
 
 <style>
