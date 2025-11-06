@@ -1,28 +1,40 @@
 // Utility functions for LoRA path normalization
 
+let detectedSeparator: '/' | '\\' = '/'
+
 /**
- * Normalizes LoRA name for ComfyUI based on platform
- * On Windows, uses backslashes; on other platforms, uses forward slashes
+ * Updates the detected path separator based on LoRA list from ComfyUI API
+ * Call this when fetching loras from /api/loras
+ */
+export function updatePathSeparatorFromLoraList(loras: string[]): void {
+  if (!Array.isArray(loras) || loras.length === 0) {
+    return
+  }
+
+  // Check if any LoRA path contains backslashes
+  const hasBackslash = loras.some((name) => typeof name === 'string' && name.includes('\\'))
+  detectedSeparator = hasBackslash ? '\\' : '/'
+}
+
+/**
+ * Normalizes LoRA name for ComfyUI based on detected separator
+ * Uses the separator detected from ComfyUI API response
  */
 export function normalizeLoraPathForComfy(loraName: string): string {
-	if (typeof loraName !== 'string') {
-		return loraName
-	}
+  if (typeof loraName !== 'string') {
+    return loraName
+  }
 
-	// Detect platform - if we're running in browser, use server detection via API
-	// If we're on server, use process.platform
-	const isWindows = typeof process !== 'undefined' && process.platform === 'win32'
-
-	if (isWindows) {
-		return loraName.replace(/\//g, '\\')
-	} else {
-		return loraName.replace(/\\/g, '/')
-	}
+  if (detectedSeparator === '\\') {
+    return loraName.replace(/\//g, '\\')
+  } else {
+    return loraName.replace(/\\/g, '/')
+  }
 }
 
 /**
  * Normalizes LoRA name for display (always uses forward slashes)
  */
 export function normalizeLoraNameForDisplay(loraName: string): string {
-	return typeof loraName === 'string' ? loraName.replace(/\\/g, '/') : loraName
+  return typeof loraName === 'string' ? loraName.replace(/\\/g, '/') : loraName
 }

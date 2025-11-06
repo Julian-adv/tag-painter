@@ -27,7 +27,7 @@ export function generateLoraChain(
   const baseNodeId = checkpointNode.nodeId
 
   // Find existing CLIP skip node in workflow
-  let clipSkipNode = findNodeByTitle(workflow, 'CLIP Set Last Layer')
+  const clipSkipNode = findNodeByTitle(workflow, 'CLIP Set Last Layer')
   if (!clipSkipNode) {
     if (selectedLoras.length === 0) {
       return {}
