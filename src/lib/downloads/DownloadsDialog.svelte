@@ -14,9 +14,10 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
   interface Props {
     isOpen: boolean
     onClose?: (result: { success: boolean }) => void
+    missingStep1Filenames?: string[]
   }
 
-  let { isOpen = $bindable(), onClose }: Props = $props()
+  let { isOpen = $bindable(), onClose, missingStep1Filenames = [] }: Props = $props()
   let allItems = $state<DownloadItem[]>([])
   let loading = $state(false)
   let downloading = $state(false)
@@ -35,7 +36,17 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
            dest.includes('loras/')
   }
 
-  const step1Items = $derived(allItems.filter(item => !isLargeModelFile(item)))
+  const step1Items = $derived(
+    allItems.filter(item => {
+      if (isLargeModelFile(item)) return false
+      // If missingStep1Filenames is provided and not empty, filter by it
+      if (missingStep1Filenames.length > 0) {
+        return missingStep1Filenames.includes(item.filename)
+      }
+      // Otherwise, show all step 1 items
+      return true
+    })
+  )
   const step2Items = $derived(allItems.filter(item => isLargeModelFile(item)))
 
   function isDownloadSuccess(value: DownloadSummary | null): value is DownloadSummary {

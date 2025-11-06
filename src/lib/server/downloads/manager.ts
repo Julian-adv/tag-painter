@@ -332,6 +332,48 @@ export async function handleGetDownloads(url: URL): Promise<Response> {
   }
 }
 
+function isLargeModelFile(dest: string): boolean {
+  const normalized = dest.toLowerCase().replace(/\\/g, '/')
+  return (
+    normalized.includes('checkpoints/') ||
+    normalized.includes('diffusion_models/') ||
+    normalized.includes('loras/')
+  )
+}
+
+export async function checkStep1FilesExist(): Promise<{ allExist: boolean; missingFilenames: string[] }> {
+  try {
+    const cfg = await loadDownloadsConfig()
+    const comfyDir = getComfyDir()
+
+    // Filter to step 1 items only (non-large model files, excluding custom-nodes)
+    const step1Items = cfg.items.filter(
+      (item) => !isLargeModelFile(item.destRelativeToComfy) && item.category !== 'custom-node'
+    )
+
+    if (step1Items.length === 0) {
+      return { allExist: true, missingFilenames: [] } // No step 1 files required
+    }
+
+    // Check which step 1 files are missing
+    const missingFilenames: string[] = []
+    for (const item of step1Items) {
+      const dest = path.join(comfyDir, item.destRelativeToComfy)
+      const exists = await fileExists(dest)
+      if (!exists) {
+        missingFilenames.push(item.filename)
+      }
+    }
+
+    return {
+      allExist: missingFilenames.length === 0,
+      missingFilenames
+    }
+  } catch {
+    return { allExist: false, missingFilenames: [] } // On error, assume files are missing
+  }
+}
+
 export async function handlePostDownloads(request: Request): Promise<Response> {
   try {
     const raw = (await request.json()) as Record<string, unknown>

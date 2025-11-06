@@ -209,6 +209,8 @@ fi
 if [[ $NEEDS_BOOTSTRAP -eq 1 ]]; then
   echo "Running bootstrap (macOS/Linux) for ComfyUI/venv ..."
   bash "$REPO_ROOT/scripts/bootstrap.sh"
+else
+  echo "ComfyUI and Python venv already exist. Skipping bootstrap."
 fi
 
 if [[ -n "$MODELS_BACKUP_DIR" && -d "$MODELS_BACKUP_DIR/models" ]]; then
@@ -238,6 +240,43 @@ fi
 ensure_required_models
 
 source "$VENV_DIR/bin/activate"
+
+# Check and install custom node dependencies if needed
+CUSTOM_NODES_DIR="$COMFY_DIR/custom_nodes"
+HAS_REQUIREMENTS=0
+
+if [[ -d "$CUSTOM_NODES_DIR" && $NEEDS_BOOTSTRAP -eq 0 ]]; then
+  # Check if any custom nodes have requirements.txt
+  for node_dir in "$CUSTOM_NODES_DIR"/*; do
+    if [[ -d "$node_dir" && -f "$node_dir/requirements.txt" ]]; then
+      HAS_REQUIREMENTS=1
+      break
+    fi
+  done
+
+  if [[ $HAS_REQUIREMENTS -eq 1 ]]; then
+    echo "Checking custom node dependencies..."
+    for node_dir in "$CUSTOM_NODES_DIR"/*; do
+      if [[ -d "$node_dir" && -f "$node_dir/requirements.txt" ]]; then
+        node_name="$(basename "$node_dir")"
+        echo "Checking dependencies for $node_name..."
+        python -m pip install -r "$node_dir/requirements.txt" || true
+      fi
+    done
+  else
+    echo "No custom node dependencies to install. Skipping Python package checks."
+  fi
+elif [[ $NEEDS_BOOTSTRAP -eq 1 && -d "$CUSTOM_NODES_DIR" ]]; then
+  # Fresh bootstrap, install all custom node requirements
+  echo "Checking custom node dependencies..."
+  for node_dir in "$CUSTOM_NODES_DIR"/*; do
+    if [[ -d "$node_dir" && -f "$node_dir/requirements.txt" ]]; then
+      node_name="$(basename "$node_dir")"
+      echo "Checking dependencies for $node_name..."
+      python -m pip install -r "$node_dir/requirements.txt" || true
+    fi
+  done
+fi
 
 echo "Starting ComfyUI..."
 (cd "$COMFY_DIR" && python main.py --listen 0.0.0.0 --port 8188 --disable-auto-launch --enable-cors-header '*') &

@@ -324,6 +324,8 @@ try {
 
     if ($needsBootstrap) {
       Invoke-Bootstrap -bootstrapArgs @()
+    } else {
+      Write-Host "ComfyUI and Python venv already exist. Skipping bootstrap." -ForegroundColor Green
     }
 
     # Ensure CUDA-enabled torch is installed when NVIDIA is present; decide CPU fallback
@@ -342,24 +344,43 @@ try {
 
     # Ensure common extras used by custom nodes and check custom node dependencies
     if (Test-Path $venvPy) {
-      Install-PythonPackages -venvPy $venvPy -packages @('matplotlib')
-
-      # Check and install custom node dependencies if missing
+      # Only check for missing packages, skip if all present
       $customNodesDir = Join-Path $ComfyDir "custom_nodes"
+      $hasRequirements = $false
+
       if (Test-Path $customNodesDir) {
         $customNodes = Get-ChildItem -Path $customNodesDir -Directory
         foreach ($node in $customNodes) {
           $requirementsFile = Join-Path $node.FullName "requirements.txt"
           if (Test-Path $requirementsFile) {
-            Write-Host "Checking dependencies for $($node.Name)..." -ForegroundColor DarkCyan
-            $uvExe = Join-Path (Resolve-Path "vendor") "uv.exe"
-            if (Test-Path $uvExe) {
-              & $uvExe pip install -p $venvPy -r $requirementsFile
-            } else {
-              & $venvPy -m pip install -r $requirementsFile
+            $hasRequirements = $true
+            break
+          }
+        }
+      }
+
+      if ($hasRequirements -or $needsBootstrap) {
+        Write-Host "Checking Python dependencies..." -ForegroundColor DarkCyan
+        Install-PythonPackages -venvPy $venvPy -packages @('matplotlib')
+
+        # Check and install custom node dependencies if missing
+        if (Test-Path $customNodesDir) {
+          $customNodes = Get-ChildItem -Path $customNodesDir -Directory
+          foreach ($node in $customNodes) {
+            $requirementsFile = Join-Path $node.FullName "requirements.txt"
+            if (Test-Path $requirementsFile) {
+              Write-Host "Checking dependencies for $($node.Name)..." -ForegroundColor DarkCyan
+              $uvExe = Join-Path (Resolve-Path "vendor") "uv.exe"
+              if (Test-Path $uvExe) {
+                & $uvExe pip install -p $venvPy -r $requirementsFile
+              } else {
+                & $venvPy -m pip install -r $requirementsFile
+              }
             }
           }
         }
+      } else {
+        Write-Host "No custom node dependencies to install. Skipping Python package checks." -ForegroundColor Green
       }
     }
 

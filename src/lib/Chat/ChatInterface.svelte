@@ -500,7 +500,11 @@
 <div class="flex h-full flex-col bg-white">
   {#if selectedCharacter}
     <div class="flex items-center gap-2 border-b px-2 py-1">
-      <img src={`/api/image?path=${encodeURIComponent('character/' + selectedCharacter.filename)}`} alt={selectedCharacter.name} class="h-6 w-6 rounded object-cover" />
+      <img
+        src={`/api/image?path=${encodeURIComponent('character/' + selectedCharacter.filename)}`}
+        alt={selectedCharacter.name}
+        class="h-6 w-6 rounded object-cover"
+      />
       <div class="text-xs text-gray-700">{selectedCharacter.name}</div>
     </div>
   {/if}
@@ -611,9 +615,9 @@
 <CharacterManagerDialog
   bind:isOpen={showCharacterDialog}
   selectedCharacterFilename={selectedCharacter?.filename}
-  latestCharacterText={latestCharacterText}
-  latestCharacterName={latestCharacterName}
-  currentImagePath={currentImagePath}
+  {latestCharacterText}
+  {latestCharacterName}
+  {currentImagePath}
   onSelect={(payload) => {
     // Toggle selection: unselect if clicking on already selected character
     if (selectedCharacter?.filename === payload.item.filename) {
