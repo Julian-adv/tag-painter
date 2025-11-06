@@ -132,6 +132,10 @@ data_files=(
   "wildcards.yaml"
   "wildcards.qwen.yaml"
   "Vision2.1.yaml"
+  "system_prompt.qwen.json"
+  "system_prompt.qwen.txt"
+  "system_prompt.sdxl.json"
+  "system_prompt.sdxl.txt"
 )
 for data_file in "${data_files[@]}"; do
   src_path="data/$data_file"

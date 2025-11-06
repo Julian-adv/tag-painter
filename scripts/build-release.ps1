@@ -73,7 +73,17 @@ try {
   # Copy specific data files only
   $dataDir = Join-Path $payloadRoot "data"
   New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
-  $dataFiles = @("prompts.json", "settings.json", "wildcards.yaml")
+  $dataFiles = @(
+    "prompts.json",
+    "settings.json",
+    "wildcards.yaml",
+    "wildcards.qwen.yaml",
+    "Vision2.1.yaml",
+    "system_prompt.qwen.json",
+    "system_prompt.qwen.txt",
+    "system_prompt.sdxl.json",
+    "system_prompt.sdxl.txt"
+  )
   foreach ($file in $dataFiles) {
     $srcPath = Join-Path "data" $file
     if (Test-Path $srcPath) {

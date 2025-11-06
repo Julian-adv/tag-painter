@@ -10,6 +10,13 @@
       "category": "upscale"
     },
     {
+      "label": "NMKD Siax 4x (ESRGAN)",
+      "filename": "4x_NMKD-Siax_200k.pth",
+      "urls": ["https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/4x_NMKD-Siax_200k.pth"],
+      "destRelativeToComfy": "models/upscale_models/4x_NMKD-Siax_200k.pth",
+      "category": "upscale"
+    },
+    {
       "label": "ADetailer person_yolov8m-seg.pt",
       "filename": "person_yolov8m-seg.pt",
       "urls": ["https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt"],
