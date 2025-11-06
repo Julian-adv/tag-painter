@@ -8,12 +8,19 @@ let detectedSeparator: '/' | '\\' = '/'
  */
 export function updatePathSeparatorFromLoraList(loras: string[]): void {
   if (!Array.isArray(loras) || loras.length === 0) {
+    console.log('[LoRA Path] No loras to detect separator from')
     return
   }
 
   // Check if any LoRA path contains backslashes
   const hasBackslash = loras.some((name) => typeof name === 'string' && name.includes('\\'))
   detectedSeparator = hasBackslash ? '\\' : '/'
+  console.log(
+    '[LoRA Path] Detected separator:',
+    detectedSeparator,
+    'from loras:',
+    loras.slice(0, 3)
+  )
 }
 
 /**
@@ -25,11 +32,18 @@ export function normalizeLoraPathForComfy(loraName: string): string {
     return loraName
   }
 
-  if (detectedSeparator === '\\') {
-    return loraName.replace(/\//g, '\\')
-  } else {
-    return loraName.replace(/\\/g, '/')
-  }
+  const result =
+    detectedSeparator === '\\' ? loraName.replace(/\//g, '\\') : loraName.replace(/\\/g, '/')
+
+  console.log(
+    '[LoRA Path] Normalizing:',
+    loraName,
+    '→',
+    result,
+    '(separator:',
+    detectedSeparator + ')'
+  )
+  return result
 }
 
 /**
