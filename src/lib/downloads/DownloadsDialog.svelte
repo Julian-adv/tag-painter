@@ -98,12 +98,23 @@
     return value !== null && value.success && value.failed.length === 0
   }
 
+  function hasFailedDownloads(summary: DownloadSummary | null): boolean {
+    return summary !== null && summary.failed.length > 0
+  }
+
   const comfyStepComplete = $derived(skippedSteps.comfy || comfyInstalled)
+  const comfyInstallDisabled = $derived(comfyInstalling || comfyStatusLoading)
+  const comfyInstallButtonLabel = $derived(
+    comfyInstallDisabled
+      ? m['comfyInstall.installing']()
+      : comfyInstalled
+        ? m['comfyInstall.reinstall']()
+        : m['comfyInstall.install']()
+  )
 
   const customNodesStepComplete = $derived(
     skippedSteps.customNodes || ((customInitialSet && (customInitiallyRequired ? customStartSuccess : true)) && comfyStepComplete)
   )
-
   const step1Complete = $derived(
     skippedSteps.downloadsCore ||
       isDownloadSuccess(step1Result) ||
@@ -114,6 +125,38 @@
     skippedSteps.downloadsModels ||
       isDownloadSuccess(step2Result) ||
       (!downloadsLoading && downloadsLoaded && step2Items.length === 0)
+  )
+
+  const step1HasFailure = $derived(hasFailedDownloads(step1Result))
+  const step2HasFailure = $derived(hasFailedDownloads(step2Result))
+
+  const customInstallButtonDisabled = $derived(
+    customNodesInstalling || customNodesLoading || customNodeItems.length === 0
+  )
+  const customInstallButtonLabel = $derived(
+    customNodesInstalling ? m['customNodes.installing']() : m['customNodes.autoInstall']()
+  )
+  const showStartComfyButton = $derived(comfyStepComplete && !customNodesStepComplete && customNodeItems.length === 0)
+  const startComfyButtonDisabled = $derived(customStarting)
+  const startComfyButtonLabel = $derived(customStarting ? m['customNodes.starting']() : m['customNodes.start']())
+  const step1ButtonDisabled = $derived(downloading || downloadsLoading || step1Complete)
+  const step1ButtonLabel = $derived(
+    step1Complete
+      ? m['downloads.completed']()
+      : currentStep === 1
+        ? m['downloads.downloading']()
+        : step1HasFailure
+          ? 'Retry'
+          : m['downloads.downloadStep1']()
+  )
+  const step2ButtonIdleLabel = $derived(step2HasFailure ? 'Retry' : m['downloads.downloadStep2']())
+  const step2ButtonDisabled = $derived(downloading || downloadsLoading || step2Complete)
+  const step2ButtonLabel = $derived(
+    step2Complete
+      ? m['downloads.completed']()
+      : currentStep === 2
+        ? m['downloads.downloading']()
+        : step2ButtonIdleLabel
   )
 
   const allComplete = $derived(comfyStepComplete && customNodesStepComplete && step1Complete && step2Complete)
@@ -800,41 +843,48 @@
       </div>
 
       <div class="space-y-4">
-        <ComfyInstallStep
-          skipped={skippedSteps.comfy}
-          stepComplete={comfyStepComplete}
-          installing={comfyInstalling || comfyStatusLoading}
-          logs={comfyInstallLogs}
-          error={comfyInstallError}
-          installed={comfyInstalled}
-          onInstall={() => installComfy({ reinstall: comfyInstalled })}
-          onSkip={() => skipStep('comfy')}
-        />
+        {#if !comfyStepComplete}
+          <ComfyInstallStep
+            skipped={skippedSteps.comfy}
+            stepComplete={comfyStepComplete}
+            installing={comfyInstalling || comfyStatusLoading}
+            logs={comfyInstallLogs}
+            error={comfyInstallError}
+            installed={comfyInstalled}
+            showActions={false}
+            onInstall={() => installComfy({ reinstall: comfyInstalled })}
+            onSkip={() => skipStep('comfy')}
+          />
+        {/if}
 
         {#if comfyStepComplete}
-          <CustomNodesStep
-            skipped={skippedSteps.customNodes}
-            stepComplete={customNodesStepComplete}
-            loading={customNodesLoading}
-            items={customNodeItems}
-            installing={customNodesInstalling}
-            installProgress={customInstallProgress}
-            progressPercent={customProgressPercent}
-            result={customNodesResult}
-            startSuccess={customStartSuccess}
-            startError={customStartError}
-            starting={customStarting}
-            onSkip={() => skipStep('customNodes')}
-            onInstall={installCustomNodes}
-            onStart={startComfy}
-          />
+          {#if !customNodesStepComplete}
+            <CustomNodesStep
+              skipped={skippedSteps.customNodes}
+              stepComplete={customNodesStepComplete}
+              loading={customNodesLoading}
+              items={customNodeItems}
+              installing={customNodesInstalling}
+              installProgress={customInstallProgress}
+              progressPercent={customProgressPercent}
+              result={customNodesResult}
+              startSuccess={customStartSuccess}
+              startError={customStartError}
+              starting={customStarting}
+              onSkip={() => skipStep('customNodes')}
+              onInstall={installCustomNodes}
+              onStart={startComfy}
+              showActions={false}
+              showStartAction={false}
+            />
+          {/if}
         {:else}
           <div class="rounded border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
             {m['comfyInstall.completeStepPrompt']?.() ?? 'Install ComfyUI to continue.'}
           </div>
         {/if}
 
-        {#if customNodesStepComplete}
+        {#if customNodesStepComplete && !step1Complete}
           <DownloadFilesStep
             title={m['downloads.step1Title']()}
             description={m['downloads.step1Description']()}
@@ -859,6 +909,8 @@
             onDownload={() => downloadStep(1)}
             onSkip={() => skipStep('downloadsCore')}
             formatBytes={formatBytes}
+            showDownloadAction={false}
+            showSkipAction={false}
           />
         {/if}
 
@@ -882,16 +934,121 @@
             progressTransition={progressTransition}
             result={step2Result}
             disableButton={downloading || downloadsLoading || step2Complete}
-            buttonIdleLabel={m['downloads.downloadStep2']()}
+            buttonIdleLabel={step2ButtonIdleLabel}
             buttonDownloadingLabel={m['downloads.downloading']()}
             onDownload={() => downloadStep(2)}
             onSkip={() => skipStep('downloadsModels')}
             formatBytes={formatBytes}
+            showDownloadAction={false}
+            showSkipAction={false}
           />
         {/if}
       </div>
 
-      <div class="mt-6 flex justify-end gap-2">
+      <div class="mt-6 flex flex-wrap justify-end gap-2">
+        {#if !comfyStepComplete}
+          <button
+            type="button"
+            class={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${comfyInstallDisabled ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+            onclick={() => installComfy({ reinstall: comfyInstalled })}
+            disabled={comfyInstallDisabled}
+          >
+            {comfyInstallButtonLabel}
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
+            onclick={() => skipStep('comfy')}
+          >
+            {m['downloads.skip']()}
+          </button>
+        {/if}
+
+        {#if comfyStepComplete && !customNodesStepComplete}
+          {#if customNodeItems.length > 0}
+            <button
+              type="button"
+              class={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${customInstallButtonDisabled ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+              onclick={installCustomNodes}
+              disabled={customInstallButtonDisabled}
+            >
+              {customInstallButtonLabel}
+            </button>
+          {/if}
+          <button
+            type="button"
+            class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
+            onclick={() => skipStep('customNodes')}
+          >
+            {m['downloads.skip']()}
+          </button>
+        {/if}
+
+        {#if showStartComfyButton}
+          <button
+            type="button"
+            class={`rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed`}
+            onclick={startComfy}
+            disabled={startComfyButtonDisabled}
+          >
+            {startComfyButtonLabel}
+          </button>
+        {/if}
+
+        {#if customNodesStepComplete && !step1Complete}
+          <button
+            type="button"
+            class={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              step1Complete
+                ? 'bg-green-200 text-green-700 cursor-not-allowed'
+                : step1ButtonDisabled
+                  ? 'bg-blue-400 text-white cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+            onclick={() => downloadStep(1)}
+            disabled={step1ButtonDisabled}
+          >
+            {step1ButtonLabel}
+          </button>
+
+          {#if !step1Complete}
+            <button
+              type="button"
+              class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
+              onclick={() => skipStep('downloadsCore')}
+            >
+              {m['downloads.skip']()}
+            </button>
+          {/if}
+        {/if}
+
+        {#if step1Complete}
+          <button
+            type="button"
+            class={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              step2Complete
+                ? 'bg-green-200 text-green-700 cursor-not-allowed'
+                : step2ButtonDisabled
+                  ? 'bg-blue-400 text-white cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+            onclick={() => downloadStep(2)}
+            disabled={step2ButtonDisabled}
+          >
+            {step2ButtonLabel}
+          </button>
+        {/if}
+
+        {#if step1Complete && !step2Complete}
+          <button
+            type="button"
+            class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
+            onclick={() => skipStep('downloadsModels')}
+          >
+            {m['downloads.skip']()}
+          </button>
+        {/if}
+
         <button
           type="button"
           class="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages'
+  import { sendClientLog } from '$lib/downloads/logClient'
 
   interface Props {
     skipped: boolean
@@ -10,9 +11,21 @@
     onInstall: () => void
     onSkip: () => void
     installed: boolean
+    showActions: boolean
   }
 
-  let { skipped, stepComplete, installing, logs, error, onInstall, onSkip, installed }: Props = $props()
+  let {
+    skipped,
+    stepComplete,
+    installing,
+    logs,
+    error,
+    onInstall,
+    onSkip,
+    installed,
+    showActions
+  }: Props = $props()
+  let comfyLogCount = 0
 
   const buttonLabel = $derived(
     installing
@@ -21,6 +34,40 @@
         ? m['comfyInstall.reinstall']()
         : m['comfyInstall.install']()
   )
+
+  $effect(() => {
+    if (logs.length < comfyLogCount) {
+      comfyLogCount = logs.length
+    }
+    if (logs.length > comfyLogCount) {
+      for (let i = comfyLogCount; i < logs.length; i += 1) {
+        const message = `[ComfyInstall] ${logs[i]}`
+        sendClientLog('log', message)
+      }
+      comfyLogCount = logs.length
+    }
+  })
+
+  $effect(() => {
+    if (error) {
+      const message = `[ComfyInstall] Error: ${error}`
+      sendClientLog('error', message)
+    }
+  })
+
+  $effect(() => {
+    if (stepComplete && !skipped) {
+      const message = '[ComfyInstall] Installation completed.'
+      sendClientLog('log', message)
+    }
+  })
+
+  $effect(() => {
+    if (skipped) {
+      const message = '[ComfyInstall] Step skipped by user.'
+      sendClientLog('warn', message)
+    }
+  })
 </script>
 
 <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
@@ -30,11 +77,15 @@
     </h3>
     <div class="flex items-center gap-2">
       {#if skipped}
-        <span class="rounded bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-100">
+        <span
+          class="rounded bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-100"
+        >
           {m['downloads.skip']()}
         </span>
       {:else if stepComplete}
-        <span class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200">
+        <span
+          class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200"
+        >
           {m['downloads.completed']()}
         </span>
       {/if}
@@ -46,19 +97,25 @@
   </p>
 
   {#if stepComplete && !skipped}
-    <div class="mb-3 rounded border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-500/40 dark:bg-green-900/40 dark:text-green-200">
+    <div
+      class="mb-3 rounded border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-500/40 dark:bg-green-900/40 dark:text-green-200"
+    >
       {m['comfyInstall.success']()}
     </div>
   {/if}
 
   {#if error}
-    <div class="mb-3 rounded border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/40 dark:bg-red-900/40 dark:text-red-200">
+    <div
+      class="mb-3 rounded border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/40 dark:bg-red-900/40 dark:text-red-200"
+    >
       {error}
     </div>
   {/if}
 
   {#if logs.length > 0}
-    <div class="mb-3 max-h-48 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+    <div
+      class="mb-3 max-h-48 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+    >
       <p class="mb-1 font-semibold">{m['comfyInstall.logsTitle']()}</p>
       <ul class="space-y-1">
         {#each logs as line, idx}
@@ -68,23 +125,25 @@
     </div>
   {/if}
 
-  <div class="mt-4 flex flex-wrap gap-2">
-    <button
-      type="button"
-      class={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${installing ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-      onclick={onInstall}
-      disabled={installing}
-    >
-      {buttonLabel}
-    </button>
-    {#if !stepComplete}
+  {#if showActions}
+    <div class="mt-4 flex flex-wrap gap-2">
       <button
         type="button"
-        class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
-        onclick={onSkip}
+        class={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${installing ? 'cursor-not-allowed bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+        onclick={onInstall}
+        disabled={installing}
       >
-        {m['downloads.skip']()}
+        {buttonLabel}
       </button>
-    {/if}
-  </div>
+      {#if !stepComplete}
+        <button
+          type="button"
+          class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
+          onclick={onSkip}
+        >
+          {m['downloads.skip']()}
+        </button>
+      {/if}
+    </div>
+  {/if}
 </div>

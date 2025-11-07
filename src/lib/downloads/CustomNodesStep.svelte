@@ -1,5 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages'
+  import { sendClientLog } from '$lib/downloads/logClient'
   import type { CustomNodeItem, DownloadSummary, ProgressState } from '$lib/downloads/types'
 
   interface Props {
@@ -17,6 +18,8 @@
     onSkip: () => void
     onInstall: () => void
     onStart: () => void
+    showActions: boolean
+    showStartAction: boolean
   }
 
   let {
@@ -33,8 +36,94 @@
     starting,
     onSkip,
     onInstall,
-    onStart
+    onStart,
+    showActions,
+    showStartAction
   }: Props = $props()
+  let installProgressSignature = ''
+  let lastResultReference: DownloadSummary | null = null
+  let loggedStartSuccess = false
+  let loggedStartError = ''
+  let loggedSkipNotice = false
+  let loggedCompletion = false
+
+  $effect(() => {
+    if (installing) {
+      const signature = `${installProgress.completed}/${installProgress.total}:${installProgress.current}`
+      if (signature !== installProgressSignature) {
+        const label = installProgress.current || 'Installing custom node'
+        const message = `[CustomNodes] ${label} (${installProgress.completed}/${installProgress.total})`
+        console.log(message)
+        sendClientLog('log', message)
+        installProgressSignature = signature
+      }
+    } else if (installProgressSignature) {
+      installProgressSignature = ''
+    }
+  })
+
+  $effect(() => {
+    if (result && result !== lastResultReference) {
+      const summary = `[CustomNodes] Install finished. Success: ${result.success}. OK: ${result.ok.length}. Failed: ${result.failed.length}.`
+      console.log(summary)
+      sendClientLog('log', summary)
+      if (result.failed.length > 0) {
+        for (const entry of result.failed) {
+          const details = entry.error ? ` - ${entry.error}` : ''
+          const failMessage = `[CustomNodes] Failed: ${entry.filename}${details}`
+          console.error(failMessage)
+          sendClientLog('error', failMessage)
+        }
+      }
+      lastResultReference = result
+    } else if (!result) {
+      lastResultReference = null
+    }
+  })
+
+  $effect(() => {
+    if (startSuccess && !loggedStartSuccess) {
+      const message = '[CustomNodes] ComfyUI started successfully.'
+      console.log(message)
+      sendClientLog('log', message)
+      loggedStartSuccess = true
+    } else if (!startSuccess && loggedStartSuccess) {
+      loggedStartSuccess = false
+    }
+  })
+
+  $effect(() => {
+    if (startError && startError !== loggedStartError) {
+      const message = `[CustomNodes] Start error: ${startError}`
+      console.error(message)
+      sendClientLog('error', message)
+      loggedStartError = startError
+    } else if (!startError && loggedStartError) {
+      loggedStartError = ''
+    }
+  })
+
+  $effect(() => {
+    if (skipped && !loggedSkipNotice) {
+      const message = '[CustomNodes] Step skipped by user.'
+      console.warn(message)
+      sendClientLog('warn', message)
+      loggedSkipNotice = true
+    } else if (!skipped && loggedSkipNotice) {
+      loggedSkipNotice = false
+    }
+  })
+
+  $effect(() => {
+    if (stepComplete && !skipped && !loggedCompletion) {
+      const message = '[CustomNodes] Installation step completed.'
+      console.log(message)
+      sendClientLog('log', message)
+      loggedCompletion = true
+    } else if (!stepComplete && loggedCompletion) {
+      loggedCompletion = false
+    }
+  })
 </script>
 
 <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
@@ -134,17 +223,8 @@
     </div>
   {/if}
 
-  <div class="mt-4 flex flex-wrap gap-2">
-    {#if items.length > 0}
-      <button
-        type="button"
-        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-        onclick={onInstall}
-        disabled={installing || loading}
-      >
-        {installing ? m['customNodes.installing']() : m['customNodes.autoInstall']()}
-      </button>
-    {:else}
+  {#if items.length === 0 && showStartAction}
+    <div class="mt-4 flex flex-wrap gap-2">
       <button
         type="button"
         class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
@@ -157,16 +237,31 @@
           {m['customNodes.start']()}
         {/if}
       </button>
-    {/if}
+    </div>
+  {/if}
 
-    {#if !stepComplete}
-      <button
-        type="button"
-        class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
-        onclick={onSkip}
-      >
-        {m['downloads.skip']()}
-      </button>
-    {/if}
-  </div>
+  {#if showActions}
+    <div class="mt-4 flex flex-wrap gap-2">
+      {#if items.length > 0}
+        <button
+          type="button"
+          class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+          onclick={onInstall}
+          disabled={installing || loading}
+        >
+          {installing ? m['customNodes.installing']() : m['customNodes.autoInstall']()}
+        </button>
+      {/if}
+
+      {#if !stepComplete}
+        <button
+          type="button"
+          class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
+          onclick={onSkip}
+        >
+          {m['downloads.skip']()}
+        </button>
+      {/if}
+    </div>
+  {/if}
 </div>
