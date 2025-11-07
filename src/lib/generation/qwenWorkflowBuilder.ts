@@ -300,10 +300,19 @@ export async function buildQwenWorkflow(
         throw new Error('Qwen Upscale with different model not yet implemented')
       }
     } else if (upscaleModelType === 'sdxl') {
+      const upscaleVaeLoader = findNodeByTitle(workflow, 'Upscale VAE Loader (SDXL)')
       if (upscaleSettings.selectedVae === '__embedded__') {
-        setInput(workflow, 'Upscale Checkpoint Loader (SDXL)', 2, 'VAE Encode (Tiled)', 'model')
-        setInput(workflow, 'Upscale Checkpoint Loader (SDXL)', 2, 'VAE Decode (Tiled)', 'model')
+        if (upscaleVaeLoader) {
+          setInput(workflow, 'Upscale VAE Loader (SDXL)', 0, 'VAE Encode (Tiled)', 'vae')
+          setInput(workflow, 'Upscale VAE Loader (SDXL)', 0, 'VAE Decode (Tiled)', 'vae')
+        } else {
+          setInput(workflow, 'Upscale Checkpoint Loader (SDXL)', 2, 'VAE Encode (Tiled)', 'vae')
+          setInput(workflow, 'Upscale Checkpoint Loader (SDXL)', 2, 'VAE Decode (Tiled)', 'vae')
+        }
       } else {
+        if (!upscaleVaeLoader) {
+          throw new Error('Upscale VAE Loader (SDXL) node not found in Qwen workflow')
+        }
         setInput(workflow, 'Upscale VAE Loader (SDXL)', 0, 'VAE Encode (Tiled)', 'vae')
         setInput(workflow, 'Upscale VAE Loader (SDXL)', 0, 'VAE Decode (Tiled)', 'vae')
         const resolvedUpscaleVae =
