@@ -223,6 +223,13 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
   }
 
   Write-Header "PyTorch"
+  Write-Host "Uninstalling existing PyTorch packages..." -ForegroundColor DarkCyan
+  if ($pipOk) {
+    & $py -m pip uninstall -y torch torchvision torchaudio 2>$null
+  } else {
+    & $uv pip uninstall -p $py torch torchvision torchaudio 2>$null
+  }
+
   $hasNvidia = $false
   try { Get-Command nvidia-smi -ErrorAction SilentlyContinue | Out-Null; $hasNvidia = $true } catch {}
   if ($hasNvidia -and -not $ForceCpuMode) {
@@ -236,10 +243,10 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
     foreach ($ix in $indexes) {
       Write-Host "Trying CUDA wheel index: $ix" -ForegroundColor DarkCyan
       if ($pipOk) {
-        & $py -m pip install torch torchvision --index-url $ix
+        & $py -m pip install torch torchvision torchaudio --index-url $ix
         if ($LASTEXITCODE -eq 0) { $gpuInstalled = $true; break }
       } else {
-        & $uv pip install -p $py --no-cache torch torchvision --index-url $ix
+        & $uv pip install -p $py --no-cache torch torchvision torchaudio --index-url $ix
         if ($LASTEXITCODE -eq 0) { $gpuInstalled = $true; break }
       }
     }
@@ -337,6 +344,20 @@ try {
   }
 
   Write-Host "ComfyUI installation completed." -ForegroundColor Green
+
+  # Check if ComfyUI was running
+  Write-Host "Checking if ComfyUI is running..." -ForegroundColor DarkCyan
+  $comfyProcess = Get-Process -Name python -ErrorAction SilentlyContinue | Where-Object {
+    $_.CommandLine -like "*main.py*--disable-auto-launch*"
+  }
+  if ($comfyProcess) {
+    Write-Host "ComfyUI is running (PID: $($comfyProcess.Id)). Terminating for restart..." -ForegroundColor Yellow
+    Stop-Process -Id $comfyProcess.Id -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    Write-Host "COMFYUI_NEEDS_RESTART"
+  } else {
+    Write-Host "ComfyUI is not currently running." -ForegroundColor DarkCyan
+  }
 } finally {
   Pop-Location
 }

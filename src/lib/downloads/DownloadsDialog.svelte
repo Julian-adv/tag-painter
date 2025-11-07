@@ -313,6 +313,7 @@
       const decoder = new TextDecoder()
       let buffer = ''
       let success = false
+      let needsRestart = false
 
       while (true) {
         const { value, done } = await reader.read()
@@ -331,6 +332,7 @@
                 comfyInstallError = event.message
               } else if (event?.type === 'complete') {
                 success = event.success === true
+                needsRestart = event.needsRestart === true
               }
             } catch {
               // ignore malformed lines
@@ -339,7 +341,6 @@
           newlineIndex = buffer.indexOf('\n')
         }
       }
-
       if (buffer.trim().length > 0) {
         try {
           const event = JSON.parse(buffer.trim())
@@ -349,6 +350,7 @@
             comfyInstallError = event.message
           } else if (event?.type === 'complete') {
             success = event.success === true
+            needsRestart = event.needsRestart === true
           }
         } catch {}
       }
@@ -358,6 +360,9 @@
       }
       if (success) {
         await loadComfyStatus()
+        if (needsRestart) {
+          await startComfy()
+        }
       }
     } catch (err) {
       comfyInstallError = err instanceof Error ? err.message : String(err)

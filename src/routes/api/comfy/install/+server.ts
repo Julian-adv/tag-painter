@@ -74,6 +74,8 @@ export const POST: RequestHandler = async ({ request }) => {
         controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`))
       }
 
+      let needsRestart = false
+
       const pipeOutput = (source: NodeJS.ReadableStream, level: 'info' | 'error') => {
         let buffer = ''
         source.on('data', (chunk) => {
@@ -83,6 +85,9 @@ export const POST: RequestHandler = async ({ request }) => {
             const line = buffer.slice(0, idx).trim()
             buffer = buffer.slice(idx + 1)
             if (line) {
+              if (line === 'COMFYUI_NEEDS_RESTART') {
+                needsRestart = true
+              }
               send({ type: 'log', level, message: line })
             }
             idx = buffer.indexOf('\n')
@@ -103,7 +108,7 @@ export const POST: RequestHandler = async ({ request }) => {
       })
 
       child.on('close', (code) => {
-        send({ type: 'complete', success: code === 0 })
+        send({ type: 'complete', success: code === 0, needsRestart })
         controller.close()
       })
 

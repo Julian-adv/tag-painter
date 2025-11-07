@@ -99,13 +99,16 @@ fi
 "$VENV_PY" -m pip install -r "$COMFY_DIR/requirements.txt"
 
 echo "Installing PyTorch..."
+echo "Uninstalling existing PyTorch packages..."
+"$VENV_PY" -m pip uninstall -y torch torchvision torchaudio 2>/dev/null || true
+
 if command -v nvidia-smi >/dev/null 2>&1 && [[ $FORCE_CPU -eq 0 ]]; then
-  if ! "$VENV_PY" -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128; then
+  if ! "$VENV_PY" -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128; then
     echo "Falling back to CPU PyTorch." >&2
-    "$VENV_PY" -m pip install --upgrade torch torchvision torchaudio
+    "$VENV_PY" -m pip install torch torchvision torchaudio
   fi
 else
-  "$VENV_PY" -m pip install --upgrade torch torchvision torchaudio
+  "$VENV_PY" -m pip install torch torchvision torchaudio
 fi
 
 echo "Installing helper Python packages..."
@@ -124,3 +127,15 @@ if [[ -n "$backup_dir" && -d "$backup_dir/models" ]]; then
 fi
 
 echo "ComfyUI installation completed."
+
+# Check if ComfyUI was running
+echo "Checking if ComfyUI is running..."
+COMFY_PID=$(pgrep -f "python.*main.py.*--disable-auto-launch" || true)
+if [[ -n "$COMFY_PID" ]]; then
+  echo "ComfyUI is running (PID: $COMFY_PID). Terminating for restart..."
+  kill "$COMFY_PID" 2>/dev/null || true
+  sleep 2
+  echo "COMFYUI_NEEDS_RESTART"
+else
+  echo "ComfyUI is not currently running."
+fi
