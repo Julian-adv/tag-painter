@@ -1,62 +1,56 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages'
-  type DownloadItem = {
-    label: string
-    filename: string
-    urls: string[]
-    dest: string
-    category?: string | null
-  }
-  type DownloadResultItem = { filename: string; url?: string | null }
-type DownloadFailedItem = { filename: string; error: string | null }
-type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: DownloadFailedItem[] }
+  import CustomNodesStep from '$lib/downloads/CustomNodesStep.svelte'
+  import DownloadFilesStep from '$lib/downloads/DownloadFilesStep.svelte'
+  import type {
+    CustomNodeItem,
+    DownloadItem,
+    DownloadResultItem,
+    DownloadFailedItem,
+    DownloadSummary,
+    ProgressState,
+    DownloadProgressState,
+    FileProgressState,
+    SkipState
+  } from '$lib/downloads/types'
+
+  type SetupStep = 'customNodes' | 'downloadsCore' | 'downloadsModels'
 
   interface Props {
     isOpen: boolean
-    onClose?: (result: { success: boolean }) => void
-    missingStep1Filenames?: string[]
+    onClose: ((result: { success: boolean }) => void) | undefined
+    missingStep1Filenames: string[] | undefined
   }
 
   let { isOpen = $bindable(), onClose, missingStep1Filenames = [] }: Props = $props()
+
+  let customNodeItems = $state<CustomNodeItem[]>([])
+  let customNodesLoading = $state(false)
+  let customNodesInstalling = $state(false)
+  let customNodesResult: DownloadSummary | null = $state(null)
+  let customInstallProgress: ProgressState = $state({ total: 0, completed: 0, current: '' })
+  const customProgressPercent = $derived(
+    customInstallProgress.total === 0
+      ? 0
+      : Math.round((customInstallProgress.completed / customInstallProgress.total) * 100)
+  )
+  let customStarting = $state(false)
+  let customStartError = $state('')
+  let customStartSuccess = $state(false)
+  let customInitialSet = $state(false)
+  let customInitiallyRequired = $state(false)
+
+  let downloadsLoading = $state(false)
+  let downloadsLoaded = $state(false)
   let allItems = $state<DownloadItem[]>([])
-  let loading = $state(false)
   let downloading = $state(false)
   let currentStep = $state<1 | 2 | null>(null)
   let step1Result: DownloadSummary | null = $state(null)
   let step2Result: DownloadSummary | null = $state(null)
-  let downloadProgress = $state({ total: 0, completed: 0, current: '', currentLabel: '' })
-  let currentFile = $state({ filename: '', label: '', received: 0, total: 0 })
+  let downloadProgress: DownloadProgressState = $state({ total: 0, completed: 0, current: '', currentLabel: '' })
+  let currentFile: FileProgressState = $state({ filename: '', label: '', received: 0, total: 0 })
   let currentMessage = $state('')
   let progressTransition = $state(true)
-
-  function isLargeModelFile(item: DownloadItem): boolean {
-    const dest = item.dest.toLowerCase().replace(/\\/g, '/')
-    return dest.includes('checkpoints/') ||
-           dest.includes('diffusion_models/') ||
-           dest.includes('loras/')
-  }
-
-  const step1Items = $derived(
-    allItems.filter(item => {
-      if (isLargeModelFile(item)) return false
-      // If missingStep1Filenames is provided and not empty, filter by it
-      if (missingStep1Filenames.length > 0) {
-        return missingStep1Filenames.includes(item.filename)
-      }
-      // Otherwise, show all step 1 items
-      return true
-    })
-  )
-  const step2Items = $derived(allItems.filter(item => isLargeModelFile(item)))
-
-  function isDownloadSuccess(value: DownloadSummary | null): value is DownloadSummary {
-    return value !== null && value.success && value.failed.length === 0
-  }
-
-  const step1Complete = $derived(isDownloadSuccess(step1Result))
-  const step2Complete = $derived(isDownloadSuccess(step2Result))
-  const allComplete = $derived(step1Complete && step2Complete)
-
   const progressPercent = $derived(
     downloadProgress.total === 0
       ? 0
@@ -70,14 +64,76 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
         : 0
   )
 
+  let skippedSteps: SkipState = $state({
+    customNodes: false,
+    downloadsCore: false,
+    downloadsModels: false
+  })
+
+  function isLargeModelFile(item: DownloadItem): boolean {
+    const dest = item.dest.toLowerCase().replace(/\\/g, '/')
+    return dest.includes('checkpoints/') || dest.includes('diffusion_models/') || dest.includes('loras/')
+  }
+
+  const step1Items = $derived(
+    allItems.filter((item) => {
+      if (isLargeModelFile(item)) return false
+      if (missingStep1Filenames.length > 0) {
+        return missingStep1Filenames.includes(item.filename)
+      }
+      return true
+    })
+  )
+  const step2Items = $derived(allItems.filter((item) => isLargeModelFile(item)))
+
+  function isDownloadSuccess(value: DownloadSummary | null): value is DownloadSummary {
+    return value !== null && value.success && value.failed.length === 0
+  }
+
+  const customNodesStepComplete = $derived(
+    skippedSteps.customNodes || (customInitialSet && (customInitiallyRequired ? customStartSuccess : true))
+  )
+
+  const step1Complete = $derived(
+    skippedSteps.downloadsCore ||
+      isDownloadSuccess(step1Result) ||
+      (!downloadsLoading && downloadsLoaded && step1Items.length === 0)
+  )
+
+  const step2Complete = $derived(
+    skippedSteps.downloadsModels ||
+      isDownloadSuccess(step2Result) ||
+      (!downloadsLoading && downloadsLoaded && step2Items.length === 0)
+  )
+
+  const allComplete = $derived(customNodesStepComplete && step1Complete && step2Complete)
+
+  function skipStep(step: SetupStep) {
+    switch (step) {
+      case 'customNodes':
+        if (!skippedSteps.customNodes) {
+          skippedSteps = { ...skippedSteps, customNodes: true }
+        }
+        break
+      case 'downloadsCore':
+        if (!skippedSteps.downloadsCore) {
+          skippedSteps = { ...skippedSteps, downloadsCore: true }
+        }
+        break
+      case 'downloadsModels':
+        if (!skippedSteps.downloadsModels) {
+          skippedSteps = { ...skippedSteps, downloadsModels: true }
+        }
+        break
+    }
+  }
+
   function closeDialog() {
     if (!isOpen) {
       return
     }
     isOpen = false
-    if (onClose) {
-      onClose({ success: allComplete })
-    }
+    onClose?.({ success: allComplete })
   }
 
   function formatBytes(bytes: number): string {
@@ -87,6 +143,28 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
     const value = bytes / Math.pow(1024, exponent)
     const rounded = value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(1)
     return `${rounded} ${units[exponent]}`
+  }
+
+  function parseDownloadResult(entry: unknown): DownloadResultItem | null {
+    if (!entry || typeof entry !== 'object') return null
+    const record = entry as Record<string, unknown>
+    const filename = record['filename']
+    if (typeof filename !== 'string' || filename.length === 0) {
+      return null
+    }
+    const urlValue = record['url']
+    return { filename, url: typeof urlValue === 'string' ? urlValue : null }
+  }
+
+  function parseFailedResult(entry: unknown): DownloadFailedItem | null {
+    if (!entry || typeof entry !== 'object') return null
+    const record = entry as Record<string, unknown>
+    const filename = record['filename']
+    if (typeof filename !== 'string' || filename.length === 0) {
+      return null
+    }
+    const errorValue = record['error']
+    return { filename, error: typeof errorValue === 'string' ? errorValue : null }
   }
 
   function handleBackdropClick(event: MouseEvent) {
@@ -99,30 +177,244 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
     closeDialog()
   }
 
-  async function loadItems() {
-    loading = true
+  function resetState() {
+    customNodeItems = []
+    customNodesLoading = false
+    customNodesInstalling = false
+    customNodesResult = null
+    customInstallProgress = { total: 0, completed: 0, current: '' }
+    customStarting = false
+    customStartError = ''
+    customStartSuccess = false
+    customInitialSet = false
+    customInitiallyRequired = false
+
+    allItems = []
+    downloadsLoading = false
+    downloadsLoaded = false
+    downloading = false
+    currentStep = null
     step1Result = null
     step2Result = null
+    downloadProgress = { total: 0, completed: 0, current: '', currentLabel: '' }
+    currentFile = { filename: '', label: '', received: 0, total: 0 }
+    currentMessage = ''
+    progressTransition = true
+    skippedSteps = { customNodes: false, downloadsCore: false, downloadsModels: false }
+  }
+
+  async function loadCustomNodes() {
+    customNodesLoading = true
+    try {
+      const res = await fetch('/api/downloads?category=custom-node&onlyMissing=1')
+      const data = await res.json()
+      if (Array.isArray(data?.items)) {
+        const parsed: CustomNodeItem[] = []
+        for (const entry of data.items as unknown[]) {
+          if (!entry || typeof entry !== 'object') continue
+          const record = entry as Record<string, unknown>
+          const urlsSource = Array.isArray(record['urls']) ? (record['urls'] as unknown[]) : []
+          const cleanUrls = urlsSource.filter((url): url is string => typeof url === 'string')
+          parsed.push({
+            label: typeof record['label'] === 'string' ? (record['label'] as string) : '',
+            filename: typeof record['filename'] === 'string' ? (record['filename'] as string) : '',
+            urls: cleanUrls,
+            dest: typeof record['dest'] === 'string' ? (record['dest'] as string) : '',
+            branch: typeof record['branch'] === 'string' ? (record['branch'] as string) : null
+          })
+        }
+        customNodeItems = parsed
+        if (!customInitialSet) {
+          customInitiallyRequired = parsed.length > 0
+          customInitialSet = true
+        }
+      } else {
+        customNodeItems = []
+        if (!customInitialSet) {
+          customInitiallyRequired = false
+          customInitialSet = true
+        }
+      }
+    } catch {
+      customNodeItems = []
+      if (!customInitialSet) {
+        customInitiallyRequired = false
+        customInitialSet = true
+      }
+    } finally {
+      customNodesLoading = false
+      if (!customInitialSet) {
+        customInitiallyRequired = customNodeItems.length > 0
+        customInitialSet = true
+      }
+    }
+  }
+
+  async function installCustomNodes() {
+    if (customNodesInstalling) return
+    if (skippedSteps.customNodes) {
+      skippedSteps = { ...skippedSteps, customNodes: false }
+    }
+    const targets = [...customNodeItems]
+    if (targets.length === 0) {
+      customNodesResult = { success: true, ok: [], failed: [] }
+      return
+    }
+
+    customNodesInstalling = true
+    customNodesResult = null
+    customStartError = ''
+    customStartSuccess = false
+    customInstallProgress = { total: targets.length, completed: 0, current: '' }
+
+    const ok: DownloadResultItem[] = []
+    const failed: DownloadFailedItem[] = []
+
+    for (const item of targets) {
+      customInstallProgress.current = item.label || item.filename
+      try {
+        const res = await fetch('/api/downloads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ onlyMissing: true, filenames: [item.filename], category: 'custom-node' })
+        })
+        let data: unknown = null
+        try {
+          data = await res.json()
+        } catch {
+          data = null
+        }
+        const record = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+        const resOk: DownloadResultItem[] = []
+        if (Array.isArray(record['ok'])) {
+          for (const entry of record['ok'] as unknown[]) {
+            if (entry && typeof entry === 'object') {
+              const value = (entry as Record<string, unknown>)['filename']
+              if (typeof value === 'string' && value.length > 0) {
+                const urlValue = (entry as Record<string, unknown>)['url']
+                resOk.push({ filename: value, url: typeof urlValue === 'string' ? urlValue : null })
+              }
+            }
+          }
+        }
+        const resFailed: DownloadFailedItem[] = []
+        if (Array.isArray(record['failed'])) {
+          for (const entry of record['failed'] as unknown[]) {
+            if (entry && typeof entry === 'object') {
+              const recordEntry = entry as Record<string, unknown>
+              const nameValue = recordEntry['filename']
+              if (typeof nameValue === 'string' && nameValue.length > 0) {
+                const errValue = typeof recordEntry['error'] === 'string' ? recordEntry['error'] : null
+                resFailed.push({ filename: nameValue, error: errValue })
+              }
+            }
+          }
+        }
+        if (resOk.length > 0) ok.push(...resOk)
+        if (resFailed.length > 0) {
+          failed.push(...resFailed)
+        } else if (!res.ok) {
+          failed.push({ filename: item.filename, error: `HTTP ${res.status}` })
+        } else if (resOk.length === 0) {
+          ok.push({ filename: item.filename, url: null })
+        }
+      } catch (err: unknown) {
+        failed.push({
+          filename: item.filename,
+          error: err instanceof Error ? err.message : String(err)
+        })
+      } finally {
+        customInstallProgress.completed += 1
+      }
+    }
+
+    customNodesResult = {
+      success: failed.length === 0,
+      ok,
+      failed
+    }
+    customInstallProgress.current = ''
+    customNodesInstalling = false
+
+    await loadCustomNodes()
+  }
+
+  async function startComfy() {
+    if (customStarting) {
+      return
+    }
+    if (skippedSteps.customNodes) {
+      skippedSteps = { ...skippedSteps, customNodes: false }
+    }
+    customStarting = true
+    customStartError = ''
+    customStartSuccess = false
+    try {
+      const res = await fetch('/api/comfy/start', { method: 'POST' })
+      let data: unknown = null
+      try {
+        data = await res.json()
+      } catch {
+        data = null
+      }
+      const record = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+      if (!res.ok || record['success'] !== true) {
+        const msg = typeof record['error'] === 'string' ? record['error'] : `HTTP ${res.status}`
+        throw new Error(msg)
+      }
+      customStartSuccess = true
+    } catch (err: unknown) {
+      customStartError = err instanceof Error ? err.message : String(err)
+    } finally {
+      customStarting = false
+    }
+  }
+
+  async function loadDownloadItems() {
+    downloadsLoading = true
+    downloadsLoaded = false
+    downloading = false
     currentStep = null
+    step1Result = null
+    step2Result = null
     try {
       const res = await fetch('/api/downloads')
       const data = await res.json()
       if (Array.isArray(data?.items)) {
-        allItems = (data.items as DownloadItem[]).filter(
-          (entry) => entry.category !== 'custom-node'
-        )
+        const parsed: DownloadItem[] = []
+        for (const entry of data.items as unknown[]) {
+          if (!entry || typeof entry !== 'object') continue
+          const record = entry as Record<string, unknown>
+          const urlsSource = Array.isArray(record['urls']) ? (record['urls'] as unknown[]) : []
+          const cleanUrls = urlsSource.filter((url): url is string => typeof url === 'string')
+          parsed.push({
+            label: typeof record['label'] === 'string' ? (record['label'] as string) : '',
+            filename: typeof record['filename'] === 'string' ? (record['filename'] as string) : '',
+            urls: cleanUrls,
+            dest: typeof record['dest'] === 'string' ? (record['dest'] as string) : '',
+            category: typeof record['category'] === 'string' ? (record['category'] as string) : null
+          })
+        }
+        allItems = parsed.filter((entry) => entry.category !== 'custom-node')
       } else {
         allItems = []
       }
-    } catch (e) {
+    } catch {
       allItems = []
     } finally {
-      loading = false
+      downloadsLoading = false
+      downloadsLoaded = true
     }
   }
 
   async function downloadStep(step: 1 | 2) {
     if (downloading) return
+    if (step === 1 && skippedSteps.downloadsCore) {
+      skippedSteps = { ...skippedSteps, downloadsCore: false }
+    }
+    if (step === 2 && skippedSteps.downloadsModels) {
+      skippedSteps = { ...skippedSteps, downloadsModels: false }
+    }
     const items = step === 1 ? step1Items : step2Items
     if (items.length === 0) {
       if (step === 1) {
@@ -166,10 +458,20 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
       if (!res.body || !contentType.includes('ndjson')) {
         const data = await res.json().catch(() => null)
         const record = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
-        const resOk = Array.isArray(record['ok']) ? (record['ok'] as DownloadResultItem[]) : []
-        const resFailed = Array.isArray(record['failed'])
-          ? (record['failed'] as DownloadFailedItem[])
-          : []
+        const resOk: DownloadResultItem[] = []
+        if (Array.isArray(record['ok'])) {
+          for (const entry of record['ok'] as unknown[]) {
+            const parsed = parseDownloadResult(entry)
+            if (parsed) resOk.push(parsed)
+          }
+        }
+        const resFailed: DownloadFailedItem[] = []
+        if (Array.isArray(record['failed'])) {
+          for (const entry of record['failed'] as unknown[]) {
+            const parsedFailed = parseFailedResult(entry)
+            if (parsedFailed) resFailed.push(parsedFailed)
+          }
+        }
         const result = {
           success: !!record['success'],
           ok: resOk,
@@ -196,12 +498,12 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
             const label = typeof event.label === 'string' && event.label.length > 0 ? event.label : filename
             downloadProgress.current = filename
             downloadProgress.currentLabel = label
-            // Disable transition temporarily when switching files
             progressTransition = false
             currentFile = { filename, label, received: 0, total: 0 }
             currentMessage = ''
-            // Re-enable transition after a brief delay
-            setTimeout(() => { progressTransition = true }, 50)
+            setTimeout(() => {
+              progressTransition = true
+            }, 50)
             break
           }
           case 'file-progress': {
@@ -212,9 +514,7 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
                   ? event.receivedBytes
                   : currentFile.received
               const total =
-                typeof event.totalBytes === 'number' && event.totalBytes >= 0
-                  ? event.totalBytes
-                  : currentFile.total
+                typeof event.totalBytes === 'number' && event.totalBytes >= 0 ? event.totalBytes : currentFile.total
               currentFile = {
                 filename,
                 label: downloadProgress.currentLabel || filename,
@@ -237,13 +537,11 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
           }
           case 'file-complete': {
             const filename = typeof event.filename === 'string' ? event.filename : currentFile.filename
-            ok.push({ filename, url: (event.url as string) ?? null })
+            const url = typeof event.url === 'string' ? event.url : null
+            ok.push({ filename, url })
             currentFile = { filename: '', label: '', received: 0, total: 0 }
             currentMessage = ''
-            downloadProgress.completed = Math.min(
-              downloadProgress.total,
-              downloadProgress.completed + 1
-            )
+            downloadProgress.completed = Math.min(downloadProgress.total, downloadProgress.completed + 1)
             break
           }
           case 'file-error': {
@@ -252,10 +550,7 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
             failed.push({ filename, error })
             currentFile = { filename: '', label: '', received: 0, total: 0 }
             currentMessage = error
-            downloadProgress.completed = Math.min(
-              downloadProgress.total,
-              downloadProgress.completed + 1
-            )
+            downloadProgress.completed = Math.min(downloadProgress.total, downloadProgress.completed + 1)
             break
           }
           case 'overall': {
@@ -265,10 +560,20 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
             break
           }
           case 'all-complete': {
-            const resOk = Array.isArray(event.ok) ? (event.ok as DownloadResultItem[]) : []
-            const resFailed = Array.isArray(event.failed)
-              ? (event.failed as DownloadFailedItem[])
-              : []
+            const resOk: DownloadResultItem[] = []
+            if (Array.isArray(event.ok)) {
+              for (const entry of event.ok as unknown[]) {
+                const parsed = parseDownloadResult(entry)
+                if (parsed) resOk.push(parsed)
+              }
+            }
+            const resFailed: DownloadFailedItem[] = []
+            if (Array.isArray(event.failed)) {
+              for (const entry of event.failed as unknown[]) {
+                const parsedFailed = parseFailedResult(entry)
+                if (parsedFailed) resFailed.push(parsedFailed)
+              }
+            }
             summary = {
               success: !!event.success,
               ok: resOk,
@@ -343,7 +648,11 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
   }
 
   $effect(() => {
-    if (isOpen) void loadItems()
+    if (isOpen) {
+      resetState()
+      void loadCustomNodes()
+      void loadDownloadItems()
+    }
   })
 </script>
 
@@ -372,225 +681,81 @@ type DownloadSummary = { success: boolean; ok: DownloadResultItem[]; failed: Dow
           aria-label={m['noCheckpoints.closeDialogLabel']()}
         >
           <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
       <div class="space-y-4">
-        {#if loading}
-          <div class="text-sm text-gray-500">{m['downloads.loading']()}</div>
-        {:else}
-          <!-- Step 1: Essential Files -->
-          {#if !step1Complete}
-          <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-            <div class="mb-2 flex items-center justify-between">
-              <h3 class="text-base font-semibold text-gray-900 dark:text-white">
-                {m['downloads.step1Title']()}
-              </h3>
-              {#if step1Complete}
-                <span class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200">
-                  {m['downloads.completed']()}
-                </span>
-              {:else}
-                <span class="text-xs text-gray-500">
-                  {m['downloads.filesCount']({ count: step1Items.length })}
-                </span>
-              {/if}
-            </div>
-            <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
-              {m['downloads.step1Description']()}
-            </p>
+        <CustomNodesStep
+          skipped={skippedSteps.customNodes}
+          stepComplete={customNodesStepComplete}
+          loading={customNodesLoading}
+          items={customNodeItems}
+          installing={customNodesInstalling}
+          installProgress={customInstallProgress}
+          progressPercent={customProgressPercent}
+          result={customNodesResult}
+          startSuccess={customStartSuccess}
+          startError={customStartError}
+          starting={customStarting}
+          onSkip={() => skipStep('customNodes')}
+          onInstall={installCustomNodes}
+          onStart={startComfy}
+        />
 
-            {#if step1Items.length > 0}
-              <div class="mb-3 max-h-40 overflow-auto rounded border border-gray-200">
-                <table class="w-full text-left text-xs">
-                  <thead class="bg-gray-100 text-gray-700">
-                    <tr>
-                      <th class="px-2 py-1">{m['downloads.fileHeader']()}</th>
-                      <th class="px-2 py-1">{m['downloads.urlHeader']()}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {#each step1Items as it}
-                      <tr class="border-t">
-                        <td class="px-2 py-1 whitespace-nowrap">{it.filename}</td>
-                        <td class="px-2 py-1 truncate text-blue-600"><a href={it.urls?.[0]} target="_blank" rel="noreferrer">{it.urls?.[0]}</a></td>
-                      </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              </div>
-            {/if}
+        <DownloadFilesStep
+          title={m['downloads.step1Title']()}
+          description={m['downloads.step1Description']()}
+          filesCount={m['downloads.filesCount']({ count: step1Items.length })}
+          showFilesCount={!step1Complete}
+          skipped={skippedSteps.downloadsCore}
+          complete={step1Complete}
+          items={step1Items}
+          loading={downloadsLoading}
+          downloading={downloading}
+          currentStepActive={currentStep === 1}
+          downloadProgress={downloadProgress}
+          currentFile={currentFile}
+          currentMessage={currentMessage}
+          progressPercent={progressPercent}
+          currentFilePercent={currentFilePercent}
+          progressTransition={progressTransition}
+          result={step1Result}
+          disableButton={downloading || downloadsLoading || step1Complete}
+          buttonIdleLabel={m['downloads.downloadStep1']()}
+          buttonDownloadingLabel={m['downloads.downloading']()}
+          onDownload={() => downloadStep(1)}
+          onSkip={() => skipStep('downloadsCore')}
+          formatBytes={formatBytes}
+        />
 
-            {#if currentStep === 1 && downloading}
-              <div class="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
-                <div class="flex items-center justify-between gap-3">
-                  <span class="truncate">
-                    {downloadProgress.currentLabel || 'Preparing download...'}
-                  </span>
-                  <span class="text-right text-[11px] text-blue-700 dark:text-blue-200">
-                    {#if currentFile.total > 0}
-                      {formatBytes(currentFile.received)} / {formatBytes(currentFile.total)} ({currentFilePercent}%)
-                    {:else if currentFile.received > 0}
-                      {formatBytes(currentFile.received)}
-                    {:else}
-                      {progressPercent}%
-                    {/if}
-                  </span>
-                </div>
-                <div class="mt-2 h-2 rounded bg-blue-100 dark:bg-blue-800">
-                  <div
-                    class={`h-full rounded bg-blue-600 ${progressTransition ? 'transition-all' : ''} ${currentFile.total === 0 ? 'animate-pulse opacity-60' : ''}`}
-                    style={`width: ${currentFile.total > 0 ? currentFilePercent : 100}%`}
-                  ></div>
-                </div>
-                {#if currentMessage}
-                  <div class="mt-2 text-[11px] text-blue-700 dark:text-blue-200">
-                    {currentMessage}
-                  </div>
-                {/if}
-                <div class="mt-1 text-right text-[11px] text-blue-700 dark:text-blue-200">
-                  {downloadProgress.completed} / {downloadProgress.total}
-                </div>
-              </div>
-            {/if}
-
-            {#if step1Result}
-              <div class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
-                <div>{m['downloads.successCount']({ ok: step1Result.ok.length, failed: step1Result.failed.length })}</div>
-                {#if step1Result.failed.length > 0}
-                  <ul class="mt-1 list-disc pl-5 text-red-600">
-                    {#each step1Result.failed as f}
-                      <li>{f.filename}{f.error ? ` - ${f.error}` : ''}</li>
-                    {/each}
-                  </ul>
-                {/if}
-              </div>
-            {/if}
-
-            <button
-              type="button"
-              class={`w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                step1Complete
-                  ? 'bg-green-200 text-green-700 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              } disabled:opacity-50`}
-              onclick={() => downloadStep(1)}
-              disabled={downloading || loading || step1Complete}
-            >
-              {step1Complete ? m['downloads.completed']() : currentStep === 1 ? m['downloads.downloading']() : m['downloads.downloadStep1']()}
-            </button>
-          </div>
-          {/if}
-
-          <!-- Step 2: Model Files -->
-          {#if step1Complete}
-          <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-            <div class="mb-2 flex items-center justify-between">
-              <h3 class="text-base font-semibold text-gray-900 dark:text-white">
-                {m['downloads.step2Title']()}
-              </h3>
-              {#if step2Complete}
-                <span class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200">
-                  {m['downloads.completed']()}
-                </span>
-              {:else}
-                <span class="text-xs text-gray-500">
-                  {m['downloads.filesCount']({ count: step2Items.length })}
-                </span>
-              {/if}
-            </div>
-            <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
-              {m['downloads.step2Description']()}
-            </p>
-
-            {#if step2Items.length > 0}
-              <div class="mb-3 max-h-40 overflow-auto rounded border border-gray-200">
-                <table class="w-full text-left text-xs">
-                  <thead class="bg-gray-100 text-gray-700">
-                    <tr>
-                      <th class="px-2 py-1">{m['downloads.fileHeader']()}</th>
-                      <th class="px-2 py-1">{m['downloads.urlHeader']()}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {#each step2Items as it}
-                      <tr class="border-t">
-                        <td class="px-2 py-1 whitespace-nowrap">{it.filename}</td>
-                        <td class="px-2 py-1 truncate text-blue-600"><a href={it.urls?.[0]} target="_blank" rel="noreferrer">{it.urls?.[0]}</a></td>
-                      </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              </div>
-            {/if}
-
-            {#if currentStep === 2 && downloading}
-              <div class="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
-                <div class="flex items-center justify-between gap-3">
-                  <span class="truncate">
-                    {downloadProgress.currentLabel || 'Preparing download...'}
-                  </span>
-                  <span class="text-right text-[11px] text-blue-700 dark:text-blue-200">
-                    {#if currentFile.total > 0}
-                      {formatBytes(currentFile.received)} / {formatBytes(currentFile.total)} ({currentFilePercent}%)
-                    {:else if currentFile.received > 0}
-                      {formatBytes(currentFile.received)}
-                    {:else}
-                      {progressPercent}%
-                    {/if}
-                  </span>
-                </div>
-                <div class="mt-2 h-2 rounded bg-blue-100 dark:bg-blue-800">
-                  <div
-                    class={`h-full rounded bg-blue-600 ${progressTransition ? 'transition-all' : ''} ${currentFile.total === 0 ? 'animate-pulse opacity-60' : ''}`}
-                    style={`width: ${currentFile.total > 0 ? currentFilePercent : 100}%`}
-                  ></div>
-                </div>
-                {#if currentMessage}
-                  <div class="mt-2 text-[11px] text-blue-700 dark:text-blue-200">
-                    {currentMessage}
-                  </div>
-                {/if}
-                <div class="mt-1 text-right text-[11px] text-blue-700 dark:text-blue-200">
-                  {downloadProgress.completed} / {downloadProgress.total}
-                </div>
-              </div>
-            {/if}
-
-            {#if step2Result}
-              <div class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
-                <div>{m['downloads.successCount']({ ok: step2Result.ok.length, failed: step2Result.failed.length })}</div>
-                {#if step2Result.failed.length > 0}
-                  <ul class="mt-1 list-disc pl-5 text-red-600">
-                    {#each step2Result.failed as f}
-                      <li>{f.filename}{f.error ? ` - ${f.error}` : ''}</li>
-                    {/each}
-                  </ul>
-                {/if}
-              </div>
-            {/if}
-
-            <button
-              type="button"
-              class={`w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                step2Complete
-                  ? 'bg-green-200 text-green-700 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              } disabled:opacity-50`}
-              onclick={() => downloadStep(2)}
-              disabled={downloading || loading || step2Complete}
-            >
-              {step2Complete ? m['downloads.completed']() : currentStep === 2 ? m['downloads.downloading']() : m['downloads.downloadStep2']()}
-            </button>
-          </div>
-          {/if}
+        {#if step1Complete}
+          <DownloadFilesStep
+            title={m['downloads.step2Title']()}
+            description={m['downloads.step2Description']()}
+            filesCount={m['downloads.filesCount']({ count: step2Items.length })}
+            showFilesCount={!step2Complete}
+            skipped={skippedSteps.downloadsModels}
+            complete={step2Complete}
+            items={step2Items}
+            loading={downloadsLoading}
+            downloading={downloading}
+            currentStepActive={currentStep === 2}
+            downloadProgress={downloadProgress}
+            currentFile={currentFile}
+            currentMessage={currentMessage}
+            progressPercent={progressPercent}
+            currentFilePercent={currentFilePercent}
+            progressTransition={progressTransition}
+            result={step2Result}
+            disableButton={downloading || downloadsLoading || step2Complete}
+            buttonIdleLabel={m['downloads.downloadStep2']()}
+            buttonDownloadingLabel={m['downloads.downloading']()}
+            onDownload={() => downloadStep(2)}
+            onSkip={() => skipStep('downloadsModels')}
+            formatBytes={formatBytes}
+          />
         {/if}
       </div>
 

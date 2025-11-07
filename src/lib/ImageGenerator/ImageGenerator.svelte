@@ -12,7 +12,6 @@
   import { dev } from '$app/environment'
   import { m } from '$lib/paraglide/messages'
   import DownloadsDialog from '$lib/downloads/DownloadsDialog.svelte'
-  import CustomNodesDialog from '$lib/downloads/CustomNodesDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import {
     loadSettings,
@@ -60,10 +59,7 @@
   let lastSeed: number | null = $state(null)
   let showDownloadsDialog = $state(false)
   let missingStep1Filenames = $state<string[]>([])
-  let showCustomNodesDialog = $state(false)
   let customNodePromptChecked = $state(false)
-  let pendingDownloads = $state(false)
-  let awaitingCustomNodeFinish = $state(false)
   let localeVersion = $state(0)
   let isQwenModel = $state(false)
   let currentRandomTagResolutions: {
@@ -93,18 +89,12 @@
   let activeTabId = $state('generator')
 
   // Show dialog when no checkpoints are found
-  async function openDownloadsDialog() {
-    if (showCustomNodesDialog || awaitingCustomNodeFinish) {
-      pendingDownloads = true
-      return
-    }
-    pendingDownloads = false
-
+  async function openDownloadsDialog(forceOpen = false) {
     // Check which Step 1 files are missing
     try {
       const res = await fetch('/api/downloads-check')
       const data = await res.json()
-      if (data.allExist) {
+      if (data.allExist && !forceOpen) {
         // All Step 1 files exist, no need to show dialog
         return
       }
@@ -116,16 +106,7 @@
       missingStep1Filenames = []
     }
 
-    if (showCustomNodesDialog || awaitingCustomNodeFinish) {
-      pendingDownloads = true
-      return
-    }
-
     showDownloadsDialog = true
-  }
-
-  function openCustomNodesDialog() {
-    showCustomNodesDialog = true
   }
 
   async function startComfyUI() {
@@ -151,26 +132,13 @@
       const res = await fetch('/api/downloads?category=custom-node&onlyMissing=1')
       const data = await res.json()
       if (Array.isArray(data?.items) && data.items.length > 0) {
-        pendingDownloads = true
-        if (showDownloadsDialog) {
-          showDownloadsDialog = false
-        }
-        awaitingCustomNodeFinish = true
-        showCustomNodesDialog = true
+        await openDownloadsDialog(true)
       } else {
         // All custom nodes are installed, start ComfyUI
         await startComfyUI()
       }
     } catch (err) {
       console.debug('Failed to check custom nodes', err)
-    }
-  }
-
-  function handleCustomNodesClosed(event: { pending: boolean; advance: boolean }) {
-    awaitingCustomNodeFinish = event.pending
-    if (event.advance || (pendingDownloads && !awaitingCustomNodeFinish)) {
-      pendingDownloads = false
-      void openDownloadsDialog()
     }
   }
 
@@ -749,20 +717,11 @@
               <button
                 type="button"
                 class="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
-                onclick={openDownloadsDialog}
+                onclick={() => openDownloadsDialog(true)}
                 aria-label={m['imageGenerator.devShowDialog']()}
                 title={m['imageGenerator.devShowDialog']()}
               >
                 !
-              </button>
-              <button
-                type="button"
-                class="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
-                onclick={openCustomNodesDialog}
-                aria-label={m['imageGenerator.devShowCustomNodesDialog']()}
-                title={m['imageGenerator.devShowCustomNodesDialog']()}
-              >
-                CN
               </button>
             </div>
           {/if}
@@ -786,7 +745,6 @@
 
 <!-- No Checkpoints Dialog -->
 <DownloadsDialog bind:isOpen={showDownloadsDialog} onClose={handleDownloadsDialogClosed} missingStep1Filenames={missingStep1Filenames} />
-<CustomNodesDialog bind:isOpen={showCustomNodesDialog} onclosed={handleCustomNodesClosed} />
 
 <style>
   :global(html, body) {
