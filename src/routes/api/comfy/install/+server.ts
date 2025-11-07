@@ -34,10 +34,18 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const spawnWithFallback = () => {
     try {
-      return spawn(command.command, command.args, { cwd: process.cwd(), env: process.env })
+      return spawn(command.command, command.args, {
+        cwd: process.cwd(),
+        env: process.env,
+        stdio: ['inherit', 'pipe', 'pipe']
+      })
     } catch (err) {
       if (process.platform === 'win32' && command.fallback) {
-        return spawn(command.fallback[0], command.fallback.slice(1), { cwd: process.cwd(), env: process.env })
+        return spawn(command.fallback[0], command.fallback.slice(1), {
+          cwd: process.cwd(),
+          env: process.env,
+          stdio: ['inherit', 'pipe', 'pipe']
+        })
       }
       throw err
     }

@@ -205,8 +205,8 @@
   "customNodes.continue": "Continue to downloads",
   "customNodes.downloadPrompt": "Would you like to continue by downloading the required model files?",
   "customNodes.successCount": "Success: {ok}, Failed: {failed}",
-  "downloads.title": "Complete Required Setup",
-  "downloads.titleCompleted": "Setup Completed",
+  "downloads.title": "Initial Setup",
+  "downloads.titleCompleted": "Initial Setup Completed",
   "comfyInstall.title": "Install ComfyUI",
   "comfyInstall.description": "Clone the latest ComfyUI release and prepare the Python environment used by Tag Painter.",
   "comfyInstall.install": "Install ComfyUI",
@@ -230,5 +230,6 @@
   "downloads.noItems": "No items.",
   "downloads.fileHeader": "File",
   "downloads.urlHeader": "URL",
-  "downloads.successCount": "Downloaded: {ok}, Failed: {failed}"
+  "downloads.successCount": "Downloaded: {ok}, Failed: {failed}",
+  "downloads.startOver": "Start Over"
 }

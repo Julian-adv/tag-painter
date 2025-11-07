@@ -228,6 +228,7 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
   if ($hasNvidia -and -not $ForceCpuMode) {
     $gpuInstalled = $false
     $indexes = @(
+      'https://download.pytorch.org/whl/cu128',
       'https://download.pytorch.org/whl/cu126',
       'https://download.pytorch.org/whl/cu124',
       'https://download.pytorch.org/whl/cu121'
@@ -235,10 +236,10 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
     foreach ($ix in $indexes) {
       Write-Host "Trying CUDA wheel index: $ix" -ForegroundColor DarkCyan
       if ($pipOk) {
-        & $py -m pip install --upgrade --force-reinstall --no-cache-dir torch torchvision torchaudio --index-url $ix
+        & $py -m pip install torch torchvision --index-url $ix
         if ($LASTEXITCODE -eq 0) { $gpuInstalled = $true; break }
       } else {
-        & $uv pip install -p $py --reinstall --no-cache torch torchvision torchaudio --index-url $ix
+        & $uv pip install -p $py --no-cache torch torchvision --index-url $ix
         if ($LASTEXITCODE -eq 0) { $gpuInstalled = $true; break }
       }
     }

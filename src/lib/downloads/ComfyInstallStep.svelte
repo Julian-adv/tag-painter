@@ -26,6 +26,7 @@
     showActions
   }: Props = $props()
   let comfyLogCount = 0
+  let lastError = ''
 
   const buttonLabel = $derived(
     installing
@@ -41,31 +42,28 @@
     }
     if (logs.length > comfyLogCount) {
       for (let i = comfyLogCount; i < logs.length; i += 1) {
-        const message = `[ComfyInstall] ${logs[i]}`
-        sendClientLog('log', message)
+        sendClientLog('log', logs[i])
       }
       comfyLogCount = logs.length
     }
   })
 
   $effect(() => {
-    if (error) {
-      const message = `[ComfyInstall] Error: ${error}`
-      sendClientLog('error', message)
+    if (error && error !== lastError) {
+      sendClientLog('error', `Error: ${error}`)
+      lastError = error
     }
   })
 
   $effect(() => {
     if (stepComplete && !skipped) {
-      const message = '[ComfyInstall] Installation completed.'
-      sendClientLog('log', message)
+      sendClientLog('log', 'Installation completed.')
     }
   })
 
   $effect(() => {
     if (skipped) {
-      const message = '[ComfyInstall] Step skipped by user.'
-      sendClientLog('warn', message)
+      sendClientLog('warn', 'Step skipped by user.')
     }
   })
 </script>
@@ -114,7 +112,7 @@
 
   {#if logs.length > 0}
     <div
-      class="mb-3 max-h-48 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+      class="mb-3 max-h-48 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-2 text-left text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
     >
       <p class="mb-1 font-semibold">{m['comfyInstall.logsTitle']()}</p>
       <ul class="space-y-1">

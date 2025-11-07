@@ -47,16 +47,15 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   for (const entry of entries) {
-    const text = `[ClientLog] ${entry.message}`
     switch (entry.level) {
       case 'warn':
-        console.warn(text)
+        console.warn(entry.message)
         break
       case 'error':
-        console.error(text)
+        console.error(entry.message)
         break
       default:
-        console.log(text)
+        console.log(entry.message)
         break
     }
   }

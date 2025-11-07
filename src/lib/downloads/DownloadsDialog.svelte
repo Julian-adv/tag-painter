@@ -267,6 +267,14 @@
     skippedSteps = { comfy: false, customNodes: false, downloadsCore: false, downloadsModels: false }
   }
 
+  function forceResetAll() {
+    resetState()
+    // Don't reload status - force showing the ComfyUI install step
+    skippedSteps = { comfy: false, customNodes: false, downloadsCore: false, downloadsModels: false }
+    void loadCustomNodes()
+    void loadDownloadItems()
+  }
+
   async function loadComfyStatus() {
     comfyStatusLoading = true
     try {
@@ -878,10 +886,6 @@
               showStartAction={false}
             />
           {/if}
-        {:else}
-          <div class="rounded border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
-            {m['comfyInstall.completeStepPrompt']?.() ?? 'Install ComfyUI to continue.'}
-          </div>
         {/if}
 
         {#if customNodesStepComplete && !step1Complete}
@@ -945,7 +949,15 @@
         {/if}
       </div>
 
-      <div class="mt-6 flex flex-wrap justify-end gap-2">
+      <div class="mt-6 flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
+          onclick={forceResetAll}
+        >
+          {m['downloads.startOver']()}
+        </button>
+        <div class="flex flex-wrap gap-2">
         {#if !comfyStepComplete}
           <button
             type="button"
@@ -1056,6 +1068,7 @@
         >
           {m['downloads.close']()}
         </button>
+        </div>
       </div>
     </div>
   </div>

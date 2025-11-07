@@ -100,7 +100,7 @@ fi
 
 echo "Installing PyTorch..."
 if command -v nvidia-smi >/dev/null 2>&1 && [[ $FORCE_CPU -eq 0 ]]; then
-  if ! "$VENV_PY" -m pip install --upgrade --force-reinstall --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121; then
+  if ! "$VENV_PY" -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128; then
     echo "Falling back to CPU PyTorch." >&2
     "$VENV_PY" -m pip install --upgrade torch torchvision torchaudio
   fi

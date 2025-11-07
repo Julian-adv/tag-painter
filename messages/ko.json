@@ -205,8 +205,8 @@
   "customNodes.continue": "다운로드 계속",
   "customNodes.downloadPrompt": "이어서 필요한 모델 파일들을 다운로드 받으시겠습니까?",
   "customNodes.successCount": "성공: {ok}, 실패: {failed}",
-  "downloads.title": "필수 설정 진행",
-  "downloads.titleCompleted": "설정 완료",
+  "downloads.title": "초기 설정",
+  "downloads.titleCompleted": "초기 설정 완료",
   "comfyInstall.title": "ComfyUI 설치",
   "comfyInstall.description": "Tag Painter에서 사용할 ComfyUI를 설치하고 Python 환경을 준비합니다.",
   "comfyInstall.install": "ComfyUI 설치",
@@ -230,5 +230,6 @@
   "downloads.noItems": "항목 없음.",
   "downloads.fileHeader": "파일",
   "downloads.urlHeader": "URL",
-  "downloads.successCount": "다운로드: {ok}개, 실패: {failed}개"
+  "downloads.successCount": "다운로드: {ok}개, 실패: {failed}개",
+  "downloads.startOver": "처음부터"
 }
