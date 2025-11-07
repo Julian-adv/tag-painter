@@ -745,15 +745,26 @@
           />
 
           {#if dev}
-            <button
-              type="button"
-              class="flex h-6 w-6 items-center justify-center self-start rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
-              onclick={openDownloadsDialog}
-              aria-label={m['imageGenerator.devShowDialog']()}
-              title={m['imageGenerator.devShowDialog']()}
-            >
-              !
-            </button>
+            <div class="flex gap-1 self-start">
+              <button
+                type="button"
+                class="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
+                onclick={openDownloadsDialog}
+                aria-label={m['imageGenerator.devShowDialog']()}
+                title={m['imageGenerator.devShowDialog']()}
+              >
+                !
+              </button>
+              <button
+                type="button"
+                class="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
+                onclick={openCustomNodesDialog}
+                aria-label={m['imageGenerator.devShowCustomNodesDialog']()}
+                title={m['imageGenerator.devShowCustomNodesDialog']()}
+              >
+                CN
+              </button>
+            </div>
           {/if}
         </div>
       </section>

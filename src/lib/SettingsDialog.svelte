@@ -437,13 +437,15 @@
           <option value="chinese">{m['settingsDialog.chatPromptLanguageChinese']()}</option>
         </select>
 
-        <label for="global-workflow" class="output-dir-label">Global Workflow</label>
+        <label for="global-workflow" class="output-dir-label">
+          {m['settingsDialog.globalWorkflow']()}
+        </label>
         <select
           id="global-workflow"
           bind:value={localSettings.customWorkflowPath}
           class="output-dir-input"
         >
-          <option value="">None (Use built-in workflow)</option>
+          <option value="">{m['settingsDialog.globalWorkflowNone']()}</option>
           {#each availableWorkflows as workflow (workflow)}
             <option value={workflow}>{workflow}</option>
           {/each}
