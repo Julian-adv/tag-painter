@@ -1,5 +1,6 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages'
+  import ComfyInstallStep from '$lib/downloads/ComfyInstallStep.svelte'
   import CustomNodesStep from '$lib/downloads/CustomNodesStep.svelte'
   import DownloadFilesStep from '$lib/downloads/DownloadFilesStep.svelte'
   import type {
@@ -14,7 +15,7 @@
     SkipState
   } from '$lib/downloads/types'
 
-  type SetupStep = 'customNodes' | 'downloadsCore' | 'downloadsModels'
+  type SetupStep = 'comfy' | 'customNodes' | 'downloadsCore' | 'downloadsModels'
 
   interface Props {
     isOpen: boolean
@@ -23,6 +24,12 @@
   }
 
   let { isOpen = $bindable(), onClose, missingStep1Filenames = [] }: Props = $props()
+
+  let comfyInstalled = $state(false)
+  let comfyStatusLoading = $state(false)
+  let comfyInstalling = $state(false)
+  let comfyInstallLogs = $state<string[]>([])
+  let comfyInstallError = $state('')
 
   let customNodeItems = $state<CustomNodeItem[]>([])
   let customNodesLoading = $state(false)
@@ -65,6 +72,7 @@
   )
 
   let skippedSteps: SkipState = $state({
+    comfy: false,
     customNodes: false,
     downloadsCore: false,
     downloadsModels: false
@@ -90,8 +98,10 @@
     return value !== null && value.success && value.failed.length === 0
   }
 
+  const comfyStepComplete = $derived(skippedSteps.comfy || comfyInstalled)
+
   const customNodesStepComplete = $derived(
-    skippedSteps.customNodes || (customInitialSet && (customInitiallyRequired ? customStartSuccess : true))
+    skippedSteps.customNodes || ((customInitialSet && (customInitiallyRequired ? customStartSuccess : true)) && comfyStepComplete)
   )
 
   const step1Complete = $derived(
@@ -106,10 +116,15 @@
       (!downloadsLoading && downloadsLoaded && step2Items.length === 0)
   )
 
-  const allComplete = $derived(customNodesStepComplete && step1Complete && step2Complete)
+  const allComplete = $derived(comfyStepComplete && customNodesStepComplete && step1Complete && step2Complete)
 
   function skipStep(step: SetupStep) {
     switch (step) {
+      case 'comfy':
+        if (!skippedSteps.comfy) {
+          skippedSteps = { ...skippedSteps, comfy: true }
+        }
+        break
       case 'customNodes':
         if (!skippedSteps.customNodes) {
           skippedSteps = { ...skippedSteps, customNodes: true }
@@ -178,6 +193,12 @@
   }
 
   function resetState() {
+    comfyInstalled = false
+    comfyStatusLoading = false
+    comfyInstalling = false
+    comfyInstallLogs = []
+    comfyInstallError = ''
+
     customNodeItems = []
     customNodesLoading = false
     customNodesInstalling = false
@@ -200,7 +221,98 @@
     currentFile = { filename: '', label: '', received: 0, total: 0 }
     currentMessage = ''
     progressTransition = true
-    skippedSteps = { customNodes: false, downloadsCore: false, downloadsModels: false }
+    skippedSteps = { comfy: false, customNodes: false, downloadsCore: false, downloadsModels: false }
+  }
+
+  async function loadComfyStatus() {
+    comfyStatusLoading = true
+    try {
+      const res = await fetch('/api/comfy/status')
+      const data = await res.json()
+      comfyInstalled = data?.installed === true
+    } catch {
+      comfyInstalled = false
+    } finally {
+      comfyStatusLoading = false
+    }
+  }
+
+  async function installComfy(options?: { reinstall?: boolean }) {
+    if (comfyInstalling) return
+    comfyInstalling = true
+    comfyInstallError = ''
+    comfyInstallLogs = []
+    try {
+      const res = await fetch('/api/comfy/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reinstall: options?.reinstall === true })
+      })
+
+      if (!res.body) {
+        if (!res.ok) {
+          const text = await res.text()
+          throw new Error(text || 'Failed to install ComfyUI')
+        }
+        comfyInstalled = true
+        return
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let success = false
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        let newlineIndex = buffer.indexOf('\n')
+        while (newlineIndex !== -1) {
+          const line = buffer.slice(0, newlineIndex).trim()
+          buffer = buffer.slice(newlineIndex + 1)
+          if (line.length > 0) {
+            try {
+              const event = JSON.parse(line)
+              if (event?.type === 'log' && typeof event.message === 'string') {
+                comfyInstallLogs = [...comfyInstallLogs, event.message]
+              } else if (event?.type === 'error' && typeof event.message === 'string') {
+                comfyInstallError = event.message
+              } else if (event?.type === 'complete') {
+                success = event.success === true
+              }
+            } catch {
+              // ignore malformed lines
+            }
+          }
+          newlineIndex = buffer.indexOf('\n')
+        }
+      }
+
+      if (buffer.trim().length > 0) {
+        try {
+          const event = JSON.parse(buffer.trim())
+          if (event?.type === 'log' && typeof event.message === 'string') {
+            comfyInstallLogs = [...comfyInstallLogs, event.message]
+          } else if (event?.type === 'error' && typeof event.message === 'string') {
+            comfyInstallError = event.message
+          } else if (event?.type === 'complete') {
+            success = event.success === true
+          }
+        } catch {}
+      }
+
+      if (!success && !comfyInstallError) {
+        comfyInstallError = 'ComfyUI installation failed'
+      }
+      if (success) {
+        await loadComfyStatus()
+      }
+    } catch (err) {
+      comfyInstallError = err instanceof Error ? err.message : String(err)
+    } finally {
+      comfyInstalling = false
+    }
   }
 
   async function loadCustomNodes() {
@@ -650,6 +762,7 @@
   $effect(() => {
     if (isOpen) {
       resetState()
+      void loadComfyStatus()
       void loadCustomNodes()
       void loadDownloadItems()
     }
@@ -687,48 +800,67 @@
       </div>
 
       <div class="space-y-4">
-        <CustomNodesStep
-          skipped={skippedSteps.customNodes}
-          stepComplete={customNodesStepComplete}
-          loading={customNodesLoading}
-          items={customNodeItems}
-          installing={customNodesInstalling}
-          installProgress={customInstallProgress}
-          progressPercent={customProgressPercent}
-          result={customNodesResult}
-          startSuccess={customStartSuccess}
-          startError={customStartError}
-          starting={customStarting}
-          onSkip={() => skipStep('customNodes')}
-          onInstall={installCustomNodes}
-          onStart={startComfy}
+        <ComfyInstallStep
+          skipped={skippedSteps.comfy}
+          stepComplete={comfyStepComplete}
+          installing={comfyInstalling || comfyStatusLoading}
+          logs={comfyInstallLogs}
+          error={comfyInstallError}
+          installed={comfyInstalled}
+          onInstall={() => installComfy({ reinstall: comfyInstalled })}
+          onSkip={() => skipStep('comfy')}
         />
 
-        <DownloadFilesStep
-          title={m['downloads.step1Title']()}
-          description={m['downloads.step1Description']()}
-          filesCount={m['downloads.filesCount']({ count: step1Items.length })}
-          showFilesCount={!step1Complete}
-          skipped={skippedSteps.downloadsCore}
-          complete={step1Complete}
-          items={step1Items}
-          loading={downloadsLoading}
-          downloading={downloading}
-          currentStepActive={currentStep === 1}
-          downloadProgress={downloadProgress}
-          currentFile={currentFile}
-          currentMessage={currentMessage}
-          progressPercent={progressPercent}
-          currentFilePercent={currentFilePercent}
-          progressTransition={progressTransition}
-          result={step1Result}
-          disableButton={downloading || downloadsLoading || step1Complete}
-          buttonIdleLabel={m['downloads.downloadStep1']()}
-          buttonDownloadingLabel={m['downloads.downloading']()}
-          onDownload={() => downloadStep(1)}
-          onSkip={() => skipStep('downloadsCore')}
-          formatBytes={formatBytes}
-        />
+        {#if comfyStepComplete}
+          <CustomNodesStep
+            skipped={skippedSteps.customNodes}
+            stepComplete={customNodesStepComplete}
+            loading={customNodesLoading}
+            items={customNodeItems}
+            installing={customNodesInstalling}
+            installProgress={customInstallProgress}
+            progressPercent={customProgressPercent}
+            result={customNodesResult}
+            startSuccess={customStartSuccess}
+            startError={customStartError}
+            starting={customStarting}
+            onSkip={() => skipStep('customNodes')}
+            onInstall={installCustomNodes}
+            onStart={startComfy}
+          />
+        {:else}
+          <div class="rounded border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-400/40 dark:bg-blue-900/40 dark:text-blue-100">
+            {m['comfyInstall.completeStepPrompt']?.() ?? 'Install ComfyUI to continue.'}
+          </div>
+        {/if}
+
+        {#if customNodesStepComplete}
+          <DownloadFilesStep
+            title={m['downloads.step1Title']()}
+            description={m['downloads.step1Description']()}
+            filesCount={m['downloads.filesCount']({ count: step1Items.length })}
+            showFilesCount={!step1Complete}
+            skipped={skippedSteps.downloadsCore}
+            complete={step1Complete}
+            items={step1Items}
+            loading={downloadsLoading}
+            downloading={downloading}
+            currentStepActive={currentStep === 1}
+            downloadProgress={downloadProgress}
+            currentFile={currentFile}
+            currentMessage={currentMessage}
+            progressPercent={progressPercent}
+            currentFilePercent={currentFilePercent}
+            progressTransition={progressTransition}
+            result={step1Result}
+            disableButton={downloading || downloadsLoading || step1Complete}
+            buttonIdleLabel={m['downloads.downloadStep1']()}
+            buttonDownloadingLabel={m['downloads.downloading']()}
+            onDownload={() => downloadStep(1)}
+            onSkip={() => skipStep('downloadsCore')}
+            formatBytes={formatBytes}
+          />
+        {/if}
 
         {#if step1Complete}
           <DownloadFilesStep

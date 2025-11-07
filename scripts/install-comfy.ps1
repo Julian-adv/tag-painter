@@ -1,22 +1,21 @@
 param(
-  [string]$NodeVersion = "22.19.0",
-  [string]$NodeZipUrl = "https://nodejs.org/dist/v22.19.0/node-v22.19.0-win-x64.zip",
-  [switch]$SkipNode
+  [string]$ComfyDir = "vendor\ComfyUI",
+  [string]$PythonVersion = "3.12",
+  [switch]$Reinstall,
+  [switch]$ForceCPU
 )
 
 <#
-  Windows bootstrap script
-  - Installs portable Git (MinGit) if system Git is not available
-  - Installs Node v$NodeVersion locally (portable) if not available
-  - ComfyUI installation is now handled via scripts/install-comfy.ps1 or the in-app setup dialog
+  Installs or reinstalls the local ComfyUI environment used by Tag Painter.
+  - Clones the latest ComfyUI release (git) into $ComfyDir
+  - Sets up a Python $PythonVersion virtual environment using uv
+  - Installs ComfyUI requirements, PyTorch (CUDA when available), and common extras
+  - Preserves the existing models directory when reinstalling
 
   Usage examples:
-    pwsh -File scripts/bootstrap.ps1
-    pwsh -File scripts/bootstrap.ps1 -SkipNode
-
-  Notes:
-  - If you prefer your system Node, pass -SkipNode
-  - After running bootstrap, run scripts/install-comfy.ps1 (or use the app) to install ComfyUI
+    pwsh -File scripts/install-comfy.ps1
+    pwsh -File scripts/install-comfy.ps1 -Reinstall
+    pwsh -File scripts/install-comfy.ps1 -ForceCPU
 #>
 
 Set-StrictMode -Version Latest
@@ -46,7 +45,6 @@ function Save-UrlIfMissing($url, $destPath) {
   throw "Failed to download $url"
 }
 
-
 function Get-7ZipPath() {
   try {
     $cmd = Get-Command 7z -ErrorAction Stop
@@ -72,7 +70,7 @@ function Expand-Zip-To($archivePath, $destDir) {
   if ($ext -eq '.7z') {
     $sevenZip = Get-7ZipPath
     if (-not $sevenZip) {
-      throw "7-Zip is required to extract .7z archives. Install 7-Zip or provide a .zip URL."
+      throw "7-Zip is required to extract .7z archives. Install 7-Zip or provide a .zip archive."
     }
     & $sevenZip x -y -o"$destDir" "$archivePath" | Out-Null
     return
@@ -80,7 +78,6 @@ function Expand-Zip-To($archivePath, $destDir) {
   throw "Unsupported archive extension: $ext"
 }
 
-# Resolve latest MinGit 64-bit URL from GitHub API (fallback to static URL)
 function Get-LatestGitMinGitUrl() {
   $api = 'https://api.github.com/repos/git-for-windows/git/releases/latest'
   try {
@@ -94,7 +91,6 @@ function Get-LatestGitMinGitUrl() {
   return 'https://github.com/git-for-windows/git/releases/latest/download/MinGit-64-bit.zip'
 }
 
-# Ensure a portable Git is available under vendor\git when system git is missing.
 function Install-Git($vendorDir) {
   Write-Header "Git"
 
@@ -106,16 +102,6 @@ function Install-Git($vendorDir) {
   if (-not (Test-Path (Join-Path $gitHome "cmd\git.exe"))) {
     Write-Host "Installing portable Git to $gitHome" -ForegroundColor DarkCyan
     Save-UrlIfMissing $gitZipUrl $gitZip
-    # If the download appears invalid (very small), retry via API-selected URL
-    try {
-      if (-not (Test-Path $gitZip) -or (Get-Item $gitZip).Length -lt 100000) {
-        $altUrl = Get-LatestGitMinGitUrl
-        if ($altUrl -ne $gitZipUrl) {
-          Write-Host "Retrying Git download from: $altUrl" -ForegroundColor DarkCyan
-          Save-UrlIfMissing $altUrl $gitZip
-        }
-      }
-    } catch {}
     Expand-Zip-To $gitZip $gitExtractDir
 
     if (Test-Path $gitHome) { Remove-Item -Recurse -Force $gitHome }
@@ -128,126 +114,9 @@ function Install-Git($vendorDir) {
     Write-Host "Using vendor Git at $gitHome" -ForegroundColor Green
   }
 
-  # Prepend vendor Git to PATH for this session (always prefer vendor Git)
   $env:PATH = (Join-Path $gitHome 'cmd') + ';' + (Join-Path $gitHome 'bin') + ';' + (Join-Path $gitHome 'usr\\bin') + ';' + $env:PATH
-  Write-Host "Vendor Git ready: $((Join-Path $gitHome 'cmd\git.exe'))" -ForegroundColor Green
+  Write-Host "Vendor Git ready." -ForegroundColor Green
   return $gitHome
-}
-
-function Install-Node($vendorDir) {
-  if ($SkipNode) {
-    Write-Host "Skipping Node setup (SkipNode)." -ForegroundColor Yellow
-    return $null
-  }
-
-  Write-Header "Node.js $NodeVersion"
-
-  $systemNode = $null
-  try {
-    $ver = (node -v) 2>$null
-    if ($ver -and $ver.Trim() -eq "v$NodeVersion") { $systemNode = "node" }
-  } catch {}
-
-  if ($systemNode) {
-    Write-Host "Using system Node $ver" -ForegroundColor Green
-    return $null
-  }
-
-  $nodeZip = Join-Path $vendorDir "node.zip"
-  $nodeExtractDir = Join-Path $vendorDir "node-extract"
-  $nodeHome = Join-Path $vendorDir "node"
-
-  Save-UrlIfMissing $NodeZipUrl $nodeZip
-  Expand-Zip-To $nodeZip $nodeExtractDir
-
-  # Move extracted folder to vendor\node for a stable path
-  if (Test-Path $nodeHome) { Remove-Item -Recurse -Force $nodeHome }
-  $sub = Get-ChildItem -Path $nodeExtractDir | Where-Object { $_.PSIsContainer } | Select-Object -First 1
-  if (-not $sub) { throw "Could not locate extracted Node folder under $nodeExtractDir" }
-  Move-Item -Path $sub.FullName -Destination $nodeHome
-  Remove-Item -Recurse -Force $nodeExtractDir
-
-  return $nodeHome
-}
-
-function Install-ComfyUIPortable($vendorDir, $comfyDir, $portableUrl) {
-  if ($SkipComfy) {
-    Write-Host "Skipping ComfyUI setup (SkipComfy)." -ForegroundColor Yellow
-    return
-  }
-
-  Write-Header "ComfyUI Portable"
-
-  if (Test-Path $comfyDir) {
-    Write-Host "ComfyUI already present at $comfyDir" -ForegroundColor Green
-    return
-  }
-
-  if (-not $portableUrl) {
-    Write-Host "No -ComfyPortableUrl provided. Please pass a direct URL to the Windows portable archive." -ForegroundColor Yellow
-    Write-Host "You can rerun: pwsh -File scripts\\bootstrap.ps1 -ComfyPortableUrl <URL>" -ForegroundColor Yellow
-    return
-  }
-
-  $tmp = Join-Path $vendorDir "comfy-download"
-  New-DirectoryIfMissing $tmp
-  try {
-    $uri = [System.Uri]$portableUrl
-    $leaf = [System.IO.Path]::GetFileName($uri.AbsolutePath)
-    if (-not $leaf) { $leaf = "comfy.zip" }
-  } catch { $leaf = "comfy.zip" }
-  $archive = Join-Path $tmp $leaf
-  Save-UrlIfMissing $portableUrl $archive
-
-  $extractDir = Join-Path $tmp "extract"
-  Expand-Zip-To $archive $extractDir
-
-  # Try to locate top-level extracted folder and rename to ComfyUI
-  $first = Get-ChildItem -Path $extractDir | Select-Object -First 1
-  if (-not $first) { throw "Failed to extract ComfyUI archive" }
-  Move-Item -Path $first.FullName -Destination $comfyDir
-  Remove-Item -Recurse -Force $tmp
-
-  Write-Host "ComfyUI extracted to: $comfyDir" -ForegroundColor Green
-}
-
-function Install-ComfyUISource($vendorDir, $comfyDir) {
-  if ($SkipComfy) {
-    Write-Host "Skipping ComfyUI setup (SkipComfy)." -ForegroundColor Yellow
-    return
-  }
-  if (Test-Path $comfyDir) {
-    Write-Host "ComfyUI already present at $comfyDir" -ForegroundColor Green
-    return
-  }
-  Write-Header "ComfyUI (latest release via git)"
-
-  # Fetch latest release tag from GitHub API
-  $latestTag = $null
-  try {
-    Write-Host "Fetching latest release tag..." -ForegroundColor DarkCyan
-    $api = 'https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest'
-    $resp = Invoke-WebRequest -Uri $api -Headers @{ 'User-Agent' = 'pwsh' } -UseBasicParsing
-    $json = $resp.Content | ConvertFrom-Json
-    if ($json.tag_name) {
-      $latestTag = $json.tag_name
-      Write-Host "Latest release tag: $latestTag" -ForegroundColor Green
-    }
-  } catch {
-    Write-Host "Failed to fetch latest release tag, falling back to master branch" -ForegroundColor Yellow
-  }
-
-  Write-Host "Cloning ComfyUI repository..." -ForegroundColor DarkCyan
-  if ($latestTag) {
-    git clone --depth 1 --branch $latestTag https://github.com/comfyanonymous/ComfyUI.git $comfyDir
-  } else {
-    git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git $comfyDir
-  }
-
-  if ($LASTEXITCODE -ne 0) {
-    throw "Failed to clone ComfyUI repository"
-  }
-  Write-Host "ComfyUI cloned to: $comfyDir" -ForegroundColor Green
 }
 
 function Install-Uv($vendorDir) {
@@ -288,15 +157,47 @@ function Install-Uv($vendorDir) {
   return $uvPath
 }
 
-function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion) {
+function Install-ComfyUISource($vendorDir, $comfyDir) {
+  if (Test-Path $comfyDir) {
+    Write-Host "ComfyUI already present at $comfyDir" -ForegroundColor Green
+    return
+  }
+  Write-Header "ComfyUI"
+
+  $latestTag = $null
+  try {
+    Write-Host "Fetching latest release tag..." -ForegroundColor DarkCyan
+    $api = 'https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest'
+    $resp = Invoke-WebRequest -Uri $api -Headers @{ 'User-Agent' = 'pwsh' } -UseBasicParsing
+    $json = $resp.Content | ConvertFrom-Json
+    if ($json.tag_name) {
+      $latestTag = $json.tag_name
+      Write-Host "Latest release tag: $latestTag" -ForegroundColor Green
+    }
+  } catch {
+    Write-Host "Failed to fetch latest release tag, falling back to master branch" -ForegroundColor Yellow
+  }
+
+  Write-Host "Cloning ComfyUI repository..." -ForegroundColor DarkCyan
+  if ($latestTag) {
+    git clone --depth 1 --branch $latestTag https://github.com/comfyanonymous/ComfyUI.git $comfyDir
+  } else {
+    git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git $comfyDir
+  }
+  if ($LASTEXITCODE -ne 0) {
+    throw "Failed to clone ComfyUI repository"
+  }
+  Write-Host "ComfyUI cloned to: $comfyDir" -ForegroundColor Green
+}
+
+function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$ForceCpuMode) {
   $uv = Install-Uv $vendorDir
   $venvDir = Join-Path $vendorDir "comfy-venv"
   Write-Header "Python venv"
   & $uv python install $pythonVersion
-  # Recreate venv if existing version mismatches requested
   if (Test-Path $venvDir) {
     try {
-      $pyExisting = Join-Path $venvDir "Scripts\\python.exe"
+      $pyExisting = Join-Path $venvDir "Scripts\python.exe"
       $verOut = & $pyExisting -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')"
       if ($verOut.Trim() -ne $pythonVersion) {
         Write-Host "Recreating venv with Python $pythonVersion (was $verOut)." -ForegroundColor Yellow
@@ -307,11 +208,10 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion) {
   if (-not (Test-Path $venvDir)) {
     & $uv venv -p $pythonVersion $venvDir
   }
-  $py = Join-Path $venvDir "Scripts\\python.exe"
+  $py = Join-Path $venvDir "Scripts\python.exe"
   if (-not (Test-Path $py)) { throw "Failed to create Python venv at $venvDir" }
 
   Write-Header "ComfyUI requirements"
-  # Ensure pip exists in the venv (uv venv may not include pip by default)
   try { & $py -m ensurepip --upgrade } catch {}
   $pipOk = $false
   try { & $py -m pip --version; if ($LASTEXITCODE -eq 0) { $pipOk = $true } } catch {}
@@ -319,14 +219,13 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion) {
     & $py -m pip install --upgrade pip
     & $py -m pip install -r (Join-Path $comfyDir "requirements.txt")
   } else {
-    # Fallback: use uv pip targeting the venv's interpreter
     & $uv pip install -p $py -r (Join-Path $comfyDir "requirements.txt")
   }
 
   Write-Header "PyTorch"
   $hasNvidia = $false
   try { Get-Command nvidia-smi -ErrorAction SilentlyContinue | Out-Null; $hasNvidia = $true } catch {}
-  if ($hasNvidia) {
+  if ($hasNvidia -and -not $ForceCpuMode) {
     $gpuInstalled = $false
     $indexes = @(
       'https://download.pytorch.org/whl/cu126',
@@ -344,7 +243,7 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion) {
       }
     }
     if (-not $gpuInstalled) {
-      Write-Host "CUDA Torch wheel not available for this environment. Installing CPU Torch instead." -ForegroundColor Yellow
+      Write-Host "CUDA Torch wheel not available. Installing CPU Torch instead." -ForegroundColor Yellow
       if ($pipOk) {
         & $py -m pip install --upgrade --force-reinstall --no-cache-dir torch torchvision torchaudio
       } else {
@@ -359,20 +258,15 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion) {
     }
   }
 
-  Write-Header "Additional Python packages"
-  if ($pipOk) {
-    & $py -m pip install matplotlib pandas
-  } else {
-    & $uv pip install -p $py matplotlib pandas
+  if ($ForceCpuMode) {
+    Write-Host "CPU mode requested. CUDA packages were not installed." -ForegroundColor Yellow
   }
 
-  return @{ PythonPath = $py; UvPath = $uv }
+  return @{ PythonPath = $py; UvPath = $uv; PipAvailable = $pipOk }
 }
 
-function Install-PythonPackages($py, $uv, [string[]]$packages) {
+function Install-PythonPackages($py, $uv, [bool]$pipOk, [string[]]$packages) {
   try { & $py -m ensurepip --upgrade } catch {}
-  $pipOk = $false
-  try { & $py -m pip --version; if ($LASTEXITCODE -eq 0) { $pipOk = $true } } catch {}
   foreach ($pkg in $packages) {
     $ok = $false
     $code = @"
@@ -393,18 +287,55 @@ else:
   }
 }
 
-# Main
+function Backup-Models($comfyDir) {
+  if (-not (Test-Path (Join-Path $comfyDir 'models'))) { return $null }
+  $backup = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+  New-DirectoryIfMissing $backup
+  $modelsBackup = Join-Path $backup 'models'
+  Move-Item -Path (Join-Path $comfyDir 'models') -Destination $modelsBackup
+  return $backup
+}
+
+function Restore-Models($backupDir, $comfyDir) {
+  if (-not $backupDir) { return }
+  $modelsBackup = Join-Path $backupDir 'models'
+  if (-not (Test-Path $modelsBackup)) { return }
+  $target = Join-Path $comfyDir 'models'
+  if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+  Move-Item -Path $modelsBackup -Destination $target
+  Remove-Item -Recurse -Force $backupDir -ErrorAction SilentlyContinue
+}
+
 Push-Location (Resolve-Path (Join-Path $PSScriptRoot ".."))
 try {
-  New-DirectoryIfMissing "vendor"
+  New-DirectoryIfMissing 'vendor'
+  $vendorDir = Resolve-Path 'vendor'
 
-  $nodeHome = Install-Node -vendorDir (Resolve-Path "vendor")
-  # Ensure Git availability (installs portable MinGit under vendor if system Git not found)
-  Install-Git -vendorDir (Resolve-Path "vendor") | Out-Null
+  Install-Git -vendorDir $vendorDir | Out-Null
 
-  Write-Host "ComfyUI installation has moved to scripts/install-comfy.ps1 (or the in-app setup dialog)." -ForegroundColor Yellow
-  Write-Host "Run that script separately to prepare the ComfyUI runtime." -ForegroundColor Yellow
+  $modelsBackup = $null
+  if ($Reinstall -and (Test-Path $ComfyDir)) {
+    Write-Header "Reinstall"
+    $modelsBackup = Backup-Models $ComfyDir
+    Remove-Item -Recurse -Force $ComfyDir -ErrorAction SilentlyContinue
+  }
+
+  Install-ComfyUISource -vendorDir $vendorDir -comfyDir $ComfyDir
+
+  $envInfo = Initialize-PythonVenv -vendorDir $vendorDir -comfyDir $ComfyDir -pythonVersion $PythonVersion -ForceCpuMode:$ForceCPU
+  $extraPkgs = @('matplotlib', 'pandas')
+  if ($ForceCPU) {
+    $extraPkgs += 'onnxruntime'
+  } else {
+    $extraPkgs += 'onnxruntime-gpu'
+  }
+  Install-PythonPackages -py $envInfo.PythonPath -uv $envInfo.UvPath -pipOk $envInfo.PipAvailable -packages $extraPkgs
+
+  if ($modelsBackup) {
+    Restore-Models -backupDir $modelsBackup -comfyDir $ComfyDir
+  }
+
+  Write-Host "ComfyUI installation completed." -ForegroundColor Green
 } finally {
   Pop-Location
 }
- 

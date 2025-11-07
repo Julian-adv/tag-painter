@@ -51,6 +51,7 @@ export type FileProgressState = {
 }
 
 export type SkipState = {
+  comfy: boolean
   customNodes: boolean
   downloadsCore: boolean
   downloadsModels: boolean

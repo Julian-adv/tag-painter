@@ -712,19 +712,17 @@
             showOnlyProgress={activeTabId === 'chat'}
           />
 
-          {#if dev}
-            <div class="flex gap-1 self-start">
-              <button
-                type="button"
-                class="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
-                onclick={() => openDownloadsDialog(true)}
-                aria-label={m['imageGenerator.devShowDialog']()}
-                title={m['imageGenerator.devShowDialog']()}
-              >
-                !
-              </button>
-            </div>
-          {/if}
+          <div class="flex gap-1 self-start">
+            <button
+              type="button"
+              class="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
+              onclick={() => openDownloadsDialog(true)}
+              aria-label={m['imageGenerator.showSetupDialog']()}
+              title={m['imageGenerator.showSetupDialog']()}
+            >
+              !
+            </button>
+          </div>
         </div>
       </section>
     {/key}
