@@ -32,19 +32,19 @@ Running `start.bat` launches the app and opens `http://127.0.0.1:3000/` in your 
 
 When the browser opens you will see the “Custom Nodes” dialog. These nodes are required for ComfyUI, so click **Install** and wait for the process to finish—it can take some time.
 
-<img src="docs/images/custom-nodes-ko.png" alt="Custom nodes dialog" width="550" />
+<img src="docs/images/custom-nodes-en.png" alt="Custom nodes dialog" width="550" />
 
 After the installation completes you will see a **Start ComfyUI** button. Click it to launch ComfyUI in the background.
 
-<img src="docs/images/start-comfyui-ko.png" alt="Start ComfyUI button" width="550" />
+<img src="docs/images/start-comfyui-en.png" alt="Start ComfyUI button" width="550" />
 
 Next, download the model files. Step 1 contains the essential downloads; click **Download Step 1** to begin.
 
-<img src="docs/images/downloads-step1-ko.png" alt="Downloads dialog (step 1)" width="550" />
+<img src="docs/images/downloads-step1-en.png" alt="Downloads dialog (step 1)" width="550" />
 
 Step 2 contains large models. If you already have those files, you can skip the download and copy your own models into `tag-painter/vendor/ComfyUI/models/checkpoints`, `.../diffusion_models`, or `.../loras`.
 
-<img src="docs/images/downloads-step2-ko.png" alt="Downloads dialog (step 2)" width="550" />
+<img src="docs/images/downloads-step2-en.png" alt="Downloads dialog (step 2)" width="550" />
 
 ## Image Generation
 
@@ -76,26 +76,26 @@ Double-click a tag to open the wildcards editor, where you can edit structures a
 
 Usage
 
-| Item                             | Description                                                                                                                              |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Node double-click (Enter)        | Edit the node name or content inline.                                                                                                    |
-| Ctrl+Enter                       | Add a sibling node next to the current node.                                                                                             |
-| Drag & drop                      | Reorder or move nodes.                                                                                                                   |
-| Random                           | Picks a new candidate at random each time you generate an image.                                                                         |
-| Consistent random                | Selects the same value across ALL, Zone 1, and Zone 2. Use this for poses or tags that must match in every zone.                         |
-| Composition                      | Determines the layout (single zone, left/right split, top/bottom split).                                                                 |
-| Weight                           | Adjusts selection probability (higher weight = higher chance of being chosen).                                                           |
-| Disable                          | Exclude specific nodes or patterns from generation.                                                                                      |
-| Pin                              | Force a node to be selected every time—useful when testing.                                                                              |
-| Multi-select/Group (Shift+click) | Select a range and press **Group** to wrap them inside a parent node.                                                                    |
-| Add/Delete                       | Use the toolbar or context menu to add children, add top-level nodes, or delete selections.                                              |
-| Expand/Collapse                  | Expand or collapse the entire tree to review the structure quickly.                                                                      |
+| Item                             | Description                                                                                                      |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Node double-click (Enter)        | Edit the node name or content inline.                                                                            |
+| Ctrl+Enter                       | Add a sibling node next to the current node.                                                                     |
+| Drag & drop                      | Reorder or move nodes.                                                                                           |
+| Random                           | Picks a new candidate at random each time you generate an image.                                                 |
+| Consistent random                | Selects the same value across ALL, Zone 1, and Zone 2. Use this for poses or tags that must match in every zone. |
+| Composition                      | Determines the layout (single zone, left/right split, top/bottom split).                                         |
+| Weight                           | Adjusts selection probability (higher weight = higher chance of being chosen).                                   |
+| Disable                          | Exclude specific nodes or patterns from generation.                                                              |
+| Pin                              | Force a node to be selected every time—useful when testing.                                                      |
+| Multi-select/Group (Shift+click) | Select a range and press **Group** to wrap them inside a parent node.                                            |
+| Add/Delete                       | Use the toolbar or context menu to add children, add top-level nodes, or delete selections.                      |
+| Expand/Collapse                  | Expand or collapse the entire tree to review the structure quickly.                                              |
 
 ### Chat
 
 Use the Gemini API to generate character cards. The cards work with [RisuAI](https://github.com/kwaroran/RisuAI). You need a Gemini API key, which you can obtain for free from [Google AI Studio](https://aistudio.google.com/).
 
-<img src="docs/images/chat-screenshot-ko.png" alt="Chat interface" width="650" />
+<img src="docs/images/chat-screenshot-en.png" alt="Chat interface" width="650" />
 
 ## Settings
 
@@ -111,11 +111,11 @@ Click the gear (settings) button next to Generate to open the settings dialog. Y
 - Default quality prompt: quality-related prefix text
 - LoRA list: manage LoRA models
 
-![Settings dialog](docs/images/settings-en.png)
+<img src="docs/images/settings-en.png" alt="Chat interface" width="450" />
 
 ## Custom Workflows
 
-Workflow files live under `data/workflow`. Example workflows that ComfyUI can load are located in `data/examples`. When you create a new workflow, export it from ComfyUI in API format and place the file inside `data/workflow` so Tag Painter can use it.
+Workflow files live under `data/workflow`. Example workflows that ComfyUI can load are located in `data/examples`. When you create a new workflow, export it from ComfyUI in API format and place the file inside `data/workflow` so Tag Painter can use it. When generating images, the app locates nodes by title to set their parameters, so the titles need to match exactly.
 
 ## License
 

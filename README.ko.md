@@ -116,7 +116,7 @@ Gemini API를 이용해서 캐릭터 카드를 생성할 수 있습니다. 생�
 
 ## 커스텀 워크플로
 
-워크플로 파일들은 data/workflow 폴더에 있습니다. ComfyUI에서 읽어들일 수 있는 워크플로우 파일들은 data/examples 폴더에 있습니다. 새로운 워크플로우를 만들 때 참고하세요. 이미지 생성에 사용하려면 ComfyUI에서 api 형태로 export 해서 data/workflow 폴더에 넣으면 됩니다.
+워크플로 파일들은 data/workflow 폴더에 있습니다. ComfyUI에서 읽어들일 수 있는 워크플로우 파일들은 data/examples 폴더에 있습니다. 새로운 워크플로우를 만들 때 참고하세요. 이미지 생성에 사용하려면 ComfyUI에서 api 형태로 export 해서 data/workflow 폴더에 넣으면 됩니다. 이미지 생성할 때 타이틀을 이용해서 노드를 찾아서 파라메터를 설정하므로 타이틀을 똑같이 하는 것이 필요합니다.
 
 ## 라이선스
 
