@@ -2,45 +2,56 @@
 
 [English](README.md) | 한국어
 
-Tag Painter는 ComfyUI와 연동되는 SvelteKit 기반 웹 애플리케이션입니다. 영역별 프롬프트 구성을 통해 다양한 캐릭터 이미지를 생성할 수 있습니다.
+Tag Painter는 ComfyUI와 연동되는 SvelteKit 기반 웹 애플리케이션입니다. 영역별 프롬프트 구성을 통해 다양한 캐릭터 이미지를 생성할 수 있습니다. 또한 Gemini와 채팅을 통해 이미지를 생성하거나 캐릭터 카드를 만들 수 있습니다.
+
+## 주요 기능
+
+- ComfyUI 실행에 필요한 어플들 설치(Node, Git, Python)
+- ComfyUI 설치
+- 커스텀 노드 설치
+- 이미지 생성 모델 다운로드
+- 와일드카드 이용한 이미지 생성
+- 와일드카드 편집
+- 채팅으로 캐릭터카드 생성
 
 ![Tag Painter 스크린샷](docs/images/app-screenshot-ko.png)
 
 ## 설치
 
-### 1. 릴리스 다운로드
+### 다운로드
 
 - [GitHub Releases](https://github.com/Julian-adv/tag-painter/releases)에서 최신 `tag-painter-release-*.zip` 파일을 받습니다.
 - 원하는 위치에 압축을 풉니다.
 
-### 2. 애플리케이션 실행
+### 애플리케이션 실행
 
-- Windows: `start.bat`
-- macOS/Linux: `bash start.sh`
+- Windows: 압축 푼 폴더에서 `start.bat` 실행
+- macOS/Linux: 압축 푼 폴더에서 `bash start.sh` 실행
 
-스크립트를 실행하면 애플리케이션이 자동으로 시작되어 브라우저에서 사용할 수 있습니다.
-처음 실행은 환경 준비(ComfyUI 설치/가상환경 구성/모델 다운로드 등)로 인해 시간이 꽤 걸릴 수 있습니다. 자동으로 열리지 않으면 브라우저에서 `http://127.0.0.1:3000/` 을 여세요.
+start.bat 스크립트를 실행하면 애플리케이션이 시작되어 브라우저에서 http://127.0.0.1:3000/ 이 열립니다.
+처음 실행은 환경 준비(Node/Git/Python/ComfyUI 설치/가상환경 구성)로 인해 시간이 꽤 걸릴 수 있습니다.
 
-설치가 완료되면 아래와 같은 "체크포인트 없음" 안내 대화상자가 나타날 수 있습니다. 이 경우 Civitai나 Hugging Face에서 체크포인트(베이스 모델) 파일을 내려받아 `ComfyUI/models/checkpoints/` 폴더에 넣어주세요. 파일을 넣은 뒤에는 새로 고침(🔄) 버튼을 눌러 모델 목록을 갱신하면 됩니다.
+브라우저가 열리면 아래와 같은 "커스텀 노드 설치" 안내 대화상자가 나타납니다. ComfyUI를 사용하는데 필요한 커스텀 노드들이니 설치 버튼을 눌러 설치를 합니다. 시간이 꽤 걸릴 수 있습니다.
 
-<img src="docs/images/no-checkpoints-ko.png" alt="체크포인트 없음 대화상자" width="335" />
+<img src="docs/images/custom-nodes-ko.png" alt="커스텀 노드 설치 대화상자" width="550" />
 
-<img src="docs/images/checkpoints-refresh-ko.png" alt="체크포인트 목록 새로고침" width="273" />
+설치가 끝나고 나면 다음과 같이 ComfyUI 시작 버튼이 나오는데 누르면 ComfyUI가 뒷단에서 실행됩니다.
 
-- Zeniji*Mix K-illust — https://civitai.com/models/1651774?modelVersionId=1869616
-  *위 스크린샷은 이 모델로 생성되었습니다.\_
+<img src="docs/images/start-comfyui-ko.png" alt="ComfyUI 시작" width="550" />
+  
+다음은 각종 모델 파일들을 다운로드 받는데, 필수적으로 필요한 파일들을 받는 1단계와 크기가 큰 모델 파일들을 받는 2단계로 나뉘어져 있습니다. 1단계 다운로드를 눌러 다운로드를 시작합니다.
 
-### 설정 열기
+<img src="docs/images/downloads-step1-ko.png" alt="ComfyUI 시작" width="550" />
 
-상단 도구 모음의 톱니(설정) 버튼을 누르면 설정 창이 열립니다. 여기에서 다음 항목을 변경할 수 있습니다.
+2단계 파일들은 본인이 이미 갖고 있는 파일들이 있으면 건너뛰고 본인의 파일들은 복사해 넣어도 됩니다. (`tag-painter\vendor\ComfyUI\models\checkpoints` 혹은 `...\diffusion_models` 혹은 `...\loras`)
 
-- 언어: 한국어/영어 전환
-- 이미지 생성 폴더: 출력 디렉터리 경로
-- 이미지 생성 파라미터: 샘플러, 스텝 수, CFG 스케일, 시드 등
-- 기본 퀄리티 프롬프트: 품질 관련 프리픽스 텍스트
-- LoRA 목록: 사용할 LoRA 모델 선택/관리
+<img src="docs/images/downloads-step2-ko.png" alt="ComfyUI 시작" width="550" />
 
-![설정 창](docs/images/settings-ko.png)
+## 이미지 생성
+
+### 와일드카드 탭
+
+data/wildcards.yaml (모델이 qwen이면 wildcards.qwen.yaml)을 이용해서 이미지를 생성합니다.
 
 ### 구도와 존 프롬프트
 
@@ -52,7 +63,7 @@ Tag Painter는 ComfyUI와 연동되는 SvelteKit 기반 웹 애플리케이션�
 - 1구역/2구역 프롬프트: 각 구역에만 적용되는 태그를 입력합니다.
 - 인페인팅 프롬프트: 인페인팅 기능을 사용할 때 적용됩니다.
 
-구도와 존 프롬프트를 함께 사용하면, 인물/배경/의상 등 서로 다른 요소를 영역별로 정교하게 제어할 수 있습니다.
+구도와 존 프롬프트를 함께 사용하면, 인물/배경/의상 등 서로 다른 요소를 영역별로 제어할 수 있습니다.
 
 ### 태그와 와일드카드 편집
 
@@ -81,138 +92,31 @@ Tag Painter는 ComfyUI와 연동되는 SvelteKit 기반 웹 애플리케이션�
 | 추가/삭제                     | 상단/우클릭 메뉴로 자식 추가, 최상위 추가, 삭제를 할 수 있습니다.                                                                |
 | 확장/접기                     | 트리의 모든 노드를 확장/접기하여 구조를 빠르게 확인합니다.                                                                       |
 
-### 자동 설치/설정 항목
+### 채팅
 
-- start.bat를 실행하면 ComfyUI와 Python 가상환경이 자동으로 준비됩니다.
-- 다음 커스텀 노드가 자동으로 설치됩니다.
-  - cgem156-ComfyUI — https://github.com/laksjdjf/cgem156-ComfyUI
-  - ComfyUI-Custom-Scripts — https://github.com/pythongosssss/ComfyUI-Custom-Scripts
-  - ComfyUI-Impact-Pack — https://github.com/ltdrdata/ComfyUI-Impact-Pack
-  - ComfyUI-Impact-Subpack — https://github.com/ltdrdata/ComfyUI-Impact-Subpack
-  - ComfyUI_essentials — https://github.com/cubiq/ComfyUI_essentials
-  - comfyui_controlnet_aux (OpenPose/DWpose 전처리기) — https://github.com/Fannovel16/comfyui_controlnet_aux
-- 추가 Python 패키지:
-  - pandas — cgem156-ComfyUI의 WD tagger 기능에 필요합니다.
-- 커스텀 노드 동작에 필요한 보조 모델도 자동 다운로드됩니다.
-  - YOLO (사람/얼굴):
-    - person_yolov8m-seg.pt — https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt
-    - face_yolov8m.pt — https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt
-  - SAM: sam_vit_b_01ec64.pth — https://huggingface.co/datasets/Gourieff/ReActor/resolve/main/models/sams/sam_vit_b_01ec64.pth
-  - VAE: fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors — https://huggingface.co/moonshotmillion/VAEfixFP16ErrorsSDXLLowerMemoryUse_v10/resolve/main/fixFP16ErrorsSDXLLowerMemoryUse_v10.safetensors
-  - ControlNet (OpenPose XL): OpenPoseXL2.safetensors — 우선적으로 Hugging Face에서 시도하며, `ComfyUI/models/controlnet/`에 배치됩니다.
-  - ControlNet Aux Annotators:
-    - body_pose_model.pth — https://huggingface.co/lllyasviel/Annotators/resolve/main/body_pose_model.pth
-    - hand_pose_model.pth — https://huggingface.co/lllyasviel/Annotators/resolve/main/hand_pose_model.pth
-    - facenet.pth — https://huggingface.co/lllyasviel/Annotators/resolve/main/facenet.pth
-- 예시 LoRA 모델이 자동으로 다운로드되어 `ComfyUI/models/loras/`에 설치됩니다.
-  - MoriiMee_Gothic_Niji_Style_Illustrious_r1 — https://huggingface.co/NeigeSnowflake/neigeworkflow/resolve/main/MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors
-  - spo_sdxl_10ep_4k-data_lora_webui — https://civitai.com/api/download/models/567119
-  - Sinozick_Style_XL_Pony — https://civitai.com/api/download/models/481798
-  - Fant5yP0ny — https://huggingface.co/LyliaEngine/Fant5yP0ny/resolve/main/Fant5yP0ny.safetensors?download=true
+Gemini API를 이용해서 캐릭터 카드를 생성할 수 있습니다. 생성된 캐릭터 카드는 [RisuAI](https://github.com/kwaroran/RisuAI)에서 사용할 수 있습니다. Gemini API key가 필요합니다. [Google AI Studio](https://aistudio.google.com/)에서 무료키를 얻을 수 있습니다.
 
-또한 인페인팅에서 사용하는 DWpose/OpenPose 전처리기를 위해 onnxruntime를 자동 설치합니다.
+<img src="docs/images/chat-screenshot-ko.png" alt="ComfyUI 시작" width="650" />
 
-- NVIDIA GPU가 감지되면: `onnxruntime-gpu` 설치(필요 시 `onnxruntime`로 대체)
-- 그 외 환경: `onnxruntime` 설치
+## 설정
 
-`OpenPoseXL2.safetensors` 자동 다운로드에 실패하면 수동으로 내려받아 `ComfyUI/models/controlnet/OpenPoseXL2.safetensors` 경로에 넣어주세요.
+생성 버튼 옆에 톱니(설정) 버튼을 누르면 설정 창이 열립니다. 여기에서 다음 항목을 변경할 수 있습니다.
 
-### 실행 옵션
+- 언어: 한국어/영어 전환
+- 출력 폴더: 출력 디렉터리 경로
+- ComfyUI URL: 자신만의 ComfyUI에 접속할 때 사용합니다.
+- Gemini API 키: 채팅으로 이미지 생성할 때 필요합니다.
+- 채팅 프롬프트 언어: Gemini가 생성한 이미지 프롬프트에서 중국어/영어 중 선택할 수 있습니다.
+- Global Workflow: 워크플로우가 따로 저장되지 않은 모델들이 사용할 워크플로우를 지정합니다.
+- 모델별 설정: 샘플러, 스텝 수, CFG 스케일, 시드 등
+- 기본 퀄리티 프롬프트: 품질 관련 프리픽스 텍스트
+- LoRA 목록: 사용할 LoRA 모델 선택/관리
 
-- `-NoComfy`: 사용자가 이미 설치/실행 중인 ComfyUI를 그대로 사용합니다. ComfyUI 설치/시작을 건너뜁니다.
+![설정 창](docs/images/settings-ko.png)
 
-`scripts/start.ps1` 실행 시 ComfyUI는 자동으로 시작되지 않습니다. 커스텀 노드 설치를 마친 뒤 애플리케이션 내 커스텀 노드 대화상자에서 ComfyUI를 시작해주세요.
+## 커스텀 워크플로
 
-## Chroma 워크플로 타이틀
-
-Tag Painter는 Chroma 워크플로를 구성할 때 노드의 `_meta.title`(대소문자 구분, 부분 일치)과 일부 클래스 타입을 기준으로 값을 주입합니다. 아래 타이틀을 워크플로에 1개씩 포함하는 것을 권장합니다.
-
-- 필수(메인 경로)
-  - `CLIP Text Encode (Positive Prompt)` — 메인 긍정 프롬프트 텍스트.
-  - `CLIP Text Encode (Negative Prompt)` — 메인 부정 프롬프트 텍스트.
-  - `Empty Latent Image` — 캔버스 역할의 잠복(latent) 이미지. 가로/세로 크기를 설정에서 적용합니다.
-  - `KSampler (Main)` 또는 `KSampler` — 메인 샘플러. 스텝/CFG/샘플러/스케줄러/시드를 적용합니다.
-  - `CLIP Set Last Layer` — 선택 사항. CLIP 스킵 레이어를 설정에서 적용합니다.
-  - `VAE Decode (Base)` — 업스케일/FaceDetailer를 사용하지 않을 때의 최종 디코드 노드.
-  - 메인 모델 로더 — 메인 경로에 `UNETLoader` 노드가 있어야 합니다. 첫 번째 `UNETLoader`의 `unet_name`을 선택한 체크포인트로 설정합니다.
-
-- 선택(페이스 디테일러)
-  - `FaceDetailer` — FD 본체 노드. 시드/스텝/CFG/샘플러/스케줄러/디노이즈를 적용합니다. 입력 이미지(`image`)는 업스케일 사용 시 `VAE Decode (Tiled)`에서, 아니면 `VAE Decode (Base)`에서 가져옵니다. 또한 `wildcard` 입력에는 존 1/존 2 프롬프트를 결합해 전달합니다.
-  - `Load Checkpoint` — FD용 체크포인트 로더. 모델(0)/CLIP(1)/VAE(2)를 `FaceDetailer`에 제공합니다.
-  - `Load VAE` — FD에서 임베디드 VAE를 사용하지 않을 때 쓰는 VAELoader. `vae_name`을 설정에서 적용합니다.
-  - `Upscale CLIP Text Encode (Positive)` — FD/업스케일 분기에서 사용하는 긍정 텍스트 인코더.
-  - `Upscale CLIP Text Encode (Negative)` — FD/업스케일 분기에서 사용하는 부정 텍스트 인코더.
-
-- 선택(업스케일)
-  - `Latent Upscale` — 타깃 잠복 이미지 크기(기본 크기 × 배율)를 설정합니다.
-  - `SDXL VAE Encode` — 업스케일 경로의 인코드 노드. 임베디드 또는 외부 `Load VAE`를 설정에 맞게 연결합니다.
-  - `KSampler (Upscale)` — 스텝/CFG/샘플러/스케줄러/디노이즈를 적용합니다.
-  - `Upscale CLIP Text Encode (Positive)` — 업스케일 분기의 긍정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
-  - `Upscale CLIP Text Encode (Negative)` — 업스케일 분기의 부정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
-  - `VAE Decode (Tiled)` — 업스케일 분기의 최종 디코드(업스케일 사용 시 출력 소스로 사용됨).
-
-동작 및 참고 사항:
-
-- 타이틀 매칭은 부분 포함, 대소문자 구분입니다. 같은 타이틀을 가진 노드는 하나만 두세요.
-- 타이틀이 일부 누락되어도 가능한 경우 클래스 타입으로 보완 설정합니다: `RandomNoise`(시드), `BasicScheduler`(스텝/스케줄러), `CFGGuider`(CFG), `KSamplerSelect`(샘플러), 첫 `UNETLoader`(체크포인트), 첫 `VAELoader`(VAE).
-- Chroma 워크플로에서 메인 모델은 `UNETLoader`를 사용합니다. `Load Checkpoint` 타이틀은 FaceDetailer용 하나만 두는 것을 권장합니다.
-- 워크플로가 `SamplerCustom` 노드를 사용할 경우(타이틀 `SamplerCustom`), 메인 `KSampler`가 없으면 `cfg` 및 `noise_seed`를 여기에 설정합니다.
-- 최종 저장은 고정 ID(`final_save_output`)를 갖는 `SaveImageWebsocket` 노드를 자동 추가합니다. 워크플로에 저장 노드를 포함할 필요가 없습니다.
-
-## Qwen 워크플로 타이틀
-
-Qwen 모델용 워크플로도 노드의 `_meta.title`(부분 일치, 대소문자 구분)을 기준으로 값을 주입합니다. 아래 타이틀을 포함해 고정된 노드 ID에 의존하지 않도록 구성하세요.
-
-- 필수(메인 경로)
-  - `KSampler` — 메인 샘플러. 스텝/CFG/샘플러/스케줄러/시드를 적용합니다.
-  - `Model Sampling Aura Flow` — UNet/LoRA 체인 뒤의 모델 출력을 받아 `KSampler.model`로 연결됩니다.
-  - `Load Qwen UNet` — 기본 UNETLoader. 선택한 체크포인트를 `unet_name`에 반영합니다.
-  - `Load Qwen VAE` — VAELoader. VAE를 선택했다면(`__embedded__`가 아닌 경우) 해당 이름을 설정합니다.
-  - `CLIP Text Encode (Positive)` — 긍정 프롬프트 텍스트. Qwen CLIP 로더에 연결되어야 합니다.
-  - `CLIP Text Encode (Negative)` — 부정 프롬프트 텍스트. Qwen CLIP 로더에 연결되어야 합니다.
-  - `Empty Latent Image` — 잠복 캔버스. 가로/세로 크기를 설정합니다.
-  - `VAE Decode` — 업스케일/FaceDetailer를 사용하지 않을 때 사용하는 베이스 디코드 노드.
-
-- 선택(페이스 디테일러)
-  - 항상:
-    - `FaceDetailer` — FD 본체 노드. 시드/스텝/CFG/샘플러/스케줄러/디노이즈를 적용합니다.
-    - `FaceDetailer CLIP Text Encode (Positive)` — FD 긍정 프롬프트(텍스트와 CLIP 입력 연결).
-    - `FaceDetailer CLIP Text Encode (Negative)` — FD 부정 프롬프트(텍스트와 CLIP 입력 연결).
-    - 입력 이미지 연결: 업스케일 사용 시 `VAE Decode (Tiled)`, 아니면 베이스 `VAE Decode`.
-  - Qwen FD 경로:
-    - `FaceDetailer UNet Loader (Qwen)` — FD용 UNETLoader. 체크포인트를 설정합니다.
-    - `FaceDetailer Model Sampling Aura Flow (Qwen)` — FD용 모델 샘플링 래퍼. `FaceDetailer`의 model 입력에 연결됩니다.
-    - `FaceDetailer CLIP Loader (Qwen)` — FD용 CLIP 로더. `FaceDetailer`와 FD 텍스트 인코더에 연결됩니다.
-    - `FaceDetailer VAE Loader (Qwen)` — FD용 VAE 로더. `FaceDetailer`의 VAE 입력과 이름을 설정합니다.
-  - SDXL FD 경로:
-    - `FaceDetailer Checkpoint Loader (SDXL)` — 체크포인트 로더. model(0)/clip(1)/vae(2)를 `FaceDetailer`에 제공합니다.
-    - `FaceDetailer VAE Loader (SDXL)` — 체크포인트 임베디드 VAE를 쓰지 않을 때 사용하는 외부 VAE 로더.
-
-- 선택(업스케일)
-  - `Latent Upscale` — 기본 크기 × 배율로 잠복 이미지 크기를 설정합니다.
-  - `SDXL VAE Encode` — 업스케일 경로의 인코드 노드. 설정에 맞게 VAE 입력을 연결합니다.
-  - `KSampler (Upscale)` — 스텝/CFG/샘플러/스케줄러/디노이즈를 적용하고, 모델 입력을 업스케일 경로에 맞게 연결합니다.
-  - Qwen 업스케일 경로:
-    - `Upscale UNet Loader (Qwen)` — 업스케일용 UNETLoader. 체크포인트를 설정합니다.
-    - `Upscale Model Sampling Aura Flow (Qwen)` — 업스케일용 모델 샘플링 래퍼. `KSampler (Upscale)`의 model 입력에 연결됩니다.
-    - `Upscale CLIP Loader (Qwen)` — 업스케일용 CLIP 로더.
-    - `Upscale VAE Loader (Qwen)` — 업스케일용 VAE 로더. 이름을 설정하며 인코드/디코드 모두에서 사용합니다.
-    - `Upscale CLIP Text Encode (Positive)` — 업스케일 긍정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
-    - `Upscale CLIP Text Encode (Negative)` — 업스케일 부정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
-    - `VAE Decode (Tiled)` — 업스케일 분기의 최종 디코드 노드.
-  - SDXL 업스케일 경로:
-    - `Upscale Checkpoint Loader (SDXL)` — 업스케일 경로에 model(0)/clip(1)/vae(2)를 제공합니다.
-    - `Upscale VAE Loader (SDXL)` — 체크포인트 임베디드 VAE를 사용하지 않을 때 쓰는 외부 VAE 로더.
-    - `Upscale CLIP Text Encode (Positive)` — 업스케일 긍정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
-    - `Upscale CLIP Text Encode (Negative)` — 업스케일 부정 프롬프트. 텍스트/CLIP 입력을 설정합니다.
-    - `VAE Decode (Tiled)` — 업스케일 분기의 최종 디코드 노드.
-
-동작 및 참고 사항:
-
-- LoRA 체인: Tag Painter가 `Load Qwen UNet`과 `Model Sampling Aura Flow` 사이에 `LoraLoaderModelOnly` 노드(타이틀 `Load Qwen LoRA N`)를 자동 삽입/연결합니다.
-- 타이틀 매칭은 부분 포함, 대소문자 구분입니다. 각 타이틀별로 한 개의 노드만 두세요.
-- 타이틀이 누락되면 일부 경로에서 기본 ID로 동작할 수 있으나, 안정적인 동작을 위해 위 타이틀 구성을 권장합니다.
-- 최종 저장 노드는 고정 ID(`final_save_output`)로 `SaveImageWebsocket`을 자동 추가합니다. 워크플로에 저장 노드를 포함할 필요가 없습니다.
+워크플로 파일들은 data/workflow 폴더에 있습니다. ComfyUI에서 읽어들일 수 있는 워크플로우 파일들은 data/examples 폴더에 있습니다. 새로운 워크플로우를 만들 때 참고하세요. 이미지 생성에 사용하려면 ComfyUI에서 api 형태로 export 해서 data/workflow 폴더에 넣으면 됩니다.
 
 ## 라이선스
 
