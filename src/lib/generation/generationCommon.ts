@@ -154,7 +154,22 @@ export async function submitToComfyUI(
   if (!response.ok) {
     const errorText = await response.text()
     console.error('ComfyUI API Error:', response.status, errorText)
-    throw new Error(`HTTP error! status: ${response.status}, response: ${errorText}`)
+
+    // Try to parse ComfyUI error response for better error messages
+    const { parseComfyError } = await import('./comfyErrorParser')
+    const parsed = parseComfyError(errorText)
+
+    // Only use parsed message if it's different from the fallback
+    if (parsed.summary !== 'Generation failed' || parsed.details.length > 1) {
+      let errorMessage = parsed.summary
+      if (parsed.details.length > 0) {
+        errorMessage += '\n\n' + parsed.details.join('\n')
+      }
+      throw new Error(errorMessage)
+    }
+
+    // Show raw error if parsing didn't produce useful results
+    throw new Error(`HTTP error! status: ${response.status}\n\n${errorText}`)
   }
 
   const result = await response.json()

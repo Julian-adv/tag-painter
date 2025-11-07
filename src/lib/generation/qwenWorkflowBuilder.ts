@@ -129,7 +129,11 @@ export async function buildQwenWorkflow(
   }
 
   for (const [nodeId, node] of Object.entries(workflow)) {
-    if (node.class_type === 'LoraLoaderModelOnly' || node.class_type === 'PreviewImage' || node.class_type === 'NunchakuQwenImageLoraStack') {
+    if (
+      node.class_type === 'LoraLoaderModelOnly' ||
+      node.class_type === 'PreviewImage' ||
+      node.class_type === 'NunchakuQwenImageLoraStack'
+    ) {
       delete workflow[nodeId]
     }
   }
@@ -302,13 +306,8 @@ export async function buildQwenWorkflow(
     } else if (upscaleModelType === 'sdxl') {
       const upscaleVaeLoader = findNodeByTitle(workflow, 'Upscale VAE Loader (SDXL)')
       if (upscaleSettings.selectedVae === '__embedded__') {
-        if (upscaleVaeLoader) {
-          setInput(workflow, 'Upscale VAE Loader (SDXL)', 0, 'VAE Encode (Tiled)', 'vae')
-          setInput(workflow, 'Upscale VAE Loader (SDXL)', 0, 'VAE Decode (Tiled)', 'vae')
-        } else {
-          setInput(workflow, 'Upscale Checkpoint Loader (SDXL)', 2, 'VAE Encode (Tiled)', 'vae')
-          setInput(workflow, 'Upscale Checkpoint Loader (SDXL)', 2, 'VAE Decode (Tiled)', 'vae')
-        }
+        setInput(workflow, 'Upscale Checkpoint Loader (SDXL)', 2, 'VAE Encode (Tiled)', 'vae')
+        setInput(workflow, 'Upscale Checkpoint Loader (SDXL)', 2, 'VAE Decode (Tiled)', 'vae')
       } else {
         if (!upscaleVaeLoader) {
           throw new Error('Upscale VAE Loader (SDXL) node not found in Qwen workflow')

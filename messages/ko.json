@@ -82,6 +82,8 @@
   "settingsDialog.qualityPlaceholder": "예: masterwork, high quality",
   "settingsDialog.qualityPrefix": "품질 접두사:",
   "settingsDialog.save": "저장",
+  "settingsDialog.restart": "ComfyUI 재시작",
+  "settingsDialog.restarting": "재시작 중...",
   "settingsDialog.scheduler": "스케줄러:",
   "settingsDialog.seed": "시드(-1은 랜덤):",
   "settingsDialog.steps": "스텝:",
