@@ -227,6 +227,15 @@
       "category": "custom-node",
       "kind": "git",
       "branch": "main"
+    },
+    {
+      "label": "ComfyUI-QwenImageLoraLoader",
+      "filename": "ComfyUI-QwenImageLoraLoader",
+      "urls": ["https://github.com/ussoewwin/ComfyUI-QwenImageLoraLoader.git"],
+      "destRelativeToComfy": "custom_nodes/ComfyUI-QwenImageLoraLoader",
+      "category": "custom-node",
+      "kind": "git",
+      "branch": "main"
     }
   ]
 }
