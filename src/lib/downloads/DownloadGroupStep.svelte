@@ -451,8 +451,6 @@
   {description}
   filesCount={filesCountText}
   showFilesCount={showFilesCount}
-  skipped={skipped}
-  complete={complete}
   {items}
   {loading}
   {downloading}

@@ -12,8 +12,6 @@
     description: string
     filesCount: string
     showFilesCount: boolean
-    skipped: boolean
-    complete: boolean
     items: DownloadItem[]
     loading: boolean
     downloading: boolean
@@ -33,8 +31,6 @@
     description,
     filesCount,
     showFilesCount,
-    skipped,
-    complete,
     items,
     loading,
     downloading,
