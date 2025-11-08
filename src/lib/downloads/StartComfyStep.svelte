@@ -5,11 +5,10 @@
   interface Props {
     controller?: StepController
     onStatusChange?: (status: StepStatus) => void
-    onComplete?: () => void
     onError?: (error: string) => void
   }
 
-  let { controller = $bindable(), onStatusChange, onComplete, onError }: Props = $props()
+  let { controller = $bindable(), onStatusChange, onError }: Props = $props()
 
   // Internal state
   let status = $state<StepStatus>('pending')
@@ -162,11 +161,6 @@
     <h3 class="text-base font-semibold text-gray-900 dark:text-white">
       Start ComfyUI
     </h3>
-    {#if startSuccess}
-      <span class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200">
-        Running
-      </span>
-    {/if}
   </div>
 
   <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">

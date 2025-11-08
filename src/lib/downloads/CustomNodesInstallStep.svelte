@@ -6,11 +6,10 @@
   interface Props {
     controller?: StepController
     onStatusChange?: (status: StepStatus) => void
-    onComplete?: () => void
     onError?: (error: string) => void
   }
 
-  let { controller = $bindable(), onStatusChange, onComplete, onError }: Props = $props()
+  let { controller = $bindable(), onStatusChange, onError }: Props = $props()
 
   // Internal state
   let status = $state<StepStatus>('pending')
@@ -43,7 +42,6 @@
     skip() {
       status = 'skipped'
       onStatusChange?.('skipped')
-      onComplete?.()
     },
 
     reset() {
@@ -266,15 +264,6 @@
     <h3 class="text-base font-semibold text-gray-900 dark:text-white">
       Custom Nodes Installation
     </h3>
-    {#if status === 'completed'}
-      <span class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200">
-        Completed
-      </span>
-    {:else if status === 'skipped'}
-      <span class="rounded bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-100">
-        Skipped
-      </span>
-    {/if}
   </div>
 
   <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">

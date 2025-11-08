@@ -6,6 +6,7 @@ import path from 'node:path'
 import { COMFY_SERVER_URL } from '$lib/server/comfyProcess'
 
 const INSTALL_WORKFLOW_PATH = path.resolve(process.cwd(), 'data', 'install_wheel.api.json')
+const NUNCHAKU_VERSIONS_PATH = path.resolve(process.cwd(), 'vendor', 'ComfyUI', 'custom_nodes', 'ComfyUI-nunchaku', 'nunchaku_versions.json')
 const MAX_WAIT_MS = 120000
 const POLL_INTERVAL_MS = 1000
 
@@ -18,31 +19,84 @@ async function loadInstallWorkflow(): Promise<Record<string, unknown>> {
   return JSON.parse(content) as Record<string, unknown>
 }
 
+async function getLatestNunchakuVersion(): Promise<string | null> {
+  try {
+    const content = await fs.readFile(NUNCHAKU_VERSIONS_PATH, 'utf-8')
+    const data = JSON.parse(content) as { versions?: string[] }
+    if (Array.isArray(data.versions) && data.versions.length > 0) {
+      return data.versions[0]
+    }
+    return null
+  } catch {
+    // File doesn't exist or is invalid
+    return null
+  }
+}
+
 async function delay(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function extractOutputMessages(entry: any): string[] {
   if (!entry || typeof entry !== 'object') return []
-  const outputs = entry.outputs
-  if (!outputs || typeof outputs !== 'object') return []
+
   const messages: string[] = []
-  for (const value of Object.values(outputs)) {
-    if (!Array.isArray(value)) continue
-    for (const item of value) {
-      if (item && typeof item === 'object') {
-        if (typeof item.text === 'string') {
-          messages.push(item.text)
-        } else if (typeof item.value === 'string') {
-          messages.push(item.value)
-        } else if (typeof item.content === 'string') {
-          messages.push(item.content)
+
+  // Try to get messages from outputs
+  const outputs = entry.outputs
+  if (outputs && typeof outputs === 'object') {
+    for (const [_nodeId, value] of Object.entries(outputs)) {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (item && typeof item === 'object') {
+            const obj = item as Record<string, unknown>
+            // Check for 'preview' field (from PreviewAny node)
+            if (typeof obj.preview === 'string') {
+              messages.push(obj.preview)
+            } else if (typeof obj.text === 'string') {
+              messages.push(obj.text)
+            } else if (typeof obj.value === 'string') {
+              messages.push(obj.value)
+            } else if (typeof obj.content === 'string') {
+              messages.push(obj.content)
+            } else if (typeof obj.string === 'string') {
+              messages.push(obj.string)
+            }
+          } else if (typeof item === 'string') {
+            messages.push(item)
+          }
         }
-      } else if (typeof item === 'string') {
-        messages.push(item)
+      } else if (value && typeof value === 'object') {
+        // Check if value is an object with message fields
+        const obj = value as Record<string, unknown>
+
+        // Check if any field contains an array of strings
+        for (const [_key, fieldValue] of Object.entries(obj)) {
+          if (Array.isArray(fieldValue)) {
+            for (const arrayItem of fieldValue) {
+              if (typeof arrayItem === 'string') {
+                messages.push(arrayItem)
+              }
+            }
+          }
+        }
+
+        // Also check for direct string fields
+        if (typeof obj.preview === 'string') {
+          messages.push(obj.preview)
+        } else if (typeof obj.text === 'string') {
+          messages.push(obj.text)
+        } else if (typeof obj.value === 'string') {
+          messages.push(obj.value)
+        } else if (typeof obj.content === 'string') {
+          messages.push(obj.content)
+        } else if (typeof obj.string === 'string') {
+          messages.push(obj.string)
+        }
       }
     }
   }
+
   return messages
 }
 
@@ -86,8 +140,23 @@ async function waitForCompletion(promptId: string): Promise<{ status: 'completed
   return { status: 'submitted', messages: lastMessages }
 }
 
-export const POST: RequestHandler = async () => {
+export const POST: RequestHandler = async ({ request }) => {
   try {
+    // Parse request body to get mode and version
+    let mode = 'install'
+    let version: string | null = null
+    try {
+      const body = await request.json()
+      if (body && typeof body.mode === 'string') {
+        mode = body.mode
+      }
+      if (body && typeof body.version === 'string') {
+        version = body.version
+      }
+    } catch {
+      // If parsing fails, use default mode
+    }
+
     // Check if ComfyUI is available by trying to access the prompt endpoint
     try {
       const checkRes = await fetch(buildComfyUrl('history'), {
@@ -108,6 +177,28 @@ export const POST: RequestHandler = async () => {
     } catch (err) {
       console.error('Failed to load install_wheel workflow:', err)
       return json({ error: 'install_wheel.api.json not found or invalid.' }, { status: 500 })
+    }
+
+    // If no version specified and mode is install, get latest version from nunchaku_versions.json
+    if (!version && mode === 'install') {
+      const latestVersion = await getLatestNunchakuVersion()
+      if (latestVersion) {
+        version = latestVersion
+      } else {
+        // Fallback to hardcoded version if file doesn't exist
+        version = '1.0.2'
+      }
+    } else if (!version) {
+      // For update mode, use 'none'
+      version = 'none'
+    }
+
+    // Set the mode and version in the workflow
+    const node1 = workflow['1'] as Record<string, unknown> | undefined
+    if (node1 && typeof node1 === 'object' && node1.inputs && typeof node1.inputs === 'object') {
+      const inputs = node1.inputs as Record<string, unknown>
+      inputs.mode = mode
+      inputs.version = version
     }
 
     const payload = {

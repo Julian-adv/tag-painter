@@ -5,11 +5,10 @@
   interface Props {
     controller?: StepController
     onStatusChange?: (status: StepStatus) => void
-    onComplete?: () => void
     onError?: (error: string) => void
   }
 
-  let { controller = $bindable(), onStatusChange, onComplete, onError }: Props = $props()
+  let { controller = $bindable(), onStatusChange, onError }: Props = $props()
 
   // Internal state
   let status = $state<StepStatus>('pending')
@@ -91,15 +90,38 @@
   async function installNunchaku() {
     installing = true
     status = 'in-progress'
-    installStatus = 'Starting installation...'
+    installStatus = 'Updating version list...'
     error = null
     messages = []
     onStatusChange?.('in-progress')
 
     try {
+      // First, update the version list
+      const updateRes = await fetch('/api/comfy/install-nunchaku', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'update node', version: 'none' })
+      })
+
+      if (!updateRes.ok) {
+        const errData = await updateRes.json()
+        throw new Error(errData.error || 'Failed to update Nunchaku version list')
+      }
+
+      const updateData = await updateRes.json()
+      if (!updateData.success) {
+        throw new Error('Failed to update Nunchaku version list')
+      }
+
+      // Collect update messages
+      const updateMessages = updateData.messages || []
+
+      // Then, install Nunchaku (version will be auto-detected from nunchaku_versions.json)
+      installStatus = 'Installing Nunchaku...'
       const res = await fetch('/api/comfy/install-nunchaku', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'install' })
       })
 
       if (!res.ok) {
@@ -113,7 +135,8 @@
         success = true
         status = 'completed'
         installStatus = data.status === 'completed' ? 'Installation completed' : 'Installation submitted'
-        messages = data.messages || []
+        // Combine update and install messages
+        messages = [...updateMessages, ...(data.messages || [])]
         onStatusChange?.('completed')
       } else {
         throw new Error('Installation did not complete successfully')
@@ -133,7 +156,6 @@
   $effect(() => {
     if (installStatus && installStatus !== lastStatus) {
       const message = `[Nunchaku] Status: ${installStatus}`
-      console.log(message)
       sendClientLog('log', message)
       lastStatus = installStatus
     }
@@ -142,7 +164,6 @@
   $effect(() => {
     if (error && error !== lastError) {
       const message = `[Nunchaku] Error: ${error}`
-      console.error(message)
       sendClientLog('error', message)
       lastError = error
     }
@@ -151,7 +172,6 @@
   $effect(() => {
     if (success && !loggedSuccess) {
       const message = '[Nunchaku] Installation completed successfully.'
-      console.log(message)
       sendClientLog('log', message)
       loggedSuccess = true
     } else if (!success && loggedSuccess) {
@@ -165,11 +185,6 @@
     <h3 class="text-base font-semibold text-gray-900 dark:text-white">
       Install Nunchaku runtime
     </h3>
-    {#if success}
-      <span class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200">
-        Completed
-      </span>
-    {/if}
   </div>
 
   <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
@@ -184,12 +199,12 @@
 
   {#if messages.length > 0}
     <div class="mt-3 rounded border border-gray-200 bg-gray-50 p-3 text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
-      <p class="font-semibold">Installed wheel:</p>
-      <ul class="list-disc pl-4">
+      <p class="font-semibold">Installation Details:</p>
+      <div class="mt-2 space-y-1">
         {#each messages as message}
-          <li class="mt-1 whitespace-pre-line">{message}</li>
+          <div class="whitespace-pre-line font-mono text-[11px]">{message}</div>
         {/each}
-      </ul>
+      </div>
     </div>
   {/if}
 

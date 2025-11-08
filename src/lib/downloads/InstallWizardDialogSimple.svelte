@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { m } from '$lib/paraglide/messages'
   import type { StepController } from './stepInterface'
   import { INSTALLATION_STEPS } from './stepConfig'
 
@@ -134,7 +133,6 @@
       <div class="mb-6">
         <currentStep.component
           bind:controller={currentController}
-          onComplete={moveToNextStep}
         />
       </div>
 

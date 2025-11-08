@@ -6,11 +6,10 @@
   interface Props {
     controller?: StepController
     onStatusChange?: (status: StepStatus) => void
-    onComplete?: () => void
     onError?: (error: string) => void
   }
 
-  let { controller = $bindable(), onStatusChange, onComplete, onError }: Props = $props()
+  let { controller = $bindable(), onStatusChange, onError }: Props = $props()
 
   // Internal state
   let status = $state<StepStatus>('pending')
@@ -41,7 +40,6 @@
       status = 'skipped'
       sendClientLog('warn', 'ComfyUI installation skipped by user.')
       onStatusChange?.('skipped')
-      onComplete?.()
     },
 
     reset() {
@@ -185,7 +183,6 @@
         installed = true
         status = 'completed'
         onStatusChange?.('completed')
-        onComplete?.()
       } else {
         status = 'error'
         onStatusChange?.('error')
@@ -245,21 +242,6 @@
     <h3 class="text-base font-semibold text-gray-900 dark:text-white">
       {m['comfyInstall.title']()}
     </h3>
-    <div class="flex items-center gap-2">
-      {#if skipped}
-        <span
-          class="rounded bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-100"
-        >
-          {m['downloads.skip']()}
-        </span>
-      {:else if status === 'completed'}
-        <span
-          class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200"
-        >
-          {m['downloads.completed']()}
-        </span>
-      {/if}
-    </div>
   </div>
 
   <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
