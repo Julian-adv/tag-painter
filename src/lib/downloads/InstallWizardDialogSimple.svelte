@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import type { StepController } from './stepInterface'
   import { INSTALLATION_STEPS } from './stepConfig'
 
@@ -8,6 +9,9 @@
   }
 
   let { isOpen = $bindable(), onClose }: Props = $props()
+
+  let stepRefs: Array<HTMLElement | null> = []
+  let stepsContainer = $state<HTMLDivElement | null>(null)
 
   // Single controller for the current active step
   let currentController: StepController | undefined = $state(undefined)
@@ -84,6 +88,47 @@
   const showSkipButton = $derived(() => {
     return currentController?.getStatus() === 'pending'
   })
+
+  let hasScrolledOnce = false
+
+  async function scrollCurrentStepIntoView(): Promise<void> {
+    await tick()
+    const currentEl = stepRefs[currentStepIndex]
+    const shouldScroll = currentStepIndex > 0 || hasScrolledOnce
+    if (!shouldScroll) {
+      return
+    }
+    if (currentEl && stepsContainer) {
+      currentEl.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'start'
+      })
+      hasScrolledOnce = true
+    }
+  }
+
+  function registerStep(el: HTMLElement, idx: number) {
+    stepRefs[idx] = el
+    return {
+      destroy() {
+        stepRefs[idx] = null
+      }
+    }
+  }
+
+  $effect(() => {
+    currentStepIndex
+    stepsContainer
+    void scrollCurrentStepIntoView()
+  })
+
+  $effect(() => {
+    if (isOpen && stepsContainer) {
+      hasScrolledOnce = false
+      stepsContainer.scrollTo({ left: 0, behavior: 'auto' })
+    }
+  })
 </script>
 
 {#if isOpen}
@@ -104,28 +149,30 @@
 
       <!-- Progress indicator -->
       <div class="mb-6">
-        <div class="flex items-center gap-2">
-          {#each INSTALLATION_STEPS as step, idx}
-            <div class="flex items-center gap-2">
-              <div
-                class={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
-                  idx === currentStepIndex
-                    ? 'bg-blue-600 text-white'
-                    : idx < currentStepIndex
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-300 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
-                }`}
-              >
-                {idx + 1}
+        <div class="overflow-x-auto no-scrollbar" bind:this={stepsContainer}>
+          <div class="flex items-center gap-2 min-w-max pr-2">
+            {#each INSTALLATION_STEPS as step, idx}
+              <div class="flex items-center gap-2 step-indicator" use:registerStep={idx}>
+                <div
+                  class={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
+                    idx === currentStepIndex
+                      ? 'bg-blue-600 text-white'
+                      : idx < currentStepIndex
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-300 text-gray-600 dark:bg-gray-600 dark:text-gray-300'
+                  }`}
+                >
+                  {idx + 1}
+                </div>
+                <span class={`text-sm ${idx === currentStepIndex ? 'font-semibold' : ''}`}>
+                    {step.name()}
+                </span>
+                {#if idx < INSTALLATION_STEPS.length - 1}
+                  <div class="mx-2 h-0.5 w-8 bg-gray-300 dark:bg-gray-600"></div>
+                {/if}
               </div>
-              <span class={`text-sm ${idx === currentStepIndex ? 'font-semibold' : ''}`}>
-                {step.name}
-              </span>
-              {#if idx < INSTALLATION_STEPS.length - 1}
-                <div class="mx-2 h-0.5 w-8 bg-gray-300 dark:bg-gray-600"></div>
-              {/if}
-            </div>
-          {/each}
+            {/each}
+          </div>
         </div>
       </div>
 
@@ -191,3 +238,17 @@
     </div>
   </div>
 {/if}
+
+<style>
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .step-indicator {
+    scroll-margin-left: 24px;
+  }
+</style>

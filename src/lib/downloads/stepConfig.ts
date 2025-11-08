@@ -1,12 +1,15 @@
 import type { Component } from 'svelte'
+import { m } from '$lib/paraglide/messages'
 import ComfyInstallStep from './ComfyInstallStep.svelte'
 import CustomNodesInstallStep from './CustomNodesInstallStep.svelte'
 import StartComfyStep from './StartComfyStep.svelte'
 import NunchakuInstallStep from './NunchakuInstallStep.svelte'
+import EssentialDownloadsStep from './EssentialDownloadsStep.svelte'
+import ModelDownloadsStep from './ModelDownloadsStep.svelte'
 
 export interface StepConfig {
   id: string
-  name: string
+  name: () => string
   component: Component
 }
 
@@ -14,22 +17,32 @@ export interface StepConfig {
 export const INSTALLATION_STEPS: StepConfig[] = [
   {
     id: 'comfy-install',
-    name: 'ComfyUI Installation',
+    name: () => m['comfyInstall.title'](),
     component: ComfyInstallStep
   },
   {
     id: 'custom-nodes',
-    name: 'Custom Nodes Installation',
+    name: () => m['customNodes.installRequired'](),
     component: CustomNodesInstallStep
   },
   {
     id: 'start-comfy',
-    name: 'Start ComfyUI',
+    name: () => m['customNodes.start'](),
     component: StartComfyStep
   },
   {
     id: 'nunchaku',
-    name: 'Nunchaku Runtime',
+    name: () => m['downloads.nunchakuTitle'](),
     component: NunchakuInstallStep
+  },
+  {
+    id: 'core-downloads',
+    name: () => m['downloads.step1Title'](),
+    component: EssentialDownloadsStep
+  },
+  {
+    id: 'model-downloads',
+    name: () => m['downloads.step2Title'](),
+    component: ModelDownloadsStep
   }
 ]

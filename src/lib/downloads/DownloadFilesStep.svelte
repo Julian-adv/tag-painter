@@ -62,17 +62,6 @@
         </span>
       {/if}
     </div>
-    <div class="flex items-center gap-2">
-      {#if skipped}
-        <span class="rounded bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-100">
-          {m['downloads.skip']()}
-        </span>
-      {:else if complete}
-        <span class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200">
-          {m['downloads.completed']()}
-        </span>
-      {/if}
-    </div>
   </div>
   <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
     {description}
