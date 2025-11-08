@@ -49,10 +49,3 @@ export type FileProgressState = {
   received: number
   total: number
 }
-
-export type SkipState = {
-  comfy: boolean
-  customNodes: boolean
-  downloadsCore: boolean
-  downloadsModels: boolean
-}

@@ -5,11 +5,9 @@
 
   interface Props {
     controller?: StepController
-    onStatusChange?: (status: StepStatus) => void
-    onError?: (error: string) => void
   }
 
-  let { controller = $bindable(), onStatusChange, onError }: Props = $props()
+  let { controller = $bindable() }: Props = $props()
 
   // Internal state
   let status = $state<StepStatus>('pending')
@@ -39,7 +37,6 @@
       skipped = true
       status = 'skipped'
       sendClientLog('warn', 'ComfyUI installation skipped by user.')
-      onStatusChange?.('skipped')
     },
 
     reset() {
@@ -96,7 +93,6 @@
         installed = data.installed === true
         if (installed) {
           status = 'completed'
-          onStatusChange?.('completed')
         }
       }
     } catch (err) {
@@ -109,7 +105,6 @@
     status = 'in-progress'
     logs = []
     error = null
-    onStatusChange?.('in-progress')
 
     try {
       const res = await fetch('/api/comfy/install', {
@@ -182,18 +177,13 @@
       if (success) {
         installed = true
         status = 'completed'
-        onStatusChange?.('completed')
       } else {
         status = 'error'
-        onStatusChange?.('error')
-        onError?.(error || 'Installation failed')
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Installation failed'
       error = errMsg
       status = 'error'
-      onStatusChange?.('error')
-      onError?.(errMsg)
     } finally {
       installing = false
     }

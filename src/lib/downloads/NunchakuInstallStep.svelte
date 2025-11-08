@@ -4,11 +4,9 @@
 
   interface Props {
     controller?: StepController
-    onStatusChange?: (status: StepStatus) => void
-    onError?: (error: string) => void
   }
 
-  let { controller = $bindable(), onStatusChange, onError }: Props = $props()
+  let { controller = $bindable() }: Props = $props()
 
   // Internal state
   let status = $state<StepStatus>('pending')
@@ -93,7 +91,6 @@
     installStatus = 'Updating version list...'
     error = null
     messages = []
-    onStatusChange?.('in-progress')
 
     try {
       // First, update the version list
@@ -137,7 +134,6 @@
         installStatus = data.status === 'completed' ? 'Installation completed' : 'Installation submitted'
         // Combine update and install messages
         messages = [...updateMessages, ...(data.messages || [])]
-        onStatusChange?.('completed')
       } else {
         throw new Error('Installation did not complete successfully')
       }
@@ -145,8 +141,6 @@
       const errMsg = err instanceof Error ? err.message : 'Nunchaku installation failed'
       error = errMsg
       status = 'error'
-      onStatusChange?.('error')
-      onError?.(errMsg)
     } finally {
       installing = false
     }

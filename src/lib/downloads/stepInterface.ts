@@ -23,10 +23,3 @@ export interface StepController {
   getUserConfirmed(): boolean
   confirmStep(): void
 }
-
-export interface StepComponentProps {
-  controller?: StepController
-  onStatusChange?: (status: StepStatus) => void
-  onComplete?: () => void
-  onError?: (error: string) => void
-}

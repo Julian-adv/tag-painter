@@ -5,11 +5,9 @@
 
   interface Props {
     controller?: StepController
-    onStatusChange?: (status: StepStatus) => void
-    onError?: (error: string) => void
   }
 
-  let { controller = $bindable(), onStatusChange, onError }: Props = $props()
+  let { controller = $bindable() }: Props = $props()
 
   // Internal state
   let status = $state<StepStatus>('pending')
@@ -41,7 +39,6 @@
 
     skip() {
       status = 'skipped'
-      onStatusChange?.('skipped')
     },
 
     reset() {
@@ -118,19 +115,16 @@
         // If no custom nodes needed, auto-complete
         if (items.length === 0) {
           status = 'completed'
-          onStatusChange?.('completed')
         }
       } else {
         items = []
         // Auto-complete if no items
         status = 'completed'
-        onStatusChange?.('completed')
       }
     } catch (err) {
       items = []
       // Auto-complete even on error if no items
       status = 'completed'
-      onStatusChange?.('completed')
       console.error('Failed to load custom nodes:', err)
     } finally {
       loading = false
@@ -143,7 +137,6 @@
     if (targets.length === 0) {
       result = { success: true, ok: [], failed: [] }
       status = 'completed'
-      onStatusChange?.('completed')
       return
     }
 
@@ -151,7 +144,6 @@
     status = 'in-progress'
     result = null
     progress = { total: targets.length, completed: 0, current: '' }
-    onStatusChange?.('in-progress')
 
     const ok: DownloadResultItem[] = []
     const failed: DownloadFailedItem[] = []
@@ -222,15 +214,7 @@
     progress.current = ''
     installing = false
 
-    if (result.success) {
-      status = 'completed'
-      onStatusChange?.('completed')
-    } else {
-      status = 'error'
-      const errorMsg = `Failed to install ${failed.length} custom node(s)`
-      onStatusChange?.('error')
-      onError?.(errorMsg)
-    }
+    status = result.success ? 'completed' : 'error'
 
     // Reload to check if any more custom nodes are needed
     await loadCustomNodes()

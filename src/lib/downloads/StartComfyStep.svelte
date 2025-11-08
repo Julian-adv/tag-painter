@@ -4,11 +4,9 @@
 
   interface Props {
     controller?: StepController
-    onStatusChange?: (status: StepStatus) => void
-    onError?: (error: string) => void
   }
 
-  let { controller = $bindable(), onStatusChange, onError }: Props = $props()
+  let { controller = $bindable() }: Props = $props()
 
   // Internal state
   let status = $state<StepStatus>('pending')
@@ -90,7 +88,6 @@
         if (data.running === true) {
           startSuccess = true
           status = 'completed'
-          onStatusChange?.('completed')
         }
       }
     } catch (err) {
@@ -102,7 +99,6 @@
     starting = true
     status = 'in-progress'
     startError = null
-    onStatusChange?.('in-progress')
 
     try {
       const res = await fetch('/api/comfy/start', {
@@ -119,7 +115,6 @@
       if (data.success) {
         startSuccess = true
         status = 'completed'
-        onStatusChange?.('completed')
       } else {
         throw new Error('ComfyUI did not start successfully')
       }
@@ -127,8 +122,6 @@
       const errMsg = err instanceof Error ? err.message : 'Failed to start ComfyUI'
       startError = errMsg
       status = 'error'
-      onStatusChange?.('error')
-      onError?.(errMsg)
     } finally {
       starting = false
     }

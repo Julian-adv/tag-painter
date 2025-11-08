@@ -16,8 +16,6 @@
 
   interface Props {
     controller?: StepController
-    onStatusChange?: (status: StepStatus) => void
-    onError?: (error: string) => void
     mode: DownloadMode
     title: string
     description: string
@@ -26,8 +24,6 @@
 
   let {
     controller = $bindable(),
-    onStatusChange,
-    onError,
     mode,
     title,
     description,
@@ -86,7 +82,6 @@
     skip() {
       skipped = true
       status = 'skipped'
-      onStatusChange?.('skipped')
     },
     reset() {
       status = 'pending'
@@ -184,7 +179,6 @@
       }
       if (items.length === 0 && status === 'pending' && !skipped) {
         status = 'completed'
-        onStatusChange?.('completed')
       }
     } catch (err) {
       console.error('Failed to load download items:', err)
@@ -200,7 +194,6 @@
       result = { success: true, ok: [], failed: [] }
       if (status !== 'completed') {
         status = 'completed'
-        onStatusChange?.('completed')
       }
       return
     }
@@ -208,7 +201,6 @@
     downloading = true
     status = 'in-progress'
     downloadError = null
-    onStatusChange?.('in-progress')
     downloadProgress = { total: items.length, completed: 0, current: '', currentLabel: '' }
     currentFile = { filename: '', label: '', received: 0, total: 0 }
     currentMessage = ''
@@ -231,8 +223,6 @@
         downloadError = message
         result = { success: false, ok: [], failed: [{ filename: '__request__', error: message }] }
         status = 'error'
-        onStatusChange?.('error')
-        onError?.(message)
         return
       }
 
@@ -257,14 +247,11 @@
       result = finalResult
       if (finalResult.success) {
         status = 'completed'
-        onStatusChange?.('completed')
         await loadItems()
       } else {
         status = 'error'
         const message = `Failed to download ${finalResult.failed.length} file(s)`
         downloadError = message
-        onStatusChange?.('error')
-        onError?.(message)
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Download failed'
@@ -272,8 +259,6 @@
       failed.push({ filename: '__request__', error: message })
       result = { success: false, ok, failed }
       status = 'error'
-      onStatusChange?.('error')
-      onError?.(message)
     } finally {
       downloading = false
       downloadProgress.current = ''
