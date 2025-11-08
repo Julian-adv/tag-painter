@@ -11,7 +11,7 @@
   import ModelControls from './ModelControls.svelte'
   import { dev } from '$app/environment'
   import { m } from '$lib/paraglide/messages'
-  import DownloadsDialog from '$lib/downloads/InstallWizardDialogSimple.svelte'
+  import DownloadsDialog from '$lib/downloads/InstallWizardDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import {
     loadSettings,
