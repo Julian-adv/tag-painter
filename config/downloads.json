@@ -157,7 +157,7 @@
       "category": "checkpoint"
     },
     {
-      "label": "Custom Node cgem156-ComfyUI",
+      "label": "cgem156-ComfyUI",
       "filename": "cgem156-ComfyUI",
       "urls": ["https://github.com/laksjdjf/cgem156-ComfyUI.git"],
       "destRelativeToComfy": "custom_nodes/cgem156-ComfyUI",
@@ -166,7 +166,7 @@
       "branch": "main"
     },
     {
-      "label": "Custom Node ComfyUI-Custom-Scripts",
+      "label": "ComfyUI-Custom-Scripts",
       "filename": "ComfyUI-Custom-Scripts",
       "urls": ["https://github.com/pythongosssss/ComfyUI-Custom-Scripts.git"],
       "destRelativeToComfy": "custom_nodes/ComfyUI-Custom-Scripts",
@@ -175,7 +175,16 @@
       "branch": "main"
     },
     {
-      "label": "Custom Node ComfyUI-Impact-Pack",
+      "label": "ComfyUI-Manager",
+      "filename": "comfyui-manager",
+      "urls": ["https://github.com/ltdrdata/ComfyUI-Manager.git"],
+      "destRelativeToComfy": "custom_nodes/comfyui-manager",
+      "category": "custom-node",
+      "kind": "git",
+      "branch": "main"
+    },
+    {
+      "label": "ComfyUI-Impact-Pack",
       "filename": "ComfyUI-Impact-Pack",
       "urls": ["https://github.com/ltdrdata/ComfyUI-Impact-Pack.git"],
       "destRelativeToComfy": "custom_nodes/ComfyUI-Impact-Pack",
@@ -184,7 +193,7 @@
       "branch": "Main"
     },
     {
-      "label": "Custom Node ComfyUI-Impact-Subpack",
+      "label": "ComfyUI-Impact-Subpack",
       "filename": "ComfyUI-Impact-Subpack",
       "urls": ["https://github.com/ltdrdata/ComfyUI-Impact-Subpack.git"],
       "destRelativeToComfy": "custom_nodes/ComfyUI-Impact-Subpack",
@@ -193,7 +202,16 @@
       "branch": "main"
     },
     {
-      "label": "Custom Node ComfyUI_essentials",
+      "label": "ComfyUI-nunchaku",
+      "filename": "ComfyUI-nunchaku",
+      "urls": ["https://github.com/nunchaku-tech/ComfyUI-nunchaku.git"],
+      "destRelativeToComfy": "custom_nodes/ComfyUI-nunchaku",
+      "category": "custom-node",
+      "kind": "git",
+      "branch": "main"
+    },
+    {
+      "label": "ComfyUI_essentials",
       "filename": "ComfyUI_essentials",
       "urls": ["https://github.com/cubiq/ComfyUI_essentials.git"],
       "destRelativeToComfy": "custom_nodes/ComfyUI_essentials",
@@ -202,7 +220,7 @@
       "branch": "main"
     },
     {
-      "label": "Custom Node comfyui_controlnet_aux",
+      "label": "comfyui_controlnet_aux",
       "filename": "comfyui_controlnet_aux",
       "urls": ["https://github.com/Fannovel16/comfyui_controlnet_aux.git"],
       "destRelativeToComfy": "custom_nodes/comfyui_controlnet_aux",

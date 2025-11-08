@@ -1,71 +1,243 @@
 <script lang="ts">
   import { m } from '$lib/paraglide/messages'
   import { sendClientLog } from '$lib/downloads/logClient'
+  import type { StepController, StepStatus } from './stepInterface'
 
   interface Props {
-    skipped: boolean
-    stepComplete: boolean
-    installing: boolean
-    logs: string[]
-    error: string
-    onInstall: () => void
-    onSkip: () => void
-    installed: boolean
-    showActions: boolean
+    controller?: StepController
+    onStatusChange?: (status: StepStatus) => void
+    onComplete?: () => void
+    onError?: (error: string) => void
   }
 
-  let {
-    skipped,
-    stepComplete,
-    installing,
-    logs,
-    error,
-    onInstall,
-    onSkip,
-    installed,
-    showActions
-  }: Props = $props()
-  let comfyLogCount = 0
+  let { controller = $bindable(), onStatusChange, onComplete, onError }: Props = $props()
+
+  // Internal state
+  let status = $state<StepStatus>('pending')
+  let installed = $state(false)
+  let installing = $state(false)
+  let logs = $state<string[]>([])
+  let error = $state<string | null>(null)
+  let userConfirmed = $state(false)
+  let skipped = $state(false)
+
+  // Logging state
+  let logCount = 0
   let lastError = ''
 
-  const buttonLabel = $derived(
-    installing
-      ? m['comfyInstall.installing']()
-      : installed
-        ? m['comfyInstall.reinstall']()
-        : m['comfyInstall.install']()
-  )
+  // Controller API exposed to parent
+  const controllerImpl: StepController = {
+    async init() {
+      status = 'pending'
+      await checkComfyStatus()
+    },
+
+    async execute() {
+      await installComfy(false)
+    },
+
+    skip() {
+      skipped = true
+      status = 'skipped'
+      sendClientLog('warn', 'ComfyUI installation skipped by user.')
+      onStatusChange?.('skipped')
+      onComplete?.()
+    },
+
+    reset() {
+      status = 'pending'
+      installed = false
+      installing = false
+      logs = []
+      error = null
+      userConfirmed = false
+      skipped = false
+      logCount = 0
+      lastError = ''
+    },
+
+    getStatus() {
+      return status
+    },
+
+    isComplete() {
+      return status === 'completed' || status === 'skipped'
+    },
+
+    canProceed() {
+      return (status === 'completed' && userConfirmed) || status === 'skipped'
+    },
+
+    getError() {
+      return error
+    },
+
+    requiresUserConfirmation() {
+      return true
+    },
+
+    getUserConfirmed() {
+      return userConfirmed
+    },
+
+    confirmStep() {
+      userConfirmed = true
+    }
+  }
+
+  // Expose controller to parent via bindable prop
+  $effect(() => {
+    controller = controllerImpl
+  })
+
+  async function checkComfyStatus() {
+    try {
+      const res = await fetch('/api/comfy/status')
+      if (res.ok) {
+        const data = await res.json()
+        installed = data.installed === true
+        if (installed) {
+          status = 'completed'
+          onStatusChange?.('completed')
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check ComfyUI status:', err)
+    }
+  }
+
+  async function installComfy(reinstall: boolean) {
+    installing = true
+    status = 'in-progress'
+    logs = []
+    error = null
+    onStatusChange?.('in-progress')
+
+    try {
+      const res = await fetch('/api/comfy/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reinstall })
+      })
+
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.error || 'Installation failed')
+      }
+
+      const reader = res.body?.getReader()
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let success = false
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        let newlineIndex = buffer.indexOf('\n')
+        while (newlineIndex !== -1) {
+          const line = buffer.slice(0, newlineIndex).trim()
+          buffer = buffer.slice(newlineIndex + 1)
+          if (line.length > 0) {
+            try {
+              const event = JSON.parse(line)
+              if (event?.type === 'log' && typeof event.message === 'string') {
+                logs = [...logs, event.message]
+              } else if (event?.type === 'error' && typeof event.message === 'string') {
+                error = event.message
+              } else if (event?.type === 'complete') {
+                success = event.success === true
+              }
+            } catch {
+              // ignore malformed lines
+            }
+          }
+          newlineIndex = buffer.indexOf('\n')
+        }
+      }
+
+      // Process remaining buffer
+      if (buffer.trim().length > 0) {
+        try {
+          const event = JSON.parse(buffer.trim())
+          if (event?.type === 'log' && typeof event.message === 'string') {
+            logs = [...logs, event.message]
+          } else if (event?.type === 'error' && typeof event.message === 'string') {
+            error = event.message
+          } else if (event?.type === 'complete') {
+            success = event.success === true
+          }
+        } catch {
+          // ignore malformed lines
+        }
+      }
+
+      if (!success && !error) {
+        error = 'ComfyUI installation failed'
+      }
+
+      if (success) {
+        installed = true
+        status = 'completed'
+        onStatusChange?.('completed')
+        onComplete?.()
+      } else {
+        status = 'error'
+        onStatusChange?.('error')
+        onError?.(error || 'Installation failed')
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Installation failed'
+      error = errMsg
+      status = 'error'
+      onStatusChange?.('error')
+      onError?.(errMsg)
+    } finally {
+      installing = false
+    }
+  }
+
+  // Auto-scroll logs to bottom
+  let logsContainer: HTMLDivElement | undefined = $state(undefined)
 
   $effect(() => {
-    if (logs.length < comfyLogCount) {
-      comfyLogCount = logs.length
+    if (logsContainer && logs.length > 0) {
+      logsContainer.scrollTop = logsContainer.scrollHeight
     }
-    if (logs.length > comfyLogCount) {
-      for (let i = comfyLogCount; i < logs.length; i += 1) {
+  })
+
+  // Logging effects
+  $effect(() => {
+    if (logs.length < logCount) {
+      logCount = logs.length
+    }
+    if (logs.length > logCount) {
+      for (let i = logCount; i < logs.length; i += 1) {
         sendClientLog('log', logs[i])
       }
-      comfyLogCount = logs.length
+      logCount = logs.length
     }
   })
 
   $effect(() => {
     if (error && error !== lastError) {
-      sendClientLog('error', `Error: ${error}`)
+      sendClientLog('error', `[ComfyUI] Error: ${error}`)
       lastError = error
     }
   })
 
   $effect(() => {
-    if (stepComplete && !skipped) {
-      sendClientLog('log', 'Installation completed.')
+    if (status === 'completed' && !skipped) {
+      sendClientLog('log', '[ComfyUI] Installation completed.')
     }
   })
 
-  $effect(() => {
-    if (skipped) {
-      sendClientLog('warn', 'Step skipped by user.')
-    }
-  })
+  const showNextButton = $derived(installed && !installing && !userConfirmed && !skipped)
 </script>
 
 <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
@@ -80,7 +252,7 @@
         >
           {m['downloads.skip']()}
         </span>
-      {:else if stepComplete}
+      {:else if status === 'completed'}
         <span
           class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200"
         >
@@ -94,7 +266,7 @@
     {m['comfyInstall.description']()}
   </p>
 
-  {#if stepComplete && !skipped}
+  {#if status === 'completed' && !skipped}
     <div
       class="mb-3 rounded border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-500/40 dark:bg-green-900/40 dark:text-green-200"
     >
@@ -112,36 +284,23 @@
 
   {#if logs.length > 0}
     <div
+      bind:this={logsContainer}
       class="mb-3 max-h-48 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-2 text-left text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
     >
       <p class="mb-1 font-semibold">{m['comfyInstall.logsTitle']()}</p>
       <ul class="space-y-1">
-        {#each logs as line, idx}
+        {#each logs as line}
           <li class="font-mono text-[11px]">{line}</li>
         {/each}
       </ul>
     </div>
   {/if}
 
-  {#if showActions}
-    <div class="mt-4 flex flex-wrap gap-2">
-      <button
-        type="button"
-        class={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${installing ? 'cursor-not-allowed bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}`}
-        onclick={onInstall}
-        disabled={installing}
-      >
-        {buttonLabel}
-      </button>
-      {#if !stepComplete}
-        <button
-          type="button"
-          class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
-          onclick={onSkip}
-        >
-          {m['downloads.skip']()}
-        </button>
-      {/if}
+  {#if showNextButton}
+    <div class="mt-3">
+      <p class="mb-2 text-xs text-gray-600 dark:text-gray-400">
+        Installation complete. Click "Next Step" to continue.
+      </p>
     </div>
   {/if}
 </div>

@@ -11,7 +11,7 @@
   import ModelControls from './ModelControls.svelte'
   import { dev } from '$app/environment'
   import { m } from '$lib/paraglide/messages'
-  import DownloadsDialog from '$lib/downloads/DownloadsDialog.svelte'
+  import DownloadsDialog from '$lib/downloads/InstallWizardDialogSimple.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import {
     loadSettings,
@@ -173,10 +173,9 @@
     }
   }
 
-  function handleDownloadsDialogClosed(result: { success: boolean }) {
-    if (result?.success) {
-      void reloadCheckpoints()
-    }
+  function handleDownloadsDialogClosed() {
+    // Simple wizard always reloads checkpoints when closed
+    void reloadCheckpoints()
   }
 
   // Settings state
@@ -742,7 +741,7 @@
 <Toasts bind:this={toastsRef} />
 
 <!-- No Checkpoints Dialog -->
-<DownloadsDialog bind:isOpen={showDownloadsDialog} onClose={handleDownloadsDialogClosed} missingStep1Filenames={missingStep1Filenames} />
+<DownloadsDialog bind:isOpen={showDownloadsDialog} onClose={handleDownloadsDialogClosed} />
 
 <style>
   :global(html, body) {

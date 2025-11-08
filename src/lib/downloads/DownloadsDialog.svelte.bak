@@ -1,0 +1,1162 @@
+<script lang="ts">
+  import { m } from '$lib/paraglide/messages'
+  import ComfyInstallStep from '$lib/downloads/ComfyInstallStep.svelte'
+  import CustomNodesStep from '$lib/downloads/CustomNodesStep.svelte'
+  import NunchakuInstallStep from '$lib/downloads/NunchakuInstallStep.svelte'
+  import DownloadFilesStep from '$lib/downloads/DownloadFilesStep.svelte'
+  import type {
+    CustomNodeItem,
+    DownloadItem,
+    DownloadResultItem,
+    DownloadFailedItem,
+    DownloadSummary,
+    ProgressState,
+    DownloadProgressState,
+    FileProgressState,
+    SkipState
+  } from '$lib/downloads/types'
+
+  type SetupStep = 'comfy' | 'customNodes' | 'downloadsCore' | 'downloadsModels'
+
+  interface Props {
+    isOpen: boolean
+    onClose: ((result: { success: boolean }) => void) | undefined
+    missingStep1Filenames: string[] | undefined
+  }
+
+  let { isOpen = $bindable(), onClose, missingStep1Filenames = [] }: Props = $props()
+
+  let comfyInstalled = $state(false)
+  let comfyStatusLoading = $state(false)
+  let comfyInstalling = $state(false)
+  let comfyInstallLogs = $state<string[]>([])
+  let comfyInstallError = $state('')
+  let userConfirmedComfyStep = $state(false)
+
+  let customNodeItems = $state<CustomNodeItem[]>([])
+  let customNodesLoading = $state(false)
+  let customNodesInstalling = $state(false)
+  let customNodesResult: DownloadSummary | null = $state(null)
+  let customInstallProgress: ProgressState = $state({ total: 0, completed: 0, current: '' })
+  const customProgressPercent = $derived(
+    customInstallProgress.total === 0
+      ? 0
+      : Math.round((customInstallProgress.completed / customInstallProgress.total) * 100)
+  )
+  let customStarting = $state(false)
+  let customStartError = $state('')
+  let customStartSuccess = $state(false)
+  let customInitialSet = $state(false)
+  let customInitiallyRequired = $state(false)
+  let userConfirmedCustomNodesStep = $state(false)
+
+  let nunchakuInstalling = $state(false)
+  let nunchakuInstallStatus = $state('')
+  let nunchakuInstallError = $state('')
+  let nunchakuInstallSuccess = $state(false)
+  let nunchakuInstallMessages = $state<string[]>([])
+  let nunchakuInstallPromptId: string | null = $state(null)
+
+  let downloadsLoading = $state(false)
+  let downloadsLoaded = $state(false)
+  let allItems = $state<DownloadItem[]>([])
+  let downloading = $state(false)
+  let currentStep = $state<1 | 2 | null>(null)
+  let step1Result: DownloadSummary | null = $state(null)
+  let step2Result: DownloadSummary | null = $state(null)
+  let downloadProgress: DownloadProgressState = $state({ total: 0, completed: 0, current: '', currentLabel: '' })
+  let currentFile: FileProgressState = $state({ filename: '', label: '', received: 0, total: 0 })
+  let currentMessage = $state('')
+  let progressTransition = $state(true)
+  const progressPercent = $derived(
+    downloadProgress.total === 0
+      ? 0
+      : Math.round((downloadProgress.completed / downloadProgress.total) * 100)
+  )
+  const currentFilePercent = $derived(
+    currentFile.total > 0
+      ? Math.min(100, Math.round((currentFile.received / currentFile.total) * 100))
+      : currentFile.received > 0
+        ? 100
+        : 0
+  )
+
+  let skippedSteps: SkipState = $state({
+    comfy: false,
+    customNodes: false,
+    downloadsCore: false,
+    downloadsModels: false
+  })
+
+  function isLargeModelFile(item: DownloadItem): boolean {
+    const dest = item.dest.toLowerCase().replace(/\\/g, '/')
+    return dest.includes('checkpoints/') || dest.includes('diffusion_models/') || dest.includes('loras/')
+  }
+
+  const step1Items = $derived(
+    allItems.filter((item) => {
+      if (isLargeModelFile(item)) return false
+      if (missingStep1Filenames.length > 0) {
+        return missingStep1Filenames.includes(item.filename)
+      }
+      return true
+    })
+  )
+  const step2Items = $derived(allItems.filter((item) => isLargeModelFile(item)))
+
+  function isDownloadSuccess(value: DownloadSummary | null): value is DownloadSummary {
+    return value !== null && value.success && value.failed.length === 0
+  }
+
+  function hasFailedDownloads(summary: DownloadSummary | null): boolean {
+    return summary !== null && summary.failed.length > 0
+  }
+
+  const comfyStepComplete = $derived(skippedSteps.comfy || (comfyInstalled && userConfirmedComfyStep))
+  const comfyInstallDisabled = $derived(comfyInstalling || comfyStatusLoading)
+  const comfyInstallButtonLabel = $derived(
+    comfyInstallDisabled
+      ? m['comfyInstall.installing']()
+      : comfyInstalled
+        ? m['comfyInstall.reinstall']()
+        : m['comfyInstall.install']()
+  )
+  const showComfyNextButton = $derived(comfyInstalled && !comfyInstalling && !userConfirmedComfyStep)
+
+  const customNodesStepComplete = $derived(
+    skippedSteps.customNodes || ((customInitialSet && (customInitiallyRequired ? (customStartSuccess && userConfirmedCustomNodesStep) : userConfirmedCustomNodesStep)) && comfyStepComplete)
+  )
+  const showCustomNodesNextButton = $derived(
+    comfyStepComplete &&
+    customInitialSet &&
+    !customNodesStepComplete &&
+    ((customNodeItems.length === 0 && customStartSuccess) || (customNodeItems.length > 0 && isDownloadSuccess(customNodesResult)))
+  )
+  const step1Complete = $derived(
+    skippedSteps.downloadsCore ||
+      isDownloadSuccess(step1Result) ||
+      (!downloadsLoading && downloadsLoaded && step1Items.length === 0)
+  )
+
+  const step2Complete = $derived(
+    skippedSteps.downloadsModels ||
+      isDownloadSuccess(step2Result) ||
+      (!downloadsLoading && downloadsLoaded && step2Items.length === 0)
+  )
+
+  const step1HasFailure = $derived(hasFailedDownloads(step1Result))
+  const step2HasFailure = $derived(hasFailedDownloads(step2Result))
+
+  const customInstallButtonDisabled = $derived(
+    customNodesInstalling || customNodesLoading || customNodeItems.length === 0
+  )
+  const customInstallButtonLabel = $derived(
+    customNodesInstalling ? m['customNodes.installing']() : m['customNodes.autoInstall']()
+  )
+  const showStartComfyButton = $derived(comfyStepComplete && !customNodesStepComplete && customNodeItems.length === 0)
+  const startComfyButtonDisabled = $derived(customStarting)
+  const startComfyButtonLabel = $derived(customStarting ? m['customNodes.starting']() : m['customNodes.start']())
+  const showNunchakuInstall = $derived(customNodesStepComplete && customStartSuccess && comfyStepComplete)
+  const nunchakuReady = $derived(!showNunchakuInstall || nunchakuInstallSuccess)
+  const step1ButtonDisabled = $derived(downloading || downloadsLoading || step1Complete)
+  const step1ButtonLabel = $derived(
+    step1Complete
+      ? m['downloads.completed']()
+      : currentStep === 1
+        ? m['downloads.downloading']()
+        : step1HasFailure
+          ? 'Retry'
+          : m['downloads.downloadStep1']()
+  )
+  const step2ButtonIdleLabel = $derived(step2HasFailure ? 'Retry' : m['downloads.downloadStep2']())
+  const step2ButtonDisabled = $derived(downloading || downloadsLoading || step2Complete)
+  const step2ButtonLabel = $derived(
+    step2Complete
+      ? m['downloads.completed']()
+      : currentStep === 2
+        ? m['downloads.downloading']()
+        : step2ButtonIdleLabel
+  )
+
+  const allComplete = $derived(comfyStepComplete && customNodesStepComplete && step1Complete && step2Complete)
+
+  function skipStep(step: SetupStep) {
+    switch (step) {
+      case 'comfy':
+        if (!skippedSteps.comfy) {
+          skippedSteps = { ...skippedSteps, comfy: true }
+        }
+        break
+      case 'customNodes':
+        if (!skippedSteps.customNodes) {
+          skippedSteps = { ...skippedSteps, customNodes: true }
+        }
+        break
+      case 'downloadsCore':
+        if (!skippedSteps.downloadsCore) {
+          skippedSteps = { ...skippedSteps, downloadsCore: true }
+        }
+        break
+      case 'downloadsModels':
+        if (!skippedSteps.downloadsModels) {
+          skippedSteps = { ...skippedSteps, downloadsModels: true }
+        }
+        break
+    }
+  }
+
+  function closeDialog() {
+    if (!isOpen) {
+      return
+    }
+    isOpen = false
+    onClose?.({ success: allComplete })
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes <= 0) return '0 B'
+    const units = ['B', 'KB', 'MB', 'GB', 'TB']
+    const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+    const value = bytes / Math.pow(1024, exponent)
+    const rounded = value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(1)
+    return `${rounded} ${units[exponent]}`
+  }
+
+  function parseDownloadResult(entry: unknown): DownloadResultItem | null {
+    if (!entry || typeof entry !== 'object') return null
+    const record = entry as Record<string, unknown>
+    const filename = record['filename']
+    if (typeof filename !== 'string' || filename.length === 0) {
+      return null
+    }
+    const urlValue = record['url']
+    return { filename, url: typeof urlValue === 'string' ? urlValue : null }
+  }
+
+  function parseFailedResult(entry: unknown): DownloadFailedItem | null {
+    if (!entry || typeof entry !== 'object') return null
+    const record = entry as Record<string, unknown>
+    const filename = record['filename']
+    if (typeof filename !== 'string' || filename.length === 0) {
+      return null
+    }
+    const errorValue = record['error']
+    return { filename, error: typeof errorValue === 'string' ? errorValue : null }
+  }
+
+  function handleBackdropClick(event: MouseEvent) {
+    if (event.target === event.currentTarget) {
+      closeDialog()
+    }
+  }
+
+  function handleClose() {
+    closeDialog()
+  }
+
+  function resetState() {
+    comfyInstalled = false
+    comfyStatusLoading = false
+    comfyInstalling = false
+    comfyInstallLogs = []
+    comfyInstallError = ''
+    userConfirmedComfyStep = false
+
+    customNodeItems = []
+    customNodesLoading = false
+    customNodesInstalling = false
+    customNodesResult = null
+    customInstallProgress = { total: 0, completed: 0, current: '' }
+    customStarting = false
+    customStartError = ''
+    customStartSuccess = false
+    customInitialSet = false
+    customInitiallyRequired = false
+    userConfirmedCustomNodesStep = false
+    nunchakuInstalling = false
+    nunchakuInstallStatus = ''
+    nunchakuInstallError = ''
+    nunchakuInstallSuccess = false
+    nunchakuInstallMessages = []
+    nunchakuInstallPromptId = null
+
+    allItems = []
+    downloadsLoading = false
+    downloadsLoaded = false
+    downloading = false
+    currentStep = null
+    step1Result = null
+    step2Result = null
+    downloadProgress = { total: 0, completed: 0, current: '', currentLabel: '' }
+    currentFile = { filename: '', label: '', received: 0, total: 0 }
+    currentMessage = ''
+    progressTransition = true
+    skippedSteps = { comfy: false, customNodes: false, downloadsCore: false, downloadsModels: false }
+  }
+
+  function forceResetAll() {
+    resetState()
+    // Don't reload status - force showing the ComfyUI install step
+    skippedSteps = { comfy: false, customNodes: false, downloadsCore: false, downloadsModels: false }
+    void loadCustomNodes()
+    void loadDownloadItems()
+  }
+
+  async function loadComfyStatus() {
+    comfyStatusLoading = true
+    try {
+      const res = await fetch('/api/comfy/status')
+      const data = await res.json()
+      comfyInstalled = data?.installed === true
+    } catch {
+      comfyInstalled = false
+    } finally {
+      comfyStatusLoading = false
+    }
+  }
+
+  async function installComfy(options?: { reinstall?: boolean }) {
+    if (comfyInstalling) return
+    comfyInstalling = true
+    comfyInstallError = ''
+    comfyInstallLogs = []
+    try {
+      const res = await fetch('/api/comfy/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reinstall: options?.reinstall === true })
+      })
+
+      if (!res.body) {
+        if (!res.ok) {
+          const text = await res.text()
+          throw new Error(text || 'Failed to install ComfyUI')
+        }
+        comfyInstalled = true
+        return
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let success = false
+      let needsRestart = false
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        let newlineIndex = buffer.indexOf('\n')
+        while (newlineIndex !== -1) {
+          const line = buffer.slice(0, newlineIndex).trim()
+          buffer = buffer.slice(newlineIndex + 1)
+          if (line.length > 0) {
+            try {
+              const event = JSON.parse(line)
+              if (event?.type === 'log' && typeof event.message === 'string') {
+                comfyInstallLogs = [...comfyInstallLogs, event.message]
+              } else if (event?.type === 'error' && typeof event.message === 'string') {
+                comfyInstallError = event.message
+              } else if (event?.type === 'complete') {
+                success = event.success === true
+                needsRestart = event.needsRestart === true
+              }
+            } catch {
+              // ignore malformed lines
+            }
+          }
+          newlineIndex = buffer.indexOf('\n')
+        }
+      }
+      if (buffer.trim().length > 0) {
+        try {
+          const event = JSON.parse(buffer.trim())
+          if (event?.type === 'log' && typeof event.message === 'string') {
+            comfyInstallLogs = [...comfyInstallLogs, event.message]
+          } else if (event?.type === 'error' && typeof event.message === 'string') {
+            comfyInstallError = event.message
+          } else if (event?.type === 'complete') {
+            success = event.success === true
+            needsRestart = event.needsRestart === true
+          }
+        } catch {}
+      }
+
+      if (!success && !comfyInstallError) {
+        comfyInstallError = 'ComfyUI installation failed'
+      }
+      if (success) {
+        await loadComfyStatus()
+        if (needsRestart) {
+          await startComfy()
+        }
+      }
+    } catch (err) {
+      comfyInstallError = err instanceof Error ? err.message : String(err)
+    } finally {
+      comfyInstalling = false
+    }
+  }
+
+  async function loadCustomNodes() {
+    customNodesLoading = true
+    try {
+      const res = await fetch('/api/downloads?category=custom-node&onlyMissing=1')
+      const data = await res.json()
+      if (Array.isArray(data?.items)) {
+        const parsed: CustomNodeItem[] = []
+        for (const entry of data.items as unknown[]) {
+          if (!entry || typeof entry !== 'object') continue
+          const record = entry as Record<string, unknown>
+          const urlsSource = Array.isArray(record['urls']) ? (record['urls'] as unknown[]) : []
+          const cleanUrls = urlsSource.filter((url): url is string => typeof url === 'string')
+          parsed.push({
+            label: typeof record['label'] === 'string' ? (record['label'] as string) : '',
+            filename: typeof record['filename'] === 'string' ? (record['filename'] as string) : '',
+            urls: cleanUrls,
+            dest: typeof record['dest'] === 'string' ? (record['dest'] as string) : '',
+            branch: typeof record['branch'] === 'string' ? (record['branch'] as string) : null
+          })
+        }
+        customNodeItems = parsed
+        if (!customInitialSet) {
+          customInitiallyRequired = parsed.length > 0
+          customInitialSet = true
+        }
+      } else {
+        customNodeItems = []
+        if (!customInitialSet) {
+          customInitiallyRequired = false
+          customInitialSet = true
+        }
+      }
+    } catch {
+      customNodeItems = []
+      if (!customInitialSet) {
+        customInitiallyRequired = false
+        customInitialSet = true
+      }
+    } finally {
+      customNodesLoading = false
+      if (!customInitialSet) {
+        customInitiallyRequired = customNodeItems.length > 0
+        customInitialSet = true
+      }
+    }
+  }
+
+  async function installCustomNodes() {
+    if (customNodesInstalling) return
+    if (skippedSteps.customNodes) {
+      skippedSteps = { ...skippedSteps, customNodes: false }
+    }
+    const targets = [...customNodeItems]
+    if (targets.length === 0) {
+      customNodesResult = { success: true, ok: [], failed: [] }
+      return
+    }
+
+    customNodesInstalling = true
+    customNodesResult = null
+    customStartError = ''
+    customStartSuccess = false
+    customInstallProgress = { total: targets.length, completed: 0, current: '' }
+
+    const ok: DownloadResultItem[] = []
+    const failed: DownloadFailedItem[] = []
+
+    for (const item of targets) {
+      customInstallProgress.current = item.label || item.filename
+      try {
+        const res = await fetch('/api/downloads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ onlyMissing: true, filenames: [item.filename], category: 'custom-node' })
+        })
+        let data: unknown = null
+        try {
+          data = await res.json()
+        } catch {
+          data = null
+        }
+        const record = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+        const resOk: DownloadResultItem[] = []
+        if (Array.isArray(record['ok'])) {
+          for (const entry of record['ok'] as unknown[]) {
+            if (entry && typeof entry === 'object') {
+              const value = (entry as Record<string, unknown>)['filename']
+              if (typeof value === 'string' && value.length > 0) {
+                const urlValue = (entry as Record<string, unknown>)['url']
+                resOk.push({ filename: value, url: typeof urlValue === 'string' ? urlValue : null })
+              }
+            }
+          }
+        }
+        const resFailed: DownloadFailedItem[] = []
+        if (Array.isArray(record['failed'])) {
+          for (const entry of record['failed'] as unknown[]) {
+            if (entry && typeof entry === 'object') {
+              const recordEntry = entry as Record<string, unknown>
+              const nameValue = recordEntry['filename']
+              if (typeof nameValue === 'string' && nameValue.length > 0) {
+                const errValue = typeof recordEntry['error'] === 'string' ? recordEntry['error'] : null
+                resFailed.push({ filename: nameValue, error: errValue })
+              }
+            }
+          }
+        }
+        if (resOk.length > 0) ok.push(...resOk)
+        if (resFailed.length > 0) {
+          failed.push(...resFailed)
+        } else if (!res.ok) {
+          failed.push({ filename: item.filename, error: `HTTP ${res.status}` })
+        } else if (resOk.length === 0) {
+          ok.push({ filename: item.filename, url: null })
+        }
+      } catch (err: unknown) {
+        failed.push({
+          filename: item.filename,
+          error: err instanceof Error ? err.message : String(err)
+        })
+      } finally {
+        customInstallProgress.completed += 1
+      }
+    }
+
+    customNodesResult = {
+      success: failed.length === 0,
+      ok,
+      failed
+    }
+    customInstallProgress.current = ''
+    customNodesInstalling = false
+
+    await loadCustomNodes()
+  }
+
+  async function startComfy() {
+    if (customStarting) {
+      return
+    }
+    if (skippedSteps.customNodes) {
+      skippedSteps = { ...skippedSteps, customNodes: false }
+    }
+    customStarting = true
+    customStartError = ''
+    customStartSuccess = false
+    try {
+      const res = await fetch('/api/comfy/start', { method: 'POST' })
+      let data: unknown = null
+      try {
+        data = await res.json()
+      } catch {
+        data = null
+      }
+      const record = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+      if (!res.ok || record['success'] !== true) {
+        const msg = typeof record['error'] === 'string' ? record['error'] : `HTTP ${res.status}`
+        throw new Error(msg)
+      }
+      customStartSuccess = true
+    } catch (err: unknown) {
+      customStartError = err instanceof Error ? err.message : String(err)
+    } finally {
+      customStarting = false
+    }
+  }
+
+  async function installNunchakuRuntime() {
+    if (nunchakuInstalling) {
+      return
+    }
+    nunchakuInstalling = true
+    nunchakuInstallError = ''
+    nunchakuInstallStatus = ''
+    nunchakuInstallSuccess = false
+    nunchakuInstallMessages = []
+    nunchakuInstallPromptId = null
+    try {
+      const res = await fetch('/api/comfy/install-nunchaku', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok || data?.success !== true) {
+        const errorMessage = typeof data?.error === 'string' ? data.error : `HTTP ${res.status}`
+        throw new Error(errorMessage)
+      }
+      nunchakuInstallStatus = typeof data?.status === 'string' ? data.status : 'submitted'
+      nunchakuInstallSuccess = nunchakuInstallStatus === 'completed'
+      if (Array.isArray(data?.messages)) {
+        nunchakuInstallMessages = data.messages.filter(
+          (entry: unknown): entry is string => typeof entry === 'string' && entry.length > 0
+        )
+      }
+      if (typeof data?.promptId === 'string') {
+        nunchakuInstallPromptId = data.promptId
+      }
+    } catch (err: unknown) {
+      nunchakuInstallError = err instanceof Error ? err.message : String(err)
+    } finally {
+      nunchakuInstalling = false
+    }
+  }
+
+  async function loadDownloadItems() {
+    downloadsLoading = true
+    downloadsLoaded = false
+    downloading = false
+    currentStep = null
+    step1Result = null
+    step2Result = null
+    try {
+      const res = await fetch('/api/downloads')
+      const data = await res.json()
+      if (Array.isArray(data?.items)) {
+        const parsed: DownloadItem[] = []
+        for (const entry of data.items as unknown[]) {
+          if (!entry || typeof entry !== 'object') continue
+          const record = entry as Record<string, unknown>
+          const urlsSource = Array.isArray(record['urls']) ? (record['urls'] as unknown[]) : []
+          const cleanUrls = urlsSource.filter((url): url is string => typeof url === 'string')
+          parsed.push({
+            label: typeof record['label'] === 'string' ? (record['label'] as string) : '',
+            filename: typeof record['filename'] === 'string' ? (record['filename'] as string) : '',
+            urls: cleanUrls,
+            dest: typeof record['dest'] === 'string' ? (record['dest'] as string) : '',
+            category: typeof record['category'] === 'string' ? (record['category'] as string) : null
+          })
+        }
+        allItems = parsed.filter((entry) => entry.category !== 'custom-node')
+      } else {
+        allItems = []
+      }
+    } catch {
+      allItems = []
+    } finally {
+      downloadsLoading = false
+      downloadsLoaded = true
+    }
+  }
+
+  async function downloadStep(step: 1 | 2) {
+    if (downloading) return
+    if (step === 1 && skippedSteps.downloadsCore) {
+      skippedSteps = { ...skippedSteps, downloadsCore: false }
+    }
+    if (step === 2 && skippedSteps.downloadsModels) {
+      skippedSteps = { ...skippedSteps, downloadsModels: false }
+    }
+    const items = step === 1 ? step1Items : step2Items
+    if (items.length === 0) {
+      if (step === 1) {
+        step1Result = { success: true, ok: [], failed: [] }
+      } else {
+        step2Result = { success: true, ok: [], failed: [] }
+      }
+      return
+    }
+
+    downloading = true
+    currentStep = step
+    downloadProgress = { total: items.length, completed: 0, current: '', currentLabel: '' }
+    currentFile = { filename: '', label: '', received: 0, total: 0 }
+    currentMessage = ''
+    const ok: DownloadResultItem[] = []
+    const failed: DownloadFailedItem[] = []
+    let summary: DownloadSummary | null = null
+
+    try {
+      const targetFilenames = items.map((item) => item.filename)
+      const res = await fetch('/api/downloads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ onlyMissing: true, filenames: targetFilenames })
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        const message = typeof (data as any)?.error === 'string' ? (data as any).error : `HTTP ${res.status}`
+        const result = { success: false, ok: [], failed: [{ filename: '__request__', error: message }] }
+        if (step === 1) {
+          step1Result = result
+        } else {
+          step2Result = result
+        }
+        return
+      }
+
+      const contentType = res.headers.get('Content-Type') || ''
+      if (!res.body || !contentType.includes('ndjson')) {
+        const data = await res.json().catch(() => null)
+        const record = data && typeof data === 'object' ? (data as Record<string, unknown>) : {}
+        const resOk: DownloadResultItem[] = []
+        if (Array.isArray(record['ok'])) {
+          for (const entry of record['ok'] as unknown[]) {
+            const parsed = parseDownloadResult(entry)
+            if (parsed) resOk.push(parsed)
+          }
+        }
+        const resFailed: DownloadFailedItem[] = []
+        if (Array.isArray(record['failed'])) {
+          for (const entry of record['failed'] as unknown[]) {
+            const parsedFailed = parseFailedResult(entry)
+            if (parsedFailed) resFailed.push(parsedFailed)
+          }
+        }
+        const result = {
+          success: !!record['success'],
+          ok: resOk,
+          failed: resFailed
+        }
+        if (step === 1) {
+          step1Result = result
+        } else {
+          step2Result = result
+        }
+        downloadProgress.completed = resOk.length + resFailed.length
+        return
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      const handleEvent = (event: any) => {
+        if (!event || typeof event !== 'object') return
+        switch (event.type) {
+          case 'file-start': {
+            const filename = typeof event.filename === 'string' ? event.filename : ''
+            const label = typeof event.label === 'string' && event.label.length > 0 ? event.label : filename
+            downloadProgress.current = filename
+            downloadProgress.currentLabel = label
+            progressTransition = false
+            currentFile = { filename, label, received: 0, total: 0 }
+            currentMessage = ''
+            setTimeout(() => {
+              progressTransition = true
+            }, 50)
+            break
+          }
+          case 'file-progress': {
+            const filename = typeof event.filename === 'string' ? event.filename : currentFile.filename
+            if (filename === currentFile.filename || currentFile.filename === '') {
+              const received =
+                typeof event.receivedBytes === 'number' && event.receivedBytes >= 0
+                  ? event.receivedBytes
+                  : currentFile.received
+              const total =
+                typeof event.totalBytes === 'number' && event.totalBytes >= 0 ? event.totalBytes : currentFile.total
+              currentFile = {
+                filename,
+                label: downloadProgress.currentLabel || filename,
+                received,
+                total
+              }
+              if (typeof event.message === 'string' && event.message.length > 0) {
+                currentMessage = event.message
+              } else if (event.totalBytes !== null) {
+                currentMessage = ''
+              }
+            }
+            break
+          }
+          case 'file-attempt-error': {
+            if (typeof event.error === 'string') {
+              currentMessage = event.error
+            }
+            break
+          }
+          case 'file-complete': {
+            const filename = typeof event.filename === 'string' ? event.filename : currentFile.filename
+            const url = typeof event.url === 'string' ? event.url : null
+            ok.push({ filename, url })
+            currentFile = { filename: '', label: '', received: 0, total: 0 }
+            currentMessage = ''
+            downloadProgress.completed = Math.min(downloadProgress.total, downloadProgress.completed + 1)
+            break
+          }
+          case 'file-error': {
+            const filename = typeof event.filename === 'string' ? event.filename : currentFile.filename
+            const error = typeof event.error === 'string' ? event.error : 'Download failed'
+            failed.push({ filename, error })
+            currentFile = { filename: '', label: '', received: 0, total: 0 }
+            currentMessage = error
+            downloadProgress.completed = Math.min(downloadProgress.total, downloadProgress.completed + 1)
+            break
+          }
+          case 'overall': {
+            if (typeof event.completed === 'number') {
+              downloadProgress.completed = event.completed
+            }
+            break
+          }
+          case 'all-complete': {
+            const resOk: DownloadResultItem[] = []
+            if (Array.isArray(event.ok)) {
+              for (const entry of event.ok as unknown[]) {
+                const parsed = parseDownloadResult(entry)
+                if (parsed) resOk.push(parsed)
+              }
+            }
+            const resFailed: DownloadFailedItem[] = []
+            if (Array.isArray(event.failed)) {
+              for (const entry of event.failed as unknown[]) {
+                const parsedFailed = parseFailedResult(entry)
+                if (parsedFailed) resFailed.push(parsedFailed)
+              }
+            }
+            summary = {
+              success: !!event.success,
+              ok: resOk,
+              failed: resFailed
+            }
+            downloadProgress.completed = resOk.length + resFailed.length
+            currentFile = { filename: '', label: '', received: 0, total: 0 }
+            currentMessage = ''
+            break
+          }
+          case 'error': {
+            const error = typeof event.error === 'string' ? event.error : 'Download failed'
+            failed.push({ filename: '__request__', error })
+            currentMessage = error
+            break
+          }
+        }
+      }
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        let newlineIndex = buffer.indexOf('\n')
+        while (newlineIndex !== -1) {
+          const line = buffer.slice(0, newlineIndex).trim()
+          buffer = buffer.slice(newlineIndex + 1)
+          if (line.length > 0) {
+            try {
+              handleEvent(JSON.parse(line))
+            } catch {
+              // ignore malformed chunks
+            }
+          }
+          newlineIndex = buffer.indexOf('\n')
+        }
+      }
+      const trailing = buffer.trim()
+      if (trailing.length > 0) {
+        try {
+          handleEvent(JSON.parse(trailing))
+        } catch {
+          // ignore
+        }
+      }
+
+      const result = summary ? summary : { success: failed.length === 0, ok, failed }
+      if (step === 1) {
+        step1Result = result
+      } else {
+        step2Result = result
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (failed.length === 0) {
+        failed.push({ filename: '__request__', error: message })
+      }
+      const result = { success: false, ok, failed }
+      if (step === 1) {
+        step1Result = result
+      } else {
+        step2Result = result
+      }
+    } finally {
+      downloading = false
+      currentStep = null
+      downloadProgress.current = ''
+      downloadProgress.currentLabel = ''
+      currentFile = { filename: '', label: '', received: 0, total: 0 }
+      currentMessage = ''
+    }
+  }
+
+  $effect(() => {
+    if (isOpen) {
+      resetState()
+      void loadComfyStatus()
+      void loadCustomNodes()
+      void loadDownloadItems()
+    }
+  })
+</script>
+
+{#if isOpen}
+  <div
+    class="bg-opacity-0 fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+    onclick={handleBackdropClick}
+    onkeydown={(e) => e.key === 'Escape' && handleClose()}
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="downloads-title"
+    tabindex="-1"
+  >
+    <div
+      class="mx-4 w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800"
+      role="document"
+    >
+      <div class="mb-4 flex items-center justify-between">
+        <h2 id="downloads-title" class="text-xl font-semibold text-gray-900 dark:text-white">
+          {allComplete ? m['downloads.titleCompleted']() : m['downloads.title']()}
+        </h2>
+        <button
+          type="button"
+          class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          onclick={handleClose}
+          aria-label={m['noCheckpoints.closeDialogLabel']()}
+        >
+          <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        {#if !comfyStepComplete}
+          <ComfyInstallStep
+            skipped={skippedSteps.comfy}
+            stepComplete={comfyStepComplete}
+            installing={comfyInstalling || comfyStatusLoading}
+            logs={comfyInstallLogs}
+            error={comfyInstallError}
+            installed={comfyInstalled}
+          />
+        {/if}
+
+        {#if comfyStepComplete}
+          {#if !customNodesStepComplete}
+            <CustomNodesStep
+              skipped={skippedSteps.customNodes}
+              stepComplete={customNodesStepComplete}
+              loading={customNodesLoading}
+              items={customNodeItems}
+              installing={customNodesInstalling}
+              installProgress={customInstallProgress}
+              progressPercent={customProgressPercent}
+              result={customNodesResult}
+              startSuccess={customStartSuccess}
+              startError={customStartError}
+              starting={customStarting}
+            />
+          {/if}
+
+          {#if showNunchakuInstall}
+            <NunchakuInstallStep
+              installing={nunchakuInstalling}
+              status={nunchakuInstallStatus}
+              error={nunchakuInstallError}
+              success={nunchakuInstallSuccess}
+              messages={nunchakuInstallMessages}
+            />
+          {/if}
+        {/if}
+
+        {#if customNodesStepComplete && nunchakuReady && !step1Complete}
+          <DownloadFilesStep
+            title={m['downloads.step1Title']()}
+            description={m['downloads.step1Description']()}
+            filesCount={m['downloads.filesCount']({ count: step1Items.length })}
+            showFilesCount={!step1Complete}
+            skipped={skippedSteps.downloadsCore}
+            complete={step1Complete}
+            items={step1Items}
+            loading={downloadsLoading}
+            downloading={downloading}
+            currentStepActive={currentStep === 1}
+            downloadProgress={downloadProgress}
+            currentFile={currentFile}
+            currentMessage={currentMessage}
+            progressPercent={progressPercent}
+            currentFilePercent={currentFilePercent}
+            progressTransition={progressTransition}
+            result={step1Result}
+            formatBytes={formatBytes}
+          />
+        {/if}
+
+        {#if step1Complete}
+          <DownloadFilesStep
+            title={m['downloads.step2Title']()}
+            description={m['downloads.step2Description']()}
+            filesCount={m['downloads.filesCount']({ count: step2Items.length })}
+            showFilesCount={!step2Complete}
+            skipped={skippedSteps.downloadsModels}
+            complete={step2Complete}
+            items={step2Items}
+            loading={downloadsLoading}
+            downloading={downloading}
+            currentStepActive={currentStep === 2}
+            downloadProgress={downloadProgress}
+            currentFile={currentFile}
+            currentMessage={currentMessage}
+            progressPercent={progressPercent}
+            currentFilePercent={currentFilePercent}
+            progressTransition={progressTransition}
+            result={step2Result}
+            formatBytes={formatBytes}
+          />
+        {/if}
+      </div>
+
+      <div class="mt-6 flex flex-wrap items-center justify-between gap-2">
+        <button
+          type="button"
+          class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
+          onclick={forceResetAll}
+        >
+          {m['downloads.startOver']()}
+        </button>
+        <div class="flex flex-wrap gap-2">
+        {#if !comfyStepComplete}
+          <button
+            type="button"
+            class={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${comfyInstallDisabled ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+            onclick={() => installComfy({ reinstall: comfyInstalled })}
+            disabled={comfyInstallDisabled}
+          >
+            {comfyInstallButtonLabel}
+          </button>
+          {#if showComfyNextButton}
+            <button
+              type="button"
+              class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+              onclick={() => userConfirmedComfyStep = true}
+            >
+              Next Step
+            </button>
+          {:else}
+            <button
+              type="button"
+              class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
+              onclick={() => skipStep('comfy')}
+            >
+              {m['downloads.skip']()}
+            </button>
+          {/if}
+        {/if}
+
+        {#if comfyStepComplete && !customNodesStepComplete}
+          {#if customNodeItems.length > 0}
+            <button
+              type="button"
+              class={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${customInstallButtonDisabled ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+              onclick={installCustomNodes}
+              disabled={customInstallButtonDisabled}
+            >
+              {customInstallButtonLabel}
+            </button>
+          {/if}
+          {#if showCustomNodesNextButton}
+            <button
+              type="button"
+              class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+              onclick={() => userConfirmedCustomNodesStep = true}
+            >
+              Next Step
+            </button>
+          {:else if !showStartComfyButton}
+            <button
+              type="button"
+              class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
+              onclick={() => skipStep('customNodes')}
+            >
+              {m['downloads.skip']()}
+            </button>
+          {/if}
+        {/if}
+
+        {#if showStartComfyButton}
+          <button
+            type="button"
+            class={`rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed`}
+            onclick={startComfy}
+            disabled={startComfyButtonDisabled}
+          >
+            {startComfyButtonLabel}
+          </button>
+        {/if}
+
+        {#if showNunchakuInstall && !nunchakuInstallSuccess}
+          <button
+            type="button"
+            class={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors ${
+              nunchakuInstalling ? 'cursor-not-allowed bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
+            onclick={installNunchakuRuntime}
+            disabled={nunchakuInstalling}
+          >
+            {nunchakuInstalling ? 'Installing Nunchaku…' : 'Install Nunchaku runtime'}
+          </button>
+        {/if}
+
+        {#if customNodesStepComplete && nunchakuReady && !step1Complete}
+          <button
+            type="button"
+            class={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              step1Complete
+                ? 'bg-green-200 text-green-700 cursor-not-allowed'
+                : step1ButtonDisabled
+                  ? 'bg-blue-400 text-white cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+            onclick={() => downloadStep(1)}
+            disabled={step1ButtonDisabled}
+          >
+            {step1ButtonLabel}
+          </button>
+
+          {#if !step1Complete}
+            <button
+              type="button"
+              class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
+              onclick={() => skipStep('downloadsCore')}
+            >
+              {m['downloads.skip']()}
+            </button>
+          {/if}
+        {/if}
+
+        {#if step1Complete}
+          <button
+            type="button"
+            class={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              step2Complete
+                ? 'bg-green-200 text-green-700 cursor-not-allowed'
+                : step2ButtonDisabled
+                  ? 'bg-blue-400 text-white cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+            onclick={() => downloadStep(2)}
+            disabled={step2ButtonDisabled}
+          >
+            {step2ButtonLabel}
+          </button>
+        {/if}
+
+        {#if step1Complete && !step2Complete}
+          <button
+            type="button"
+            class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
+            onclick={() => skipStep('downloadsModels')}
+          >
+            {m['downloads.skip']()}
+          </button>
+        {/if}
+
+        <button
+          type="button"
+          class="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+          onclick={handleClose}
+        >
+          {m['downloads.close']()}
+        </button>
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}

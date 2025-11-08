@@ -2,9 +2,9 @@ import type { RequestHandler } from '@sveltejs/kit'
 import { spawn } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { findComfyPython, getComfyDir } from '$lib/server/comfy'
+import { isComfyAvailable, stopComfyProcess } from '$lib/server/comfyProcess'
 
 const STARTUP_WAIT_SECONDS = 45
-const COMFY_URL = 'http://127.0.0.1:8188/'
 
 function buildArgs(): string[] {
   const args: string[] = ['-s', 'main.py', '--disable-auto-launch', '--listen', '0.0.0.0', '--enable-cors-header', '*']
@@ -12,15 +12,6 @@ function buildArgs(): string[] {
     args.splice(2, 0, '--windows-standalone-build')
   }
   return args
-}
-
-async function isComfyAvailable(): Promise<boolean> {
-  try {
-    const res = await fetch(COMFY_URL, { method: 'GET', signal: AbortSignal.timeout(3000) })
-    return res.ok
-  } catch {
-    return false
-  }
 }
 
 async function waitForComfyToStart(): Promise<boolean> {
@@ -39,9 +30,14 @@ export const POST: RequestHandler = async () => {
     // Check if ComfyUI is already running
     const alreadyRunning = await isComfyAvailable()
     if (alreadyRunning) {
-      return new Response(JSON.stringify({ success: true, message: 'ComfyUI is already running' }), {
-        headers: { 'Content-Type': 'application/json' }
-      })
+      await stopComfyProcess()
+      const stillRunning = await isComfyAvailable()
+      if (stillRunning) {
+        return new Response(JSON.stringify({ error: 'Failed to stop existing ComfyUI instance.' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
     }
 
     const python = await findComfyPython()
@@ -73,7 +69,7 @@ export const POST: RequestHandler = async () => {
       })
     }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, restarted: alreadyRunning }), {
       headers: { 'Content-Type': 'application/json' }
     })
   } catch (err: unknown) {

@@ -15,11 +15,6 @@
     startSuccess: boolean
     startError: string
     starting: boolean
-    onSkip: () => void
-    onInstall: () => void
-    onStart: () => void
-    showActions: boolean
-    showStartAction: boolean
   }
 
   let {
@@ -33,12 +28,7 @@
     result,
     startSuccess,
     startError,
-    starting,
-    onSkip,
-    onInstall,
-    onStart,
-    showActions,
-    showStartAction
+    starting
   }: Props = $props()
   let installProgressSignature = ''
   let lastResultReference: DownloadSummary | null = null
@@ -223,45 +213,4 @@
     </div>
   {/if}
 
-  {#if items.length === 0 && showStartAction}
-    <div class="mt-4 flex flex-wrap gap-2">
-      <button
-        type="button"
-        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-        onclick={onStart}
-        disabled={starting}
-      >
-        {#if starting}
-          {m['customNodes.starting']()}
-        {:else}
-          {m['customNodes.start']()}
-        {/if}
-      </button>
-    </div>
-  {/if}
-
-  {#if showActions}
-    <div class="mt-4 flex flex-wrap gap-2">
-      {#if items.length > 0}
-        <button
-          type="button"
-          class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-          onclick={onInstall}
-          disabled={installing || loading}
-        >
-          {installing ? m['customNodes.installing']() : m['customNodes.autoInstall']()}
-        </button>
-      {/if}
-
-      {#if !stepComplete}
-        <button
-          type="button"
-          class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400 dark:hover:bg-gray-800"
-          onclick={onSkip}
-        >
-          {m['downloads.skip']()}
-        </button>
-      {/if}
-    </div>
-  {/if}
 </div>

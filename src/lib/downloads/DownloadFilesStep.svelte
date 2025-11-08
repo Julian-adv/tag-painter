@@ -25,14 +25,7 @@
     currentFilePercent: number
     progressTransition: boolean
     result: DownloadSummary | null
-    disableButton: boolean
-    buttonIdleLabel: string
-    buttonDownloadingLabel: string
-    onDownload: () => void
-    onSkip: () => void
     formatBytes: (value: number) => string
-    showDownloadAction: boolean
-    showSkipAction: boolean
   }
 
   let {
@@ -53,14 +46,7 @@
     currentFilePercent,
     progressTransition,
     result,
-    disableButton,
-    buttonIdleLabel,
-    buttonDownloadingLabel,
-    onDownload,
-    onSkip,
-    formatBytes,
-    showDownloadAction,
-    showSkipAction
+    formatBytes
   }: Props = $props()
 </script>
 
@@ -85,15 +71,6 @@
         <span class="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-200">
           {m['downloads.completed']()}
         </span>
-      {/if}
-      {#if showSkipAction && !complete}
-        <button
-          type="button"
-          class="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 transition hover:border-gray-400 hover:text-gray-800 dark:border-gray-600 dark:text-gray-200 dark:hover:border-gray-400"
-          onclick={onSkip}
-        >
-          {m['downloads.skip']()}
-        </button>
       {/if}
     </div>
   </div>
@@ -172,22 +149,4 @@
     </div>
   {/if}
 
-  {#if showDownloadAction}
-    <button
-      type="button"
-      class={`w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-        complete ? 'bg-green-200 text-green-700 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
-      } disabled:opacity-50`}
-      onclick={onDownload}
-      disabled={disableButton}
-    >
-      {#if complete}
-        {m['downloads.completed']()}
-      {:else if currentStepActive}
-        {buttonDownloadingLabel}
-      {:else}
-        {buttonIdleLabel}
-      {/if}
-    </button>
-  {/if}
 </div>
