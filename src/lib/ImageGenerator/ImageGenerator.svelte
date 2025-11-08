@@ -83,7 +83,27 @@
   let tagZonesRef: TagZonesHandle | undefined = $state()
 
   // Toasts component ref for showing messages
+  type ToastType = 'success' | 'error' | 'info'
   let toastsRef = $state<any>()
+  let pendingToasts: { type: ToastType; message: string }[] = $state([])
+
+  function showToast(type: ToastType, message: string) {
+    if (toastsRef) {
+      toastsRef[type](message)
+    } else {
+      pendingToasts = [...pendingToasts, { type, message }]
+    }
+  }
+
+  $effect(() => {
+    if (!toastsRef || pendingToasts.length === 0) {
+      return
+    }
+    for (const toast of pendingToasts) {
+      toastsRef[toast.type](toast.message)
+    }
+    pendingToasts = []
+  })
 
   // Tab state for left section
   let activeTabId = $state('generator')
@@ -111,12 +131,17 @@
 
   async function startComfyUI() {
     try {
+      const statusRes = await fetch('/api/comfy/status')
+      const statusData = statusRes.ok ? await statusRes.json() : null
+      if (statusData?.running) {
+        console.log('ComfyUI already running; skipping auto-start.')
+        return
+      }
+
       const res = await fetch('/api/comfy/start', { method: 'POST' })
       const data = await res.json()
       if (data?.success) {
         console.log('ComfyUI started successfully')
-      } else if (data?.alreadyRunning) {
-        console.log('ComfyUI is already running')
       } else {
         console.error('Failed to start ComfyUI:', data?.error || 'Unknown error')
       }
@@ -371,7 +396,7 @@
 
     // Store the results
     if (result.error) {
-      toastsRef?.error(result.error)
+      showToast('error', result.error)
       isLoading = false
     } else {
       lastSeed = result.seed!
@@ -481,7 +506,7 @@
 
     // Store the results
     if (result.error) {
-      toastsRef?.error(result.error)
+      showToast('error', result.error)
       isLoading = false
     } else {
       lastSeed = result.seed!
@@ -609,7 +634,7 @@
       )
     } catch (error) {
       console.error('Failed to generate image from chat prompt', error)
-      toastsRef?.error('Failed to generate image from chat prompt.')
+      showToast('error', 'Failed to generate image from chat prompt.')
       isLoading = false
     }
   }
@@ -662,6 +687,7 @@
                   {disabledZones}
                   {settings}
                   onOpenSettings={openSettingsFromTagZones}
+                  onWildcardsError={(message) => showToast('error', message)}
                 />
               </div>
             </div>
@@ -677,11 +703,11 @@
                   currentImagePath={currentImageFileName}
                   onShowToast={(message, type) => {
                     if (type === 'success') {
-                      toastsRef?.success(message)
+        showToast('success', message)
                     } else if (type === 'error') {
-                      toastsRef?.error(message)
+        showToast('error', message)
                     } else {
-                      toastsRef?.info(message)
+        showToast('info', message)
                     }
                   }}
                 />

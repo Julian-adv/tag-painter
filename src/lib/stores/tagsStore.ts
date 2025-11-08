@@ -135,6 +135,7 @@ export function updateWildcardsFromText(text: string) {
     console.error('updateWildcardsFromText failed:', e)
     wildcardNameSet = new Set()
     wildcardModel = fromYAML('')
+    throw e instanceof Error ? e : new Error(String(e))
   }
   updateCombinedTags()
 }

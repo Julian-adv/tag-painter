@@ -23,13 +23,15 @@
     disabledZones?: Set<string>
     settings: Settings
     onOpenSettings?: (focusField: 'quality' | 'negative') => void
+    onWildcardsError?: (message: string) => void
   }
 
   let {
     currentRandomTagResolutions = { all: {}, zone1: {}, zone2: {}, negative: {}, inpainting: {} },
     disabledZones = new Set(),
     settings,
-    onOpenSettings
+    onOpenSettings,
+    onWildcardsError
   }: Props = $props()
 
   let allTags = $state<string>('')
@@ -116,14 +118,17 @@
       directiveDisabledZones = new Set(zones.directives?.disabledZones ?? [])
       wildcardsRefreshToken += 1
     } catch (error) {
-      // If wildcards file doesn't exist, start with empty zones
-      // Error will be shown as toast when user tries to generate image
+      // If wildcards file doesn't exist, start with empty zones and notify user
       allTags = ''
       firstZoneTags = ''
       secondZoneTags = ''
       negativeTags = ''
       inpaintingTags = ''
       directiveDisabledZones = new Set()
+      const fileLabel = targetFile ?? 'wildcards.yaml'
+      const detail = error instanceof Error ? error.message : 'Failed to read wildcard zones.'
+      onWildcardsError?.(`Reading ${fileLabel} failed: ${detail}`)
+      console.error('Failed to load wildcards:', error)
     }
   }
 
