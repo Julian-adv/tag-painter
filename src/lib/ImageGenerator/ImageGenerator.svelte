@@ -11,7 +11,7 @@
   import ModelControls from './ModelControls.svelte'
   import { dev } from '$app/environment'
   import { m } from '$lib/paraglide/messages'
-  import DownloadsDialog from '$lib/downloads/InstallWizardDialog.svelte'
+  import InstallWizardDialog from '$lib/downloads/InstallWizardDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import {
     loadSettings,
@@ -714,12 +714,23 @@
           <div class="flex gap-1 self-start">
             <button
               type="button"
-              class="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
+              class="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
               onclick={() => openDownloadsDialog(true)}
               aria-label={m['imageGenerator.showSetupDialog']()}
               title={m['imageGenerator.showSetupDialog']()}
             >
-              !
+              <svg
+                class="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M13 2 3 14h9l-1 8 10-12h-9z" />
+              </svg>
             </button>
           </div>
         </div>
@@ -741,7 +752,7 @@
 <Toasts bind:this={toastsRef} />
 
 <!-- No Checkpoints Dialog -->
-<DownloadsDialog bind:isOpen={showDownloadsDialog} onClose={handleDownloadsDialogClosed} />
+<InstallWizardDialog bind:isOpen={showDownloadsDialog} onClose={handleDownloadsDialogClosed} />
 
 <style>
   :global(html, body) {
