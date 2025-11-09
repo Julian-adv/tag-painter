@@ -7,15 +7,27 @@
   import DrawingControls from './DrawingControls.svelte'
   import DrawingCanvas from './DrawingCanvas.svelte'
   import { m } from '$lib/paraglide/messages'
+  import {
+    extractPngParameters,
+    createImageObjectUrl,
+    revokeImageObjectUrl
+  } from './utils/pngMetadata'
 
   interface Props {
     imageUrl: string | null
     currentImageFileName: string
     outputDirectory: string
     onImageChange: (filePath: string) => void
+    onDroppedImageMetadata?: (metadata: string | null) => void
   }
 
-  let { imageUrl, currentImageFileName, outputDirectory, onImageChange }: Props = $props()
+  let {
+    imageUrl,
+    currentImageFileName,
+    outputDirectory,
+    onImageChange,
+    onDroppedImageMetadata
+  }: Props = $props()
 
   let allFiles: string[] = $state([])
   let currentIndex = $state(-1)
@@ -25,6 +37,9 @@
   let drawingCanvas:
     | { clearMask: () => void; getMaskData: () => string | null; hasMask: () => boolean }
     | undefined = $state()
+  let isDragging = $state(false)
+  let droppedImageUrl: string | null = $state(null)
+  let droppedImageMetadata: string | null = $state(null)
 
   // Watch for outputDirectory changes and update file list
   $effect(() => {
@@ -109,7 +124,77 @@
     isDrawingMode = false
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // Drag and drop handlers
+  function handleDragEnter(e: DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    isDragging = true
+  }
+
+  function handleDragOver(e: DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  function handleDragLeave(e: DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    // Only set isDragging to false if leaving the drop zone entirely
+    if (e.currentTarget === e.target) {
+      isDragging = false
+    }
+  }
+
+  async function handleDrop(e: DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    isDragging = false
+
+    const files = e.dataTransfer?.files
+    if (!files || files.length === 0) return
+
+    const file = files[0]
+    // Check if it's an image file
+    if (!file.type.startsWith('image/')) {
+      console.warn('Dropped file is not an image')
+      return
+    }
+
+    // Revoke previous dropped image URL if exists
+    if (droppedImageUrl) {
+      revokeImageObjectUrl(droppedImageUrl)
+    }
+
+    // Create object URL for display
+    droppedImageUrl = createImageObjectUrl(file)
+
+    // Extract PNG metadata if it's a PNG file
+    if (file.type === 'image/png') {
+      droppedImageMetadata = await extractPngParameters(file)
+      // Notify parent component about the metadata
+      if (onDroppedImageMetadata) {
+        onDroppedImageMetadata(droppedImageMetadata)
+      }
+    } else {
+      droppedImageMetadata = null
+      if (onDroppedImageMetadata) {
+        onDroppedImageMetadata(null)
+      }
+    }
+
+    // Clear current image to show dropped image
+    onImageChange('')
+  }
+
+  // Clean up object URLs when component is destroyed
+  $effect(() => {
+    return () => {
+      if (droppedImageUrl) {
+        revokeImageObjectUrl(droppedImageUrl)
+      }
+    }
+  })
+
   async function loadImageMetadata(filePath: string) {
     try {
       const metadata = (await getImageMetadata(filePath)) as { parameters?: string }
@@ -160,31 +245,57 @@
 </script>
 
 <div class="mx-auto flex w-full flex-col items-center gap-4">
-  {#if imageUrl}
-    <div class="relative inline-block">
-      <img
-        bind:this={imageElement}
-        src={imageUrl}
-        alt=""
-        class="block max-h-[calc(100vh-2rem)] max-w-full rounded-lg object-contain shadow-md"
-        onload={() => {}}
-      />
-      {#if $maskOverlay.isVisible && $maskOverlay.maskSrc}
+  <div
+    class="relative w-full"
+    role="region"
+    aria-label="Image drop zone"
+    ondragenter={handleDragEnter}
+    ondragover={handleDragOver}
+    ondragleave={handleDragLeave}
+    ondrop={handleDrop}
+  >
+    {#if isDragging}
+      <div
+        class="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-lg border-4 border-dashed border-blue-500 bg-blue-50 bg-opacity-90"
+      >
+        <p class="text-2xl font-semibold text-blue-600">Drop image here</p>
+      </div>
+    {/if}
+
+    {#if droppedImageUrl}
+      <div class="relative inline-block">
         <img
-          src={$maskOverlay.maskSrc}
-          alt={m['imageViewer.maskOverlay']()}
-          class="pointer-events-none absolute top-0 left-0 h-full w-full rounded-lg object-contain opacity-40 mix-blend-multiply"
+          src={droppedImageUrl}
+          alt=""
+          class="block max-h-[calc(100vh-2rem)] max-w-full rounded-lg object-contain shadow-md"
         />
-      {/if}
-      <DrawingCanvas bind:this={drawingCanvas} {isDrawingMode} {drawingTool} {imageElement} />
-    </div>
-  {:else}
-    <div
-      class="flex h-[1216px] w-[832px] items-center justify-center rounded-lg bg-gray-100 text-lg text-gray-500"
-    >
-      <p>{m['imageViewer.noImage']()}</p>
-    </div>
-  {/if}
+      </div>
+    {:else if imageUrl}
+      <div class="relative inline-block">
+        <img
+          bind:this={imageElement}
+          src={imageUrl}
+          alt=""
+          class="block max-h-[calc(100vh-2rem)] max-w-full rounded-lg object-contain shadow-md"
+          onload={() => {}}
+        />
+        {#if $maskOverlay.isVisible && $maskOverlay.maskSrc}
+          <img
+            src={$maskOverlay.maskSrc}
+            alt={m['imageViewer.maskOverlay']()}
+            class="pointer-events-none absolute top-0 left-0 h-full w-full rounded-lg object-contain opacity-40 mix-blend-multiply"
+          />
+        {/if}
+        <DrawingCanvas bind:this={drawingCanvas} {isDrawingMode} {drawingTool} {imageElement} />
+      </div>
+    {:else}
+      <div
+        class="flex h-[1216px] w-[832px] items-center justify-center rounded-lg bg-gray-100 text-lg text-gray-500"
+      >
+        <p>{m['imageViewer.noImage']()}</p>
+      </div>
+    {/if}
+  </div>
 
   <div class="flex w-full items-center justify-between">
     <div class="flex items-center gap-2">

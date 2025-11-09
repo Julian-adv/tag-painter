@@ -586,15 +586,34 @@
     if (imageUrl && imageUrl.startsWith('blob:')) {
       URL.revokeObjectURL(imageUrl)
     }
-    imageUrl = `/api/image?path=${encodeURIComponent(filePath)}`
-    currentImageFileName = filePath
 
-    // Load metadata for PNG Info tab
-    try {
-      const result = await getImageMetadata(filePath)
-      metadata = result as Record<string, unknown> | null
-    } catch (error) {
-      console.error('Failed to load image metadata:', error)
+    // Only load metadata if filePath is not empty
+    if (filePath) {
+      imageUrl = `/api/image?path=${encodeURIComponent(filePath)}`
+      currentImageFileName = filePath
+
+      // Load metadata for PNG Info tab
+      try {
+        const result = await getImageMetadata(filePath)
+        metadata = result as Record<string, unknown> | null
+      } catch (error) {
+        console.error('Failed to load image metadata:', error)
+        metadata = null
+      }
+    } else {
+      // Empty path means showing dropped image, don't change metadata
+      imageUrl = null
+      currentImageFileName = ''
+    }
+  }
+
+  function handleDroppedImageMetadata(metadataText: string | null) {
+    // Update metadata for PNG Info tab
+    if (metadataText) {
+      metadata = { parameters: metadataText }
+      // Switch to PNG Info tab automatically
+      activeTabId = 'pnginfo'
+    } else {
       metadata = null
     }
   }
@@ -818,6 +837,7 @@
         {currentImageFileName}
         outputDirectory={settings.outputDirectory}
         onImageChange={handleImageChange}
+        onDroppedImageMetadata={handleDroppedImageMetadata}
       />
     </section>
   </div>
