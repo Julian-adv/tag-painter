@@ -225,12 +225,14 @@
       usingSpecialSuggestions && !!specialTriggerPrefix && word.startsWith(specialTriggerPrefix)
     const hasClosing = isSpecial ? word.endsWith(specialTriggerPrefix) : false
 
+    // Only convert underscores to spaces for Danbooru tags (non-custom tags)
+    // For custom tags (YAML array/object node names), keep underscores as-is
+    const processedSuggestion = isCustomTag(suggestion) ? suggestion : suggestion.replace(/_/g, ' ')
+
     if (isSpecial) {
       const closing = hasClosing ? '' : specialTriggerPrefix
-      const processedSuggestion = suggestion.replace(/_/g, ' ')
       value = beforeWord + specialTriggerPrefix + processedSuggestion + closing + afterWord
     } else {
-      const processedSuggestion = suggestion.replace(/_/g, ' ')
       value = beforeWord + processedSuggestion + afterWord
     }
     showSuggestions = false
@@ -238,7 +240,6 @@
 
     // Set cursor position after the inserted suggestion
     setTimeout(() => {
-      const processedSuggestion = suggestion.replace(/_/g, ' ')
       const addedPrefixLen = isSpecial ? specialTriggerPrefix.length : 0
       const addedSuffixLen = isSpecial ? (hasClosing ? 0 : specialTriggerPrefix.length) : 0
       const newCursorPosition =
