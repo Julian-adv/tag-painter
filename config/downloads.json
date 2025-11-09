@@ -236,6 +236,15 @@
       "category": "custom-node",
       "kind": "git",
       "branch": "main"
+    },
+    {
+      "label": "ComfyUI-Easy-Use",
+      "filename": "ComfyUI-Easy-Use",
+      "urls": ["https://github.com/yolain/ComfyUI-Easy-Use.git"],
+      "destRelativeToComfy": "custom_nodes/ComfyUI-Easy-Use",
+      "category": "custom-node",
+      "kind": "git",
+      "branch": "main"
     }
   ]
 }
