@@ -9,7 +9,6 @@
   import TabNavigation from './TabNavigation.svelte'
   import ChatInterface from '$lib/Chat/ChatInterface.svelte'
   import ModelControls from './ModelControls.svelte'
-  import { dev } from '$app/environment'
   import { m } from '$lib/paraglide/messages'
   import InstallWizardDialog from '$lib/downloads/InstallWizardDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
@@ -33,7 +32,8 @@
     autoSaveCurrentValues,
     updateComposition
   } from '$lib/stores/promptsStore'
-  import { detectPlatform } from '$lib/utils/loraPath'
+import { detectPlatform } from '$lib/utils/loraPath'
+import { Bolt, ArrowPath } from 'svelte-heros-v2'
 
   // Component state
   let isLoading = $state(false)
@@ -86,6 +86,7 @@
   type ToastType = 'success' | 'error' | 'info'
   let toastsRef = $state<any>()
   let pendingToasts: { type: ToastType; message: string }[] = $state([])
+  let restartingComfyUI = $state(false)
 
   function showToast(type: ToastType, message: string) {
     if (toastsRef) {
@@ -129,24 +130,49 @@
     showDownloadsDialog = true
   }
 
-  async function startComfyUI() {
+  async function startComfyUI(forceRestart = false) {
     try {
-      const statusRes = await fetch('/api/comfy/status')
-      const statusData = statusRes.ok ? await statusRes.json() : null
-      if (statusData?.running) {
-        console.log('ComfyUI already running; skipping auto-start.')
-        return
+      if (forceRestart) {
+        if (restartingComfyUI) {
+          return
+        }
+        restartingComfyUI = true
+      }
+      if (!forceRestart) {
+        const statusRes = await fetch('/api/comfy/status')
+        const statusData = statusRes.ok ? await statusRes.json() : null
+        if (statusData?.running) {
+          console.log('ComfyUI already running; skipping auto-start.')
+          return
+        }
       }
 
-      const res = await fetch('/api/comfy/start', { method: 'POST' })
+      const res = await fetch('/api/comfy/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restart: forceRestart })
+      })
       const data = await res.json()
       if (data?.success) {
         console.log('ComfyUI started successfully')
+        if (forceRestart) {
+          showToast('success', m['imageGenerator.comfyRestarted']())
+        }
       } else {
         console.error('Failed to start ComfyUI:', data?.error || 'Unknown error')
+        if (forceRestart) {
+          showToast('error', data?.error || 'Failed to restart ComfyUI.')
+        }
       }
     } catch (err) {
       console.error('Failed to start ComfyUI:', err)
+      if (forceRestart) {
+        showToast('error', err instanceof Error ? err.message : 'Failed to restart ComfyUI.')
+      }
+    } finally {
+      if (forceRestart) {
+        restartingComfyUI = false
+      }
     }
   }
 
@@ -703,11 +729,11 @@
                   currentImagePath={currentImageFileName}
                   onShowToast={(message, type) => {
                     if (type === 'success') {
-        showToast('success', message)
+                      showToast('success', message)
                     } else if (type === 'error') {
-        showToast('error', message)
+                      showToast('error', message)
                     } else {
-        showToast('info', message)
+                      showToast('info', message)
                     }
                   }}
                 />
@@ -737,7 +763,7 @@
             showOnlyProgress={activeTabId === 'chat'}
           />
 
-          <div class="flex gap-1 self-start">
+          <div class="flex gap-2 self-start">
             <button
               type="button"
               class="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
@@ -745,18 +771,21 @@
               aria-label={m['imageGenerator.showSetupDialog']()}
               title={m['imageGenerator.showSetupDialog']()}
             >
-              <svg
-                class="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M13 2 3 14h9l-1 8 10-12h-9z" />
-              </svg>
+              <Bolt class="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class={`flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-500 shadow-sm transition ${restartingComfyUI ? 'cursor-wait opacity-70' : 'hover:border-gray-400 hover:text-gray-700'}`}
+              onclick={() => startComfyUI(true)}
+              aria-label={m['imageGenerator.restartComfy']()}
+              title={m['imageGenerator.restartComfy']()}
+              disabled={restartingComfyUI}
+            >
+              {#if restartingComfyUI}
+                <ArrowPath class="h-4 w-4 animate-spin" aria-hidden="true" />
+              {:else}
+                <ArrowPath class="h-4 w-4" aria-hidden="true" />
+              {/if}
             </button>
           </div>
         </div>

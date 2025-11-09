@@ -22,6 +22,8 @@
   "imageGenerator.checkpointLabel": "체크포인트",
   "imageGenerator.devShowDialog": "체크포인트 없음 대화상자 열기",
   "imageGenerator.showSetupDialog": "필수 설정 열기",
+  "imageGenerator.restartComfy": "ComfyUI 다시 시작",
+  "imageGenerator.comfyRestarted": "ComfyUI를 다시 시작했습니다.",
   "imageGenerator.devShowCustomNodesDialog": "커스텀 노드 대화상자 열기",
   "imageGenerator.missingInpaintingAlert": "인페인팅을 사용하려면 먼저 인페인팅 프롬프트를 추가하세요.",
   "imageGenerator.reloadCheckpoints": "ComfyUI 목록 새로고침",

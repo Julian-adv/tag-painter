@@ -22,6 +22,8 @@
   "imageGenerator.checkpointLabel": "Checkpoint",
   "imageGenerator.devShowDialog": "Show No Checkpoints Dialog",
   "imageGenerator.showSetupDialog": "Open Required Setup",
+  "imageGenerator.restartComfy": "Restart ComfyUI",
+  "imageGenerator.comfyRestarted": "ComfyUI restarted successfully",
   "imageGenerator.devShowCustomNodesDialog": "Show Custom Nodes Dialog",
   "imageGenerator.missingInpaintingAlert": "Please add inpainting prompts before using inpainting.",
   "imageGenerator.reloadCheckpoints": "Reload lists from ComfyUI",

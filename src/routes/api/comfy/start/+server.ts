@@ -25,11 +25,24 @@ async function waitForComfyToStart(): Promise<boolean> {
   return false
 }
 
-export const POST: RequestHandler = async () => {
+export const POST: RequestHandler = async ({ request }) => {
   try {
+    let restartRequested = false
+    try {
+      const body = await request.json()
+      restartRequested = body?.restart === true
+    } catch {
+      restartRequested = false
+    }
+
     // Check if ComfyUI is already running
     const alreadyRunning = await isComfyAvailable()
     if (alreadyRunning) {
+      if (!restartRequested) {
+        return new Response(JSON.stringify({ success: true, alreadyRunning: true }), {
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
       await stopComfyProcess()
       const stillRunning = await isComfyAvailable()
       if (stillRunning) {
@@ -69,7 +82,7 @@ export const POST: RequestHandler = async () => {
       })
     }
 
-    return new Response(JSON.stringify({ success: true, restarted: alreadyRunning }), {
+    return new Response(JSON.stringify({ success: true, restarted: restartRequested && alreadyRunning }), {
       headers: { 'Content-Type': 'application/json' }
     })
   } catch (err: unknown) {
