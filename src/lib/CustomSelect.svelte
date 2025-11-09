@@ -11,9 +11,20 @@
 
   let isOpen = $state(false)
   let selectElement: HTMLDivElement
+  let triggerElement: HTMLButtonElement
+  let dropdownElement: HTMLDivElement
+  let dropdownPosition = $state({ top: 0, left: 0, width: 0 })
 
   function toggleDropdown(event: MouseEvent) {
     event.stopPropagation()
+    if (!isOpen && triggerElement) {
+      const rect = triggerElement.getBoundingClientRect()
+      dropdownPosition = {
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width
+      }
+    }
     isOpen = !isOpen
   }
 
@@ -38,13 +49,23 @@
       }
     }
 
+    function handleScroll(event: Event) {
+      // Don't close if scrolling inside the dropdown itself
+      if (dropdownElement && dropdownElement.contains(event.target as Node)) {
+        return
+      }
+      isOpen = false
+    }
+
     if (isOpen) {
       document.addEventListener('click', handleClickOutside, true)
       document.addEventListener('keydown', handleKeydown)
+      window.addEventListener('scroll', handleScroll, true)
 
       return () => {
         document.removeEventListener('click', handleClickOutside, true)
         document.removeEventListener('keydown', handleKeydown)
+        window.removeEventListener('scroll', handleScroll, true)
       }
     }
   })
@@ -59,28 +80,33 @@
   <button
     type="button"
     class="select-trigger"
+    bind:this={triggerElement}
     onclick={(e) => toggleDropdown(e)}
     aria-expanded={isOpen}
   >
     <span class="select-value">{getSelectedLabel()}</span>
     <span class="select-arrow" class:open={isOpen}>▼</span>
   </button>
-
-  {#if isOpen}
-    <div class="select-dropdown">
-      {#each options as option (option.value)}
-        <button
-          type="button"
-          class="select-option"
-          class:selected={option.value === value}
-          onclick={() => selectOption(option.value)}
-        >
-          {option.label}
-        </button>
-      {/each}
-    </div>
-  {/if}
 </div>
+
+{#if isOpen}
+  <div
+    bind:this={dropdownElement}
+    class="select-dropdown"
+    style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px; min-width: {dropdownPosition.width}px;"
+  >
+    {#each options as option (option.value)}
+      <button
+        type="button"
+        class="select-option"
+        class:selected={option.value === value}
+        onclick={() => selectOption(option.value)}
+      >
+        {option.label}
+      </button>
+    {/each}
+  </div>
+{/if}
 
 <style>
   .custom-select {
@@ -132,10 +158,7 @@
   }
 
   .select-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin-top: 4px;
+    position: fixed;
     background: white;
     border: 2px solid #999;
     border-radius: 4px;
