@@ -352,11 +352,12 @@
 
       <div class="dialog-body">
         <label for="app-locale" class="two-col-label">{m['settingsDialog.locale']()}</label>
-        <select id="app-locale" class="two-col-input" bind:value={localSettings.locale}>
-          {#each locales as localeCode (localeCode)}
-            <option value={localeCode}>{localeLabel(localeCode)}</option>
-          {/each}
-        </select>
+        <CustomSelect
+          id="app-locale"
+          class="two-col-input"
+          bind:value={localSettings.locale}
+          options={locales.map((code) => ({ value: code, label: localeLabel(code) }))}
+        />
 
         <!-- Global settings -->
         <label for="image-width" class="two-col-label">{m['settingsDialog.imageWidth']()}</label>
@@ -428,28 +429,29 @@
         <label for="chat-prompt-language" class="output-dir-label">
           {m['settingsDialog.chatPromptLanguage']()}
         </label>
-        <select
+        <CustomSelect
           id="chat-prompt-language"
           class="output-dir-input"
           bind:value={localSettings.chatPromptLanguage}
-        >
-          <option value="english">{m['settingsDialog.chatPromptLanguageEnglish']()}</option>
-          <option value="chinese">{m['settingsDialog.chatPromptLanguageChinese']()}</option>
-        </select>
+          options={[
+            { value: 'english', label: m['settingsDialog.chatPromptLanguageEnglish']() },
+            { value: 'chinese', label: m['settingsDialog.chatPromptLanguageChinese']() }
+          ]}
+        />
 
         <label for="global-workflow" class="output-dir-label">
           {m['settingsDialog.globalWorkflow']()}
         </label>
-        <select
+        <CustomSelect
           id="global-workflow"
-          bind:value={localSettings.customWorkflowPath}
+          value={localSettings.customWorkflowPath || ''}
           class="output-dir-input"
-        >
-          <option value="">{m['settingsDialog.globalWorkflowNone']()}</option>
-          {#each availableWorkflows as workflow (workflow)}
-            <option value={workflow}>{workflow}</option>
-          {/each}
-        </select>
+          options={[
+            { value: '', label: m['settingsDialog.globalWorkflowNone']() },
+            ...availableWorkflows.map((w) => ({ value: w, label: w }))
+          ]}
+          onchange={(v) => (localSettings.customWorkflowPath = v)}
+        />
 
         <!-- Per-model overrides -->
         <div class="section-spacer" style="grid-column: 1 / 4; height: 10px;"></div>
@@ -461,16 +463,13 @@
         </div>
 
         <label for="model-key" class="two-col-label">{m['settingsDialog.model']()}</label>
-        <select
+        <CustomSelect
           id="model-key"
           class="two-col-input"
           bind:value={selectedModelKey}
-          onchange={() => ensureModelEntry(selectedModelKey)}
-        >
-          {#each availableCheckpoints as cp (cp)}
-            <option value={cp}>{cp}</option>
-          {/each}
-        </select>
+          options={availableCheckpoints.map((cp) => ({ value: cp, label: cp }))}
+          onchange={(value) => ensureModelEntry(value)}
+        />
 
         {#if localSettings.perModel[selectedModelKey]}
           <label for="pm-model-type" class="two-col-label">{m['settingsDialog.modelType']()}</label>
@@ -509,83 +508,29 @@
           />
 
           <label for="pm-sampler" class="two-col-label">{m['settingsDialog.sampler']()}</label>
-          <select
+          <SamplerSelector
             id="pm-sampler"
             bind:value={localSettings.perModel[selectedModelKey].sampler}
             class="two-col-input"
-          >
-            <option value="euler">Euler</option>
-            <option value="euler_cfg_pp">Euler CFG++</option>
-            <option value="euler_ancestral">Euler Ancestral</option>
-            <option value="euler_ancestral_cfg_pp">Euler Ancestral CFG++</option>
-            <option value="heun">Heun</option>
-            <option value="heunpp2">Heun++2</option>
-            <option value="dpm_2">DPM 2</option>
-            <option value="dpm_2_ancestral">DPM 2 Ancestral</option>
-            <option value="lms">LMS</option>
-            <option value="dpm_fast">DPM Fast</option>
-            <option value="dpm_adaptive">DPM Adaptive</option>
-            <option value="dpmpp_2s_ancestral">DPM++ 2S Ancestral</option>
-            <option value="dpmpp_2s_ancestral_cfg_pp">DPM++ 2S Ancestral CFG++</option>
-            <option value="dpmpp_sde">DPM++ SDE</option>
-            <option value="dpmpp_sde_gpu">DPM++ SDE GPU</option>
-            <option value="dpmpp_2m">DPM++ 2M</option>
-            <option value="dpmpp_2m_cfg_pp">DPM++ 2M CFG++</option>
-            <option value="dpmpp_2m_sde">DPM++ 2M SDE</option>
-            <option value="dpmpp_2m_sde_gpu">DPM++ 2M SDE GPU</option>
-            <option value="dpmpp_2m_sde_heun">DPM++ 2M SDE Heun</option>
-            <option value="dpmpp_2m_sde_heun_gpu">DPM++ 2M SDE Heun GPU</option>
-            <option value="dpmpp_3m_sde">DPM++ 3M SDE</option>
-            <option value="dpmpp_3m_sde_gpu">DPM++ 3M SDE GPU</option>
-            <option value="ddpm">DDPM</option>
-            <option value="lcm">LCM</option>
-            <option value="ipndm">IPNDM</option>
-            <option value="ipndm_v">IPNDM V</option>
-            <option value="deis">DEIS</option>
-            <option value="res_multistep">RES Multistep</option>
-            <option value="res_multistep_cfg_pp">RES Multistep CFG++</option>
-            <option value="res_multistep_ancestral">RES Multistep Ancestral</option>
-            <option value="res_multistep_ancestral_cfg_pp">RES Multistep Ancestral CFG++</option>
-            <option value="gradient_estimation">Gradient Estimation</option>
-            <option value="gradient_estimation_cfg_pp">Gradient Estimation CFG++</option>
-            <option value="er_sde">ER SDE</option>
-            <option value="seeds_2">Seeds 2</option>
-            <option value="seeds_3">Seeds 3</option>
-            <option value="sa_solver">SA Solver</option>
-            <option value="sa_solver_pece">SA Solver PECE</option>
-            <option value="ddim">DDIM</option>
-            <option value="uni_pc">Uni PC</option>
-            <option value="uni_pc_bh2">Uni PC BH2</option>
-          </select>
+          />
 
           <label for="pm-scheduler" class="two-col-label">{m['settingsDialog.scheduler']()}</label>
-          <select
+          <SchedulerSelector
             id="pm-scheduler"
             bind:value={localSettings.perModel[selectedModelKey].scheduler}
             class="two-col-input"
-          >
-            <option value="simple">Simple</option>
-            <option value="sgm_uniform">SGM Uniform</option>
-            <option value="karras">Karras</option>
-            <option value="exponential">Exponential</option>
-            <option value="ddim_uniform">DDIM Uniform</option>
-            <option value="beta">Beta</option>
-            <option value="normal">Normal</option>
-            <option value="linear_quadratic">Linear Quadratic</option>
-            <option value="kl_optimal">KL Optimal</option>
-          </select>
+          />
 
           <label for="pm-vae" class="two-col-label">{m['settingsDialog.vae']()}</label>
-          <select
+          <CustomSelect
             id="pm-vae"
             bind:value={localSettings.perModel[selectedModelKey].selectedVae}
             class="two-col-input-wide"
-          >
-            <option value="__embedded__">{m['settingsDialog.useEmbeddedVae']()}</option>
-            {#each availableVaes as vae (vae)}
-              <option value={vae}>{vae}</option>
-            {/each}
-          </select>
+            options={[
+              { value: '__embedded__', label: m['settingsDialog.useEmbeddedVae']() },
+              ...availableVaes.map((vae) => ({ value: vae, label: vae }))
+            ]}
+          />
 
           <label for="pm-clipskip" class="two-col-label">{m['settingsDialog.clipSkip']()}</label>
           <input
@@ -599,16 +544,16 @@
           />
 
           <label for="pm-workflow" class="two-col-label">Workflow</label>
-          <select
+          <CustomSelect
             id="pm-workflow"
-            bind:value={localSettings.perModel[selectedModelKey].customWorkflowPath}
+            value={localSettings.perModel[selectedModelKey].customWorkflowPath || ''}
             class="two-col-input-wide"
-          >
-            <option value="">None (Use global or default)</option>
-            {#each availableWorkflows as workflow (workflow)}
-              <option value={workflow}>{workflow}</option>
-            {/each}
-          </select>
+            options={[
+              { value: '', label: 'None (Use global or default)' },
+              ...availableWorkflows.map((w) => ({ value: w, label: w }))
+            ]}
+            onchange={(v) => (localSettings.perModel[selectedModelKey].customWorkflowPath = v)}
+          />
 
           <label for="pm-wildcards-file" class="two-col-label">Wildcards File</label>
           <input
@@ -666,28 +611,26 @@
             <label for="us-checkpoint" class="two-col-label"
               >{m['settingsDialog.upscaleCheckpoint']()}</label
             >
-            <select
+            <CustomSelect
               id="us-checkpoint"
               class="two-col-input-wide"
               bind:value={localSettings.perModel[selectedModelKey].upscale.checkpoint}
-            >
-              {#each availableCheckpoints as checkpoint}
-                <option value={checkpoint}>{checkpoint}</option>
-              {/each}
-            </select>
+              options={availableCheckpoints.map((cp) => ({ value: cp, label: cp }))}
+            />
 
             <label for="us-model-type" class="two-col-label"
               >{m['settingsDialog.upscaleModelType']()}</label
             >
-            <select
+            <CustomSelect
               id="us-model-type"
               class="two-col-input"
               bind:value={localSettings.perModel[selectedModelKey].upscale.modelType}
-            >
-              <option value="sdxl">SDXL</option>
-              <option value="qwen">Qwen</option>
-              <option value="chroma">Chroma</option>
-            </select>
+              options={[
+                { value: 'sdxl', label: 'SDXL' },
+                { value: 'qwen', label: 'Qwen' },
+                { value: 'chroma', label: 'Chroma' }
+              ]}
+            />
 
             <label for="us-scale" class="two-col-label">{m['settingsDialog.upscaleScale']()}</label>
             <input
@@ -754,16 +697,15 @@
             />
 
             <label for="us-vae" class="two-col-label">{m['settingsDialog.upscaleVae']()}</label>
-            <select
+            <CustomSelect
               id="us-vae"
               bind:value={localSettings.perModel[selectedModelKey].upscale.selectedVae}
               class="two-col-input-wide"
-            >
-              <option value="__embedded__">{m['settingsDialog.useEmbeddedVae']()}</option>
-              {#each availableVaes as vae}
-                <option value={vae}>{vae}</option>
-              {/each}
-            </select>
+              options={[
+                { value: '__embedded__', label: m['settingsDialog.useEmbeddedVae']() },
+                ...availableVaes.map((vae) => ({ value: vae, label: vae }))
+              ]}
+            />
 
             <!-- FaceDetailer Settings -->
             <div
@@ -776,28 +718,26 @@
             <label for="fd-checkpoint" class="two-col-label"
               >{m['settingsDialog.faceDetailerCheckpoint']()}</label
             >
-            <select
+            <CustomSelect
               id="fd-checkpoint"
               class="two-col-input-wide"
               bind:value={localSettings.perModel[selectedModelKey].faceDetailer.checkpoint}
-            >
-              {#each availableCheckpoints as checkpoint}
-                <option value={checkpoint}>{checkpoint}</option>
-              {/each}
-            </select>
+              options={availableCheckpoints.map((cp) => ({ value: cp, label: cp }))}
+            />
 
             <label for="fd-model-type" class="two-col-label"
               >{m['settingsDialog.faceDetailerModelType']()}</label
             >
-            <select
+            <CustomSelect
               id="fd-model-type"
               class="two-col-input"
               bind:value={localSettings.perModel[selectedModelKey].faceDetailer.modelType}
-            >
-              <option value="sdxl">SDXL</option>
-              <option value="qwen">Qwen</option>
-              <option value="chroma">Chroma</option>
-            </select>
+              options={[
+                { value: 'sdxl', label: 'SDXL' },
+                { value: 'qwen', label: 'Qwen' },
+                { value: 'chroma', label: 'Chroma' }
+              ]}
+            />
 
             <label for="fd-steps" class="two-col-label"
               >{m['settingsDialog.faceDetailerSteps']()}</label
@@ -858,16 +798,15 @@
 
             <label for="fd-vae" class="two-col-label">{m['settingsDialog.faceDetailerVae']()}</label
             >
-            <select
+            <CustomSelect
               id="fd-vae"
               bind:value={localSettings.perModel[selectedModelKey].faceDetailer.selectedVae}
               class="two-col-input-wide"
-            >
-              <option value="__embedded__">{m['settingsDialog.useEmbeddedVae']()}</option>
-              {#each availableVaes as vae}
-                <option value={vae}>{vae}</option>
-              {/each}
-            </select>
+              options={[
+                { value: '__embedded__', label: m['settingsDialog.useEmbeddedVae']() },
+                ...availableVaes.map((vae) => ({ value: vae, label: vae }))
+              ]}
+            />
           {/if}
         {/if}
       </div>
@@ -971,8 +910,7 @@
     text-align: right;
   }
 
-  .dialog-body input,
-  .dialog-body select {
+  .dialog-body input {
     padding: 6px 10px;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -980,8 +918,7 @@
     width: 100%;
   }
 
-  .dialog-body input:focus,
-  .dialog-body select:focus {
+  .dialog-body input:focus {
     outline: none;
     border-color: #007bff;
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);

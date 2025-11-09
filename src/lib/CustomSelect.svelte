@@ -135,7 +135,6 @@
     position: absolute;
     top: 100%;
     left: 0;
-    right: 0;
     margin-top: 4px;
     background: white;
     border: 2px solid #999;
@@ -143,18 +142,23 @@
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     max-height: 300px;
     overflow-y: auto;
+    overflow-x: hidden;
     z-index: 10000;
+    width: max-content;
   }
 
   .select-option {
     width: 100%;
-    padding: 8px 12px;
+    padding: 6px 12px;
     border: none;
     background: white;
     text-align: left;
     cursor: pointer;
     font-size: 13px;
     transition: background-color 0.15s;
+    white-space: nowrap;
+    display: block;
+    box-sizing: border-box;
   }
 
   .select-option:hover {
