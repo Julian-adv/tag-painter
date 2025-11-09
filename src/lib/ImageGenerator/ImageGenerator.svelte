@@ -8,6 +8,7 @@
   import TagZones from './TagZones.svelte'
   import TabNavigation from './TabNavigation.svelte'
   import ChatInterface from '$lib/Chat/ChatInterface.svelte'
+  import PngInfoPanel from '$lib/PngInfo/PngInfoPanel.svelte'
   import ModelControls from './ModelControls.svelte'
   import { m } from '$lib/paraglide/messages'
   import InstallWizardDialog from '$lib/downloads/InstallWizardDialog.svelte'
@@ -16,7 +17,8 @@
     loadSettings,
     saveSettings as saveSettingsToFile,
     saveMaskData,
-    saveImage
+    saveImage,
+    getImageMetadata
   } from '$lib/utils/fileIO'
   import { fetchCheckpoints, connectWebSocket, normalizeBaseUrl } from '$lib/generation/comfyui'
   import { generateImage } from '$lib/generation/imageGeneration'
@@ -81,6 +83,7 @@ import { Bolt, ArrowPath } from 'svelte-heros-v2'
     refreshSelectedTags: () => Promise<void>
   }
   let tagZonesRef: TagZonesHandle | undefined = $state()
+  let metadata: Record<string, unknown> | null = $state(null)
 
   // Toasts component ref for showing messages
   type ToastType = 'success' | 'error' | 'info'
@@ -579,12 +582,21 @@ import { Bolt, ArrowPath } from 'svelte-heros-v2'
     isGeneratingForever = false
   }
 
-  function handleImageChange(filePath: string) {
+  async function handleImageChange(filePath: string) {
     if (imageUrl && imageUrl.startsWith('blob:')) {
       URL.revokeObjectURL(imageUrl)
     }
     imageUrl = `/api/image?path=${encodeURIComponent(filePath)}`
     currentImageFileName = filePath
+
+    // Load metadata for PNG Info tab
+    try {
+      const result = await getImageMetadata(filePath)
+      metadata = result as Record<string, unknown> | null
+    } catch (error) {
+      console.error('Failed to load image metadata:', error)
+      metadata = null
+    }
   }
 
   async function handleChatGeneratePrompt(promptText: string, options?: { isRedraw?: boolean }) {
@@ -696,7 +708,8 @@ import { Bolt, ArrowPath } from 'svelte-heros-v2'
         <TabNavigation
           tabs={[
             { id: 'generator', label: m['tabs.wildcards']() },
-            { id: 'chat', label: m['tabs.chat']() }
+            { id: 'chat', label: m['tabs.chat']() },
+            { id: 'pnginfo', label: 'PNG Info' }
           ]}
           bind:activeTabId
         />
@@ -739,56 +752,62 @@ import { Bolt, ArrowPath } from 'svelte-heros-v2'
                 />
               </div>
             </div>
+          {:else if activeTabId === 'pnginfo'}
+            <div class="flex h-full flex-col gap-2 p-2">
+              <PngInfoPanel {metadata} />
+            </div>
           {/if}
         </div>
 
-        <div class="flex flex-shrink-0 flex-col gap-2 p-2 pt-0">
-          <ModelControls {availableCheckpoints} onRefreshModels={refreshModels} />
+        {#if activeTabId !== 'pnginfo'}
+          <div class="flex flex-shrink-0 flex-col gap-2 p-2 pt-0">
+            <ModelControls {availableCheckpoints} onRefreshModels={refreshModels} />
 
-          <GenerationControls
-            bind:this={generationControlsRef}
-            {isLoading}
-            {progressData}
-            {settings}
-            {isGeneratingForever}
-            {lastSeed}
-            {toastsRef}
-            onGenerate={() => handleGenerate(null)}
-            onInpaint={handleInpaint}
-            onRegenerate={() => handleGenerate(lastSeed)}
-            onGenerateForever={handleGenerateForever}
-            onStopGeneration={handleStopGeneration}
-            onSettingsChange={handleSettingsChange}
-            disableInpaint={isQwenModel}
-            showOnlyProgress={activeTabId === 'chat'}
-          />
+            <GenerationControls
+              bind:this={generationControlsRef}
+              {isLoading}
+              {progressData}
+              {settings}
+              {isGeneratingForever}
+              {lastSeed}
+              {toastsRef}
+              onGenerate={() => handleGenerate(null)}
+              onInpaint={handleInpaint}
+              onRegenerate={() => handleGenerate(lastSeed)}
+              onGenerateForever={handleGenerateForever}
+              onStopGeneration={handleStopGeneration}
+              onSettingsChange={handleSettingsChange}
+              disableInpaint={isQwenModel}
+              showOnlyProgress={activeTabId === 'chat'}
+            />
 
-          <div class="flex gap-2 self-start">
-            <button
-              type="button"
-              class="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
-              onclick={() => openDownloadsDialog(true)}
-              aria-label={m['imageGenerator.showSetupDialog']()}
-              title={m['imageGenerator.showSetupDialog']()}
-            >
-              <Bolt class="h-4 w-4" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              class={`flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-500 shadow-sm transition ${restartingComfyUI ? 'cursor-wait opacity-70' : 'hover:border-gray-400 hover:text-gray-700'}`}
-              onclick={() => startComfyUI(true)}
-              aria-label={m['imageGenerator.restartComfy']()}
-              title={m['imageGenerator.restartComfy']()}
-              disabled={restartingComfyUI}
-            >
-              {#if restartingComfyUI}
-                <ArrowPath class="h-4 w-4 animate-spin" aria-hidden="true" />
-              {:else}
-                <ArrowPath class="h-4 w-4" aria-hidden="true" />
-              {/if}
-            </button>
+            <div class="flex gap-2 self-start">
+              <button
+                type="button"
+                class="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
+                onclick={() => openDownloadsDialog(true)}
+                aria-label={m['imageGenerator.showSetupDialog']()}
+                title={m['imageGenerator.showSetupDialog']()}
+              >
+                <Bolt class="h-4 w-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class={`flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-500 shadow-sm transition ${restartingComfyUI ? 'cursor-wait opacity-70' : 'hover:border-gray-400 hover:text-gray-700'}`}
+                onclick={() => startComfyUI(true)}
+                aria-label={m['imageGenerator.restartComfy']()}
+                title={m['imageGenerator.restartComfy']()}
+                disabled={restartingComfyUI}
+              >
+                {#if restartingComfyUI}
+                  <ArrowPath class="h-4 w-4 animate-spin" aria-hidden="true" />
+                {:else}
+                  <ArrowPath class="h-4 w-4" aria-hidden="true" />
+                {/if}
+              </button>
+            </div>
           </div>
-        </div>
+        {/if}
       </section>
     {/key}
 
