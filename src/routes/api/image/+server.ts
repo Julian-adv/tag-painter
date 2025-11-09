@@ -9,25 +9,8 @@ import encodeChunks from 'png-chunks-encode'
 import textChunk from 'png-chunk-text'
 import { DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
 import { getTodayDate, getFormattedTime } from '$lib/utils/date'
-
-// Type definitions for workflow and settings data
-interface WorkflowNode {
-  inputs?: {
-    steps?: number
-    sampler_name?: string
-    scheduler?: string
-    cfg?: number
-    seed?: number
-    noise_seed?: number
-    width?: number
-    height?: number
-    ckpt_name?: string
-  }
-}
-
-interface WorkflowData {
-  [key: string]: WorkflowNode
-}
+import { findNodeByTitle } from '$lib/generation/workflowMapping'
+import type { ComfyUIWorkflow } from '$lib/types'
 
 interface PngChunk {
   name: string
@@ -151,7 +134,7 @@ export async function POST({ request }) {
     let imageBuffer: Buffer
     let promptText = ''
     let outputDirectory = DEFAULT_OUTPUT_DIRECTORY
-    let workflowData: WorkflowData | null = null
+    let workflowData: ComfyUIWorkflow | null = null
     const prompts: {
       all: string
       zone1: string
@@ -222,20 +205,73 @@ export async function POST({ request }) {
     const filePath = path.join(finalOutputDir, fileName)
 
     // Add metadata to PNG if prompt is provided
-    if (promptText) {
-      // Extract parameters from workflow and settings
-      const steps = workflowData?.['45']?.inputs?.steps || 28
-      const sampler = workflowData?.['15']?.inputs?.sampler_name || 'euler_ancestral'
-      // Prefer scheduler from the main sampler, fall back to KSampler used by inpainting
+    if (promptText && workflowData) {
+      // Extract parameters from workflow and settings using node titles
+      // Support multiple workflow types: SD, Qwen, Chroma, Flux1 Krea
+
+      // Scheduler nodes (SD uses BasicScheduler, others use KSampler directly)
+      const basicSchedulerNode = findNodeByTitle(workflowData, 'BasicScheduler')
+      const samplerCustomNode = findNodeByTitle(workflowData, 'SamplerCustom')
+      const ksamplerSelectNode = findNodeByTitle(workflowData, 'KSamplerSelect')
+      const ksamplerInpaintingNode = findNodeByTitle(workflowData, 'KSampler (inpainting)')
+      const ksamplerNode = findNodeByTitle(workflowData, 'KSampler') // Qwen/Chroma/Flux1
+      const emptyLatentNode = findNodeByTitle(workflowData, 'Empty Latent Image')
+
+      // Checkpoint nodes (different for each model type)
+      const sdCheckpointNode = findNodeByTitle(workflowData, 'Load Checkpoint') // SD/SDXL/Chroma
+      const qwenUnetNode = findNodeByTitle(workflowData, 'Load Qwen UNet') // Qwen
+      const qwenNunchakuNode = findNodeByTitle(workflowData, 'Nunchaku Qwen-Image DiT Loader') // Qwen (alternative)
+      const flux1UnetNode = findNodeByTitle(workflowData, 'Load Diffusion Model') // Flux1 Krea
+
+      // Helper to safely get input value as number
+      const getInputNumber = (nodeId: string | undefined, key: string, defaultValue: number): number => {
+        if (!nodeId || !workflowData[nodeId]) return defaultValue
+        const value = workflowData[nodeId].inputs[key]
+        return typeof value === 'number' ? value : defaultValue
+      }
+
+      // Helper to safely get input value as string
+      const getInputString = (nodeId: string | undefined, key: string, defaultValue: string): string => {
+        if (!nodeId || !workflowData[nodeId]) return defaultValue
+        const value = workflowData[nodeId].inputs[key]
+        return typeof value === 'string' ? value : defaultValue
+      }
+
+      const steps =
+        getInputNumber(basicSchedulerNode?.nodeId, 'steps', 0) ||
+        getInputNumber(ksamplerNode?.nodeId, 'steps', 0) ||
+        getInputNumber(ksamplerInpaintingNode?.nodeId, 'steps', 0) ||
+        28
+      const sampler =
+        getInputString(ksamplerSelectNode?.nodeId, 'sampler_name', '') ||
+        getInputString(ksamplerNode?.nodeId, 'sampler_name', '') ||
+        getInputString(ksamplerInpaintingNode?.nodeId, 'sampler_name', '') ||
+        'euler_ancestral'
       const scheduler =
-        workflowData?.['45']?.inputs?.scheduler ||
-        workflowData?.['10']?.inputs?.scheduler ||
+        getInputString(basicSchedulerNode?.nodeId, 'scheduler', '') ||
+        getInputString(ksamplerNode?.nodeId, 'scheduler', '') ||
+        getInputString(ksamplerInpaintingNode?.nodeId, 'scheduler', '') ||
         'simple'
-      const cfg = workflowData?.['14']?.inputs?.cfg || 5
-      const workflowSeed = workflowData?.['14']?.inputs?.noise_seed || seed
-      const width = workflowData?.['16']?.inputs?.width || 832
-      const height = workflowData?.['16']?.inputs?.height || 1216
-      const model = workflowData?.['11']?.inputs?.ckpt_name || 'unknown'
+      const cfg =
+        getInputNumber(samplerCustomNode?.nodeId, 'cfg', 0) ||
+        getInputNumber(ksamplerNode?.nodeId, 'cfg', 0) ||
+        getInputNumber(ksamplerInpaintingNode?.nodeId, 'cfg', 0) ||
+        5
+      const workflowSeed =
+        getInputNumber(samplerCustomNode?.nodeId, 'noise_seed', 0) ||
+        getInputNumber(ksamplerNode?.nodeId, 'seed', 0) ||
+        getInputNumber(ksamplerInpaintingNode?.nodeId, 'seed', 0) ||
+        seed
+      const width = getInputNumber(emptyLatentNode?.nodeId, 'width', 832)
+      const height = getInputNumber(emptyLatentNode?.nodeId, 'height', 1216)
+
+      // Get model name from the appropriate checkpoint node based on model type
+      const model =
+        getInputString(sdCheckpointNode?.nodeId, 'ckpt_name', '') ||
+        getInputString(qwenUnetNode?.nodeId, 'unet_name', '') ||
+        getInputString(qwenNunchakuNode?.nodeId, 'model_name', '') ||
+        getInputString(flux1UnetNode?.nodeId, 'unet_name', '') ||
+        'unknown'
 
       // Convert scheduler to proper format
       const schedulerMap: Record<string, string> = {
