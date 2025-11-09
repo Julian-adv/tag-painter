@@ -34,8 +34,8 @@
     autoSaveCurrentValues,
     updateComposition
   } from '$lib/stores/promptsStore'
-import { detectPlatform } from '$lib/utils/loraPath'
-import { Bolt, ArrowPath } from 'svelte-heros-v2'
+  import { detectPlatform } from '$lib/utils/loraPath'
+  import { Bolt, ArrowPath } from 'svelte-heros-v2'
 
   // Component state
   let isLoading = $state(false)
@@ -753,7 +753,7 @@ import { Bolt, ArrowPath } from 'svelte-heros-v2'
               </div>
             </div>
           {:else if activeTabId === 'pnginfo'}
-            <div class="flex h-full flex-col gap-2 p-2">
+            <div class="flex h-full flex-col gap-2 p-0">
               <PngInfoPanel {metadata} />
             </div>
           {/if}

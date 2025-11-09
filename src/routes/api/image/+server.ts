@@ -34,14 +34,33 @@ interface PngChunk {
   data: Uint8Array
 }
 
-// Replace characters outside Latin-1 with '?' to satisfy PNG tEXt constraints
-function toLatin1(input: string): string {
-  let out = ''
-  for (let i = 0; i < input.length; i++) {
-    const code = input.charCodeAt(i)
-    out += code <= 0xff ? input[i] : '?'
+// Create iTXt chunk for UTF-8 text (supports all Unicode characters including Chinese, Korean, etc.)
+function createITXtChunk(keyword: string, text: string): PngChunk {
+  const keywordBuffer = Buffer.from(keyword, 'latin1')
+  const textBuffer = Buffer.from(text, 'utf8')
+
+  // iTXt chunk format:
+  // - Keyword (null-terminated)
+  // - Compression flag (1 byte, 0 = uncompressed)
+  // - Compression method (1 byte, 0)
+  // - Language tag (null-terminated, empty for default)
+  // - Translated keyword (null-terminated, empty for none)
+  // - Text (UTF-8)
+
+  const data = Buffer.concat([
+    keywordBuffer,
+    Buffer.from([0]), // null terminator for keyword
+    Buffer.from([0]), // compression flag (0 = uncompressed)
+    Buffer.from([0]), // compression method
+    Buffer.from([0]), // null terminator for language tag (empty)
+    Buffer.from([0]), // null terminator for translated keyword (empty)
+    textBuffer
+  ])
+
+  return {
+    name: 'iTXt',
+    data: new Uint8Array(data)
   }
-  return out
 }
 
 export async function GET({ url }) {
@@ -266,9 +285,8 @@ Steps: ${steps}, Sampler: ${samplerName}, Schedule type: ${scheduleType}, CFG sc
         // Extract PNG chunks
         const chunks = extractChunks(processedBuffer)
 
-        // Create a text chunk with parameters (WebUI style)
-        // PNG tEXt must be Latin-1; replace non-Latin-1 chars to avoid errors
-        const parametersChunk = textChunk.encode('parameters', toLatin1(parametersText))
+        // Create an iTXt chunk with parameters (supports UTF-8 for all languages)
+        const parametersChunk = createITXtChunk('parameters', parametersText)
 
         // Insert the text chunk before the IEND chunk
         const iendIndex = chunks.findIndex((chunk: PngChunk) => chunk.name === 'IEND')
@@ -297,6 +315,40 @@ Steps: ${steps}, Sampler: ${samplerName}, Schedule type: ${scheduleType}, CFG sc
   }
 }
 
+// Helper function to decode iTXt chunk
+function decodeITXtChunk(data: Uint8Array): { keyword: string; text: string } | null {
+  try {
+    const buffer = Buffer.from(data)
+    let offset = 0
+
+    // Read keyword (null-terminated)
+    const keywordEnd = buffer.indexOf(0, offset)
+    if (keywordEnd === -1) return null
+    const keyword = buffer.toString('latin1', offset, keywordEnd)
+    offset = keywordEnd + 1
+
+    // Skip compression flag, compression method
+    offset += 2
+
+    // Read language tag (null-terminated)
+    const langEnd = buffer.indexOf(0, offset)
+    if (langEnd === -1) return null
+    offset = langEnd + 1
+
+    // Read translated keyword (null-terminated)
+    const transEnd = buffer.indexOf(0, offset)
+    if (transEnd === -1) return null
+    offset = transEnd + 1
+
+    // Read text (UTF-8)
+    const text = buffer.toString('utf8', offset)
+
+    return { keyword, text }
+  } catch {
+    return null
+  }
+}
+
 // Helper function to extract PNG parameters from text chunks
 async function extractPngParameters(filePath: string): Promise<string | null> {
   try {
@@ -305,7 +357,15 @@ async function extractPngParameters(filePath: string): Promise<string | null> {
 
     // Look for text chunks containing parameters
     for (const chunk of chunks) {
-      if (chunk.name === 'tEXt') {
+      // First check iTXt (UTF-8 support)
+      if (chunk.name === 'iTXt') {
+        const decoded = decodeITXtChunk(chunk.data)
+        if (decoded && decoded.keyword === 'parameters') {
+          return decoded.text
+        }
+      }
+      // Fallback to tEXt for backward compatibility
+      else if (chunk.name === 'tEXt') {
         try {
           const decoded = textChunk.decode(chunk.data)
           if (decoded.keyword === 'parameters') {
