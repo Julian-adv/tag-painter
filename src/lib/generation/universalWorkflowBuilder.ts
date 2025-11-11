@@ -6,14 +6,15 @@ import type {
   ComfyUIWorkflow,
   ModelType
 } from '$lib/types'
-import { findNodeByTitle, loadCustomWorkflow } from './workflowMapping'
+import { loadCustomWorkflow, setRequiredNodeInput } from './workflowMapping'
 
 // Map ModelType string values to numeric enum values
 const MODEL_TYPE_MAP: Record<ModelType, number> = {
   sdxl: 1,
   qwen: 2,
-  chroma: 3,
-  flux1_krea: 4
+  qwen_nunchaku: 3,
+  flux1_krea: 4,
+  chroma: 5
 }
 
 export async function buildWorkflow(
@@ -29,12 +30,9 @@ export async function buildWorkflow(
   // Load the universal workflow
   const workflow = await loadCustomWorkflow('universal.api.workflow.json')
 
-  // Find and set the Model type node
-  const modelTypeNode = findNodeByTitle(workflow, 'Model type')
-  if (modelTypeNode) {
-    const modelTypeValue = MODEL_TYPE_MAP[modelSettings.modelType]
-    workflow[modelTypeNode.nodeId].inputs.value = modelTypeValue
-  }
+  // Set the Model type node
+  const modelTypeValue = MODEL_TYPE_MAP[modelSettings.modelType]
+  setRequiredNodeInput(workflow, 'Model type', 'value', modelTypeValue)
 
   return workflow
 }

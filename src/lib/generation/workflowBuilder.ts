@@ -26,6 +26,8 @@ export function getDefaultWorkflowForModelType(modelType: string | undefined): s
   switch (modelType) {
     case 'qwen':
       return 'qwen.api.workflow.json'
+    case 'qwen_nunchaku':
+      return 'qwen_nunchaku.api.workflow.json'
     case 'chroma':
       return 'chroma.api.workflow.json'
     case 'flux1_krea':

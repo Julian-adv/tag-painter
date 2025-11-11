@@ -253,7 +253,10 @@
     // Model type changed - apply defaults for the new type
     const defaults = MODEL_TYPE_DEFAULTS[currentModelType]
     if (defaults) {
-      const nextLoras = 'loras' in defaults && defaults.loras ? defaults.loras.map((entry: { name: string; weight: number }) => ({ ...entry })) : []
+      const nextLoras =
+        'loras' in defaults && defaults.loras
+          ? defaults.loras.map((entry: { name: string; weight: number }) => ({ ...entry }))
+          : []
       localSettings = {
         ...localSettings,
         perModel: {
@@ -589,9 +592,9 @@
             />
           </div>
 
-          <div class="two-col-label" style="text-align: right;">
+          <label for="lora-selector" class="two-col-label">
             {m['settingsDialog.loraModels']()}
-          </div>
+          </label>
           <div class="two-col-input-wide lora-embed">
             <LoraSelector
               selectedLoras={localSettings.perModel[selectedModelKey].loras as LoraWithWeight[]}
@@ -814,7 +817,7 @@
       <div class="dialog-footer">
         <button
           type="button"
-          class={((hasUnsavedChanges || selectedModelDirty)
+          class={(hasUnsavedChanges || selectedModelDirty
             ? 'bg-blue-500 text-white hover:bg-blue-600 focus:ring-blue-500 '
             : 'bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-gray-500 disabled:cursor-default ') +
             'rounded-md px-4 py-2 transition-colors focus:ring-2 focus:outline-none'}

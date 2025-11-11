@@ -78,6 +78,21 @@ export const MODEL_TYPE_DEFAULTS = {
       }
     ]
   },
+  qwen_nunchaku: {
+    cfgScale: 1.0,
+    steps: 8,
+    sampler: 'euler',
+    scheduler: 'normal',
+    clipSkip: 1,
+    qualityPrefix:
+      'cinematic lighting, ray tracing reflections, depth of field, ultra detailed textures, 8k resolution, hyperrealistic, dramatic composition',
+    negativePrefix:
+      'paintings, cartoon, rendered, anime,embedding:SmoothNegative_Hands-neg, embedding:Smooth_Negative-neg,  sketches, (worst quality:2), (low quality:2), (normal quality:2),freckles, (facial wrinkles:1.4), (old girl:1.4),(Cleft Chin:1.4)',
+    wildcardsFile: 'wildcards.qwen.yaml',
+    customWorkflowPath: 'qwen_nunchaku.api.workflow.json',
+    selectedVae: 'qwen_image_vae.safetensors',
+    loras: []
+  },
   chroma: {
     cfgScale: 3.5,
     steps: 20,

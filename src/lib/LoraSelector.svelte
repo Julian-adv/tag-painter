@@ -87,7 +87,7 @@
 
   <!-- Stable-height container prevents layout jump during refresh -->
   <div
-    class="lora-display-area max-h-24 min-h-[6rem] w-full overflow-y-auto rounded-lg border border-gray-300 bg-white p-2"
+    class="lora-display-area max-h-40 min-h-40 w-full overflow-y-auto rounded-lg border border-gray-300 bg-white p-2"
   >
     {#if loading}
       <div class="text-sm text-gray-500" aria-live="polite">{m['loraSelector.loading']()}</div>

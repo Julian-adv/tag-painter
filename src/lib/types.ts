@@ -27,7 +27,7 @@ export interface LoraWithWeight {
   weight: number
 }
 
-export type ModelType = 'sdxl' | 'qwen' | 'chroma' | 'flux1_krea'
+export type ModelType = 'sdxl' | 'qwen' | 'qwen_nunchaku' | 'chroma' | 'flux1_krea'
 
 export enum RefineMode {
   none = 1,

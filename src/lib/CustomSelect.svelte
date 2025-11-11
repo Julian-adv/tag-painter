@@ -10,6 +10,11 @@
   let { id, value = $bindable(), options, onchange, class: className = '' }: Props = $props()
 
   let isOpen = $state(false)
+
+  // Check if className contains a text-size class (text-xs, text-sm, text-base, etc.)
+  const hasTextSizeClass = $derived(
+    className.split(' ').some((cls) => /^text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)$/.test(cls))
+  )
   let selectElement: HTMLDivElement
   let triggerElement: HTMLButtonElement
   let dropdownElement = $state<HTMLDivElement | undefined>(undefined)
@@ -76,7 +81,11 @@
   }
 </script>
 
-<div class="custom-select {className}" bind:this={selectElement} {id}>
+<div
+  class="custom-select {className} {hasTextSizeClass ? '' : 'default-font-size'}"
+  bind:this={selectElement}
+  {id}
+>
   <button
     type="button"
     class="select-trigger"
@@ -112,6 +121,10 @@
   .custom-select {
     position: relative;
     width: 100%;
+  }
+
+  .custom-select.default-font-size {
+    font-size: 13px;
   }
 
   .select-trigger {
