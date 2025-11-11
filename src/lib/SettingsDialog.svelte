@@ -483,6 +483,7 @@
             options={[
               { value: 'sdxl', label: 'SDXL' },
               { value: 'qwen', label: 'Qwen' },
+              { value: 'qwen_nunchaku', label: 'Qwen Nunchaku' },
               { value: 'chroma', label: 'Chroma' },
               { value: 'flux1_krea', label: 'Flux1 Krea' }
             ]}

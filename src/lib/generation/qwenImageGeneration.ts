@@ -3,7 +3,8 @@
 // This module handles Qwen model image generation workflows
 
 import { findNodeByTitle } from './workflowMapping'
-import { buildQwenWorkflow } from './qwenWorkflowBuilder'
+import { buildWorkflow } from './universalWorkflowBuilder'
+import { RefineMode, FaceDetailerMode } from '$lib/types'
 import {
   expandCustomTags,
   detectCompositionFromTags,
@@ -212,18 +213,29 @@ export async function generateQwenImage(
 
     const appliedSeed = seed ?? Math.floor(Math.random() * 1000000000000000)
 
-    // Build workflow using centralized builder function
-    const workflow = await buildQwenWorkflow(
+    // Build workflow using universal workflow builder
+    const appliedSettings = applyPerModelOverrides(settings, promptsData.selectedCheckpoint)
+
+    const refineMode: RefineMode = promptsData.useUpscale
+      ? RefineMode.refine
+      : RefineMode.none
+
+    const faceDetailerMode: FaceDetailerMode = promptsData.useFaceDetailer
+      ? FaceDetailerMode.face_detail
+      : FaceDetailerMode.none
+
+    const useFilmgrain = false
+
+    const workflow = await buildWorkflow(
       combinedPrompt,
       negativeTagsText,
-      { ...settings, seed: appliedSeed },
+      appliedSettings,
       promptsData.selectedCheckpoint || 'qwen_image_fp8_e4m3fn.safetensors',
-      promptsData.useUpscale || false,
-      promptsData.useFaceDetailer || false,
-      modelSettings
+      refineMode,
+      faceDetailerMode,
+      useFilmgrain,
+      modelSettings!
     )
-
-    const appliedSettings = applyPerModelOverrides(settings, promptsData.selectedCheckpoint)
 
     console.log('workflow (qwen)', workflow)
     await submitToComfyUI(
