@@ -9,7 +9,9 @@ import {
   setNodeImageSize,
   setNodeVae,
   setNodeClipSkip,
-  loadCustomWorkflow
+  loadCustomWorkflow,
+  setRequiredNodeInput,
+  setRequiredNodeText
 } from './workflowMapping'
 import {
   getEffectiveModelSettings,
@@ -32,28 +34,6 @@ export function getDefaultWorkflowForModelType(modelType: string | undefined): s
     default:
       return 'sdxl.api.workflow.json'
   }
-}
-
-function setRequiredNodeInput(
-  workflow: ComfyUIWorkflow,
-  title: string,
-  inputKey: string,
-  value: any
-): void {
-  const node = findNodeByTitle(workflow, title)
-  if (node) {
-    if (workflow[node.nodeId].inputs && inputKey in workflow[node.nodeId].inputs) {
-      workflow[node.nodeId].inputs[inputKey] = value
-    } else {
-      throw new Error(`Workflow node "${title}" missing input key: "${inputKey}"`)
-    }
-  } else {
-    throw new Error(`Workflow node not found: "${title}"`)
-  }
-}
-
-function setRequiredNodeText(workflow: ComfyUIWorkflow, title: string, text: string): void {
-  setRequiredNodeInput(workflow, title, 'text', text)
 }
 
 function configureWorkflowForPrompts(

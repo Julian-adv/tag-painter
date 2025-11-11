@@ -8,34 +8,14 @@ import {
   findNodeByTitle,
   setNodeImageSize,
   setNodeSampler,
-  loadCustomWorkflow
+  loadCustomWorkflow,
+  setRequiredNodeInput,
+  setRequiredNodeText
 } from './workflowMapping'
 import { applyQwenLoraChain } from './qwenImageGeneration'
 import { applyPerModelOverrides, getEffectiveLoras } from './generationCommon'
 import { getDefaultWorkflowForModelType } from './workflowBuilder'
 import { FINAL_SAVE_NODE_ID } from './workflow'
-
-function setRequiredNodeInput(
-  workflow: ComfyUIWorkflow,
-  title: string,
-  inputKey: string,
-  value: string | number | boolean | [string, number]
-): void {
-  const node = findNodeByTitle(workflow, title)
-  if (node) {
-    if (workflow[node.nodeId].inputs && inputKey in workflow[node.nodeId].inputs) {
-      workflow[node.nodeId].inputs[inputKey] = value
-    } else {
-      throw new Error(`Workflow node "${title}" missing input key: "${inputKey}"`)
-    }
-  } else {
-    throw new Error(`Workflow node not found: "${title}"`)
-  }
-}
-
-function setRequiredNodeText(workflow: ComfyUIWorkflow, title: string, text: string): void {
-  setRequiredNodeInput(workflow, title, 'text', text)
-}
 
 function setInput(
   workflow: ComfyUIWorkflow,

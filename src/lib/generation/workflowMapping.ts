@@ -251,3 +251,33 @@ export function deleteNodesByTitlePattern(
   }
   return nodesToDelete.length
 }
+
+/**
+ * Set a required input for a node found by title
+ * Throws an error if the node or input key is not found
+ */
+export function setRequiredNodeInput(
+  workflow: ComfyUIWorkflow,
+  title: string,
+  inputKey: string,
+  value: string | number | boolean | [string, number]
+): void {
+  const node = findNodeByTitle(workflow, title)
+  if (node) {
+    if (workflow[node.nodeId].inputs && inputKey in workflow[node.nodeId].inputs) {
+      workflow[node.nodeId].inputs[inputKey] = value
+    } else {
+      throw new Error(`Workflow node "${title}" missing input key: "${inputKey}"`)
+    }
+  } else {
+    throw new Error(`Workflow node not found: "${title}"`)
+  }
+}
+
+/**
+ * Set text input for a node found by title
+ * Convenience wrapper around setRequiredNodeInput for 'text' inputs
+ */
+export function setRequiredNodeText(workflow: ComfyUIWorkflow, title: string, text: string): void {
+  setRequiredNodeInput(workflow, title, 'text', text)
+}
