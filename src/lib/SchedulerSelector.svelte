@@ -16,9 +16,11 @@
     { value: 'exponential', label: 'Exponential' },
     { value: 'ddim_uniform', label: 'DDIM Uniform' },
     { value: 'beta', label: 'Beta' },
+    { value: 'beta57', label: 'Beta57' },
     { value: 'normal', label: 'Normal' },
     { value: 'linear_quadratic', label: 'Linear Quadratic' },
-    { value: 'kl_optimal', label: 'KL Optimal' }
+    { value: 'kl_optimal', label: 'KL Optimal' },
+    { value: 'bong_tangent', label: 'Bong Tangent' }
   ]
 </script>
 
