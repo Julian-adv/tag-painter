@@ -29,6 +29,19 @@ export interface LoraWithWeight {
 
 export type ModelType = 'sdxl' | 'qwen' | 'chroma' | 'flux1_krea'
 
+export enum RefineMode {
+  none = 1,
+  upscale_only = 2,
+  refine = 3,
+  refine_sdxl = 4
+}
+
+export enum FaceDetailerMode {
+  none = 1,
+  face_detail = 2,
+  face_detail_sdxl = 3
+}
+
 export interface FaceDetailerSettings {
   checkpoint: string
   modelType: ModelType

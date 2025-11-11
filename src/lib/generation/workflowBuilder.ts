@@ -1,13 +1,6 @@
-import {
-  defaultWorkflowPrompt,
-  generateLoraChain,
-  FINAL_SAVE_NODE_ID
-} from './workflow'
-import {
-  DEFAULT_FACE_DETAILER_SETTINGS,
-  DEFAULT_UPSCALE_SETTINGS
-} from '$lib/constants'
-import type { Settings, ComfyUIWorkflow, ModelSettings } from '$lib/types'
+import { defaultWorkflowPrompt, generateLoraChain, FINAL_SAVE_NODE_ID } from './workflow'
+import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
+import type { Settings, ComfyUIWorkflow, ModelSettings, RefineMode, FaceDetailerMode } from '$lib/types'
 import {
   findNodeByTitle,
   setNodeTextInput,
@@ -24,8 +17,7 @@ import {
   applyPerModelOverrides,
   generateClientId
 } from './generationCommon'
-import { qwenWorkflowPrompt } from './qwenWorkflow'
-import { buildQwenWorkflow } from './qwenWorkflowBuilder'
+import { buildWorkflow } from './universalWorkflowBuilder'
 import { buildComfyHttpUrl, normalizeBaseUrl } from './comfyui'
 
 export function getDefaultWorkflowForModelType(modelType: string | undefined): string {
@@ -42,10 +34,15 @@ export function getDefaultWorkflowForModelType(modelType: string | undefined): s
   }
 }
 
-function setRequiredNodeInput(workflow: ComfyUIWorkflow, title: string, inputKey: string, value: any): void {
+function setRequiredNodeInput(
+  workflow: ComfyUIWorkflow,
+  title: string,
+  inputKey: string,
+  value: any
+): void {
   const node = findNodeByTitle(workflow, title)
   if (node) {
-    if (workflow[node.nodeId].inputs && (inputKey in workflow[node.nodeId].inputs)) {
+    if (workflow[node.nodeId].inputs && inputKey in workflow[node.nodeId].inputs) {
       workflow[node.nodeId].inputs[inputKey] = value
     } else {
       throw new Error(`Workflow node "${title}" missing input key: "${inputKey}"`)
@@ -55,11 +52,7 @@ function setRequiredNodeInput(workflow: ComfyUIWorkflow, title: string, inputKey
   }
 }
 
-function setRequiredNodeText(
-  workflow: ComfyUIWorkflow,
-  title: string,
-  text: string
-): void {
+function setRequiredNodeText(workflow: ComfyUIWorkflow, title: string, text: string): void {
   setRequiredNodeInput(workflow, title, 'text', text)
 }
 
@@ -71,7 +64,7 @@ function configureWorkflowForPrompts(
   useFaceDetailer: boolean
 ): { error: string } | null {
   if (checkpoint) {
-  if (!setNodeCheckpoint(workflow, 'Load Checkpoint', checkpoint)) {
+    if (!setNodeCheckpoint(workflow, 'Load Checkpoint', checkpoint)) {
       return { error: 'Workflow node not found: Load Checkpoint' }
     }
   }
@@ -94,7 +87,9 @@ function configureWorkflowForPrompts(
   if (!setNodeSampler(workflow, 'KSamplerSelect', { sampler_name: settings.sampler })) {
     return { error: 'Workflow node not found: KSamplerSelect' }
   }
-  if (!setNodeImageSize(workflow, 'Empty Latent Image', settings.imageWidth, settings.imageHeight)) {
+  if (
+    !setNodeImageSize(workflow, 'Empty Latent Image', settings.imageWidth, settings.imageHeight)
+  ) {
     return { error: 'Workflow node not found: Empty Latent Image' }
   }
 
@@ -112,7 +107,9 @@ function configureWorkflowForPrompts(
     const upscaleImage = findNodeByTitle(workflow, 'Upscale Image')?.nodeId
     if (upscaleImage && workflow[upscaleImage]) {
       workflow[upscaleImage].inputs.width = Math.round(settings.imageWidth * upscaleSettings.scale)
-      workflow[upscaleImage].inputs.height = Math.round(settings.imageHeight * upscaleSettings.scale)
+      workflow[upscaleImage].inputs.height = Math.round(
+        settings.imageHeight * upscaleSettings.scale
+      )
     }
 
     if (!setNodeCheckpoint(workflow, 'Upscale Checkpoint Loader', upscaleSettings.checkpoint)) {
@@ -175,11 +172,20 @@ function configureWorkflowForPrompts(
   if (useFaceDetailer) {
     const faceDetailerSettings = effectiveModel?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
 
-    if (!faceDetailerSettings.checkpoint || faceDetailerSettings.checkpoint === 'model.safetensors') {
+    if (
+      !faceDetailerSettings.checkpoint ||
+      faceDetailerSettings.checkpoint === 'model.safetensors'
+    ) {
       return { error: 'FaceDetailer checkpoint not configured in model settings' }
     }
 
-    if (!setNodeCheckpoint(workflow, 'FaceDetailer Checkpoint Loader', faceDetailerSettings.checkpoint)) {
+    if (
+      !setNodeCheckpoint(
+        workflow,
+        'FaceDetailer Checkpoint Loader',
+        faceDetailerSettings.checkpoint
+      )
+    ) {
       return { error: 'Workflow node not found: FaceDetailer Checkpoint Loader' }
     }
 
@@ -231,61 +237,36 @@ export async function buildWorkflowForPrompts(
   negative: string,
   settings: Settings,
   checkpoint: string,
-  useUpscale: boolean,
-  useFaceDetailer: boolean
+  refineMode: RefineMode,
+  faceDetailerMode: FaceDetailerMode,
+  useFilmGrain: boolean
 ): Promise<ComfyUIWorkflow> {
   const rawPositiveText = positive.trim()
   const rawNegativeText = negative.trim()
   const modelSettings = getEffectiveModelSettings(settings, checkpoint)
-  const qualityPrefix = (modelSettings?.qualityPrefix || '').trim()
-  const negativePrefix = (modelSettings?.negativePrefix || '').trim()
-  const positiveText = [qualityPrefix, rawPositiveText].filter((text) => text.length > 0).join(', ')
-  const negativeText = [negativePrefix, rawNegativeText].filter((text) => text.length > 0).join(', ')
-  const modelType = modelSettings?.modelType || 'sdxl'
 
-  switch (modelType) {
-    case 'qwen':
-      return buildQwenWorkflow(
-        positiveText,
-        negativeText,
-        settings,
-        checkpoint,
-        useUpscale,
-        useFaceDetailer,
-        modelSettings
-      )
-    case 'chroma':
-      return buildChromaWorkflow(
-        positiveText,
-        negativeText,
-        settings,
-        checkpoint,
-        useUpscale,
-        useFaceDetailer,
-        modelSettings
-      )
-    case 'flux1_krea':
-      return buildFlux1KreaWorkflow(
-        positiveText,
-        negativeText,
-        settings,
-        checkpoint,
-        useUpscale,
-        useFaceDetailer,
-        modelSettings
-      )
-    case 'sdxl':
-    default:
-      return buildSdxlWorkflow(
-        positiveText,
-        negativeText,
-        settings,
-        checkpoint,
-        useUpscale,
-        useFaceDetailer,
-        modelSettings
-      )
+  if (!modelSettings) {
+    throw new Error('Failed to get model settings')
   }
+
+  const qualityPrefix = (modelSettings.qualityPrefix || '').trim()
+  const negativePrefix = (modelSettings.negativePrefix || '').trim()
+  const positiveText = [qualityPrefix, rawPositiveText].filter((text) => text.length > 0).join(', ')
+  const negativeText = [negativePrefix, rawNegativeText]
+    .filter((text) => text.length > 0)
+    .join(', ')
+  const modelType = modelSettings.modelType || 'sdxl'
+
+  return buildWorkflow(
+    positiveText,
+    negativeText,
+    settings,
+    checkpoint,
+    refineMode,
+    faceDetailerMode,
+    useFilmGrain,
+    modelSettings
+  )
 }
 
 export interface SubmitWorkflowForPromptsResult {
@@ -299,8 +280,9 @@ export async function submitWorkflowForPrompts(
   negative: string,
   settings: Settings,
   checkpoint: string,
-  useUpscale: boolean,
-  useFaceDetailer: boolean,
+  refineMode: RefineMode,
+  faceDetailerMode: FaceDetailerMode,
+  useFilmGrain: boolean,
   clientId?: string
 ): Promise<SubmitWorkflowForPromptsResult> {
   const workflow = await buildWorkflowForPrompts(
@@ -308,8 +290,9 @@ export async function submitWorkflowForPrompts(
     negative,
     settings,
     checkpoint,
-    useUpscale,
-    useFaceDetailer
+    refineMode,
+    faceDetailerMode,
+    useFilmGrain
   )
   console.log('Submitting workflow:', workflow)
   const resolvedClientId = clientId ?? generateClientId()
@@ -455,7 +438,12 @@ async function buildChromaWorkflow(
   if (loraResult.error) {
     throw new Error(loraResult.error)
   }
-  setNodeImageSize(workflow, 'Empty Latent Image', appliedSettings.imageWidth, appliedSettings.imageHeight)
+  setNodeImageSize(
+    workflow,
+    'Empty Latent Image',
+    appliedSettings.imageWidth,
+    appliedSettings.imageHeight
+  )
 
   const scheduler = modelSettings?.scheduler || 'simple'
   setNodeSampler(workflow, 'BasicScheduler', { steps: appliedSettings.steps, scheduler })
@@ -525,7 +513,12 @@ async function buildFlux1KreaWorkflow(
   if (loraResult.error) {
     throw new Error(loraResult.error)
   }
-  setNodeImageSize(workflow, 'EmptySD3LatentImage', appliedSettings.imageWidth, appliedSettings.imageHeight)
+  setNodeImageSize(
+    workflow,
+    'EmptySD3LatentImage',
+    appliedSettings.imageWidth,
+    appliedSettings.imageHeight
+  )
 
   const scheduler = modelSettings?.scheduler || 'simple'
   setNodeSampler(workflow, 'KSampler', {

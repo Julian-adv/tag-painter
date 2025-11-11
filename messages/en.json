@@ -239,5 +239,8 @@
   "downloads.fileHeader": "File",
   "downloads.urlHeader": "URL",
   "downloads.successCount": "Downloaded: {ok}, Failed: {failed}",
-  "downloads.startOver": "Start Over"
+  "downloads.startOver": "Start Over",
+  "postProcessing.refineMode": "Refine Mode",
+  "postProcessing.faceDetailer": "Face Detailer",
+  "postProcessing.useFilmGrain": "Use Film Grain"
 }

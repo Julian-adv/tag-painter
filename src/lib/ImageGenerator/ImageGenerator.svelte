@@ -10,9 +10,11 @@
   import ChatInterface from '$lib/Chat/ChatInterface.svelte'
   import PngInfoPanel from '$lib/PngInfo/PngInfoPanel.svelte'
   import ModelControls from './ModelControls.svelte'
+  import PostProcessingControls from './PostProcessingControls.svelte'
   import { m } from '$lib/paraglide/messages'
   import InstallWizardDialog from '$lib/downloads/InstallWizardDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
+  import { RefineMode, FaceDetailerMode } from '$lib/types'
   import {
     loadSettings,
     saveSettings as saveSettingsToFile,
@@ -84,6 +86,9 @@
   }
   let tagZonesRef: TagZonesHandle | undefined = $state()
   let metadata: Record<string, unknown> | null = $state(null)
+  let selectedRefineMode = $state(RefineMode.none)
+  let selectedFaceDetailerMode = $state(FaceDetailerMode.none)
+  let useFilmGrain = $state(false)
 
   // Toasts component ref for showing messages
   type ToastType = 'success' | 'error' | 'info'
@@ -636,8 +641,6 @@
     const currentPromptsData = get(promptsData)
     const negativePrompt = (currentPromptsData.tags?.negative || []).join(', ')
     const checkpointKey = currentPromptsData.selectedCheckpoint || ''
-    const useUpscaleFlag = currentPromptsData.useUpscale ?? false
-    const useFaceDetailerFlag = currentPromptsData.useFaceDetailer ?? false
     const promptsForSaving = {
       all: promptForSubmission,
       zone1: '',
@@ -652,8 +655,9 @@
         negativePrompt,
         settings,
         checkpointKey,
-        useUpscaleFlag,
-        useFaceDetailerFlag
+        selectedRefineMode,
+        selectedFaceDetailerMode,
+        useFilmGrain
       )
       const comfyBase = normalizeBaseUrl(settings.comfyUrl)
       connectWebSocket(
@@ -781,6 +785,12 @@
         {#if activeTabId !== 'pnginfo'}
           <div class="flex flex-shrink-0 flex-col gap-2 p-2 pt-0">
             <ModelControls {availableCheckpoints} onRefreshModels={refreshModels} />
+
+            <PostProcessingControls
+              bind:selectedRefineMode
+              bind:selectedFaceDetailerMode
+              bind:useFilmGrain
+            />
 
             <GenerationControls
               bind:this={generationControlsRef}

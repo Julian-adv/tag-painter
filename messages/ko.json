@@ -239,5 +239,8 @@
   "downloads.fileHeader": "파일",
   "downloads.urlHeader": "URL",
   "downloads.successCount": "다운로드: {ok}개, 실패: {failed}개",
-  "downloads.startOver": "처음부터"
+  "downloads.startOver": "처음부터",
+  "postProcessing.refineMode": "리파인 모드",
+  "postProcessing.faceDetailer": "얼굴 디테일러",
+  "postProcessing.useFilmGrain": "필름 그레인 사용"
 }

@@ -12,7 +12,7 @@
   let isOpen = $state(false)
   let selectElement: HTMLDivElement
   let triggerElement: HTMLButtonElement
-  let dropdownElement: HTMLDivElement
+  let dropdownElement = $state<HTMLDivElement | undefined>(undefined)
   let dropdownPosition = $state({ top: 0, left: 0, width: 0 })
 
   function toggleDropdown(event: MouseEvent) {
@@ -92,7 +92,7 @@
 {#if isOpen}
   <div
     bind:this={dropdownElement}
-    class="select-dropdown"
+    class="select-dropdown {className}"
     style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px; min-width: {dropdownPosition.width}px;"
   >
     {#each options as option (option.value)}
@@ -120,7 +120,7 @@
     border: 1px solid #ddd;
     border-radius: 4px;
     background: white;
-    font-size: 13px;
+    font-size: inherit;
     text-align: left;
     cursor: pointer;
     display: flex;
@@ -177,7 +177,7 @@
     background: white;
     text-align: left;
     cursor: pointer;
-    font-size: 13px;
+    font-size: inherit;
     transition: background-color 0.15s;
     white-space: nowrap;
     display: block;

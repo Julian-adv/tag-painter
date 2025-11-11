@@ -2,7 +2,7 @@
 <script lang="ts">
   import { ArrowPath } from 'svelte-heros-v2'
   import { m } from '$lib/paraglide/messages'
-  import { promptsData, updateCheckpoint, updateUpscale, updateFaceDetailer } from '$lib/stores/promptsStore'
+  import { promptsData, updateCheckpoint } from '$lib/stores/promptsStore'
 
   interface Props {
     availableCheckpoints: string[]
@@ -41,29 +41,4 @@
     </select>
   </div>
 
-  <!-- Upscale Option -->
-  <div class="flex flex-col gap-2">
-    <label class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal">
-      <input
-        type="checkbox"
-        checked={$promptsData.useUpscale}
-        onchange={(e) => updateUpscale((e.target as HTMLInputElement).checked)}
-        class="m-0 cursor-pointer accent-sky-600"
-      />
-      {m['imageGenerator.useUpscale']()}
-    </label>
-  </div>
-
-  <!-- Face Detailer Option -->
-  <div class="flex flex-col gap-2">
-    <label class="flex cursor-pointer flex-row items-center gap-2 text-xs font-normal">
-      <input
-        type="checkbox"
-        class="m-0 cursor-pointer accent-sky-600"
-        checked={$promptsData.useFaceDetailer}
-        onchange={(e) => updateFaceDetailer((e.target as HTMLInputElement).checked)}
-      />
-      {m['imageGenerator.useFaceDetailer']()}
-    </label>
-  </div>
 </div>
