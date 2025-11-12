@@ -47,12 +47,6 @@ export async function buildWorkflow(
   const checkpointLoader = checkpointLoaderMap[modelSettings.modelType]
   setRequiredNodeInput(workflow, checkpointLoader.node, checkpointLoader.key, checkpoint)
 
-  // Handle embedded VAE for SDXL models
-  if (modelSettings.modelType === 'sdxl') {
-    const useEmbeddedVae = modelSettings.selectedVae === '__embedded__'
-    setRequiredNodeInput(workflow, 'Use embedded VAE', 'value', useEmbeddedVae)
-  }
-
   // Set refine mode
   setRequiredNodeInput(workflow, 'Refine mode', 'value', refineMode)
   // Set FaceDetailer mode
@@ -64,6 +58,20 @@ export async function buildWorkflow(
   // Set prompts
   setRequiredNodeInput(workflow, 'Positive prompt', 'value', positiveText)
   setRequiredNodeInput(workflow, 'Negative prompt', 'value', negativeText)
+
+  // Handle embedded VAE for SDXL models
+  if (modelSettings.modelType === 'sdxl') {
+    const useEmbeddedVae = modelSettings.selectedVae === '__embedded__'
+    setRequiredNodeInput(workflow, 'Use embedded VAE', 'value', useEmbeddedVae)
+
+    // Set CLIP Skip for SDXL models
+    setRequiredNodeInput(
+      workflow,
+      'CLIP Set Last Layer',
+      'stop_at_clip_layer',
+      modelSettings.clipSkip
+    )
+  }
 
   // Handle LoRA settings for qwen_nunchaku
   if (modelSettings.modelType === 'qwen_nunchaku' && modelSettings.loras.length > 0) {
