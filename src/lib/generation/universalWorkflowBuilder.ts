@@ -58,6 +58,10 @@ export async function buildWorkflow(
   // Set prompts
   setRequiredNodeInput(workflow, 'Positive prompt', 'value', positiveText)
   setRequiredNodeInput(workflow, 'Negative prompt', 'value', negativeText)
+  setRequiredNodeInput(workflow, 'KSamplerSelect (base)', 'sampler_name', settings.sampler)
+
+  setRequiredNodeInput(workflow, 'Empty Latent Image', 'width', settings.imageWidth)
+  setRequiredNodeInput(workflow, 'Empty Latent Image', 'height', settings.imageHeight)
 
   // Handle embedded VAE for SDXL models
   if (modelSettings.modelType === 'sdxl') {
