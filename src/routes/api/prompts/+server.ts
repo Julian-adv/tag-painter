@@ -115,7 +115,7 @@ export async function GET() {
         categories: createDefaultCategories(),
         tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] },
         customTags: {},
-        selectedCheckpoint: null,
+        selectedCheckpoint: '',
         selectedComposition: 'left-horizontal',
         useUpscale: true,
         useFaceDetailer: true,

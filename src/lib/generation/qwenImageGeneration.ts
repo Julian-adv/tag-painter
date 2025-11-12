@@ -224,7 +224,7 @@ export async function generateImage(
       combinedPrompt,
       negativeTagsText,
       appliedSettings,
-      promptsData.selectedCheckpoint || 'qwen_image_fp8_e4m3fn.safetensors',
+      promptsData.selectedCheckpoint,
       refineMode,
       faceDetailerMode,
       useFilmgrain,

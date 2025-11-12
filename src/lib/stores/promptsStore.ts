@@ -9,7 +9,7 @@ const defaultPromptsData: PromptsData = {
   categories: [],
   tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] },
   customTags: {},
-  selectedCheckpoint: null,
+  selectedCheckpoint: '',
   selectedComposition: 'left-horizontal',
   useUpscale: false,
   useFaceDetailer: false,

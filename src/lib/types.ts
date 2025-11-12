@@ -133,7 +133,7 @@ export interface PromptsData {
     inpainting: string[]
   }
   customTags: Record<string, CustomTag>
-  selectedCheckpoint: string | null
+  selectedCheckpoint: string
   selectedComposition: string
   useUpscale: boolean
   useFaceDetailer: boolean
