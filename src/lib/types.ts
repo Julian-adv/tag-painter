@@ -137,6 +137,8 @@ export interface PromptsData {
   selectedComposition: string
   useUpscale: boolean
   useFaceDetailer: boolean
+  selectedRefineMode: RefineMode
+  selectedFaceDetailerMode: FaceDetailerMode
   selectedLoras: { name: string; weight: number }[]
 }
 

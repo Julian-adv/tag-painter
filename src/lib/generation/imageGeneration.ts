@@ -9,10 +9,7 @@ import {
   generateLoraChain
 } from './workflow'
 import { getDefaultWorkflowForModelType } from './workflowBuilder'
-import {
-  DEFAULT_FACE_DETAILER_SETTINGS,
-  DEFAULT_UPSCALE_SETTINGS
-} from '$lib/constants'
+import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
 import { generateQwenImage } from './qwenImageGeneration'
 import { generateChromaImage } from './chromaImageGeneration'
 import { generateFlux1KreaImage } from './flux1KreaImageGeneration'
@@ -34,6 +31,7 @@ import { getWildcardModel } from '../stores/tagsStore'
 import { readWildcardZones } from '../utils/wildcardZones'
 import { updateComposition } from '../stores/promptsStore'
 import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow } from '$lib/types'
+import { RefineMode, FaceDetailerMode } from '$lib/types'
 import {
   findNodeByTitle,
   setNodeTextInput,
@@ -66,7 +64,11 @@ export interface GenerationOptions {
   onImageReceived: (imageBlob: Blob, filePath: string) => void
 }
 
-export async function generateImage(options: GenerationOptions): Promise<{
+export async function generateImage(
+  options: GenerationOptions,
+  refineMode: RefineMode,
+  faceDetailerMode: FaceDetailerMode
+): Promise<{
   error?: string
   seed?: number
   randomTagResolutions?: {
@@ -93,398 +95,8 @@ export async function generateImage(options: GenerationOptions): Promise<{
   } = options
   const modelSettings = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
 
-  if (!isInpainting && modelSettings?.modelType === 'qwen') {
-    return generateQwenImage(options, modelSettings)
-  }
-
-  if (isInpainting && modelSettings?.modelType === 'qwen') {
-    const message = 'Qwen models do not support inpainting.'
-    console.warn(message)
-    return { error: message }
-  }
-
-  if (!isInpainting && modelSettings?.modelType === 'chroma') {
-    return generateChromaImage(options, modelSettings)
-  }
-
-  if (isInpainting && modelSettings?.modelType === 'chroma') {
-    // Conservatively treat like SDXL inpainting unless specified otherwise
-    // If Chroma does not support inpainting in your workflow, set a custom workflow per model.
-  }
-
-  if (!isInpainting && modelSettings?.modelType === 'flux1_krea') {
-    return generateFlux1KreaImage(options, modelSettings)
-  }
-
-  if (isInpainting && modelSettings?.modelType === 'flux1_krea') {
-    const message = 'Flux1 Krea models do not support inpainting.'
-    console.warn(message)
-    return { error: message }
-  }
-
-  try {
-    // Load custom workflow if specified, otherwise use default based on model type
-    let workflow: ComfyUIWorkflow
-    const customWorkflowPath = modelSettings?.customWorkflowPath || getDefaultWorkflowForModelType(modelSettings?.modelType)
-    try {
-      workflow = await loadCustomWorkflow(customWorkflowPath)
-      console.log('Loaded custom workflow from:', customWorkflowPath)
-    } catch (error) {
-      console.error('Failed to load custom workflow, using fallback:', error)
-      workflow = JSON.parse(
-        JSON.stringify(isInpainting ? inpaintingWorkflowPrompt : defaultWorkflowPrompt)
-      )
-    }
-
-    onLoadingChange(true)
-    onProgressUpdate({ value: 0, max: 100, currentNode: '' })
-
-    // Generate unique client ID
-    const clientId = generateClientId()
-
-    // Read wildcard zones instead of using promptsData.tags
-    let wildcardZones
-    try {
-      wildcardZones = await readWildcardZones(modelSettings?.wildcardsFile, {
-        reroll: true,
-        skipRefresh: true
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to load wildcards file'
-      return { error: message }
-    }
-
-    // Expand custom tags and create prompt parts, using previous resolutions if regenerating
-    const previousAll = previousRandomTagResolutions?.all || {}
-    const model = getWildcardModel()
-    // Prefetch wildcard files referenced in model tree
-    await prefetchWildcardFilesFromTexts(model)
-
-    // Create shared disabled context to propagate disables across zones
-    const sharedDisabledContext = { names: new Set<string>(), patterns: [] as string[] }
-
-    const allResult = expandCustomTags(
-      wildcardZones.all,
-      model,
-      new Set(),
-      {},
-      previousAll,
-      sharedDisabledContext
-    )
-
-    // Check for composition detection
-    const detectedComposition = detectCompositionFromTags([allResult.expandedText])
-    if (detectedComposition) {
-      console.log(`Auto-selecting composition: ${detectedComposition}`)
-      updateComposition(detectedComposition)
-      // Update promptsData with the new composition for this generation
-      promptsData.selectedComposition = detectedComposition
-    }
-
-    const previousZone1 = previousRandomTagResolutions?.zone1 || {}
-    // Check if zone1 is disabled before expanding
-    const zone1Result = sharedDisabledContext.names.has('zone1')
-      ? { expandedText: '', randomTagResolutions: {} }
-      : expandCustomTags(
-          wildcardZones.zone1,
-          model,
-          new Set(),
-          { ...allResult.randomTagResolutions },
-          previousZone1,
-          sharedDisabledContext
-        )
-
-    const previousZone2 = previousRandomTagResolutions?.zone2 || {}
-    // Check if zone2 is disabled before expanding
-    const zone2Result = sharedDisabledContext.names.has('zone2')
-      ? { expandedText: '', randomTagResolutions: {} }
-      : expandCustomTags(
-          wildcardZones.zone2,
-          model,
-          new Set(),
-          { ...allResult.randomTagResolutions, ...zone1Result.randomTagResolutions },
-          previousZone2,
-          sharedDisabledContext
-        )
-
-    const previousNegative = previousRandomTagResolutions?.negative || {}
-    // Check if negative is disabled before expanding
-    const negativeResult = sharedDisabledContext.names.has('negative')
-      ? { expandedText: '', randomTagResolutions: {} }
-      : expandCustomTags(
-          wildcardZones.negative,
-          model,
-          new Set(),
-          {
-            ...allResult.randomTagResolutions,
-            ...zone1Result.randomTagResolutions,
-            ...zone2Result.randomTagResolutions
-          },
-          previousNegative,
-          sharedDisabledContext
-        )
-
-    const previousInpainting = previousRandomTagResolutions?.inpainting || {}
-    // Check if inpainting is disabled before expanding
-    const inpaintingResult = sharedDisabledContext.names.has('inpainting')
-      ? { expandedText: '', randomTagResolutions: {} }
-      : expandCustomTags(
-          wildcardZones.inpainting,
-          model,
-          new Set(),
-          {
-            ...allResult.randomTagResolutions,
-            ...zone1Result.randomTagResolutions,
-            ...zone2Result.randomTagResolutions,
-            ...negativeResult.randomTagResolutions
-          },
-          previousInpainting,
-          sharedDisabledContext
-        )
-
-    // Resolve wildcard directives inside leaf expansion already; now just clean directives
-    let allTagsText = cleanDirectivesFromTags(allResult.expandedText)
-
-    let zone1TagsText = cleanDirectivesFromTags(zone1Result.expandedText)
-
-    let zone2TagsText = cleanDirectivesFromTags(zone2Result.expandedText)
-
-    let negativeTagsText = cleanDirectivesFromTags(negativeResult.expandedText)
-
-    let inpaintingTagsText = cleanDirectivesFromTags(inpaintingResult.expandedText)
-
-    // Track disabled zones for UI feedback (zones already filtered during expansion)
-    const disabledZones = new Set<string>(sharedDisabledContext.names)
-
-    // Organize random tag resolutions by zone (already resolved, includes wildcard replacements)
-    const allRandomResolutions = {
-      all: { ...allResult.randomTagResolutions },
-      zone1: { ...zone1Result.randomTagResolutions },
-      zone2: { ...zone2Result.randomTagResolutions },
-      negative: { ...negativeResult.randomTagResolutions },
-      inpainting: { ...inpaintingResult.randomTagResolutions }
-    }
-
-    // Apply per-model quality/negative prefixes
-    const qualityPrefix = modelSettings?.qualityPrefix ?? ''
-    const negativePrefix = modelSettings?.negativePrefix ?? ''
-    if (qualityPrefix && qualityPrefix.trim().length > 0) {
-      allTagsText = [qualityPrefix.trim(), allTagsText].filter((p) => p && p.length > 0).join(', ')
-    }
-    if (negativePrefix && negativePrefix.trim().length > 0) {
-      negativeTagsText = [negativePrefix.trim(), negativeTagsText]
-        .filter((p) => p && p.length > 0)
-        .join(', ')
-    }
-
-    if (isInpainting) {
-      // Configure inpainting workflow (title-based)
-      if (!setNodeTextInput(workflow, 'CLIP Text Encode (Prompt)', inpaintingTagsText)) {
-        return { error: 'Workflow node not found: CLIP Text Encode (Prompt)' }
-      }
-      if (!setNodeTextInput(workflow, 'CLIP Text Encode (Negative)', negativeTagsText)) {
-        return { error: 'Workflow node not found: CLIP Text Encode (Negative)' }
-      }
-
-      // Set the current image as input
-      if (currentImagePath) {
-        if (!setNodeImagePath(workflow, 'Load Input Image', currentImagePath)) {
-          return { error: 'Workflow node not found: Load Input Image' }
-        }
-        console.log('Using image path:', currentImagePath)
-      }
-
-      // Set the mask image (already has full path)
-      if (maskFilePath) {
-        if (!setNodeImagePath(workflow, 'Load Mask Image', maskFilePath)) {
-          return { error: 'Workflow node not found: Load Mask Image' }
-        }
-        console.log('Using mask path:', maskFilePath)
-      }
-    } else {
-      // Configure regular workflow
-      // If composition is 'all', ignore zone2 so it doesn't affect generation
-      const isAll = promptsData.selectedComposition === 'all'
-      if (isAll) {
-        zone2TagsText = ''
-        disabledZones.add('zone2')
-      }
-
-      // Assign prompts to different nodes (title-based)
-      if (!setNodeTextInput(workflow, 'CLIP Text Encode (All)', allTagsText)) {
-        return { error: 'Workflow node not found: CLIP Text Encode (All)' }
-      }
-      if (!setNodeTextInput(workflow, 'CLIP Text Encode (Zone1)', zone1TagsText)) {
-        return { error: 'Workflow node not found: CLIP Text Encode (Zone1)' }
-      }
-      if (!setNodeTextInput(workflow, 'CLIP Text Encode (Zone2)', zone2TagsText)) {
-        return { error: 'Workflow node not found: CLIP Text Encode (Zone2)' }
-      }
-
-      // Set mask configuration for regional separation (title-based)
-      const coupleNode = findNodeByTitle(workflow, 'Attention Couple 🍌')?.nodeId
-      if (!coupleNode) {
-        return { error: 'Workflow node not found: Attention Couple 🍌' }
-      }
-      const leftMask = findNodeByTitle(workflow, 'Convert Image to Mask')?.nodeId
-      if (!leftMask) {
-        return { error: 'Workflow node not found: Convert Image to Mask' }
-      }
-      const invertedMask = findNodeByTitle(workflow, 'InvertMask')?.nodeId
-      if (!invertedMask) {
-        return { error: 'Workflow node not found: InvertMask' }
-      }
-      if (workflow[coupleNode]) {
-        workflow[coupleNode].inputs.mask_1 = [leftMask, 0]
-        workflow[coupleNode].inputs.mask_2 = [invertedMask, 0]
-      }
-
-      // Set negative prompt from negative tags
-      if (!setNodeTextInput(workflow, 'CLIP Text Encode (Negative)', negativeTagsText)) {
-        return { error: 'Workflow node not found: CLIP Text Encode (Negative)' }
-      }
-
-      // Get mask image path from server-side API with selected composition
-      const maskResponse = await fetch(
-        `/api/mask-path?composition=${encodeURIComponent(promptsData.selectedComposition)}`
-      )
-      if (!maskResponse.ok) {
-        throw new Error(`Failed to get mask path: ${maskResponse.statusText}`)
-      }
-      const { maskImagePath } = await maskResponse.json()
-      if (!setNodeImagePath(workflow, 'Load Image', maskImagePath)) {
-        return { error: 'Workflow node not found: Load Image' }
-      }
-    }
-
-    // Configure workflow based on settings merged with per-model overrides
-    const appliedSettings = applyPerModelOverrides(settings, promptsData.selectedCheckpoint)
-
-    // Configure LoRA chain with per-model overrides
-    const effectiveLoras = getEffectiveLoras(
-      settings,
-      promptsData.selectedCheckpoint,
-      promptsData.selectedLoras
-    )
-    const loraResult = generateLoraChain(effectiveLoras, workflow, appliedSettings.clipSkip)
-    if (loraResult.error) {
-      return { error: loraResult.error }
-    }
-
-    const configureResult = configureWorkflow(
-      workflow,
-      promptsData,
-      appliedSettings,
-      isInpainting,
-      inpaintDenoiseStrength
-    )
-    if (configureResult) {
-      return { error: configureResult.error }
-    }
-
-    // Configure CLIP skip (title-based and legacy numeric for compatibility)
-    if (!setNodeClipSkip(workflow, 'CLIP Set Last Layer', appliedSettings.clipSkip)) {
-      return { error: 'Workflow node not found: CLIP Set Last Layer' }
-    }
-    if (isInpainting) {
-      if (!setNodeClipSkip(workflow, 'CLIP Set Last Layer (Inpainting)', appliedSettings.clipSkip)) {
-        return { error: 'Workflow node not found: CLIP Set Last Layer (Inpainting)' }
-      }
-    }
-
-    // Apply seeds (either use provided seed or generate new one)
-    const appliedSeed = applySeedsToWorkflow(workflow, seed, isInpainting)
-
-    // Add SaveImageWebsocket node for output
-    const saveImageResult = addSaveImageWebsocketNode(workflow, promptsData, isInpainting)
-    if (saveImageResult) {
-      return { error: saveImageResult.error }
-    }
-
-    // Configure upscale text prompts if enabled
-    if (promptsData.useUpscale) {
-      const isAllComposition = promptsData.selectedComposition === 'all'
-      const combinedPrompt = isAllComposition
-        ? allTagsText
-        : allTagsText && (zone1TagsText || zone2TagsText)
-          ? `${allTagsText}, ${zone1TagsText || ''}${zone2TagsText ? (zone1TagsText ? ', ' : '') + zone2TagsText : ''}`
-          : allTagsText || zone1TagsText || zone2TagsText
-
-      if (!setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Positive)', combinedPrompt)) {
-        return { error: 'Workflow node not found: Upscale CLIP Text Encode (Positive)' }
-      }
-      if (!setNodeTextInput(workflow, 'Upscale CLIP Text Encode (Negative)', negativeTagsText)) {
-        return { error: 'Workflow node not found: Upscale CLIP Text Encode (Negative)' }
-      }
-    }
-
-    // Configure FaceDetailer text prompts and wildcard if enabled
-    if (promptsData.useFaceDetailer) {
-      // Set face detailer wildcard with appropriate prompts
-      const isAllComposition = promptsData.selectedComposition === 'all'
-      const combinedZonePrompt = isAllComposition
-        ? zone1TagsText
-        : zone1TagsText && zone2TagsText
-          ? `[ASC] ${zone1TagsText} [SEP] ${zone2TagsText}`
-          : zone1TagsText || zone2TagsText
-
-      // Set wildcard for FaceDetailer node
-      const fdNode = findNodeByTitle(workflow, 'FaceDetailer')?.nodeId
-      if (fdNode && workflow[fdNode] && 'wildcard' in workflow[fdNode].inputs) {
-        workflow[fdNode].inputs.wildcard = combinedZonePrompt
-      }
-
-      // Configure FaceDetailer text prompts for separate conditioning
-      const combinedPrompt = isAllComposition
-        ? allTagsText
-        : allTagsText && (zone1TagsText || zone2TagsText)
-          ? `${allTagsText}, ${zone1TagsText || ''}${zone2TagsText ? (zone1TagsText ? ', ' : '') + zone2TagsText : ''}`
-          : allTagsText || zone1TagsText || zone2TagsText
-
-      if (!setNodeTextInput(workflow, 'FaceDetailer CLIP Text Encode (Positive)', combinedPrompt)) {
-        return { error: 'Workflow node not found: FaceDetailer CLIP Text Encode (Positive)' }
-      }
-      if (
-        !setNodeTextInput(workflow, 'FaceDetailer CLIP Text Encode (Negative)', negativeTagsText)
-      ) {
-        return { error: 'Workflow node not found: FaceDetailer CLIP Text Encode (Negative)' }
-      }
-    }
-
-    console.log('workflow', workflow)
-    // Submit to ComfyUI
-    await submitToComfyUI(
-      workflow,
-      clientId,
-      {
-        all: allTagsText,
-        zone1: zone1TagsText,
-        zone2: zone2TagsText,
-        negative: negativeTagsText,
-        inpainting: inpaintingTagsText
-      },
-      appliedSettings,
-      appliedSeed,
-      {
-        onLoadingChange,
-        onProgressUpdate,
-        onImageReceived
-      }
-    )
-
-    return {
-      seed: appliedSeed,
-      randomTagResolutions: allRandomResolutions,
-      disabledZones
-    }
-  } catch (error) {
-    console.error('Failed to generate image:', error)
-    return {
-      error: error instanceof Error ? error.message : 'Failed to generate image'
-    }
-  }
+  return generateQwenImage(options, modelSettings, refineMode, faceDetailerMode)
 }
-
 
 function configureWorkflow(
   workflow: ComfyUIWorkflow,
@@ -530,7 +142,9 @@ function configureWorkflow(
     if (!setNodeSampler(workflow, 'KSamplerSelect', { sampler_name: settings.sampler })) {
       return { error: 'Workflow node not found: KSamplerSelect' }
     }
-    if (!setNodeImageSize(workflow, 'Empty Latent Image', settings.imageWidth, settings.imageHeight)) {
+    if (
+      !setNodeImageSize(workflow, 'Empty Latent Image', settings.imageWidth, settings.imageHeight)
+    ) {
       return { error: 'Workflow node not found: Empty Latent Image' }
     }
 
@@ -539,7 +153,10 @@ function configureWorkflow(
     }
 
     if (promptsData.useUpscale) {
-      const effectiveModelSettings = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
+      const effectiveModelSettings = getEffectiveModelSettings(
+        settings,
+        promptsData.selectedCheckpoint
+      )
       const upscaleSettings = effectiveModelSettings?.upscale || DEFAULT_UPSCALE_SETTINGS
 
       if (!upscaleSettings.checkpoint || upscaleSettings.checkpoint === 'model.safetensors') {
@@ -548,8 +165,12 @@ function configureWorkflow(
 
       const upscaleImage = findNodeByTitle(workflow, 'Upscale Image')?.nodeId
       if (upscaleImage && workflow[upscaleImage]) {
-        workflow[upscaleImage].inputs.width = Math.round(settings.imageWidth * upscaleSettings.scale)
-        workflow[upscaleImage].inputs.height = Math.round(settings.imageHeight * upscaleSettings.scale)
+        workflow[upscaleImage].inputs.width = Math.round(
+          settings.imageWidth * upscaleSettings.scale
+        )
+        workflow[upscaleImage].inputs.height = Math.round(
+          settings.imageHeight * upscaleSettings.scale
+        )
       }
 
       if (!setNodeCheckpoint(workflow, 'Upscale Checkpoint Loader', upscaleSettings.checkpoint)) {
@@ -610,14 +231,27 @@ function configureWorkflow(
     }
 
     if (promptsData.useFaceDetailer) {
-      const effectiveModelSettings = getEffectiveModelSettings(settings, promptsData.selectedCheckpoint)
-      const faceDetailerSettings = effectiveModelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
+      const effectiveModelSettings = getEffectiveModelSettings(
+        settings,
+        promptsData.selectedCheckpoint
+      )
+      const faceDetailerSettings =
+        effectiveModelSettings?.faceDetailer || DEFAULT_FACE_DETAILER_SETTINGS
 
-      if (!faceDetailerSettings.checkpoint || faceDetailerSettings.checkpoint === 'model.safetensors') {
+      if (
+        !faceDetailerSettings.checkpoint ||
+        faceDetailerSettings.checkpoint === 'model.safetensors'
+      ) {
         return { error: 'FaceDetailer checkpoint not configured in model settings' }
       }
 
-      if (!setNodeCheckpoint(workflow, 'FaceDetailer Checkpoint Loader', faceDetailerSettings.checkpoint)) {
+      if (
+        !setNodeCheckpoint(
+          workflow,
+          'FaceDetailer Checkpoint Loader',
+          faceDetailerSettings.checkpoint
+        )
+      ) {
         return { error: 'Workflow node not found: FaceDetailer Checkpoint Loader' }
       }
 

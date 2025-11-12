@@ -48,6 +48,8 @@ export async function POST({ request }) {
       selectedComposition: data.selectedComposition || 'left-horizontal',
       useUpscale: data.useUpscale,
       useFaceDetailer: data.useFaceDetailer,
+      selectedRefineMode: data.selectedRefineMode ?? 1,
+      selectedFaceDetailerMode: data.selectedFaceDetailerMode ?? 1,
       selectedLoras: data.selectedLoras
     }
 
@@ -117,6 +119,8 @@ export async function GET() {
         selectedComposition: 'left-horizontal',
         useUpscale: true,
         useFaceDetailer: true,
+        selectedRefineMode: 1,
+        selectedFaceDetailerMode: 1,
         selectedLoras: []
       }
       return json(defaultPrompts)

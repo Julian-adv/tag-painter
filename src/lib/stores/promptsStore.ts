@@ -13,6 +13,8 @@ const defaultPromptsData: PromptsData = {
   selectedComposition: 'left-horizontal',
   useUpscale: false,
   useFaceDetailer: false,
+  selectedRefineMode: 1, // RefineMode.none
+  selectedFaceDetailerMode: 1, // FaceDetailerMode.none
   selectedLoras: []
 }
 
@@ -34,7 +36,9 @@ export async function initializePromptsStore() {
         inpainting: savedPrompts.tags?.inpainting || []
       },
       customTags: savedPrompts.customTags || {},
-      selectedComposition: savedPrompts.selectedComposition || 'left-horizontal'
+      selectedComposition: savedPrompts.selectedComposition || 'left-horizontal',
+      selectedRefineMode: savedPrompts.selectedRefineMode ?? 1, // RefineMode.none
+      selectedFaceDetailerMode: savedPrompts.selectedFaceDetailerMode ?? 1 // FaceDetailerMode.none
     }
     promptsData.set(migratedData)
   } else {

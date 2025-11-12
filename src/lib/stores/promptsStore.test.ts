@@ -48,6 +48,8 @@ describe('promptsStore', () => {
       selectedComposition: 'left-horizontal',
       useUpscale: false,
       useFaceDetailer: false,
+      selectedRefineMode: 1,
+      selectedFaceDetailerMode: 1,
       selectedLoras: []
     })
   })
@@ -151,6 +153,8 @@ describe('promptsStore', () => {
         selectedComposition: 'left-horizontal',
         useUpscale: true,
         useFaceDetailer: false,
+        selectedRefineMode: 1,
+        selectedFaceDetailerMode: 1,
         selectedLoras: [{ name: 'lora1', weight: 1.0 }]
       }
 

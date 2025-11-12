@@ -60,7 +60,9 @@ export function applyQwenLoraChain(
 
 export async function generateQwenImage(
   options: GenerationOptions,
-  modelSettings: ModelSettings | null
+  modelSettings: ModelSettings | null,
+  refineMode: RefineMode,
+  faceDetailerMode: FaceDetailerMode
 ): Promise<{
   error?: string
   seed?: number
@@ -215,14 +217,6 @@ export async function generateQwenImage(
 
     // Build workflow using universal workflow builder
     const appliedSettings = applyPerModelOverrides(settings, promptsData.selectedCheckpoint)
-
-    const refineMode: RefineMode = promptsData.useUpscale
-      ? RefineMode.refine
-      : RefineMode.none
-
-    const faceDetailerMode: FaceDetailerMode = promptsData.useFaceDetailer
-      ? FaceDetailerMode.face_detail
-      : FaceDetailerMode.none
 
     const useFilmgrain = false
 

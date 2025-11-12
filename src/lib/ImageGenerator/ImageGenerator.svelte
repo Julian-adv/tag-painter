@@ -397,36 +397,40 @@
       }
     }
 
-    const result = await generateImage({
-      promptsData: currentPromptsData,
-      settings,
-      seed: seedToUse,
-      maskFilePath,
-      currentImagePath: currentImageFileName,
-      isInpainting: false,
-      previousRandomTagResolutions: isRegeneration ? currentRandomTagResolutions : undefined,
-      onLoadingChange: (loading) => {
-        isLoading = loading
-      },
-      onProgressUpdate: (progress) => {
-        progressData = progress
-      },
-      onImageReceived: async (imageBlob, filePath) => {
-        // Create blob URL for immediate display
-        if (imageUrl && imageUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(imageUrl)
-        }
-        imageUrl = URL.createObjectURL(imageBlob)
+    const result = await generateImage(
+      {
+        promptsData: currentPromptsData,
+        settings,
+        seed: seedToUse,
+        maskFilePath,
+        currentImagePath: currentImageFileName,
+        isInpainting: false,
+        previousRandomTagResolutions: isRegeneration ? currentRandomTagResolutions : undefined,
+        onLoadingChange: (loading) => {
+          isLoading = loading
+        },
+        onProgressUpdate: (progress) => {
+          progressData = progress
+        },
+        onImageReceived: async (imageBlob, filePath) => {
+          // Create blob URL for immediate display
+          if (imageUrl && imageUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(imageUrl)
+          }
+          imageUrl = URL.createObjectURL(imageBlob)
 
-        // Set the current image file name
-        currentImageFileName = filePath
+          // Set the current image file name
+          currentImageFileName = filePath
 
-        // Update file list after new image is generated
-        if (imageViewer?.updateFileList) {
-          await imageViewer.updateFileList()
+          // Update file list after new image is generated
+          if (imageViewer?.updateFileList) {
+            await imageViewer.updateFileList()
+          }
         }
-      }
-    })
+      },
+      currentPromptsData.selectedRefineMode,
+      currentPromptsData.selectedFaceDetailerMode
+    )
 
     // Store the results
     if (result.error) {
@@ -506,37 +510,41 @@
       }
     }
 
-    const result = await generateImage({
-      promptsData: currentPromptsData,
-      settings,
-      seed: null,
-      maskFilePath,
-      currentImagePath: currentImageFileName,
-      isInpainting: true,
-      inpaintDenoiseStrength: denoiseStrength,
-      previousRandomTagResolutions: undefined,
-      onLoadingChange: (loading) => {
-        isLoading = loading
-      },
-      onProgressUpdate: (progress) => {
-        progressData = progress
-      },
-      onImageReceived: async (imageBlob, filePath) => {
-        // Create blob URL for immediate display
-        if (imageUrl && imageUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(imageUrl)
-        }
-        imageUrl = URL.createObjectURL(imageBlob)
+    const result = await generateImage(
+      {
+        promptsData: currentPromptsData,
+        settings,
+        seed: null,
+        maskFilePath,
+        currentImagePath: currentImageFileName,
+        isInpainting: true,
+        inpaintDenoiseStrength: denoiseStrength,
+        previousRandomTagResolutions: undefined,
+        onLoadingChange: (loading) => {
+          isLoading = loading
+        },
+        onProgressUpdate: (progress) => {
+          progressData = progress
+        },
+        onImageReceived: async (imageBlob, filePath) => {
+          // Create blob URL for immediate display
+          if (imageUrl && imageUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(imageUrl)
+          }
+          imageUrl = URL.createObjectURL(imageBlob)
 
-        // Set the current image file name
-        currentImageFileName = filePath
+          // Set the current image file name
+          currentImageFileName = filePath
 
-        // Update file list after new image is generated
-        if (imageViewer?.updateFileList) {
-          await imageViewer.updateFileList()
+          // Update file list after new image is generated
+          if (imageViewer?.updateFileList) {
+            await imageViewer.updateFileList()
+          }
         }
-      }
-    })
+      },
+      currentPromptsData.selectedRefineMode,
+      currentPromptsData.selectedFaceDetailerMode
+    )
 
     // Store the results
     if (result.error) {
