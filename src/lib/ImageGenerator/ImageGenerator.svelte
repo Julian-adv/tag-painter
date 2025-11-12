@@ -23,7 +23,8 @@
     getImageMetadata
   } from '$lib/utils/fileIO'
   import { fetchCheckpoints, connectWebSocket, normalizeBaseUrl } from '$lib/generation/comfyui'
-  import { generateImage } from '$lib/generation/imageGeneration'
+  import { generateQwenImage } from '$lib/generation/qwenImageGeneration'
+  import { getEffectiveModelSettings } from '$lib/generation/generationCommon'
   import { DEFAULT_COMFY_URL, DEFAULT_OUTPUT_DIRECTORY, DEFAULT_SETTINGS } from '$lib/constants'
   import { submitWorkflowForPrompts } from '$lib/generation/workflowBuilder'
   import { FINAL_SAVE_NODE_ID } from '$lib/generation/workflow'
@@ -397,7 +398,8 @@
       }
     }
 
-    const result = await generateImage(
+    const modelSettings = getEffectiveModelSettings(settings, currentPromptsData.selectedCheckpoint)
+    const result = await generateQwenImage(
       {
         promptsData: currentPromptsData,
         settings,
@@ -428,6 +430,7 @@
           }
         }
       },
+      modelSettings,
       currentPromptsData.selectedRefineMode,
       currentPromptsData.selectedFaceDetailerMode
     )
@@ -510,7 +513,8 @@
       }
     }
 
-    const result = await generateImage(
+    const modelSettings = getEffectiveModelSettings(settings, currentPromptsData.selectedCheckpoint)
+    const result = await generateQwenImage(
       {
         promptsData: currentPromptsData,
         settings,
@@ -542,6 +546,7 @@
           }
         }
       },
+      modelSettings,
       currentPromptsData.selectedRefineMode,
       currentPromptsData.selectedFaceDetailerMode
     )
