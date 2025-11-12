@@ -135,8 +135,6 @@ export interface PromptsData {
   customTags: Record<string, CustomTag>
   selectedCheckpoint: string
   selectedComposition: string
-  useUpscale: boolean
-  useFaceDetailer: boolean
   selectedRefineMode: RefineMode
   selectedFaceDetailerMode: FaceDetailerMode
   selectedLoras: { name: string; weight: number }[]

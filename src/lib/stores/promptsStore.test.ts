@@ -11,8 +11,6 @@ import {
   updateCategory,
   updateCheckpoint,
   updateComposition,
-  updateUpscale,
-  updateFaceDetailer,
   updateSelectedLoras,
   updateTags,
   saveCustomTag,
@@ -46,8 +44,6 @@ describe('promptsStore', () => {
       customTags: {},
       selectedCheckpoint: '',
       selectedComposition: 'left-horizontal',
-      useUpscale: false,
-      useFaceDetailer: false,
       selectedRefineMode: 1,
       selectedFaceDetailerMode: 1,
       selectedLoras: []
@@ -151,8 +147,6 @@ describe('promptsStore', () => {
         customTags: {},
         selectedCheckpoint: 'test.ckpt',
         selectedComposition: 'left-horizontal',
-        useUpscale: true,
-        useFaceDetailer: false,
         selectedRefineMode: 1,
         selectedFaceDetailerMode: 1,
         selectedLoras: [{ name: 'lora1', weight: 1.0 }]
@@ -260,20 +254,6 @@ describe('promptsStore', () => {
 
       const storeData = get(promptsData)
       expect(storeData.selectedComposition).toBe('right-vertical')
-    })
-
-    it('should update upscale setting', () => {
-      updateUpscale(true)
-
-      const storeData = get(promptsData)
-      expect(storeData.useUpscale).toBe(true)
-    })
-
-    it('should update face detailer setting', () => {
-      updateFaceDetailer(true)
-
-      const storeData = get(promptsData)
-      expect(storeData.useFaceDetailer).toBe(true)
     })
 
     it('should update selected loras', () => {

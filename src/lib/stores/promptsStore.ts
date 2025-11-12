@@ -11,8 +11,6 @@ const defaultPromptsData: PromptsData = {
   customTags: {},
   selectedCheckpoint: '',
   selectedComposition: 'left-horizontal',
-  useUpscale: false,
-  useFaceDetailer: false,
   selectedRefineMode: 1, // RefineMode.none
   selectedFaceDetailerMode: 1, // FaceDetailerMode.none
   selectedLoras: []
@@ -107,14 +105,6 @@ export function updateCheckpoint(checkpoint: string) {
 
 export function updateComposition(composition: string) {
   promptsData.update((data) => ({ ...data, selectedComposition: composition }))
-}
-
-export function updateUpscale(enabled: boolean) {
-  promptsData.update((data) => ({ ...data, useUpscale: enabled }))
-}
-
-export function updateFaceDetailer(enabled: boolean) {
-  promptsData.update((data) => ({ ...data, useFaceDetailer: enabled }))
 }
 
 export function updateSelectedLoras(loras: { name: string; weight: number }[]) {
