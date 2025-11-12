@@ -29,7 +29,8 @@ export async function POST({ request }) {
       selectedComposition: data.selectedComposition || 'left-horizontal',
       selectedRefineMode: data.selectedRefineMode ?? 1,
       selectedFaceDetailerMode: data.selectedFaceDetailerMode ?? 1,
-      selectedLoras: data.selectedLoras
+      selectedLoras: data.selectedLoras,
+      useFilmGrain: data.useFilmGrain ?? false
     }
 
     await fs.writeFile(filePath, JSON.stringify(cleanedData, null, 2))
@@ -55,7 +56,8 @@ export async function GET() {
         selectedComposition: 'left-horizontal',
         selectedRefineMode: 1,
         selectedFaceDetailerMode: 1,
-        selectedLoras: []
+        selectedLoras: [],
+        useFilmGrain: false
       }
       return json(defaultPrompts)
     }

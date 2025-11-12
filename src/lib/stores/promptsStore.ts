@@ -11,7 +11,8 @@ const defaultPromptsData: PromptsData = {
   selectedComposition: 'left-horizontal',
   selectedRefineMode: 1, // RefineMode.none
   selectedFaceDetailerMode: 1, // FaceDetailerMode.none
-  selectedLoras: []
+  selectedLoras: [],
+  useFilmGrain: false
 }
 
 // Create reactive store
@@ -33,7 +34,8 @@ export async function initializePromptsStore() {
       },
       selectedComposition: savedPrompts.selectedComposition || 'left-horizontal',
       selectedRefineMode: savedPrompts.selectedRefineMode ?? 1, // RefineMode.none
-      selectedFaceDetailerMode: savedPrompts.selectedFaceDetailerMode ?? 1 // FaceDetailerMode.none
+      selectedFaceDetailerMode: savedPrompts.selectedFaceDetailerMode ?? 1, // FaceDetailerMode.none
+      useFilmGrain: savedPrompts.useFilmGrain ?? false
     }
     promptsData.set(migratedData)
   } else {
@@ -89,6 +91,10 @@ export function updateTags(
       inpainting: inpaintingTags
     }
   }))
+}
+
+export function updateUseFilmGrain(useFilmGrain: boolean) {
+  promptsData.update((data) => ({ ...data, useFilmGrain }))
 }
 
 

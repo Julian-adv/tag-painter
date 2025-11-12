@@ -7,7 +7,8 @@ import {
   updateCheckpoint,
   updateComposition,
   updateSelectedLoras,
-  updateTags
+  updateTags,
+  updateUseFilmGrain
 } from './promptsStore'
 import type { PromptsData } from '$lib/types'
 
@@ -34,7 +35,8 @@ describe('promptsStore', () => {
       selectedComposition: 'left-horizontal',
       selectedRefineMode: 1,
       selectedFaceDetailerMode: 1,
-      selectedLoras: []
+      selectedLoras: [],
+      useFilmGrain: false
     })
   })
 
@@ -68,7 +70,7 @@ describe('promptsStore', () => {
 
     it('should handle missing fields in loaded data', async () => {
       const incompleteData: Partial<PromptsData> = {
-        // Missing tags, selectedComposition
+        // Missing tags, selectedComposition, useFilmGrain
       }
 
       vi.mocked(loadPrompts).mockResolvedValueOnce(incompleteData as PromptsData)
@@ -84,6 +86,7 @@ describe('promptsStore', () => {
         inpainting: []
       })
       expect(storeData.selectedComposition).toBe('left-horizontal')
+      expect(storeData.useFilmGrain).toBe(false)
     })
 
     it('should handle load failure gracefully', async () => {
@@ -111,7 +114,8 @@ describe('promptsStore', () => {
         selectedComposition: 'left-horizontal',
         selectedRefineMode: 1,
         selectedFaceDetailerMode: 1,
-        selectedLoras: [{ name: 'lora1', weight: 1.0 }]
+        selectedLoras: [{ name: 'lora1', weight: 1.0 }],
+        useFilmGrain: false
       }
 
       promptsData.set(testData)
@@ -146,6 +150,18 @@ describe('promptsStore', () => {
 
       const storeData = get(promptsData)
       expect(storeData.selectedLoras).toEqual(loras)
+    })
+
+    it('should update useFilmGrain', () => {
+      updateUseFilmGrain(true)
+
+      const storeData = get(promptsData)
+      expect(storeData.useFilmGrain).toBe(true)
+
+      updateUseFilmGrain(false)
+
+      const storeData2 = get(promptsData)
+      expect(storeData2.useFilmGrain).toBe(false)
     })
   })
 

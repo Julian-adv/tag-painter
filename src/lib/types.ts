@@ -136,6 +136,7 @@ export interface PromptsData {
   selectedRefineMode: RefineMode
   selectedFaceDetailerMode: FaceDetailerMode
   selectedLoras: { name: string; weight: number }[]
+  useFilmGrain: boolean
 }
 
 export interface ProgressData {

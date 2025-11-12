@@ -34,7 +34,8 @@
     promptsData,
     initializePromptsStore,
     savePromptsData,
-    updateComposition
+    updateComposition,
+    updateUseFilmGrain
   } from '$lib/stores/promptsStore'
   import { detectPlatform } from '$lib/utils/loraPath'
   import { Bolt, ArrowPath } from 'svelte-heros-v2'
@@ -304,6 +305,12 @@
     // Initialize prompts store
     await initializePromptsStore()
 
+    // Load post-processing settings from store
+    const currentPromptsData = get(promptsData)
+    selectedRefineMode = currentPromptsData.selectedRefineMode
+    selectedFaceDetailerMode = currentPromptsData.selectedFaceDetailerMode
+    useFilmGrain = currentPromptsData.useFilmGrain
+
     // Load settings
     const savedSettings = await loadSettings()
     if (savedSettings) {
@@ -349,6 +356,19 @@
     } else if (wasQwenModel) {
       wasQwenModel = false
     }
+  })
+
+  // Sync post-processing settings to store when they change
+  $effect(() => {
+    updateUseFilmGrain(useFilmGrain)
+  })
+
+  $effect(() => {
+    promptsData.update((data) => ({ ...data, selectedRefineMode }))
+  })
+
+  $effect(() => {
+    promptsData.update((data) => ({ ...data, selectedFaceDetailerMode }))
   })
 
   // Event handlers
