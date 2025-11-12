@@ -1,11 +1,11 @@
 import type {
   Settings,
-  RefineMode,
   FaceDetailerMode,
   ModelSettings,
   ComfyUIWorkflow,
   ModelType
 } from '$lib/types'
+import { RefineMode } from '$lib/types'
 import { loadCustomWorkflow, setRequiredNodeInput, findNodeByTitle } from './workflowMapping'
 import { FINAL_SAVE_NODE_ID } from './workflow'
 
@@ -26,7 +26,9 @@ export async function buildWorkflow(
   refineMode: RefineMode,
   faceDetailerMode: FaceDetailerMode,
   useFilmgrain: boolean,
-  modelSettings: ModelSettings
+  modelSettings: ModelSettings,
+  maskImagePath: string | null,
+  seed: number
 ): Promise<ComfyUIWorkflow> {
   // Load the universal workflow
   const workflow = await loadCustomWorkflow('universal.api.workflow.json')
@@ -52,6 +54,12 @@ export async function buildWorkflow(
   // Set FaceDetailer mode
   setRequiredNodeInput(workflow, 'FaceDetailer mode', 'value', faceDetailerMode)
 
+  if (refineMode === RefineMode.refine) {
+    setRequiredNodeInput(workflow, 'BasicScheduler (refine)', 'scheduler', settings.scheduler)
+  } else if (refineMode === RefineMode.refine_sdxl) {
+    setRequiredNodeInput(workflow, 'BasicScheduler (refine sdxl)', 'scheduler', settings.scheduler)
+  }
+
   // Set film grain mode
   setRequiredNodeInput(workflow, 'Film grain mode', 'value', useFilmgrain)
 
@@ -60,8 +68,19 @@ export async function buildWorkflow(
   setRequiredNodeInput(workflow, 'Negative prompt', 'value', negativeText)
   setRequiredNodeInput(workflow, 'KSamplerSelect (base)', 'sampler_name', settings.sampler)
 
+  setRequiredNodeInput(workflow, 'Detailer (SEGS)', 'seed', seed)
+  setRequiredNodeInput(workflow, 'Detailer (SEGS) (sdxl)', 'seed', seed)
+  setRequiredNodeInput(workflow, 'RandomNoise', 'noise_seed', seed)
+
   setRequiredNodeInput(workflow, 'Empty Latent Image', 'width', settings.imageWidth)
   setRequiredNodeInput(workflow, 'Empty Latent Image', 'height', settings.imageHeight)
+  if (refineMode !== RefineMode.none) {
+    const upscaleScale = modelSettings.upscale.scale
+    const upscaleWidth = Math.round(settings.imageWidth * upscaleScale)
+    const upscaleHeight = Math.round(settings.imageHeight * upscaleScale)
+    setRequiredNodeInput(workflow, 'Upscale Image', 'width', upscaleWidth)
+    setRequiredNodeInput(workflow, 'Upscale Image', 'height', upscaleHeight)
+  }
 
   // Handle embedded VAE for SDXL models
   if (modelSettings.modelType === 'sdxl') {
@@ -73,8 +92,15 @@ export async function buildWorkflow(
       workflow,
       'CLIP Set Last Layer',
       'stop_at_clip_layer',
-      modelSettings.clipSkip
+      -modelSettings.clipSkip
     )
+
+    if (!useEmbeddedVae && modelSettings.selectedVae) {
+      setRequiredNodeInput(workflow, 'Load VAE (sdxl)', 'vae_name', modelSettings.selectedVae)
+    }
+    if (maskImagePath) {
+      setRequiredNodeInput(workflow, 'Load Image', 'image', maskImagePath)
+    }
   }
 
   // Handle LoRA settings for qwen_nunchaku
@@ -110,5 +136,12 @@ export async function buildWorkflow(
     class_type: 'SaveImageWebsocket',
     _meta: { title: 'Final Save Image Websocket' }
   }
+
+  for (const [nodeId, node] of Object.entries(workflow)) {
+    if (node._meta?.title === 'Preview Image') {
+      delete workflow[nodeId]
+    }
+  }
+
   return workflow
 }

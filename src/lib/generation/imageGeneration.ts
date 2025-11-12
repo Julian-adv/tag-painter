@@ -2,7 +2,13 @@
 //
 // This module provides shared types and image generation for all models
 
-import type { PromptsData, Settings, ProgressData, ComfyUIWorkflow, ModelSettings } from '$lib/types'
+import type {
+  PromptsData,
+  Settings,
+  ProgressData,
+  ComfyUIWorkflow,
+  ModelSettings
+} from '$lib/types'
 import { RefineMode, FaceDetailerMode } from '$lib/types'
 import { findNodeByTitle } from './workflowMapping'
 import { buildWorkflow } from './universalWorkflowBuilder'
@@ -100,6 +106,7 @@ export async function generateImage(
     promptsData,
     settings,
     seed,
+    maskFilePath,
     previousRandomTagResolutions,
     onLoadingChange,
     onProgressUpdate,
@@ -249,7 +256,9 @@ export async function generateImage(
       refineMode,
       faceDetailerMode,
       useFilmgrain,
-      modelSettings!
+      modelSettings!,
+      maskFilePath,
+      appliedSeed
     )
 
     console.log('workflow (qwen)', workflow)

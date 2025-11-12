@@ -26,7 +26,9 @@ export async function buildWorkflowForPrompts(
   checkpoint: string,
   refineMode: RefineMode,
   faceDetailerMode: FaceDetailerMode,
-  useFilmGrain: boolean
+  useFilmGrain: boolean,
+  composition: string = 'left-horizontal',
+  maskImagePath: string | null = null
 ): Promise<ComfyUIWorkflow> {
   const rawPositiveText = positive.trim()
   const rawNegativeText = negative.trim()
@@ -51,7 +53,10 @@ export async function buildWorkflowForPrompts(
     refineMode,
     faceDetailerMode,
     useFilmGrain,
-    modelSettings
+    modelSettings,
+    composition,
+    maskImagePath,
+    settings.seed
   )
 }
 
@@ -69,6 +74,8 @@ export async function submitWorkflowForPrompts(
   refineMode: RefineMode,
   faceDetailerMode: FaceDetailerMode,
   useFilmGrain: boolean,
+  composition?: string,
+  maskImagePath?: string | null,
   clientId?: string
 ): Promise<SubmitWorkflowForPromptsResult> {
   const workflow = await buildWorkflowForPrompts(
@@ -78,7 +85,9 @@ export async function submitWorkflowForPrompts(
     checkpoint,
     refineMode,
     faceDetailerMode,
-    useFilmGrain
+    useFilmGrain,
+    composition,
+    maskImagePath ?? null
   )
   console.log('Submitting workflow:', workflow)
   const resolvedClientId = clientId ?? generateClientId()
