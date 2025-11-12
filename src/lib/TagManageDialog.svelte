@@ -1,7 +1,6 @@
 <!-- Dialog component for managing tags with input and display -->
 <script lang="ts">
   import TagDisplay from './TagDisplay.svelte'
-  import { saveCustomTag } from './stores/promptsStore'
   import type { CustomTag } from './types'
 
   interface Props {
@@ -40,9 +39,6 @@
     if (newTagInput.trim()) {
       const customTagName = newTagInput.trim()
       const currentDialogTagNames = dialogTags.map((tag) => tag.name) // Convert to string array
-
-      // Save the custom tag
-      await saveCustomTag(customTagName, currentDialogTagNames)
 
       // Pass the custom tag name and original tags to parent for processing
       onSave(customTagName, currentDialogTagNames)

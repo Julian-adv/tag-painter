@@ -2,8 +2,6 @@
  * Shared tag styling utilities for consistent visual appearance across components
  */
 
-import { get } from 'svelte/store'
-import { promptsData } from '../stores/promptsStore'
 import type { CustomTag, TagType } from '../types'
 
 export interface TagStyleOptions {
@@ -27,9 +25,8 @@ function getTagType(tag: string | CustomTag): TagType {
     return tag.type
   }
 
-  const currentData = get(promptsData)
-  const customTag = currentData.customTags[tag]
-  return customTag?.type ?? 'regular'
+  // Default to 'regular' for string tags
+  return 'regular'
 }
 
 /**

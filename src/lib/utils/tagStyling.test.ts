@@ -1,27 +1,6 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { getTagClasses, getTagRemoveButtonClasses, baseTagClasses } from './tagStyling'
 import type { CustomTag } from '../types'
-
-// Mock the svelte store
-const mockPromptsData = {
-  customTags: {
-    'hair-color': { name: 'hair-color', type: 'random', tags: ['blonde', 'brown'] },
-    'eye-color': { name: 'eye-color', type: 'consistent-random', tags: ['blue', 'green'] },
-    character: { name: 'character', type: 'sequential', tags: ['1girl', 'solo'] }
-  }
-}
-
-vi.mock('../stores/promptsStore', () => ({
-  promptsData: {
-    subscribe: vi.fn(),
-    set: vi.fn(),
-    update: vi.fn()
-  }
-}))
-
-vi.mock('svelte/store', () => ({
-  get: vi.fn(() => mockPromptsData)
-}))
 
 describe('tagStyling utilities', () => {
   describe('getTagClasses', () => {
@@ -40,35 +19,60 @@ describe('tagStyling utilities', () => {
     })
 
     it('should apply random tag styling', () => {
-      const result = getTagClasses({ tag: 'hair-color' })
+      const customTag: CustomTag = {
+        name: 'hair-color',
+        type: 'random',
+        tags: ['blonde', 'brown']
+      }
+      const result = getTagClasses({ tag: customTag })
 
       expect(result).toContain('bg-purple-100 text-purple-800')
       expect(result).toContain('border-1 border-dashed border-purple-400')
     })
 
     it('should apply selected random tag styling', () => {
-      const result = getTagClasses({ tag: 'hair-color', selected: true })
+      const customTag: CustomTag = {
+        name: 'hair-color',
+        type: 'random',
+        tags: ['blonde', 'brown']
+      }
+      const result = getTagClasses({ tag: customTag, selected: true })
 
       expect(result).toContain('bg-purple-200 text-purple-900')
       expect(result).toContain('border-2 border-solid border-purple-500')
     })
 
     it('should apply consistent-random tag styling', () => {
-      const result = getTagClasses({ tag: 'eye-color' })
+      const customTag: CustomTag = {
+        name: 'eye-color',
+        type: 'consistent-random',
+        tags: ['blue', 'green']
+      }
+      const result = getTagClasses({ tag: customTag })
 
       expect(result).toContain('bg-orange-100 text-orange-800')
       expect(result).toContain('border-1 border-dashed border-orange-400')
     })
 
     it('should apply selected consistent-random tag styling', () => {
-      const result = getTagClasses({ tag: 'eye-color', selected: true })
+      const customTag: CustomTag = {
+        name: 'eye-color',
+        type: 'consistent-random',
+        tags: ['blue', 'green']
+      }
+      const result = getTagClasses({ tag: customTag, selected: true })
 
       expect(result).toContain('bg-orange-200 text-orange-900')
       expect(result).toContain('border-2 border-solid border-orange-500')
     })
 
     it('should apply sequential tag styling', () => {
-      const result = getTagClasses({ tag: 'character' })
+      const customTag: CustomTag = {
+        name: 'character',
+        type: 'sequential',
+        tags: ['1girl', 'solo']
+      }
+      const result = getTagClasses({ tag: customTag })
 
       expect(result).toContain('bg-purple-100 text-purple-800')
       expect(result).toContain('border-1 border-dashed border-purple-400')
@@ -117,19 +121,34 @@ describe('tagStyling utilities', () => {
     })
 
     it('should return purple classes for random tags', () => {
-      const result = getTagRemoveButtonClasses('hair-color')
+      const customTag: CustomTag = {
+        name: 'hair-color',
+        type: 'random',
+        tags: ['blonde', 'brown']
+      }
+      const result = getTagRemoveButtonClasses(customTag)
 
       expect(result).toContain('text-purple-600 hover:text-purple-800 hover:bg-purple-200')
     })
 
     it('should return orange classes for consistent-random tags', () => {
-      const result = getTagRemoveButtonClasses('eye-color')
+      const customTag: CustomTag = {
+        name: 'eye-color',
+        type: 'consistent-random',
+        tags: ['blue', 'green']
+      }
+      const result = getTagRemoveButtonClasses(customTag)
 
       expect(result).toContain('text-orange-600 hover:text-orange-800 hover:bg-orange-200')
     })
 
     it('should return purple classes for sequential tags', () => {
-      const result = getTagRemoveButtonClasses('character')
+      const customTag: CustomTag = {
+        name: 'character',
+        type: 'sequential',
+        tags: ['1girl', 'solo']
+      }
+      const result = getTagRemoveButtonClasses(customTag)
 
       expect(result).toContain('text-purple-600 hover:text-purple-800 hover:bg-purple-200')
     })

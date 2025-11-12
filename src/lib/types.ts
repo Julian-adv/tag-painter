@@ -132,7 +132,6 @@ export interface PromptsData {
     negative: string[]
     inpainting: string[]
   }
-  customTags: Record<string, CustomTag>
   selectedCheckpoint: string
   selectedComposition: string
   selectedRefineMode: RefineMode

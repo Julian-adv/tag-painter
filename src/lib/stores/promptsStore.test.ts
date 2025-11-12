@@ -13,7 +13,6 @@ import {
   updateComposition,
   updateSelectedLoras,
   updateTags,
-  saveCustomTag,
   reorderCategories,
   getSourceCategory,
   getEffectiveOptions,
@@ -41,7 +40,6 @@ describe('promptsStore', () => {
     promptsData.set({
       categories: [],
       tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] },
-      customTags: {},
       selectedCheckpoint: '',
       selectedComposition: 'left-horizontal',
       selectedRefineMode: 1,
@@ -68,14 +66,7 @@ describe('promptsStore', () => {
           inpainting: ['inpaint1']
         },
         selectedCheckpoint: 'test-model.ckpt',
-        selectedComposition: 'center',
-        customTags: {
-          custom1: {
-            name: 'custom1',
-            tags: ['option1', 'option2'],
-            type: 'sequential'
-          }
-        }
+        selectedComposition: 'center'
       }
 
       vi.mocked(loadPrompts).mockResolvedValueOnce(mockLoadedData as PromptsData)
@@ -88,19 +79,13 @@ describe('promptsStore', () => {
       expect(storeData.selectedCheckpoint).toBe('test-model.ckpt')
       expect(storeData.selectedComposition).toBe('center')
 
-      expect(storeData.customTags.custom1).toEqual({
-        name: 'custom1',
-        tags: ['option1', 'option2'],
-        type: 'sequential'
-      })
-
       // Tags are updated through internal mechanisms
     })
 
     it('should handle missing fields in loaded data', async () => {
       const incompleteData: Partial<PromptsData> = {
         categories: []
-        // Missing tags, customTags, selectedComposition
+        // Missing tags, selectedComposition
       }
 
       vi.mocked(loadPrompts).mockResolvedValueOnce(incompleteData as PromptsData)
@@ -115,7 +100,6 @@ describe('promptsStore', () => {
         negative: [],
         inpainting: []
       })
-      expect(storeData.customTags).toEqual({})
       expect(storeData.selectedComposition).toBe('left-horizontal')
     })
 
@@ -144,7 +128,6 @@ describe('promptsStore', () => {
           { id: 'test', name: 'Test', values: [], currentValue: { title: '', value: '' } }
         ],
         tags: { all: ['tag1'], zone1: [], zone2: [], negative: [], inpainting: [] },
-        customTags: {},
         selectedCheckpoint: 'test.ckpt',
         selectedComposition: 'left-horizontal',
         selectedRefineMode: 1,
@@ -280,20 +263,6 @@ describe('promptsStore', () => {
         negative: ['neg1'],
         inpainting: ['inpaint1']
       })
-    })
-
-    it('should save custom tag', async () => {
-      await saveCustomTag('testTag', ['option1', 'option2'], 'random')
-
-      const storeData = get(promptsData)
-      expect(storeData.customTags.testTag).toEqual({
-        name: 'testTag',
-        tags: ['option1', 'option2'],
-        type: 'random'
-      })
-
-      expect(savePrompts).toHaveBeenCalled()
-      // Tags are updated through internal mechanisms
     })
   })
 

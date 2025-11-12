@@ -1,6 +1,6 @@
 // Central store for prompts data using Svelte stores
 import { writable } from 'svelte/store'
-import type { PromptsData, PromptCategory, OptionItem, TagType } from '$lib/types'
+import type { PromptsData, PromptCategory, OptionItem } from '$lib/types'
 import { savePrompts, loadPrompts } from '../utils/fileIO'
 import { updateCombinedTags } from './tagsStore'
 
@@ -8,7 +8,6 @@ import { updateCombinedTags } from './tagsStore'
 const defaultPromptsData: PromptsData = {
   categories: [],
   tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] },
-  customTags: {},
   selectedCheckpoint: '',
   selectedComposition: 'left-horizontal',
   selectedRefineMode: 1, // RefineMode.none
@@ -33,7 +32,6 @@ export async function initializePromptsStore() {
         negative: savedPrompts.tags?.negative || [],
         inpainting: savedPrompts.tags?.inpainting || []
       },
-      customTags: savedPrompts.customTags || {},
       selectedComposition: savedPrompts.selectedComposition || 'left-horizontal',
       selectedRefineMode: savedPrompts.selectedRefineMode ?? 1, // RefineMode.none
       selectedFaceDetailerMode: savedPrompts.selectedFaceDetailerMode ?? 1 // FaceDetailerMode.none
@@ -136,27 +134,6 @@ export function updateTags(
   }))
 }
 
-export async function saveCustomTag(name: string, tags: string[], type: TagType = 'sequential') {
-  let updatedData: PromptsData
-
-  promptsData.update((data) => {
-    updatedData = {
-      ...data,
-      customTags: {
-        ...data.customTags,
-        [name]: {
-          name,
-          tags: [...tags],
-          type
-        }
-      }
-    }
-    return updatedData
-  })
-
-  // Save to API immediately
-  await savePrompts(updatedData!)
-}
 
 export function reorderCategories(fromIndex: number, toIndex: number) {
   promptsData.update((data) => {
