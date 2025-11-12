@@ -3,7 +3,7 @@
 import { json } from '@sveltejs/kit'
 import fs from 'fs/promises'
 import path from 'path'
-import type { PromptsData, PromptCategory } from '$lib/types'
+import type { PromptsData } from '$lib/types'
 
 const dataDir = path.resolve(process.cwd(), 'data')
 const filePath = path.join(dataDir, 'prompts.json')
@@ -17,31 +17,13 @@ async function ensureDir() {
   }
 }
 
-// Clean category data to remove unnecessary fields
-function cleanCategoryData(category: PromptCategory): PromptCategory {
-  const cleaned: PromptCategory = {
-    id: category.id,
-    name: category.name,
-    values: category.aliasOf ? [] : category.values, // Empty array if it's an alias
-    currentValue: category.currentValue
-  }
-
-  // Include aliasOf if it exists
-  if (category.aliasOf) {
-    cleaned.aliasOf = category.aliasOf
-  }
-
-  return cleaned
-}
-
 export async function POST({ request }) {
   await ensureDir()
   const data: PromptsData = await request.json()
 
   try {
-    // Clean the data to remove unnecessary fields like placeholder, rows, etc.
+    // Clean the data to remove unnecessary fields
     const cleanedData: PromptsData = {
-      categories: data.categories.map(cleanCategoryData),
       tags: data.tags || { all: [], zone1: [], zone2: [], negative: [] },
       selectedCheckpoint: data.selectedCheckpoint,
       selectedComposition: data.selectedComposition || 'left-horizontal',
@@ -58,47 +40,6 @@ export async function POST({ request }) {
   }
 }
 
-function createDefaultCategories(): PromptCategory[] {
-  return [
-    {
-      id: 'quality',
-      name: 'Quality',
-      values: [],
-      currentValue: { title: '', value: '' }
-    },
-    {
-      id: 'character',
-      name: 'Character',
-      values: [],
-      currentValue: { title: '', value: '' }
-    },
-    {
-      id: 'outfit',
-      name: 'Outfit',
-      values: [],
-      currentValue: { title: '', value: '' }
-    },
-    {
-      id: 'pose',
-      name: 'Pose',
-      values: [],
-      currentValue: { title: '', value: '' }
-    },
-    {
-      id: 'backgrounds',
-      name: 'Backgrounds',
-      values: [],
-      currentValue: { title: '', value: '' }
-    },
-    {
-      id: 'negative',
-      name: 'Negative',
-      values: [],
-      currentValue: { title: '', value: '' }
-    }
-  ]
-}
-
 export async function GET() {
   await ensureDir()
   try {
@@ -109,7 +50,6 @@ export async function GET() {
     // If the file doesn't exist, return a default structure
     if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
       const defaultPrompts: PromptsData = {
-        categories: createDefaultCategories(),
         tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] },
         selectedCheckpoint: '',
         selectedComposition: 'left-horizontal',

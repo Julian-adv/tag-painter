@@ -124,7 +124,6 @@ export interface CustomTag {
 }
 
 export interface PromptsData {
-  categories: PromptCategory[]
   tags: {
     all: string[]
     zone1: string[]

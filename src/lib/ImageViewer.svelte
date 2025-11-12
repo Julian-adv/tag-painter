@@ -194,54 +194,6 @@
       }
     }
   })
-
-  async function loadImageMetadata(filePath: string) {
-    try {
-      const metadata = (await getImageMetadata(filePath)) as { parameters?: string }
-
-      if (metadata && metadata.parameters) {
-        // Parse metadata to extract categorized prompts
-        const params = metadata.parameters as string
-
-        // Helper function to extract category value from metadata
-        function extractCategoryValue(params: string, categoryName: string): string | undefined {
-          const pattern = new RegExp(`${categoryName}: ([^\n]*)`, 'i')
-          return params.match(pattern)?.[1]?.trim()
-        }
-
-        // Helper function to find matching option and create proper OptionItem
-        function findOrCreateOption(matchedValue: string, optionsArray: OptionItem[]): OptionItem {
-          const existingOption = optionsArray.find((item) => item.value === matchedValue)
-          if (existingOption) {
-            return { title: existingOption.title, value: existingOption.value }
-          }
-          // If not found, create with value as title
-          return { title: matchedValue, value: matchedValue }
-        }
-
-        // Update prompts data based on image metadata
-        promptsData.update((data) => {
-          const updatedCategories = data.categories.map((category) => {
-            // Use category name (capitalized) to extract value from metadata
-            const categoryName = category.name.charAt(0).toUpperCase() + category.name.slice(1)
-            const matchedValue = extractCategoryValue(params, categoryName)
-
-            if (matchedValue) {
-              return {
-                ...category,
-                currentValue: findOrCreateOption(matchedValue, category.values)
-              }
-            }
-            return category
-          })
-
-          return { ...data, categories: updatedCategories }
-        })
-      }
-    } catch (error) {
-      console.error('Failed to load image metadata:', error)
-    }
-  }
 </script>
 
 <div class="mx-auto flex w-full flex-col items-center gap-4">
@@ -256,7 +208,7 @@
   >
     {#if isDragging}
       <div
-        class="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-lg border-4 border-dashed border-blue-500 bg-blue-50 bg-opacity-90"
+        class="bg-opacity-90 pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-lg border-4 border-dashed border-blue-500 bg-blue-50"
       >
         <p class="text-2xl font-semibold text-blue-600">Drop image here</p>
       </div>

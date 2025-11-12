@@ -27,7 +27,7 @@ describe('fileIO utilities', () => {
   describe('savePrompts', () => {
     it('should save prompts successfully', async () => {
       const mockData: Partial<PromptsData> = {
-        categories: []
+        tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] }
       }
 
       mockFetch.mockResolvedValueOnce({
@@ -47,7 +47,7 @@ describe('fileIO utilities', () => {
 
     it('should handle save prompts error gracefully', async () => {
       const mockData: Partial<PromptsData> = {
-        categories: []
+        tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] }
       }
 
       mockFetch.mockRejectedValueOnce(new Error('Network error'))
@@ -60,9 +60,8 @@ describe('fileIO utilities', () => {
   describe('loadPrompts', () => {
     it('should load prompts successfully', async () => {
       const mockData: Partial<PromptsData> = {
-        categories: [
-          { id: 'test', name: 'test', values: [], currentValue: { title: '', value: '' } }
-        ]
+        tags: { all: ['tag1'], zone1: [], zone2: [], negative: [], inpainting: [] },
+        selectedCheckpoint: 'test.ckpt'
       }
 
       mockFetch.mockResolvedValueOnce({

@@ -34,7 +34,6 @@
     promptsData,
     initializePromptsStore,
     savePromptsData,
-    autoSaveCurrentValues,
     updateComposition
   } from '$lib/stores/promptsStore'
   import { detectPlatform } from '$lib/utils/loraPath'
@@ -369,9 +368,6 @@
       return
     }
 
-    // Add current values to options if they're not already there
-    autoSaveCurrentValues()
-
     // Save tag zones immediately before generating
     if (tagZonesRef) {
       await tagZonesRef.saveTags()
@@ -466,9 +462,6 @@
 
   async function handleInpaintGeneration(denoiseStrength: number) {
     toastsRef?.clear()
-
-    // Add current values to options if they're not already there
-    autoSaveCurrentValues()
 
     // Save tag zones immediately before generating
     if (tagZonesRef) {
