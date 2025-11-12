@@ -58,7 +58,7 @@ export function applyQwenLoraChain(
   }
 }
 
-export async function generateQwenImage(
+export async function generateImage(
   options: GenerationOptions,
   modelSettings: ModelSettings | null,
   refineMode: RefineMode,
