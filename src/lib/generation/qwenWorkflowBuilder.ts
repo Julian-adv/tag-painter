@@ -12,7 +12,7 @@ import {
   setRequiredNodeInput,
   setRequiredNodeText
 } from './workflowMapping'
-import { applyQwenLoraChain } from './qwenImageGeneration'
+import { applyQwenLoraChain } from './imageGeneration'
 import { applyPerModelOverrides, getEffectiveLoras } from './generationCommon'
 import { getDefaultWorkflowForModelType } from './workflowBuilder'
 import { FINAL_SAVE_NODE_ID } from './workflow'

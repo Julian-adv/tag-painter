@@ -121,8 +121,7 @@ Located in `src/lib/utils/`:
 
 #### Generation Utilities (`src/lib/generation/`)
 
-- **imageGeneration.ts**: Main generation entry point and router
-- **qwenImageGeneration.ts**: Qwen-specific image generation logic with specialized workflow handling
+- **imageGeneration.ts**: Main generation entry point and router with Qwen-specific workflow handling
 - **generationCommon.ts**: Shared utilities for both SD and Qwen generation paths (UUID generation, model settings resolution)
 - **comfyui.ts**: WebSocket communication and API interaction utilities
 - **comfyErrorParser.ts**: ComfyUI error parsing and handling
