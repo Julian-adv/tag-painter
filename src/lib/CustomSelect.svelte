@@ -101,7 +101,7 @@
 {#if isOpen}
   <div
     bind:this={dropdownElement}
-    class="select-dropdown {className}"
+    class="select-dropdown {className} {hasTextSizeClass ? '' : 'default-font-size'}"
     style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px; min-width: {dropdownPosition.width}px;"
   >
     {#each options as option (option.value)}
@@ -181,6 +181,10 @@
     overflow-x: hidden;
     z-index: 10000;
     width: max-content;
+  }
+
+  .select-dropdown.default-font-size {
+    font-size: 13px;
   }
 
   .select-option {
