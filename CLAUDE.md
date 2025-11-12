@@ -4,7 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Tag Painter is a SvelteKit-based web application that interfaces with ComfyUI for AI image generation. The application allows users to create character art by providing tags across different zones (All, First Zone, Second Zone, Negative Tags) and generates images using a local ComfyUI instance.
+Tag Painter is a SvelteKit-based web application that interfaces with ComfyUI for AI image generation. The application allows users to create character art by providing tags across different zones, with advanced features including:
+
+- **LLM-Assisted Prompt Generation**: Integrated Gemini chat interface for generating prompts via conversation
+- **Character Management**: Full character card support with CHARX-JPEG format for embedding character data
+- **Multi-Model Support**: SDXL, Qwen, Qwen Nunchaku, Chroma, and Flux1 Krea models
+- **Advanced Wildcard System**: YAML-based hierarchical prompt organization with visual tree editor
+- **Automated Installation**: Guided installation wizard for ComfyUI, models, and dependencies
+- **Mask-Based Inpainting**: Interactive canvas drawing for precise image editing
 
 ## Development Commands
 
@@ -38,50 +45,113 @@ npm run test:ui     # Run tests with UI interface
 
 ### Core Components
 
-The application follows a modular component architecture located in `src/lib/`:
+The application follows a modular component architecture with components organized in `src/lib/`:
 
-- **ImageGenerator.svelte**: Main orchestrating component that integrates all child components with grid layout
+#### ImageGenerator Module (`src/lib/ImageGenerator/`)
+
+Main orchestration module for image generation workflow:
+
+- **ImageGenerator.svelte**: Core component integrating all generation features, chat interface, and workflow management
+- **TagZones.svelte**: Container for managing tag input zones with ChipEditor integration
 - **CompositionSelector.svelte**: Interface for selecting image composition layouts with visual previews
-- **TagZones.svelte**: Container component for managing different tag input zones with persistent storage
+- **ModelControls.svelte**: Model selection and configuration controls
+- **PostProcessingControls.svelte**: Post-processing options (refine/face detail modes)
+- **TabNavigation.svelte**: Tab navigation between different sections
+
+#### Chat & Character Components (`src/lib/Chat/`)
+
+LLM integration and character management:
+
+- **ChatInterface.svelte**: Gemini LLM chat interface for prompt generation with character context support
+- **CharacterManagerDialog.svelte**: Character card management with CRUD operations and CHARX-JPEG support
+
+#### Download & Installation (`src/lib/downloads/`)
+
+Guided installation system with step-based wizard:
+
+- **InstallWizardDialog.svelte**: Main wizard container with step controller
+- **EssentialDownloadsStep.svelte**: Essential files download step
+- **ComfyInstallStep.svelte**: ComfyUI installation
+- **CustomNodesInstallStep.svelte**: Custom ComfyUI nodes installation
+- **ModelDownloadsStep.svelte**: Model downloads
+- **NunchakuInstallStep.svelte**: Nunchaku framework installation
+- **DownloadFilesStep.svelte**: Generic file download handler
+- **DownloadGroupStep.svelte**: Group-based download management with progress tracking
+- **StartComfyStep.svelte**: ComfyUI startup
+
+#### Tag Management Components
+
 - **TagInput.svelte**: Individual tag zone input component with quick tag entry and autocomplete
 - **TagDisplay.svelte**: Component for displaying tags as removable boxes with delete functionality
 - **TagItem.svelte**: Individual tag box component with styling and delete functionality
-- **TagManageDialog.svelte**: Dialog for managing tag collections and categories
-- **ImageViewer.svelte**: Handles image display, navigation controls, and integrates mask drawing components
-- **DrawingControls.svelte**: Dedicated component for mask drawing controls with radio-style tool selection
+- **AutoCompleteTextarea.svelte**: Enhanced textarea component with auto-completion from tag database
+- **CategoryManagerDialog.svelte**: Dialog for managing tag categories and options
+
+#### Image Viewing & Drawing
+
+- **ImageViewer.svelte**: Image display, navigation controls, metadata display, and mask drawing integration
+- **DrawingControls.svelte**: Mask drawing tool controls with radio-style tool selection
 - **DrawingCanvas.svelte**: Canvas component for interactive mask drawing with brush and flood fill tools
-- **GenerationControls.svelte**: Contains generation button, progress tracking, and settings dialog
+- **PngInfoPanel.svelte**: Displays PNG metadata from generated images
+
+#### Generation Controls
+
+- **GenerationControls.svelte**: Generation button, progress tracking, and settings access
+- **SettingsDialog.svelte**: Comprehensive modal for configuring generation parameters with per-model overrides
+
+#### Model Selection Components
+
 - **LoraSelector.svelte**: Component for selecting and configuring LoRA models with weight adjustment
 - **LoraItem.svelte**: Individual LoRA item display component
 - **LoraSelectionModal.svelte**: Modal for browsing and selecting LoRA models
-- **SettingsDialog.svelte**: Modal for configuring generation parameters
 - **SamplerSelector.svelte**: Dropdown selector for sampling methods
 - **SchedulerSelector.svelte**: Dropdown selector for scheduler algorithms
-- **CategoryManagerDialog.svelte**: Dialog for managing tag categories and options
-- **AutoCompleteTextarea.svelte**: Enhanced textarea component with auto-completion from tag database
+
+#### UI Utilities
+
 - **ComboBox.svelte**: Filtering and selection component with dropdown
+- **CustomSelect.svelte**: Custom select component
 - **WheelAdjustableInput.svelte**: Numeric input with mouse wheel adjustment support
 - **ActionButton.svelte**: Reusable button component with consistent styling
-- **DownloadsDialog.svelte**: Dialog for managing required downloads when assets are missing
+- **Toasts.svelte**: Toast notification system for messages and errors
 
 ### Utility Modules
 
 Located in `src/lib/utils/`:
 
-- **imageGeneration.ts**: Main image generation logic and ComfyUI workflow management for Stable Diffusion models
+#### Generation Utilities (`src/lib/generation/`)
+
+- **imageGeneration.ts**: Main generation entry point and router
 - **qwenImageGeneration.ts**: Qwen-specific image generation logic with specialized workflow handling
-- **generationCommon.ts**: Shared utilities for both SD and Qwen generation paths
+- **generationCommon.ts**: Shared utilities for both SD and Qwen generation paths (UUID generation, model settings resolution)
 - **comfyui.ts**: WebSocket communication and API interaction utilities
+- **comfyErrorParser.ts**: ComfyUI error parsing and handling
+- **workflowBuilder.ts**: Main workflow submission for prompts
+- **universalWorkflowBuilder.ts**: Universal workflow building
+- **qwenWorkflowBuilder.ts**: Qwen-specific workflow configuration
+- **workflowMapping.ts**: Node mapping and configuration
+- **workflow.ts**: ComfyUI workflow constants and node definitions for Stable Diffusion
+- **qwenNunchakuLora.ts**: Nunchaku LoRA attachment for Qwen models
+
+#### File & Data Operations
+
 - **fileIO.ts**: File system operations for saving/loading prompts and images
-- **workflow.ts**: ComfyUI workflow configuration constants and node definitions for Stable Diffusion
-- **qwenWorkflow.ts**: ComfyUI workflow configuration for Qwen models
+- **pngMetadata.ts**: PNG metadata extraction and embedding using chunk manipulation
+- **loraPath.ts**: LoRA path resolution utilities
+
+#### Tag & Wildcard Processing
+
 - **tagExpansion.ts**: Advanced tag expansion with wildcard support, random selection, and directive processing
 - **wildcards.ts**: Wildcard file handling and path resolution
 - **wildcardZones.ts**: Zone-based wildcard data reading and writing
 - **compositionDetection.ts**: Auto-detection of composition from tags (e.g., composition=all)
-- **date.ts**: Date and time formatting utilities for timestamps
 - **tagStyling.ts**: Tag styling and highlighting utilities
 - **textFormatting.ts**: Text formatting and manipulation utilities
+
+#### General Utilities
+
+- **date.ts**: Date and time formatting utilities for timestamps
+- **random.ts**: Random number generation utilities
 - **stringSimilarity.ts**: String similarity calculation for autocomplete
 - **treeBuilder.ts**: Tree model construction for hierarchical data
 - **treeSearch.ts**: Tree model search and traversal utilities
@@ -129,93 +199,235 @@ Visual tree editor for managing hierarchical wildcard structures:
 
 Located in `src/routes/api/`:
 
-- **`/api/prompts`**: Handles saving and loading tag zone data to/from `data/prompts.json`
-- **`/api/settings`**: Handles saving and loading user settings to/from `data/settings.json`
+#### Image Management
+
 - **`/api/image`**: Serves generated images from the output directory
 - **`/api/image-list`**: Returns list of generated images in the output directory
+
+#### Tag & Prompt Management
+
 - **`/api/tags`**: Provides autocomplete tags for prompt suggestions from Danbooru tag database
-- **`/api/loras`**: Handles LoRA model information and selection from ComfyUI
-- **`/api/mask-path`**: Provides composition mask file paths (handles temp-mask special case)
-- **`/api/mask`**: Handles saving of user-drawn mask data to temporary file
+- **`/api/prompts`**: Handles saving and loading tag zone data to/from `data/prompts.json`
 - **`/api/wildcards`**: Handles reading and writing wildcard YAML files (model-type specific)
 - **`/api/wildcard-file`**: Serves individual wildcard files by name
+
+#### Settings & Configuration
+
+- **`/api/settings`**: Handles saving and loading user settings to/from `data/settings.json`
+
+#### LoRA & Models
+
+- **`/api/loras`**: Handles LoRA model information and selection from ComfyUI
+
+#### Mask & Inpainting
+
+- **`/api/mask`**: Handles saving of user-drawn mask data to temporary file
+- **`/api/mask-path`**: Provides composition mask file paths (handles temp-mask special case)
+
+#### Character Management
+
+- **`/api/characters`**: List all character cards
+- **`/api/characters/create`**: Create new character card
+- **`/api/characters/update`**: Update existing character card
+- **`/api/characters/delete`**: Delete character card
+- **`/api/characters/order`**: Reorder character cards
+
+#### Chat & LLM
+
+- **`/api/chat-history`**: Save and load chat conversation history
+
+#### ComfyUI Integration
+
+- **`/api/comfy/status`**: Check ComfyUI status
+- **`/api/comfy/start`**: Start ComfyUI instance
+- **`/api/comfy/install`**: Install ComfyUI
+- **`/api/comfy/install-nunchaku`**: Install Nunchaku framework
+
+#### Download Management
+
+- **`/api/downloads`**: Stream-based download handler for files/archives/git repos
+- **`/api/downloads-check`**: Check for missing required files
+
+#### Workflow & Utilities
+
+- **`/api/workflow`**: Custom workflow handling
 - **`/api/open-folder`**: Opens output folder in system file explorer (Windows/Linux/Mac)
+- **`/api/platform`**: Platform detection (OS information)
+- **`/api/logs`**: Logging endpoints
 
 ### ComfyUI Integration
 
 The application connects to a local ComfyUI instance at `http://127.0.0.1:8188` and uses:
 
-- REST API for submitting workflows and fetching available checkpoints, VAEs, and LoRAs
-- WebSocket connection for real-time progress updates and image delivery
-- Dynamic workflow configuration based on user settings (upscale, face detailer, checkpoint selection)
-- Automatic node injection for SaveImageWebsocket based on selected options
-- Dual workflow support: Stable Diffusion (with regional prompting) and Qwen models
-- Per-model settings and overrides (checkpoints, VAEs, schedulers, quality/negative prefixes)
-- Inpainting workflow with mask-based image editing
+- **REST API**: Submitting workflows and fetching available checkpoints, VAEs, and LoRAs
+- **WebSocket Connection**: Real-time progress updates and image delivery
+- **Dynamic Workflow Configuration**: Based on user settings (upscale, face detailer, checkpoint selection)
+- **Automatic Node Injection**: SaveImageWebsocket based on selected options
+- **Multi-Model Support**: SDXL, Qwen, Qwen Nunchaku, Chroma, Flux1 Krea workflows
+- **Per-Model Settings**: Checkpoints, VAEs, schedulers, quality/negative prefixes, LoRA configurations
+- **Inpainting Workflow**: Mask-based image editing with adjustable denoise strength
+- **Automated Installation**: Guided installation wizard for ComfyUI, custom nodes, models, and Nunchaku framework
+- **Error Handling**: ComfyUI error parsing with user-friendly messages
 
 ### Data Management
+
+#### Wildcard & Prompt Storage
 
 - **Wildcard Storage**: User wildcards stored in YAML format at `data/wildcards.yaml` (Stable Diffusion) and `data/wildcards_qwen.yaml` (Qwen models)
 - **Zone-based Wildcards**: Wildcards organized by zones (all, zone1, zone2, negative, inpainting) with hierarchical tree structure
 - **Tag Expansion**: Advanced wildcard processing with random selection, pinning, disabling, and nested expansion
+- **Prompts Persistence**: Tag zone data saved to `data/prompts.json` (legacy, now uses wildcards.yaml)
+
+#### Image & Mask Storage
+
 - **Image Storage**: Generated images are saved to `data/output/` with timestamp-based filenames
 - **Mask Storage**: User-drawn masks stored as `static/temp_mask.png` for web accessibility and reuse
-- **Metadata Storage**: PNG images include embedded metadata with expanded prompts and settings for restoration
+- **Metadata Storage**: PNG images include embedded metadata with expanded prompts and settings for restoration using PNG chunk manipulation
+
+#### Character & Chat Data
+
+- **Character Cards**: Character data stored in `data/characters/` with `.character.json` format
+- **CHARX-JPEG Support**: Binary format for embedding character cards in JPEG images with ZIP payload
+- **Chat History**: Conversation history stored in `data/chat-history/` per model
+- **System Prompts**: Model-specific system prompts in `data/system-prompt/`
+
+#### Configuration & Database
+
 - **Tag Database**: Comprehensive tag suggestions from `data/danbooru_tags.txt` (20,000+ tags)
-- **State Management**: Uses Svelte 5's `$state`, stores, and callback patterns to avoid prop mutation warnings
 - **Settings Persistence**: User preferences saved to `data/settings.json` with per-model overrides and validation
-- **Prompts Persistence**: Tag zone data saved to `data/prompts.json` (legacy, now uses wildcards.yaml)
+- **State Management**: Uses Svelte 5's `$state`, stores, and callback patterns to avoid prop mutation warnings
 
 ### UI/UX Features
 
+#### Layout & Navigation
+
 - **Responsive Layout**: Grid layout with tag zones section and image section
-- **Composition Selection**: Visual composition selector with clickable layout previews
-- **Tag Zone Management**: Separate input zones for All tags, First Zone, Second Zone, and Negative Tags
+- **Tab Navigation**: Organized tabs for different sections and features
+- **Image Navigation**: Previous/next buttons with current position indicator (n / total)
+- **Scrollable Sections**: Tag zones with custom thin scrollbars for overflow handling
+
+#### Tag & Prompt Management
+
+- **Tag Zone Management**: Separate input zones for All tags, First Zone, Second Zone, and Negative Tags with ChipEditor
 - **Tag Display**: Tags shown as removable boxes with individual delete functionality
 - **Quick Tag Entry**: Autocomplete-enabled quick input for adding tags to zones
-- **Image Navigation**: Previous/next buttons with current position indicator (n / total)
 - **Enhanced Autocomplete**: Tag suggestions with keyboard navigation, filtering, and fixed positioning to prevent clipping
-- **Progress Tracking**: Real-time progress bar with optimized animation timing
-- **Metadata Restoration**: Clicking through saved images automatically loads their generation tags (toggleable)
-- **Scrollable Sections**: Tag zones with custom thin scrollbars for overflow handling
+- **Visual Tree Editor**: TreeEdit interface for managing hierarchical wildcard structures with drag & drop
+
+#### LLM Chat Integration
+
+- **Chat Interface**: Gemini LLM integration for conversational prompt generation
+- **Character Context**: Select character cards to provide context for prompt generation
+- **Multi-language Support**: English/Chinese prompt generation
+- **Chat History**: Persistent conversation history with resend capability
+
+#### Character Management
+
+- **Character Browser**: Browse and select character cards
+- **Character Editor**: Create, update, and delete character cards
+- **CHARX-JPEG Support**: Import/export character cards embedded in JPEG images
+- **Character Ordering**: Reorder character list
+
+#### Image Generation & Viewing
+
+- **Composition Selection**: Visual composition selector with clickable layout previews
+- **Model Selection**: Choose from SDXL, Qwen, Qwen Nunchaku, Chroma, Flux1 Krea models
 - **LoRA Integration**: Model selector with weight adjustment and visual feedback
-- **Persistent Storage**: Automatic saving of tag zones and settings with instant updates
+- **Progress Tracking**: Real-time progress bar with optimized animation timing
+- **Metadata Display**: View PNG metadata with generation parameters
+- **Metadata Restoration**: Clicking through saved images automatically loads their generation tags (toggleable)
+
+#### Mask Drawing & Inpainting
+
 - **Interactive Mask Drawing**: Canvas-based drawing with brush and flood fill tools, custom cursors, and visual feedback
 - **Modular Drawing Components**: Separated drawing controls and canvas logic for better maintainability
+- **Black Background**: Optimized for inpainting visibility
+
+#### Installation & Downloads
+
+- **Installation Wizard**: Step-by-step guided installation for ComfyUI and dependencies
+- **Progress Tracking**: Real-time download progress with file/archive/git support
+- **Missing Files Detection**: Automatic detection and guided download of required files
+
+#### General UX
+
+- **Toast Notifications**: User-friendly messages and error notifications
+- **Persistent Storage**: Automatic saving of tag zones and settings with instant updates
+- **Keyboard Shortcuts**: Enhanced navigation and editing in tree editor
+- **Mouse Wheel Adjustment**: Numeric inputs with scroll-to-adjust
 
 ### Key Features
 
-- **Advanced Wildcard System** with YAML-based hierarchical tree structure for organizing prompts
-- **TreeEdit Interface** with visual tree editor for managing wildcard hierarchies (arrays, objects, leaves)
-- **Zone-based Organization** with separate wildcard zones (All, Zone1, Zone2, Negative, Inpainting)
-- **Intelligent Tag Expansion** with random selection from arrays, consistent randomization, pinning, disabling directives, and inline options `{a|b|c}`
-- **Composition Auto-detection** automatically selects layout from tags (e.g., `composition=all`, `composition=2h`)
-- **Dual Model Support** with separate workflows for Stable Diffusion and Qwen image models
-- **Visual composition selection** with clickable layout previews for image generation
-- **Real-time progress tracking** during image generation with WebSocket communication
-- **Dynamic checkpoint selection** from ComfyUI with automatic detection
-- **LoRA model integration** with weight adjustment and visual selection interface
-- **Per-model Settings** with checkpoint-specific overrides for samplers, schedulers, VAEs, and prompt prefixes
-- **Optional upscaling and face detailing** with configurable per-model settings
-- **Inpainting Support** with mask drawing, image-to-image workflow, and adjustable denoise strength
-- **Automatic image saving** with embedded PNG metadata including expanded prompts and settings
-- **Comprehensive tag autocomplete** with 20,000+ Danbooru tags and similarity-based filtering
-- **Persistent wildcard storage** with automatic saving and loading of YAML trees
-- **Image navigation** with position tracking and metadata loading control
-- **Custom scrollbars** for improved UI aesthetics
-- **Interactive mask drawing** with brush and flood fill tools, custom cursors, and black background for inpainting
-- **Cross-platform folder opening** for Windows/Linux/Mac output directory access
+#### LLM & Character Integration
+
+- **Gemini LLM Integration**: Conversational prompt generation with Gemini 2.5 Pro
+- **Character Card Support**: Full character.json specification with multi-language support
+- **CHARX-JPEG Format**: Embed character cards in JPEG images with ZIP payload
+- **Character Management**: Create, update, delete, and reorder character cards
+- **Chat History**: Persistent conversation history with context awareness
+
+#### Prompt & Wildcard System
+
+- **Advanced Wildcard System**: YAML-based hierarchical tree structure for organizing prompts
+- **TreeEdit Interface**: Visual tree editor for managing wildcard hierarchies (arrays, objects, leaves)
+- **Zone-based Organization**: Separate wildcard zones (All, Zone1, Zone2, Negative, Inpainting)
+- **Intelligent Tag Expansion**: Random selection from arrays, consistent randomization, pinning, disabling directives, and inline options `{a|b|c}`
+- **Composition Auto-detection**: Automatically selects layout from tags (e.g., `composition=all`, `composition=2h`)
+- **Comprehensive Tag Autocomplete**: 20,000+ Danbooru tags with similarity-based filtering
+
+#### Multi-Model Support
+
+- **5 Model Types**: SDXL, Qwen, Qwen Nunchaku, Chroma, Flux1 Krea with separate workflows
+- **Per-Model Settings**: Checkpoint-specific overrides for samplers, schedulers, VAEs, and prompt prefixes
+- **Dynamic Checkpoint Selection**: Automatic detection from ComfyUI
+- **LoRA Integration**: Model selector with weight adjustment and visual selection interface
+- **Nunchaku Framework**: Specialized support for Qwen Nunchaku LoRA
+
+#### Image Generation & Processing
+
+- **Visual Composition Selection**: Clickable layout previews for image generation
+- **Real-time Progress Tracking**: WebSocket communication for generation progress
+- **Optional Upscaling**: Configurable per-model upscaling with refine modes
+- **Face Detailing**: Face enhancement with per-model settings
+- **Inpainting Support**: Mask drawing, image-to-image workflow, adjustable denoise strength
+- **Automatic Metadata Embedding**: PNG metadata with expanded prompts and settings
+- **Metadata Restoration**: Load generation settings from saved images
+
+#### Installation & Setup
+
+- **Automated Installation Wizard**: Step-by-step guided installation for ComfyUI and dependencies
+- **ComfyUI Auto-Install**: Download and install ComfyUI Portable automatically
+- **Custom Nodes Installation**: Install required ComfyUI nodes
+- **Model Downloads**: Guided download for checkpoints, VAEs, and LoRAs
+- **Nunchaku Installation**: Automated Nunchaku framework setup
+- **Missing Files Detection**: Check and download required files
+
+#### Drawing & Editing
+
+- **Interactive Mask Drawing**: Canvas-based drawing with brush and flood fill tools
+- **Custom Cursors**: Visual feedback for drawing tools
+- **Black Background**: Optimized for inpainting visibility
+- **Modular Architecture**: Separated drawing controls and canvas logic
+
+#### Data & Storage
+
+- **Persistent Wildcard Storage**: Automatic saving and loading of YAML trees
+- **Image Navigation**: Position tracking and metadata loading control
+- **Character Data Storage**: Organized character card files
+- **Chat History Persistence**: Per-model conversation history
+- **Cross-platform Support**: Windows/Linux/Mac folder opening and file handling
 
 ## Component Communication
 
-- Uses `bind:` syntax for clean two-way data binding between components (preferred over callbacks)
-- Parent-child communication through well-defined interfaces with `$bindable()` tags
-- Component instance binding for exposing utility functions (e.g., `refreshFileList`)
-- Event-driven updates for real-time progress and image delivery
-- **Svelte stores integration** for shared state management (tag zones, settings)
-- **Cross-component data flow** through centralized stores and reactive patterns
-- **Tag zone synchronization** between TagZones, TagInput, and TagDisplay components
-- **Modular drawing architecture** with separated DrawingControls and DrawingCanvas components for better maintainability
+- **Two-way Data Binding**: Uses `bind:` syntax for clean component communication (preferred over callbacks)
+- **Parent-Child Interfaces**: Well-defined interfaces with `$bindable()` tags for prop binding
+- **Component Instance Binding**: Exposing utility functions (e.g., `refreshFileList`)
+- **Event-driven Updates**: Real-time progress and image delivery via events
+- **Svelte Stores Integration**: Centralized state management for tag zones, settings, test mode, and mask overlay
+- **Cross-component Data Flow**: Reactive patterns through stores and state sharing
+- **Tag Zone Synchronization**: Between TagZones, TagInput, and TagDisplay components
+- **Modular Architecture**: Separated concerns (e.g., DrawingControls and DrawingCanvas, ImageGenerator module structure)
+- **Step-based Wizard Pattern**: InstallWizard uses StepInterface for modular installation flow
 
 ## Important Notes
 
