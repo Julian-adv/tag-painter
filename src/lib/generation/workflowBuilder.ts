@@ -47,6 +47,8 @@ export async function buildWorkflowForPrompts(
 
   return buildWorkflow(
     positiveText,
+    positiveText,
+    positiveText,
     negativeText,
     settings,
     checkpoint,
@@ -54,7 +56,6 @@ export async function buildWorkflowForPrompts(
     faceDetailerMode,
     useFilmGrain,
     modelSettings,
-    composition,
     maskImagePath,
     settings.seed
   )

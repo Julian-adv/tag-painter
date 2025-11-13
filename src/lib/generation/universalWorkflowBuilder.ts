@@ -19,7 +19,9 @@ const MODEL_TYPE_MAP: Record<ModelType, number> = {
 }
 
 export async function buildWorkflow(
-  positiveText: string,
+  allTagsText: string,
+  zone1TagsText: string,
+  zone2TagsText: string,
   negativeText: string,
   settings: Settings,
   checkpoint: string,
@@ -54,19 +56,63 @@ export async function buildWorkflow(
   // Set FaceDetailer mode
   setRequiredNodeInput(workflow, 'FaceDetailer mode', 'value', faceDetailerMode)
 
+  setRequiredNodeInput(workflow, 'KSamplerSelect (base)', 'sampler_name', modelSettings.sampler)
+  setRequiredNodeInput(workflow, 'BasicScheduler (base)', 'scheduler', modelSettings.scheduler)
+  setRequiredNodeInput(workflow, 'BasicScheduler (base)', 'steps', modelSettings.steps)
+  setRequiredNodeInput(workflow, 'CFGGuider (base)', 'cfg', modelSettings.cfgScale)
   if (refineMode === RefineMode.refine) {
-    setRequiredNodeInput(workflow, 'BasicScheduler (refine)', 'scheduler', settings.scheduler)
+    setRequiredNodeInput(
+      workflow,
+      'KSamplerSelect (refine)',
+      'sampler_name',
+      modelSettings.upscale.sampler
+    )
+    setRequiredNodeInput(
+      workflow,
+      'BasicScheduler (refine)',
+      'scheduler',
+      modelSettings.upscale.scheduler
+    )
+    setRequiredNodeInput(workflow, 'BasicScheduler (refine)', 'steps', modelSettings.upscale.steps)
+    setRequiredNodeInput(workflow, 'CFGGuider (refine)', 'cfg', modelSettings.upscale.cfgScale)
   } else if (refineMode === RefineMode.refine_sdxl) {
-    setRequiredNodeInput(workflow, 'BasicScheduler (refine sdxl)', 'scheduler', settings.scheduler)
+    setRequiredNodeInput(
+      workflow,
+      'KSamplerSelect (refine sdxl)',
+      'sampler_name',
+      modelSettings.upscale.sampler
+    )
+    setRequiredNodeInput(
+      workflow,
+      'BasicScheduler (refine sdxl)',
+      'scheduler',
+      modelSettings.upscale.scheduler
+    )
+    setRequiredNodeInput(
+      workflow,
+      'BasicScheduler (refine sdxl)',
+      'steps',
+      modelSettings.upscale.steps
+    )
+    setRequiredNodeInput(workflow, 'CFGGuider (refine sdxl)', 'cfg', modelSettings.upscale.cfgScale)
   }
 
   // Set film grain mode
   setRequiredNodeInput(workflow, 'Film grain mode', 'value', useFilmgrain)
 
   // Set prompts
-  setRequiredNodeInput(workflow, 'Positive prompt', 'value', positiveText)
+  if (modelSettings.modelType === 'sdxl') {
+    setRequiredNodeInput(workflow, 'Positive prompt', 'value', allTagsText)
+    setRequiredNodeInput(workflow, 'CLIP Text Encode (Left)', 'text', zone1TagsText)
+    setRequiredNodeInput(workflow, 'CLIP Text Encode (Right)', 'text', zone2TagsText)
+  } else {
+    const promptText = [allTagsText, zone1TagsText, zone2TagsText]
+      .filter((text) => text && text.trim().length > 0)
+      .join(' BREAK ')
+
+    setRequiredNodeInput(workflow, 'Positive prompt', 'value', promptText)
+  }
   setRequiredNodeInput(workflow, 'Negative prompt', 'value', negativeText)
-  setRequiredNodeInput(workflow, 'KSamplerSelect (base)', 'sampler_name', settings.sampler)
 
   setRequiredNodeInput(workflow, 'Detailer (SEGS)', 'seed', seed)
   setRequiredNodeInput(workflow, 'Detailer (SEGS) (sdxl)', 'seed', seed)
@@ -124,6 +170,12 @@ export async function buildWorkflow(
     setRequiredNodeInput(workflow, 'Load Qwen VAE', 'vae_name', modelSettings.selectedVae)
   }
 
+  for (const [nodeId, node] of Object.entries(workflow)) {
+    if (node._meta?.title === 'Preview Image') {
+      delete workflow[nodeId]
+    }
+  }
+
   const imageSourceNodeId = findNodeByTitle(
     workflow,
     'ImpactConditionalBranch (film grain)'
@@ -135,12 +187,6 @@ export async function buildWorkflow(
     inputs: { images: [imageSourceNodeId, 0] },
     class_type: 'SaveImageWebsocket',
     _meta: { title: 'Final Save Image Websocket' }
-  }
-
-  for (const [nodeId, node] of Object.entries(workflow)) {
-    if (node._meta?.title === 'Preview Image') {
-      delete workflow[nodeId]
-    }
   }
 
   return workflow
