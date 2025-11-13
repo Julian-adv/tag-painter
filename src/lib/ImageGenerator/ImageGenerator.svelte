@@ -448,7 +448,8 @@
       },
       modelSettings,
       currentPromptsData.selectedRefineMode,
-      currentPromptsData.selectedFaceDetailerMode
+      currentPromptsData.selectedFaceDetailerMode,
+      currentPromptsData.useFilmGrain
     )
 
     // Store the results
@@ -561,7 +562,8 @@
       },
       modelSettings,
       currentPromptsData.selectedRefineMode,
-      currentPromptsData.selectedFaceDetailerMode
+      currentPromptsData.selectedFaceDetailerMode,
+      currentPromptsData.useFilmGrain
     )
 
     // Store the results

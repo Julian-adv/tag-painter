@@ -89,7 +89,8 @@ export async function generateImage(
   options: GenerationOptions,
   modelSettings: ModelSettings | null,
   refineMode: RefineMode,
-  faceDetailerMode: FaceDetailerMode
+  faceDetailerMode: FaceDetailerMode,
+  useFilmgrain: boolean
 ): Promise<{
   error?: string
   seed?: number
@@ -236,20 +237,15 @@ export async function generateImage(
       inpainting: {}
     }
 
-    // Combine all enabled zones for Qwen's single prompt input
-    const combinedPrompt = [allTagsText, zone1TagsText, zone2TagsText]
-      .filter((text) => text && text.trim().length > 0)
-      .join(' BREAK ')
-
     const appliedSeed = seed ?? Math.floor(Math.random() * 1000000000000000)
 
     // Build workflow using universal workflow builder
     const appliedSettings = applyPerModelOverrides(settings, promptsData.selectedCheckpoint)
 
-    const useFilmgrain = false
-
     const workflow = await buildWorkflow(
-      combinedPrompt,
+      allTagsText,
+      zone1TagsText,
+      zone2TagsText,
       negativeTagsText,
       appliedSettings,
       promptsData.selectedCheckpoint,
