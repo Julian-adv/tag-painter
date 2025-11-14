@@ -1,12 +1,17 @@
 import type {
   Settings,
-  FaceDetailerMode,
   ModelSettings,
   ComfyUIWorkflow,
-  ModelType
+  ModelType,
+  LoraWithWeight
 } from '$lib/types'
-import { RefineMode } from '$lib/types'
-import { loadCustomWorkflow, setRequiredNodeInput, findNodeByTitle } from './workflowMapping'
+import { RefineMode, FaceDetailerMode } from '$lib/types'
+import {
+  loadCustomWorkflow,
+  setRequiredNodeInput,
+  findNodeByTitle,
+  findNodesByTitle
+} from './workflowMapping'
 import { FINAL_SAVE_NODE_ID } from './workflow'
 
 // Map ModelType string values to numeric enum values
@@ -95,6 +100,67 @@ export async function buildWorkflow(
       modelSettings.upscale.steps
     )
     setRequiredNodeInput(workflow, 'CFGGuider (refine sdxl)', 'cfg', modelSettings.upscale.cfgScale)
+    setRequiredNodeInput(
+      workflow,
+      'Load VAE (refine)',
+      'vae_name',
+      modelSettings.upscale.selectedVae
+    )
+  }
+
+  if (faceDetailerMode === FaceDetailerMode.face_detail) {
+    setRequiredNodeInput(workflow, 'Detailer (SEGS)', 'steps', modelSettings.faceDetailer.steps)
+    setRequiredNodeInput(workflow, 'Detailer (SEGS)', 'cfg', modelSettings.faceDetailer.cfgScale)
+    setRequiredNodeInput(
+      workflow,
+      'Detailer (SEGS)',
+      'sampler_name',
+      modelSettings.faceDetailer.sampler
+    )
+    setRequiredNodeInput(
+      workflow,
+      'Detailer (SEGS)',
+      'scheduler',
+      modelSettings.faceDetailer.scheduler
+    )
+    setRequiredNodeInput(workflow, 'Detailer (SEGS)', 'denoise', modelSettings.faceDetailer.denoise)
+  } else if (faceDetailerMode === FaceDetailerMode.face_detail_sdxl) {
+    setRequiredNodeInput(
+      workflow,
+      'Load Checkpoint (FaceDetail)',
+      'ckpt_name',
+      modelSettings.faceDetailer.checkpoint
+    )
+    setRequiredNodeInput(
+      workflow,
+      'Detailer (SEGS) (sdxl)',
+      'steps',
+      modelSettings.faceDetailer.steps
+    )
+    setRequiredNodeInput(
+      workflow,
+      'Detailer (SEGS) (sdxl)',
+      'cfg',
+      modelSettings.faceDetailer.cfgScale
+    )
+    setRequiredNodeInput(
+      workflow,
+      'Detailer (SEGS) (sdxl)',
+      'sampler_name',
+      modelSettings.faceDetailer.sampler
+    )
+    setRequiredNodeInput(
+      workflow,
+      'Detailer (SEGS) (sdxl)',
+      'scheduler',
+      modelSettings.faceDetailer.scheduler
+    )
+    setRequiredNodeInput(
+      workflow,
+      'Detailer (SEGS) (sdxl)',
+      'denoise',
+      modelSettings.faceDetailer.denoise
+    )
   }
 
   // Set film grain mode
@@ -149,16 +215,19 @@ export async function buildWorkflow(
     }
   }
 
-  // Handle LoRA settings for qwen_nunchaku
-  if (modelSettings.modelType === 'qwen_nunchaku' && modelSettings.loras.length > 0) {
-    const loraStackNode = 'Nunchaku Qwen Image LoRA Stack'
-    setRequiredNodeInput(workflow, loraStackNode, 'lora_count', modelSettings.loras.length)
+  if (modelSettings.loras.length > 0) {
+    if (modelSettings.modelType === 'qwen') {
+      configureQwenPowerLoraLoader(workflow, modelSettings.loras)
+    } else if (modelSettings.modelType === 'qwen_nunchaku') {
+      const loraStackNode = 'Nunchaku Qwen Image LoRA Stack'
+      setRequiredNodeInput(workflow, loraStackNode, 'lora_count', modelSettings.loras.length)
 
-    modelSettings.loras.forEach((lora, index) => {
-      const loraIndex = index + 1
-      setRequiredNodeInput(workflow, loraStackNode, `lora_name_${loraIndex}`, lora.name)
-      setRequiredNodeInput(workflow, loraStackNode, `lora_strength_${loraIndex}`, lora.weight)
-    })
+      modelSettings.loras.forEach((lora, index) => {
+        const loraIndex = index + 1
+        setRequiredNodeInput(workflow, loraStackNode, `lora_name_${loraIndex}`, lora.name)
+        setRequiredNodeInput(workflow, loraStackNode, `lora_strength_${loraIndex}`, lora.weight)
+      })
+    }
   }
 
   // Handle VAE settings for qwen and qwen_nunchaku models
@@ -168,6 +237,10 @@ export async function buildWorkflow(
     modelSettings.selectedVae !== '__embedded__'
   ) {
     setRequiredNodeInput(workflow, 'Load Qwen VAE', 'vae_name', modelSettings.selectedVae)
+  }
+
+  if (modelSettings.modelType === 'flux1_krea' && modelSettings.selectedVae) {
+    setRequiredNodeInput(workflow, 'Load VAE (flux1)', 'vae_name', modelSettings.selectedVae)
   }
 
   for (const [nodeId, node] of Object.entries(workflow)) {
@@ -190,4 +263,49 @@ export async function buildWorkflow(
   }
 
   return workflow
+}
+
+function configureQwenPowerLoraLoader(workflow: ComfyUIWorkflow, loras: LoraWithWeight[]): void {
+  const powerLoraLoaderNode = findNodeByTitle(workflow, 'Power Lora Loader (rgthree)')
+  if (!powerLoraLoaderNode) {
+    throw new Error('Workflow must contain "Power Lora Loader (rgthree)" node')
+  }
+
+  const { nodeId } = powerLoraLoaderNode
+  const node = workflow[nodeId]
+
+  // Initialize the inputs with the header widget
+  const inputs: Record<
+    string,
+    string | number | boolean | [string, number] | Record<string, unknown>
+  > = {
+    PowerLoraLoaderHeaderWidget: {
+      type: 'PowerLoraLoaderHeaderWidget'
+    }
+  }
+
+  // Add each LoRA to the inputs
+  loras.forEach((lora, index) => {
+    const loraIndex = index + 1
+    inputs[`lora_${loraIndex}`] = {
+      on: true,
+      lora: lora.name,
+      strength: lora.weight
+    }
+  })
+
+  // Add the "➕ Add Lora" field
+  inputs['➕ Add Lora'] = ''
+
+  // Preserve model and clip inputs if they exist
+  if (node.inputs?.model) {
+    inputs.model = node.inputs.model
+  }
+  if (node.inputs?.clip) {
+    inputs.clip = node.inputs.clip
+  }
+
+  // Update the node inputs
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  workflow[nodeId].inputs = inputs as any
 }
