@@ -57,7 +57,8 @@ export async function buildWorkflowForPrompts(
     useFilmGrain,
     modelSettings,
     maskImagePath,
-    settings.seed
+    settings.seed,
+    new Set()
   )
 }
 

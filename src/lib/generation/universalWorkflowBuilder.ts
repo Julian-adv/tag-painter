@@ -35,7 +35,8 @@ export async function buildWorkflow(
   useFilmgrain: boolean,
   modelSettings: ModelSettings,
   maskImagePath: string | null,
-  seed: number
+  seed: number,
+  disabledZones: Set<string>
 ): Promise<ComfyUIWorkflow> {
   // Load the universal workflow
   const workflow = await loadCustomWorkflow('universal.api.workflow.json')
@@ -169,12 +170,17 @@ export async function buildWorkflow(
   // Set prompts
   if (modelSettings.modelType === 'sdxl') {
     setRequiredNodeInput(workflow, 'Positive prompt', 'value', allTagsText)
-    setRequiredNodeInput(workflow, 'CLIP Text Encode (Left)', 'text', zone1TagsText)
-    setRequiredNodeInput(workflow, 'CLIP Text Encode (Right)', 'text', zone2TagsText)
+    const zone1Text = disabledZones.has('zone1') ? '' : zone1TagsText
+    const zone2Text = disabledZones.has('zone2') ? '' : zone2TagsText
+    setRequiredNodeInput(workflow, 'CLIP Text Encode (Left)', 'text', zone1Text)
+    setRequiredNodeInput(workflow, 'CLIP Text Encode (Right)', 'text', zone2Text)
   } else {
-    const promptText = [allTagsText, zone1TagsText, zone2TagsText]
-      .filter((text) => text && text.trim().length > 0)
-      .join(' BREAK ')
+    const promptParts = [
+      allTagsText,
+      disabledZones.has('zone1') ? '' : zone1TagsText,
+      disabledZones.has('zone2') ? '' : zone2TagsText
+    ]
+    const promptText = promptParts.filter((text) => text && text.trim().length > 0).join(' BREAK ')
 
     setRequiredNodeInput(workflow, 'Positive prompt', 'value', promptText)
   }

@@ -143,6 +143,22 @@ export async function generateImage(
 
     // Create shared disabled context to propagate disables across zones
     const sharedDisabledContext = { names: new Set<string>(), patterns: [] as string[] }
+    if (wildcardZones.directives?.disabledZones) {
+      for (const zone of wildcardZones.directives.disabledZones) {
+        if (zone) {
+          sharedDisabledContext.names.add(zone)
+        }
+      }
+    }
+    const hasDisabledZone = (zoneName: string): boolean => {
+      const normalizedZone = zoneName.trim().toLowerCase()
+      for (const name of sharedDisabledContext.names) {
+        if (typeof name === 'string' && name.trim().toLowerCase() === normalizedZone) {
+          return true
+        }
+      }
+      return false
+    }
 
     const allResult = expandCustomTags(
       wildcardZones.all,
@@ -163,7 +179,7 @@ export async function generateImage(
     }
 
     // Check if zone1 is disabled before expanding
-    const zone1Result = sharedDisabledContext.names.has('zone1')
+    const zone1Result = hasDisabledZone('zone1')
       ? { expandedText: '', randomTagResolutions: {} }
       : expandCustomTags(
           wildcardZones.zone1,
@@ -175,7 +191,7 @@ export async function generateImage(
         )
 
     // Check if zone2 is disabled before expanding
-    const zone2Result = sharedDisabledContext.names.has('zone2')
+    const zone2Result = hasDisabledZone('zone2')
       ? { expandedText: '', randomTagResolutions: {} }
       : expandCustomTags(
           wildcardZones.zone2,
@@ -187,7 +203,7 @@ export async function generateImage(
         )
 
     // Check if negative is disabled before expanding
-    const negativeResult = sharedDisabledContext.names.has('negative')
+    const negativeResult = hasDisabledZone('negative')
       ? { expandedText: '', randomTagResolutions: {} }
       : expandCustomTags(
           wildcardZones.negative,
@@ -208,7 +224,7 @@ export async function generateImage(
     let negativeTagsText = cleanDirectivesFromTags(negativeResult.expandedText)
 
     // Track disabled zones for UI feedback (zones already filtered during expansion)
-    const disabledZones = new Set<string>(sharedDisabledContext.names)
+    const disabledZones = sharedDisabledContext.names
 
     // Apply composition-based zone filtering
     const isAll = promptsData.selectedComposition === 'all'
@@ -254,7 +270,8 @@ export async function generateImage(
       useFilmgrain,
       modelSettings!,
       maskFilePath,
-      appliedSeed
+      appliedSeed,
+      disabledZones
     )
 
     console.log('workflow (qwen)', workflow)
