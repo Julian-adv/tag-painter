@@ -39,12 +39,22 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
 export async function GET({ url }) {
   await ensureDir()
   const filename = url.searchParams.get('filename') || undefined
+  const createIfMissing = url.searchParams.get('createIfMissing') === 'true'
   try {
     const filePath = getWildcardsFilePath(filename)
     const text = await fs.readFile(filePath, 'utf-8')
     return new Response(text, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
   } catch (error: unknown) {
     if (isErrnoException(error) && error.code === 'ENOENT') {
+      // If createIfMissing flag is set, create the file with minimal content
+      if (createIfMissing && filename) {
+        const filePath = getWildcardsFilePath(filename)
+        const minimalContent = getMinimalWildcardsContent()
+        await fs.writeFile(filePath, minimalContent, 'utf-8')
+        return new Response(minimalContent, {
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        })
+      }
       // If a custom filename was specified but not found, return 404
       if (filename) {
         return json({ error: `Wildcards file not found: ${filename}` }, { status: 404 })
@@ -56,4 +66,18 @@ export async function GET({ url }) {
     console.error(`Error reading ${fileName}:`, error)
     return json({ error: `Failed to read ${fileName}` }, { status: 500 })
   }
+}
+
+function getMinimalWildcardsContent(): string {
+  return `all:
+  - ""
+zone1:
+  - ""
+zone2:
+  - ""
+negative:
+  - ""
+inpainting:
+  - ""
+`
 }

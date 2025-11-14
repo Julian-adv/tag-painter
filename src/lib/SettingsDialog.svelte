@@ -303,7 +303,7 @@
   })
 
   async function handleSave() {
-    // Validate wildcards files exist
+    // Validate and create wildcards files if needed
     const wildcardsToCheck = new Set<string>()
     for (const modelSettings of Object.values(localSettings.perModel)) {
       if (modelSettings.wildcardsFile && modelSettings.wildcardsFile.trim()) {
@@ -311,13 +311,13 @@
       }
     }
 
-    // Check each unique wildcards file
+    // Check each unique wildcards file and create if missing
     for (const filename of wildcardsToCheck) {
       try {
-        const params = `?filename=${encodeURIComponent(filename)}`
+        const params = `?filename=${encodeURIComponent(filename)}&createIfMissing=true`
         const res = await fetch(`/api/wildcards${params}`)
-        if (res.status === 404) {
-          onError?.(`Wildcards file not found: ${filename}`)
+        if (!res.ok && res.status !== 404) {
+          onError?.(`Failed to access wildcards file: ${filename}`)
           return
         }
       } catch (error) {
