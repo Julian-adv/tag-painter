@@ -37,7 +37,7 @@
     onMutate: (structural: boolean) => void
     selectedIds?: string[]
     onSelect: (id: string, shiftKey?: boolean) => void
-    setAutoEditChildId?: (id: string | null) => void
+    setAutoEditChildId?: (id: string | null, behavior?: 'selectAll' | 'caretEnd') => void
     onChipDoubleClick?: (tagName: string) => void
     tabbingActive?: boolean
     shiftTabActive?: boolean

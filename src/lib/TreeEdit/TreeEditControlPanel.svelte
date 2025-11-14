@@ -56,7 +56,7 @@
     addBySelection: () => void
     deleteBySelection: () => void
     onModelChanged?: () => void
-    setAutoEditChildId?: (id: string | null) => void
+    setAutoEditChildId?: (id: string | null, behavior?: 'selectAll' | 'caretEnd') => void
     setRenameCallback?: (
       nodeId: string | null,
       callback: ((newName: string) => void) | null

@@ -306,10 +306,12 @@
   }
 
   // Allow descendants to request auto-editing of a specific child id
-  function setAutoEditChildId(id: string | null) {
+  function setAutoEditChildId(
+    id: string | null,
+    behavior: 'selectAll' | 'caretEnd' = 'caretEnd'
+  ) {
     autoEditChildId = id
-    // Default behavior: caret at end when entering edit programmatically
-    autoEditBehavior = 'caretEnd'
+    autoEditBehavior = behavior
   }
 
   function handleTreeMutate(structural: boolean) {
@@ -477,7 +479,7 @@
     if (!result.changed) return
 
     autoEditBehavior = result.autoEditBehavior
-    if (result.autoEditChildId) setAutoEditChildId(result.autoEditChildId)
+    if (result.autoEditChildId) setAutoEditChildId(result.autoEditChildId, result.autoEditBehavior)
     newlyAddedRootChildId = result.newlyAddedRootChildId
 
     if (result.selectedId) {
