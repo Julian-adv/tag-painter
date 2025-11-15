@@ -48,6 +48,16 @@
     }
   })
 
+  // Clear dropped image when a new generated image is set
+  $effect(() => {
+    if (currentImageFileName && droppedImageUrl) {
+      // Revoke the dropped image URL
+      revokeImageObjectUrl(droppedImageUrl)
+      droppedImageUrl = null
+      droppedImageMetadata = null
+    }
+  })
+
   // Update file list and current index
   export async function updateFileList() {
     allFiles = await getImageList(outputDirectory)
