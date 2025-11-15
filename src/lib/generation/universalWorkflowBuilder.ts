@@ -233,6 +233,11 @@ export async function buildWorkflow(
         setRequiredNodeInput(workflow, loraStackNode, `lora_name_${loraIndex}`, lora.name)
         setRequiredNodeInput(workflow, loraStackNode, `lora_strength_${loraIndex}`, lora.weight)
       })
+
+      // Set remaining LoRA slots to None (up to 10 total slots)
+      for (let i = modelSettings.loras.length + 1; i <= 10; i++) {
+        setRequiredNodeInput(workflow, loraStackNode, `lora_name_${i}`, 'None')
+      }
     }
   }
 
