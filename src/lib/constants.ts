@@ -1,6 +1,6 @@
 export const CONSISTENT_RANDOM_MARKER = '=consistent-random'
 export const DEFAULT_OUTPUT_DIRECTORY = 'data/output'
-export const DEFAULT_ARRAY_WEIGHT = 100
+export const DEFAULT_ARRAY_WEIGHT = -1 // -1 means no explicit probability set
 export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8188'
 export const DEFAULT_WORKFLOW = 'sdxl.api.workflow.json'
 

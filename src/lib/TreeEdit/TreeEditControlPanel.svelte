@@ -196,163 +196,78 @@
     onModelChanged?.()
   }
 
-  function getSelectedLeafWeight(): number | null {
-    if (selectedIds.length !== 1) return null
+  function getSelectedLeafProb(): number {
+    if (selectedIds.length !== 1) return 0
     const selectedId = selectedIds[0]
     const node = model.nodes[selectedId]
-    if (!node || node.kind !== 'leaf') return null
+    if (!node || node.kind !== 'leaf') return 0
 
-    return parseWeightDirective(String(node.value || ''))
+    const prob = parseWeightDirective(String(node.value || ''))
+    // Return 0 for display if no explicit probability is set (-1)
+    return prob === -1 ? 0 : prob
   }
 
-  function updateSelectedWeight(newWeight: number) {
+  function updateSelectedProb(newProb: number, removeDirective: boolean = false) {
     if (selectedIds.length !== 1) return
     const selectedId = selectedIds[0]
     const node = model.nodes[selectedId]
     if (!node || node.kind !== 'leaf') return
 
-    // Clamp weight between 0.1 and 10000
-    const clampedWeight = Math.max(0.1, Math.min(10000, newWeight))
-
     const currentValue = String(node.value || '').trim()
 
-    // Remove existing weight directive if any
-    let cleaned = currentValue.replace(/,?\s*weight=\d+(?:\.\d+)?/gi, '')
+    // Remove existing prob/weight directive if any
+    let cleaned = currentValue.replace(/,?\s*(?:prob|weight)=\d+(?:\.\d+)?/gi, '')
     cleaned = cleaned.replace(/^\s*,\s*|\s*,\s*$/g, '').trim()
 
-    // Add new weight directive if not default
-    if (clampedWeight !== DEFAULT_ARRAY_WEIGHT) {
-      const newValue = cleaned ? `${cleaned}, weight=${clampedWeight}` : `weight=${clampedWeight}`
-      node.value = newValue
-    } else {
+    if (removeDirective) {
+      // Reset: remove prob directive entirely
       node.value = cleaned || ''
+    } else {
+      // Clamp probability between 0 and 100
+      const clampedProb = Math.max(0, Math.min(100, newProb))
+      // Always add prob directive with the value (including 0)
+      const newValue = cleaned ? `${cleaned}, prob=${clampedProb}` : `prob=${clampedProb}`
+      node.value = newValue
     }
 
     onModelChanged?.()
   }
 
-  function getSelectedLeafProbability(): string | null {
-    if (selectedIds.length !== 1) return null
+  function getSelectedArrayProb(): number {
+    if (!isSelectedArrayInObject()) return 0
     const selectedId = selectedIds[0]
     const node = model.nodes[selectedId]
-    if (!node || node.kind !== 'leaf') return null
+    if (!node || node.kind !== 'array') return 0
 
-    // Find the parent array node
-    let parentId = node.parentId
-    let parentNode = parentId ? model.nodes[parentId] : null
-
-    // If parent is not an array, look for the nearest array ancestor
-    while (parentNode && parentNode.kind !== 'array') {
-      parentId = parentNode.parentId
-      parentNode = parentId ? model.nodes[parentId] : null
-    }
-
-    if (!parentNode || parentNode.kind !== 'array') {
-      return null // Not inside an array, no probability to calculate
-    }
-
-    // Calculate weights for all siblings in the array
-    const siblings = parentNode.children || []
-    let totalWeight = 0
-    let currentWeight = 0
-
-    for (const siblingId of siblings) {
-      const siblingNode = model.nodes[siblingId]
-      if (!siblingNode) continue
-
-      let weight = DEFAULT_ARRAY_WEIGHT
-      if (siblingNode.kind === 'leaf') {
-        weight = parseWeightDirective(String(siblingNode.value || ''))
-      }
-
-      totalWeight += weight
-      if (siblingId === selectedId) {
-        currentWeight = weight
-      }
-    }
-
-    if (totalWeight === 0) return '0%'
-
-    const probability = (currentWeight / totalWeight) * 100
-    return `${probability.toFixed(1)}%`
+    const prob = parseWeightDirective(node.name)
+    // Return 0 for display if no explicit probability is set (-1)
+    return prob === -1 ? 0 : prob
   }
 
-  function getSelectedArrayWeight(): number | null {
-    if (!isSelectedArrayInObject()) return null
-    const selectedId = selectedIds[0]
-    const node = model.nodes[selectedId]
-    if (!node || node.kind !== 'array') return null
-    return parseWeightDirective(node.name)
-  }
-
-  function updateSelectedArrayWeight(newWeight: number) {
+  function updateSelectedArrayProb(newProb: number, removeDirective: boolean = false) {
     if (!isSelectedArrayInObject()) return
     const selectedId = selectedIds[0]
     const node = model.nodes[selectedId]
     if (!node || node.kind !== 'array') return
 
-    // Clamp weight between 0.1 and 10000
-    const clampedWeight = Math.max(0.1, Math.min(10000, newWeight))
-
     const currentName = node.name.trim()
 
-    // Remove existing weight directive if any
-    let cleaned = currentName.replace(/,?\s*weight=\d+(?:\.\d+)?/gi, '')
+    // Remove existing prob/weight directive if any
+    let cleaned = currentName.replace(/,?\s*(?:prob|weight)=\d+(?:\.\d+)?/gi, '')
     cleaned = cleaned.replace(/^\s*,\s*|\s*,\s*$/g, '').trim()
 
-    // Add new weight directive if not default
-    if (clampedWeight !== DEFAULT_ARRAY_WEIGHT) {
-      const newName = cleaned ? `${cleaned}, weight=${clampedWeight}` : `weight=${clampedWeight}`
-      node.name = newName
-    } else {
+    if (removeDirective) {
+      // Reset: remove prob directive entirely
       node.name = cleaned || ''
+    } else {
+      // Clamp probability between 0 and 100
+      const clampedProb = Math.max(0, Math.min(100, newProb))
+      // Always add prob directive with the value (including 0)
+      const newName = cleaned ? `${cleaned}, prob=${clampedProb}` : `prob=${clampedProb}`
+      node.name = newName
     }
 
     onModelChanged?.()
-  }
-
-  function getSelectedArrayProbability(): string {
-    if (!isSelectedArrayInObject()) return ''
-    const selectedId = selectedIds[0]
-    const node = model.nodes[selectedId]
-    if (!node || node.kind !== 'array') return ''
-
-    const parentId = node.parentId
-    if (!parentId) return ''
-
-    const parent = model.nodes[parentId]
-    if (!parent || parent.kind !== 'object') return ''
-
-    // Get all sibling arrays in the object
-    const arrayChildren = []
-    const stack = [...(parent.children || [])]
-    const seen = new Set<string>()
-
-    while (stack.length) {
-      const childId = stack.pop()!
-      if (seen.has(childId)) continue
-      seen.add(childId)
-
-      const child = model.nodes[childId]
-      if (!child) continue
-
-      if (child.kind === 'array') {
-        const weight = parseWeightDirective(child.name)
-        arrayChildren.push({ id: childId, weight })
-      } else if (child.kind === 'object') {
-        stack.push(...(child.children || []))
-      }
-    }
-
-    if (arrayChildren.length === 0) return '0%'
-
-    const totalWeight = arrayChildren.reduce((sum, child) => sum + child.weight, 0)
-    const currentArray = arrayChildren.find((child) => child.id === selectedId)
-
-    if (!currentArray || totalWeight === 0) return '0%'
-
-    const probability = (currentArray.weight / totalWeight) * 100
-    return `${probability.toFixed(1)}%`
   }
 
   function startRenaming() {
@@ -473,24 +388,26 @@
           </select>
         </div>
         <div class="directive-row">
-          <label for="weight-input" class="directive-label">{m['treeEdit.weightLabel']()}</label>
-          <div class="weight-info">
+          <label for="prob-input" class="directive-label">Probability (%)</label>
+          <div class="prob-input-group">
             <WheelAdjustableInput
-              value={getSelectedLeafWeight() ?? DEFAULT_ARRAY_WEIGHT}
-              min={0.1}
-              max={10000}
+              value={getSelectedLeafProb()}
+              min={0}
+              max={100}
               step={0.1}
-              wheelStep={10}
+              wheelStep={5}
               ctrlWheelStep={1}
               arrowStep={0.1}
               class=""
-              onchange={updateSelectedWeight}
+              onchange={updateSelectedProb}
             />
-            {#if getSelectedLeafProbability()}
-              <span class="probability-display">
-                ({getSelectedLeafProbability()})
-              </span>
-            {/if}
+            <button
+              class="reset-prob-btn"
+              onclick={() => updateSelectedProb(0, true)}
+              title="Reset to default (equal probability)"
+            >
+              Reset
+            </button>
           </div>
         </div>
         <div class="directive-row stacked">
@@ -521,26 +438,26 @@
       <fieldset>
         <legend class="section-label">{m['treeEdit.arrayWeightLegend']()}</legend>
         <div class="directive-row">
-          <label for="array-weight-input" class="directive-label"
-            >{m['treeEdit.weightLabel']()}</label
-          >
-          <div class="weight-info">
+          <label for="array-prob-input" class="directive-label">Probability (%)</label>
+          <div class="prob-input-group">
             <WheelAdjustableInput
-              value={getSelectedArrayWeight() ?? DEFAULT_ARRAY_WEIGHT}
-              min={0.1}
-              max={10000}
-              step={0.1}
-              wheelStep={10}
+              value={getSelectedArrayProb()}
+              min={0}
+              max={100}
+              step={1}
+              wheelStep={5}
               ctrlWheelStep={1}
-              arrowStep={0.1}
+              arrowStep={1}
               class=""
-              onchange={updateSelectedArrayWeight}
+              onchange={updateSelectedArrayProb}
             />
-            {#if getSelectedArrayProbability()}
-              <span class="probability-display">
-                ({getSelectedArrayProbability()})
-              </span>
-            {/if}
+            <button
+              class="reset-prob-btn"
+              onclick={() => updateSelectedArrayProb(0, true)}
+              title="Reset to default (equal probability)"
+            >
+              Reset
+            </button>
           </div>
         </div>
       </fieldset>
@@ -711,20 +628,34 @@
     border-color: #3b82f6;
     box-shadow: 0 0 0 1px #3b82f6;
   }
-  .weight-info {
+  .prob-input-group {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     justify-self: start;
   }
-  .probability-display {
+  .reset-prob-btn {
+    padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
-    color: #6b7280;
-    font-weight: 500;
-    font-family: monospace;
-    padding: 0.125rem 0.375rem;
+    color: #374151;
+    background-color: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+  .reset-prob-btn:hover {
     background-color: #e5e7eb;
-    border-radius: 0.25rem;
+    border-color: #9ca3af;
+  }
+  .reset-prob-btn:active {
+    background-color: #d1d5db;
+  }
+  .reset-prob-btn:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px #3b82f6;
   }
   .array-mode fieldset {
     display: inline-flex;

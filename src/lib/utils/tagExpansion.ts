@@ -204,7 +204,10 @@ export function cleanDirectivesFromTags(tagsText: string): string {
   // Remove composition directives
   cleaned = cleaned.replace(/,?\s*composition=\w+/g, '')
 
-  // Remove weight directives
+  // Remove prob directives (new syntax)
+  cleaned = cleaned.replace(/,?\s*prob=\d+(?:\.\d+)?/gi, '')
+
+  // Remove weight directives (legacy syntax)
   cleaned = cleaned.replace(/,?\s*weight=\d+(?:\.\d+)?/gi, '')
 
   // Remove any unexpanded wildcards directives just in case
@@ -737,20 +740,30 @@ function expandObjectNode(
 }
 
 /**
- * Parse weight directive from text content
+ * Parse probability/weight directive from text content
+ * Supports both prob=xx (0-100%) and weight=xx (legacy) syntax
+ * Returns:
+ *   -1: No explicit probability set (use default equal distribution)
+ *   0: Explicitly set to 0% (exclude from selection)
+ *   1-100: Explicit probability percentage
  */
 export function parseWeightDirective(content: string): number {
   const trimmed = String(content || '').trim()
-  if (!trimmed) return DEFAULT_ARRAY_WEIGHT
+  if (!trimmed) return -1
 
-  // Look for weight=xx directive
+  // Look for prob=xx directive (new syntax)
+  const probMatch = trimmed.match(/prob=(\d+(?:\.\d+)?)/i)
+  if (probMatch) {
+    return parseFloat(probMatch[1])
+  }
+
+  // Look for weight=xx directive (legacy syntax, treat as probability)
   const weightMatch = trimmed.match(/weight=(\d+(?:\.\d+)?)/i)
-
   if (weightMatch) {
     return parseFloat(weightMatch[1])
   }
 
-  return DEFAULT_ARRAY_WEIGHT
+  return -1
 }
 
 /**
