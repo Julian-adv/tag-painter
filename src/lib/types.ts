@@ -133,10 +133,10 @@ export interface PromptsData {
   }
   selectedCheckpoint: string
   selectedComposition: string
-  selectedRefineMode: RefineMode
-  selectedFaceDetailerMode: FaceDetailerMode
   selectedLoras: { name: string; weight: number }[]
   useFilmGrain: boolean
+  enableRefine: boolean
+  enableFaceDetailer: boolean
 }
 
 export interface ProgressData {

@@ -35,7 +35,9 @@
     initializePromptsStore,
     savePromptsData,
     updateComposition,
-    updateUseFilmGrain
+    updateUseFilmGrain,
+    updateEnableRefine,
+    updateEnableFaceDetailer
   } from '$lib/stores/promptsStore'
   import { detectPlatform } from '$lib/utils/loraPath'
   import { Bolt, ArrowPath } from 'svelte-heros-v2'
@@ -90,6 +92,10 @@
   let selectedRefineMode = $state(RefineMode.none)
   let selectedFaceDetailerMode = $state(FaceDetailerMode.none)
   let useFilmGrain = $state(false)
+  let enableRefine = $state(false)
+  let enableFaceDetailer = $state(false)
+  let refineCheckpoint = $state('')
+  let faceDetailerCheckpoint = $state('')
 
   // Toasts component ref for showing messages
   type ToastType = 'success' | 'error' | 'info'
@@ -307,9 +313,9 @@
 
     // Load post-processing settings from store
     const currentPromptsData = get(promptsData)
-    selectedRefineMode = currentPromptsData.selectedRefineMode
-    selectedFaceDetailerMode = currentPromptsData.selectedFaceDetailerMode
     useFilmGrain = currentPromptsData.useFilmGrain
+    enableRefine = currentPromptsData.enableRefine
+    enableFaceDetailer = currentPromptsData.enableFaceDetailer
 
     // Load settings
     const savedSettings = await loadSettings()
@@ -358,17 +364,58 @@
     }
   })
 
+  // Determine refine mode based on checkbox state and checkpoint comparison
+  $effect(() => {
+    if (!enableRefine) {
+      selectedRefineMode = RefineMode.none
+    } else {
+      const modelSettings = getEffectiveModelSettings(settings, $promptsData.selectedCheckpoint)
+      const currentCheckpoint = $promptsData.selectedCheckpoint
+      const upscaleCheckpoint = modelSettings?.upscale?.checkpoint
+      const modelType = modelSettings?.upscale.modelType
+
+      if (modelType === 'sdxl') {
+        selectedRefineMode = RefineMode.refine_sdxl
+      } else {
+        selectedRefineMode = RefineMode.refine
+      }
+    }
+  })
+
+  // Determine face detailer mode based on checkbox state
+  $effect(() => {
+    if (!enableFaceDetailer) {
+      selectedFaceDetailerMode = FaceDetailerMode.none
+    } else {
+      const modelSettings = getEffectiveModelSettings(settings, $promptsData.selectedCheckpoint)
+      const faceDetailerModelType = modelSettings?.faceDetailer?.modelType
+
+      if (faceDetailerModelType === 'sdxl') {
+        selectedFaceDetailerMode = FaceDetailerMode.face_detail_sdxl
+      } else {
+        selectedFaceDetailerMode = FaceDetailerMode.face_detail
+      }
+    }
+  })
+
+  // Update checkpoint names for display
+  $effect(() => {
+    const modelSettings = getEffectiveModelSettings(settings, $promptsData.selectedCheckpoint)
+    refineCheckpoint = modelSettings?.upscale?.checkpoint || ''
+    faceDetailerCheckpoint = modelSettings?.faceDetailer?.checkpoint || ''
+  })
+
   // Sync post-processing settings to store when they change
   $effect(() => {
     updateUseFilmGrain(useFilmGrain)
   })
 
   $effect(() => {
-    promptsData.update((data) => ({ ...data, selectedRefineMode }))
+    updateEnableRefine(enableRefine)
   })
 
   $effect(() => {
-    promptsData.update((data) => ({ ...data, selectedFaceDetailerMode }))
+    updateEnableFaceDetailer(enableFaceDetailer)
   })
 
   // Event handlers
@@ -447,9 +494,9 @@
         }
       },
       modelSettings,
-      currentPromptsData.selectedRefineMode,
-      currentPromptsData.selectedFaceDetailerMode,
-      currentPromptsData.useFilmGrain
+      selectedRefineMode,
+      selectedFaceDetailerMode,
+      useFilmGrain
     )
 
     // Store the results
@@ -561,9 +608,9 @@
         }
       },
       modelSettings,
-      currentPromptsData.selectedRefineMode,
-      currentPromptsData.selectedFaceDetailerMode,
-      currentPromptsData.useFilmGrain
+      selectedRefineMode,
+      selectedFaceDetailerMode,
+      useFilmGrain
     )
 
     // Store the results
@@ -815,9 +862,11 @@
             <ModelControls {availableCheckpoints} onRefreshModels={refreshModels} />
 
             <PostProcessingControls
-              bind:selectedRefineMode
-              bind:selectedFaceDetailerMode
+              bind:enableRefine
+              bind:enableFaceDetailer
               bind:useFilmGrain
+              {refineCheckpoint}
+              {faceDetailerCheckpoint}
             />
 
             <GenerationControls

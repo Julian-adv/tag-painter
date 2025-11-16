@@ -9,10 +9,10 @@ const defaultPromptsData: PromptsData = {
   tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] },
   selectedCheckpoint: '',
   selectedComposition: 'left-horizontal',
-  selectedRefineMode: 1, // RefineMode.none
-  selectedFaceDetailerMode: 1, // FaceDetailerMode.none
   selectedLoras: [],
-  useFilmGrain: false
+  useFilmGrain: false,
+  enableRefine: false,
+  enableFaceDetailer: false
 }
 
 // Create reactive store
@@ -23,8 +23,7 @@ export async function initializePromptsStore() {
   const savedPrompts = await loadPrompts()
   if (savedPrompts) {
     // Ensure backward compatibility - add missing fields
-    const migratedData = {
-      ...savedPrompts,
+    const migratedData: PromptsData = {
       tags: {
         all: savedPrompts.tags?.all || [],
         zone1: savedPrompts.tags?.zone1 || [],
@@ -32,10 +31,12 @@ export async function initializePromptsStore() {
         negative: savedPrompts.tags?.negative || [],
         inpainting: savedPrompts.tags?.inpainting || []
       },
+      selectedCheckpoint: savedPrompts.selectedCheckpoint || '',
       selectedComposition: savedPrompts.selectedComposition || 'left-horizontal',
-      selectedRefineMode: savedPrompts.selectedRefineMode ?? 1, // RefineMode.none
-      selectedFaceDetailerMode: savedPrompts.selectedFaceDetailerMode ?? 1, // FaceDetailerMode.none
-      useFilmGrain: savedPrompts.useFilmGrain ?? false
+      selectedLoras: savedPrompts.selectedLoras || [],
+      useFilmGrain: savedPrompts.useFilmGrain ?? false,
+      enableRefine: savedPrompts.enableRefine ?? false,
+      enableFaceDetailer: savedPrompts.enableFaceDetailer ?? false
     }
     promptsData.set(migratedData)
   } else {
@@ -95,6 +96,14 @@ export function updateTags(
 
 export function updateUseFilmGrain(useFilmGrain: boolean) {
   promptsData.update((data) => ({ ...data, useFilmGrain }))
+}
+
+export function updateEnableRefine(enableRefine: boolean) {
+  promptsData.update((data) => ({ ...data, enableRefine }))
+}
+
+export function updateEnableFaceDetailer(enableFaceDetailer: boolean) {
+  promptsData.update((data) => ({ ...data, enableFaceDetailer }))
 }
 
 

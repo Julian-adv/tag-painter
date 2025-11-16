@@ -24,13 +24,13 @@ export async function POST({ request }) {
   try {
     // Clean the data to remove unnecessary fields
     const cleanedData: PromptsData = {
-      tags: data.tags || { all: [], zone1: [], zone2: [], negative: [] },
+      tags: data.tags || { all: [], zone1: [], zone2: [], negative: [], inpainting: [] },
       selectedCheckpoint: data.selectedCheckpoint,
       selectedComposition: data.selectedComposition || 'left-horizontal',
-      selectedRefineMode: data.selectedRefineMode ?? 1,
-      selectedFaceDetailerMode: data.selectedFaceDetailerMode ?? 1,
       selectedLoras: data.selectedLoras,
-      useFilmGrain: data.useFilmGrain ?? false
+      useFilmGrain: data.useFilmGrain ?? false,
+      enableRefine: data.enableRefine ?? false,
+      enableFaceDetailer: data.enableFaceDetailer ?? false
     }
 
     await fs.writeFile(filePath, JSON.stringify(cleanedData, null, 2))
@@ -54,10 +54,10 @@ export async function GET() {
         tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] },
         selectedCheckpoint: '',
         selectedComposition: 'left-horizontal',
-        selectedRefineMode: 1,
-        selectedFaceDetailerMode: 1,
         selectedLoras: [],
-        useFilmGrain: false
+        useFilmGrain: false,
+        enableRefine: false,
+        enableFaceDetailer: false
       }
       return json(defaultPrompts)
     }

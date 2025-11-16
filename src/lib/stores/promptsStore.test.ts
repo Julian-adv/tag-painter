@@ -33,10 +33,10 @@ describe('promptsStore', () => {
       tags: { all: [], zone1: [], zone2: [], negative: [], inpainting: [] },
       selectedCheckpoint: '',
       selectedComposition: 'left-horizontal',
-      selectedRefineMode: 1,
-      selectedFaceDetailerMode: 1,
       selectedLoras: [],
-      useFilmGrain: false
+      useFilmGrain: false,
+      enableRefine: false,
+      enableFaceDetailer: false
     })
   })
 
@@ -112,10 +112,10 @@ describe('promptsStore', () => {
         tags: { all: ['tag1'], zone1: [], zone2: [], negative: [], inpainting: [] },
         selectedCheckpoint: 'test.ckpt',
         selectedComposition: 'left-horizontal',
-        selectedRefineMode: 1,
-        selectedFaceDetailerMode: 1,
         selectedLoras: [{ name: 'lora1', weight: 1.0 }],
-        useFilmGrain: false
+        useFilmGrain: false,
+        enableRefine: false,
+        enableFaceDetailer: false
       }
 
       promptsData.set(testData)
