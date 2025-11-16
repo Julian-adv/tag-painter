@@ -38,6 +38,7 @@
     { value: 'ipndm', label: 'IPNDM' },
     { value: 'ipndm_v', label: 'IPNDM V' },
     { value: 'deis', label: 'DEIS' },
+    { value: 'res_2s', label: 'RES 2S' },
     { value: 'res_multistep', label: 'RES Multistep' },
     { value: 'res_multistep_cfg_pp', label: 'RES Multistep CFG++' },
     { value: 'res_multistep_ancestral', label: 'RES Multistep Ancestral' },
