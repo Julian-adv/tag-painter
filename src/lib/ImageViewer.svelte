@@ -40,6 +40,8 @@
   let isDragging = $state(false)
   let droppedImageUrl: string | null = $state(null)
   let droppedImageMetadata: string | null = $state(null)
+  let imageWidth = $state(0)
+  let imageHeight = $state(0)
 
   // Watch for outputDirectory changes and update file list
   $effect(() => {
@@ -196,6 +198,13 @@
     onImageChange('')
   }
 
+  // Update image dimensions when image loads
+  function handleImageLoad(e: Event) {
+    const img = e.target as HTMLImageElement
+    imageWidth = img.naturalWidth
+    imageHeight = img.naturalHeight
+  }
+
   // Clean up object URLs when component is destroyed
   $effect(() => {
     return () => {
@@ -230,6 +239,7 @@
           src={droppedImageUrl}
           alt=""
           class="block max-h-[calc(100vh-2rem)] max-w-full rounded-lg object-contain shadow-md"
+          onload={handleImageLoad}
         />
       </div>
     {:else if imageUrl}
@@ -239,7 +249,7 @@
           src={imageUrl}
           alt=""
           class="block max-h-[calc(100vh-2rem)] max-w-full rounded-lg object-contain shadow-md"
-          onload={() => {}}
+          onload={handleImageLoad}
         />
         {#if $maskOverlay.isVisible && $maskOverlay.maskSrc}
           <img
@@ -260,12 +270,11 @@
   </div>
 
   <div class="flex w-full items-center justify-between">
-    <div class="flex items-center gap-2">
-      {#if imageUrl}
-        <DrawingControls bind:isDrawingMode bind:drawingTool onClearMask={clearMask} />
-      {/if}
-    </div>
-
+    {#if imageWidth > 0 && imageHeight > 0}
+      <span class="text-sm font-medium text-gray-600">
+        {imageWidth} × {imageHeight}
+      </span>
+    {/if}
     <div class="flex items-center justify-center gap-4">
       <button
         class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-gray-300 bg-gray-100 text-gray-600 transition-all duration-200 hover:scale-105 hover:border-gray-400 hover:bg-gray-200 active:scale-95"
