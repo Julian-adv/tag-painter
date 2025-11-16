@@ -43,6 +43,20 @@
   let imageWidth = $state(0)
   let imageHeight = $state(0)
 
+  // Calculate aspect ratio as a simplified fraction
+  function calculateAspectRatio(width: number, height: number): string {
+    if (width === 0 || height === 0) return ''
+
+    const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b))
+    const divisor = gcd(width, height)
+    const ratioW = width / divisor
+    const ratioH = height / divisor
+
+    return `${ratioW}:${ratioH}`
+  }
+
+  let aspectRatio = $derived(calculateAspectRatio(imageWidth, imageHeight))
+
   // Watch for outputDirectory changes and update file list
   $effect(() => {
     if (outputDirectory) {
@@ -238,7 +252,7 @@
         <img
           src={droppedImageUrl}
           alt=""
-          class="block max-h-[calc(100vh-2rem)] max-w-full rounded-lg object-contain shadow-md"
+          class="block max-h-[calc(100vh-5rem)] max-w-full rounded-lg object-contain shadow-md"
           onload={handleImageLoad}
         />
       </div>
@@ -248,7 +262,7 @@
           bind:this={imageElement}
           src={imageUrl}
           alt=""
-          class="block max-h-[calc(100vh-2rem)] max-w-full rounded-lg object-contain shadow-md"
+          class="block max-h-[calc(100vh-5rem)] max-w-full rounded-lg object-contain shadow-md"
           onload={handleImageLoad}
         />
         {#if $maskOverlay.isVisible && $maskOverlay.maskSrc}
@@ -273,6 +287,9 @@
     {#if imageWidth > 0 && imageHeight > 0}
       <span class="text-sm font-medium text-gray-600">
         {imageWidth} × {imageHeight}
+        {#if aspectRatio}
+          <span class="text-gray-500">({aspectRatio})</span>
+        {/if}
       </span>
     {/if}
     <div class="flex items-center justify-center gap-4">
