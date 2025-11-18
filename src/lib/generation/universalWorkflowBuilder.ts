@@ -62,45 +62,47 @@ export async function buildWorkflow(
   // Set FaceDetailer mode
   setRequiredNodeInput(workflow, 'FaceDetailer mode', 'value', faceDetailerMode)
 
-  setRequiredNodeInput(workflow, 'KSamplerSelect (base)', 'sampler_name', modelSettings.sampler)
-  setRequiredNodeInput(workflow, 'BasicScheduler (base)', 'scheduler', modelSettings.scheduler)
-  setRequiredNodeInput(workflow, 'BasicScheduler (base)', 'steps', modelSettings.steps)
-  setRequiredNodeInput(workflow, 'CFGGuider (base)', 'cfg', modelSettings.cfgScale)
+  setRequiredNodeInput(workflow, 'KSampler (base)', 'sampler_name', modelSettings.sampler)
+  setRequiredNodeInput(workflow, 'KSampler (base)', 'scheduler', modelSettings.scheduler)
+  setRequiredNodeInput(workflow, 'KSampler (base)', 'steps', modelSettings.steps)
+  setRequiredNodeInput(workflow, 'KSampler (base)', 'cfg', modelSettings.cfgScale)
   if (refineMode === RefineMode.refine) {
     setRequiredNodeInput(
       workflow,
-      'KSamplerSelect (refine)',
+      'KSampler (refine)',
       'sampler_name',
       modelSettings.upscale.sampler
     )
     setRequiredNodeInput(
       workflow,
-      'BasicScheduler (refine)',
+      'KSampler (refine)',
       'scheduler',
       modelSettings.upscale.scheduler
     )
-    setRequiredNodeInput(workflow, 'BasicScheduler (refine)', 'steps', modelSettings.upscale.steps)
-    setRequiredNodeInput(workflow, 'CFGGuider (refine)', 'cfg', modelSettings.upscale.cfgScale)
+    setRequiredNodeInput(workflow, 'KSampler (refine)', 'steps', modelSettings.upscale.steps)
+    setRequiredNodeInput(workflow, 'KSampler (refine)', 'cfg', modelSettings.upscale.cfgScale)
+    setRequiredNodeInput(workflow, 'KSampler (refine)', 'denoise', modelSettings.upscale.denoise)
   } else if (refineMode === RefineMode.refine_sdxl) {
     setRequiredNodeInput(
       workflow,
-      'KSamplerSelect (refine sdxl)',
+      'KSampler (refine sdxl)',
       'sampler_name',
       modelSettings.upscale.sampler
     )
     setRequiredNodeInput(
       workflow,
-      'BasicScheduler (refine sdxl)',
+      'KSampler (refine sdxl)',
       'scheduler',
       modelSettings.upscale.scheduler
     )
+    setRequiredNodeInput(workflow, 'KSampler (refine sdxl)', 'steps', modelSettings.upscale.steps)
+    setRequiredNodeInput(workflow, 'KSampler (refine sdxl)', 'cfg', modelSettings.upscale.cfgScale)
     setRequiredNodeInput(
       workflow,
-      'BasicScheduler (refine sdxl)',
-      'steps',
-      modelSettings.upscale.steps
+      'KSampler (refine sdxl)',
+      'denoise',
+      modelSettings.upscale.denoise
     )
-    setRequiredNodeInput(workflow, 'CFGGuider (refine sdxl)', 'cfg', modelSettings.upscale.cfgScale)
     setRequiredNodeInput(
       workflow,
       'Load VAE (refine)',
@@ -188,7 +190,9 @@ export async function buildWorkflow(
 
   setRequiredNodeInput(workflow, 'Detailer (SEGS)', 'seed', seed)
   setRequiredNodeInput(workflow, 'Detailer (SEGS) (sdxl)', 'seed', seed)
-  setRequiredNodeInput(workflow, 'RandomNoise', 'noise_seed', seed)
+  setRequiredNodeInput(workflow, 'KSampler (base)', 'seed', seed)
+  setRequiredNodeInput(workflow, 'KSampler (refine)', 'seed', seed)
+  setRequiredNodeInput(workflow, 'KSampler (refine sdxl)', 'seed', seed)
 
   setRequiredNodeInput(workflow, 'Empty Latent Image', 'width', settings.imageWidth)
   setRequiredNodeInput(workflow, 'Empty Latent Image', 'height', settings.imageHeight)
