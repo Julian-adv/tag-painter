@@ -859,7 +859,7 @@
 
         {#if activeTabId !== 'pnginfo'}
           <div class="flex flex-shrink-0 flex-col gap-2 p-2 pt-0">
-            <ModelControls {availableCheckpoints} onRefreshModels={refreshModels} />
+            <ModelControls {availableCheckpoints} onRefreshModels={refreshModels} {showToast} />
 
             <PostProcessingControls
               bind:enableRefine

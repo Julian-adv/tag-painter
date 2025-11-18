@@ -27,6 +27,7 @@
   "imageGenerator.devShowCustomNodesDialog": "Show Custom Nodes Dialog",
   "imageGenerator.missingInpaintingAlert": "Please add inpainting prompts before using inpainting.",
   "imageGenerator.reloadCheckpoints": "Reload lists from ComfyUI",
+  "imageGenerator.modelsRefreshed": "Models refreshed successfully",
   "imageGenerator.selectCheckpoint": "Select checkpoint...",
   "imageGenerator.useFaceDetailer": "Use Face Detailer",
   "imageGenerator.useUpscale": "Use Upscale",

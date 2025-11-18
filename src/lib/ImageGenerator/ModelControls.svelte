@@ -7,9 +7,25 @@
   interface Props {
     availableCheckpoints: string[]
     onRefreshModels: (event: MouseEvent) => void
+    showToast: (type: 'info' | 'success' | 'error', message: string) => void
   }
 
-  let { availableCheckpoints, onRefreshModels }: Props = $props()
+  let { availableCheckpoints, onRefreshModels, showToast }: Props = $props()
+
+  let isRotating = $state(false)
+
+  async function handleRefreshClick(event: MouseEvent) {
+    if (isRotating) return
+
+    isRotating = true
+    onRefreshModels(event)
+    showToast('success', m['imageGenerator.modelsRefreshed']())
+
+    // Reset rotation after animation completes
+    setTimeout(() => {
+      isRotating = false
+    }, 900)
+  }
 </script>
 
 <div class="flex flex-shrink-0 flex-col gap-1">
@@ -21,11 +37,12 @@
       </label>
       <button
         type="button"
-        class="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-1 py-0.5 text-xs text-gray-700 hover:bg-gray-50"
+        class="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-1 py-0.5 text-xs text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         title={m['imageGenerator.reloadCheckpoints']()}
-        onclick={onRefreshModels}
+        onclick={handleRefreshClick}
+        disabled={isRotating}
       >
-        <ArrowPath class="h-3 w-3" />
+        <ArrowPath class="h-3 w-3 {isRotating ? 'animate-spin' : ''}" />
       </button>
     </div>
     <select
@@ -40,5 +57,4 @@
       {/each}
     </select>
   </div>
-
 </div>
