@@ -67,9 +67,9 @@ export const MODEL_TYPE_DEFAULTS = {
     qualityPrefix:
       'cinematic lighting, ray tracing reflections, depth of field, ultra detailed textures, 8k resolution, hyperrealistic, dramatic composition',
     negativePrefix:
-      'paintings, cartoon, rendered, anime,embedding:SmoothNegative_Hands-neg, embedding:Smooth_Negative-neg,  sketches, (worst quality:2), (low quality:2), (normal quality:2),freckles, (facial wrinkles:1.4), (old girl:1.4),(Cleft Chin:1.4)',
-    wildcardsFile: 'wildcards.qwen.yaml',
-    customWorkflowPath: 'qwen-default.api.workflow.json',
+      'worst quality, low quality, normal quality, freckles, facial wrinkles, old girl, cleft chin',
+    wildcardsFile: 'wildcards.new.yaml',
+    customWorkflowPath: 'universal.api.workflow.json',
     selectedVae: 'qwen_image_vae.safetensors',
     loras: [
       {
@@ -87,9 +87,9 @@ export const MODEL_TYPE_DEFAULTS = {
     qualityPrefix:
       'cinematic lighting, ray tracing reflections, depth of field, ultra detailed textures, 8k resolution, hyperrealistic, dramatic composition',
     negativePrefix:
-      'paintings, cartoon, rendered, anime,embedding:SmoothNegative_Hands-neg, embedding:Smooth_Negative-neg,  sketches, (worst quality:2), (low quality:2), (normal quality:2),freckles, (facial wrinkles:1.4), (old girl:1.4),(Cleft Chin:1.4)',
-    wildcardsFile: 'wildcards.qwen.yaml',
-    customWorkflowPath: 'qwen_nunchaku.api.workflow.json',
+      'worst quality, low quality, normal quality, freckles, facial wrinkles, old girl, cleft chin',
+    wildcardsFile: 'wildcards.new.yaml',
+    customWorkflowPath: 'universal.api.workflow.json',
     selectedVae: 'qwen_image_vae.safetensors',
     loras: []
   },
