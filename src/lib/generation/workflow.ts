@@ -1,6 +1,8 @@
 // ComfyUI workflow configuration and constants
 
 export const FINAL_SAVE_NODE_ID = 'final_save_output' // Consistent ID for our dynamically added save node
+export const INTERMEDIATE_SAVE_NODE_ID = 'intermediate_save_output'
+export const INTERMEDIATE_SAVE_NODE_ID_2 = 'intermediate_save_output_2'
 
 import type { ComfyUIWorkflow } from '$lib/types'
 import { deleteNodesByTitlePattern, findNodeByTitle } from './workflowMapping'

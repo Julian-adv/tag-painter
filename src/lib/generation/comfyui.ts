@@ -111,7 +111,7 @@ export async function fetchVaeModels(baseUrl: string): Promise<string[]> {
 export interface WebSocketCallbacks {
   onLoadingChange: (loading: boolean) => void
   onProgressUpdate: (progress: ProgressData) => void
-  onImageReceived: (imageBlob: Blob) => void
+  onImageReceived: (imageBlob: Blob, isFinal: boolean) => void
 }
 
 export function connectWebSocket(
@@ -120,7 +120,8 @@ export function connectWebSocket(
   finalSaveNodeId: string,
   workflow: Record<string, { _meta?: { title?: string } }>,
   callbacks: WebSocketCallbacks,
-  baseUrl: string
+  baseUrl: string,
+  intermediateSaveNodeIds?: string[]
 ): void {
   const wsUrl = buildComfyWsUrl(baseUrl, 'ws', { clientId: generatedClientId })
   const ws = new WebSocket(wsUrl)
@@ -128,6 +129,7 @@ export function connectWebSocket(
 
   let lastExecutingNode: string | null = null
   let finalNodeActive = false
+  let intermediateNodeActive = false
   let promptFinished = false
   let imageReceived = false
   let pendingCloseTimer: ReturnType<typeof setTimeout> | null = null
@@ -175,6 +177,9 @@ export function connectWebSocket(
           if (data.node === finalSaveNodeId) {
             finalNodeActive = true
           }
+          if (intermediateSaveNodeIds && intermediateSaveNodeIds.includes(data.node)) {
+            intermediateNodeActive = true
+          }
           if (data.node === null) {
             promptFinished = true
             scheduleCloseIfNeeded()
@@ -188,8 +193,13 @@ export function connectWebSocket(
         }
       } else if (message.type === 'executed') {
         const data = message.data
-        if (data.prompt_id === promptId && data.node === finalSaveNodeId) {
-          finalNodeActive = false
+        if (data.prompt_id === promptId) {
+          if (data.node === finalSaveNodeId) {
+            finalNodeActive = false
+          }
+          if (intermediateSaveNodeIds && intermediateSaveNodeIds.includes(data.node)) {
+            intermediateNodeActive = false
+          }
         }
       } else if (message.type === 'progress') {
         callbacks.onProgressUpdate({
@@ -201,11 +211,19 @@ export function connectWebSocket(
     } else if (event.data instanceof ArrayBuffer) {
       if ((finalNodeActive || lastExecutingNode === finalSaveNodeId) && promptId) {
         const imageBlob = new Blob([event.data.slice(8)], { type: 'image/png' })
-        callbacks.onImageReceived(imageBlob)
+        callbacks.onImageReceived(imageBlob, true)
         callbacks.onLoadingChange(false)
         imageReceived = true
         lastExecutingNode = null
         scheduleCloseIfNeeded()
+      } else if (
+        intermediateSaveNodeIds &&
+        (intermediateNodeActive ||
+          (lastExecutingNode && intermediateSaveNodeIds.includes(lastExecutingNode))) &&
+        promptId
+      ) {
+        const imageBlob = new Blob([event.data.slice(8)], { type: 'image/png' })
+        callbacks.onImageReceived(imageBlob, false)
       }
     }
   }

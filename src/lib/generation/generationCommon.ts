@@ -9,7 +9,11 @@ import {
   normalizeBaseUrl,
   type WebSocketCallbacks
 } from './comfyui'
-import { FINAL_SAVE_NODE_ID } from './workflow'
+import {
+  FINAL_SAVE_NODE_ID,
+  INTERMEDIATE_SAVE_NODE_ID,
+  INTERMEDIATE_SAVE_NODE_ID_2
+} from './workflow'
 import type { Settings, ProgressData, ComfyUIWorkflow, ModelSettings } from '$lib/types'
 
 export function generateClientId(): string {
@@ -178,7 +182,7 @@ export async function submitToComfyUI(
   const wsCallbacks: WebSocketCallbacks = {
     onLoadingChange: callbacks.onLoadingChange,
     onProgressUpdate: callbacks.onProgressUpdate,
-    onImageReceived: async (imageBlob: Blob) => {
+    onImageReceived: async (imageBlob: Blob, isFinal: boolean) => {
       const filePath =
         (await saveImage(imageBlob, prompts, settings.outputDirectory, workflow, seed)) ||
         `unsaved_${Date.now()}.png`
@@ -186,5 +190,13 @@ export async function submitToComfyUI(
     }
   }
 
-  connectWebSocket(result.prompt_id, clientId, FINAL_SAVE_NODE_ID, workflow, wsCallbacks, comfyBase)
+  connectWebSocket(
+    result.prompt_id,
+    clientId,
+    FINAL_SAVE_NODE_ID,
+    workflow,
+    wsCallbacks,
+    comfyBase,
+    [INTERMEDIATE_SAVE_NODE_ID, INTERMEDIATE_SAVE_NODE_ID_2]
+  )
 }

@@ -12,7 +12,11 @@ import {
   findNodeByTitle,
   findNodesByTitle
 } from './workflowMapping'
-import { FINAL_SAVE_NODE_ID } from './workflow'
+import {
+  FINAL_SAVE_NODE_ID,
+  INTERMEDIATE_SAVE_NODE_ID,
+  INTERMEDIATE_SAVE_NODE_ID_2
+} from './workflow'
 
 // Map ModelType string values to numeric enum values
 const MODEL_TYPE_MAP: Record<ModelType, number> = {
@@ -275,6 +279,26 @@ export async function buildWorkflow(
     inputs: { images: [imageSourceNodeId, 0] },
     class_type: 'SaveImageWebsocket',
     _meta: { title: 'Final Save Image Websocket' }
+  }
+
+  // Add intermediate save node for 'VAE Decode (base)' if it exists
+  const intermediateNode = findNodeByTitle(workflow, 'VAE Decode (base)')
+  if (intermediateNode) {
+    workflow[INTERMEDIATE_SAVE_NODE_ID] = {
+      inputs: { images: [intermediateNode.nodeId, 0] },
+      class_type: 'SaveImageWebsocket',
+      _meta: { title: 'Intermediate Save Image Websocket' }
+    }
+  }
+
+  // Add second intermediate save node for 'Switch (Any) (after_refine)' if it exists
+  const intermediateNode2 = findNodeByTitle(workflow, 'Switch (Any) (after_refine)')
+  if (intermediateNode2) {
+    workflow[INTERMEDIATE_SAVE_NODE_ID_2] = {
+      inputs: { images: [intermediateNode2.nodeId, 0] },
+      class_type: 'SaveImageWebsocket',
+      _meta: { title: 'Intermediate Save Image Websocket 2' }
+    }
   }
 
   return workflow
