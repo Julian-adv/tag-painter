@@ -603,6 +603,17 @@
             />
           </div>
 
+          <label for="pm-save-base" class="two-col-label"
+            >{m['settingsDialog.saveBaseImages']()}</label
+          >
+          <div class="two-col-input checkbox-container">
+            <input
+              id="pm-save-base"
+              type="checkbox"
+              bind:checked={localSettings.perModel[selectedModelKey].saveBaseImages}
+            />
+          </div>
+
           <!-- Upscale Settings -->
           <div
             class="section-title"
@@ -710,6 +721,17 @@
                 ...availableVaes.map((vae) => ({ value: vae, label: vae }))
               ]}
             />
+
+            <label for="us-save-upscale" class="two-col-label"
+              >{m['settingsDialog.saveUpscaleImages']()}</label
+            >
+            <div class="two-col-input checkbox-container">
+              <input
+                id="us-save-upscale"
+                type="checkbox"
+                bind:checked={localSettings.perModel[selectedModelKey].upscale.saveUpscaleImages}
+              />
+            </div>
 
             <!-- FaceDetailer Settings -->
             <div
@@ -993,5 +1015,15 @@
   /* Hide embedded LoRA header inside settings */
   .lora-embed :global(.lora-selector h3) {
     display: none;
+  }
+
+  .checkbox-container {
+    display: flex;
+    align-items: center;
+  }
+
+  .checkbox-container input[type='checkbox'] {
+    width: auto;
+    cursor: pointer;
   }
 </style>

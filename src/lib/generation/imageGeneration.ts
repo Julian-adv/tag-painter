@@ -291,7 +291,9 @@ export async function generateImage(
         onLoadingChange,
         onProgressUpdate,
         onImageReceived
-      }
+      },
+      modelSettings?.saveBaseImages ?? false,
+      modelSettings?.upscale?.saveUpscaleImages ?? false
     )
 
     return {

@@ -485,10 +485,11 @@
           imageUrl = URL.createObjectURL(imageBlob)
 
           // Set the current image file name
-          currentImageFileName = filePath
+          // For intermediate images (filePath is empty), use a temporary identifier
+          currentImageFileName = filePath || `intermediate_${Date.now()}`
 
-          // Update file list after new image is generated
-          if (imageViewer?.updateFileList) {
+          // Update file list after new image is generated (only if file was saved)
+          if (filePath && imageViewer?.updateFileList) {
             await imageViewer.updateFileList()
           }
         }
@@ -599,10 +600,11 @@
           imageUrl = URL.createObjectURL(imageBlob)
 
           // Set the current image file name
-          currentImageFileName = filePath
+          // For intermediate images (filePath is empty), use a temporary identifier
+          currentImageFileName = filePath || `intermediate_${Date.now()}`
 
-          // Update file list after new image is generated
-          if (imageViewer?.updateFileList) {
+          // Update file list after new image is generated (only if file was saved)
+          if (filePath && imageViewer?.updateFileList) {
             await imageViewer.updateFileList()
           }
         }

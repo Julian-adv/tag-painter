@@ -8,6 +8,8 @@
 
 import { DEFAULT_COMFY_URL } from '$lib/constants'
 import type { ProgressData } from '$lib/types'
+import { ImageStage } from '$lib/types'
+import { INTERMEDIATE_SAVE_NODE_ID, INTERMEDIATE_SAVE_NODE_ID_2 } from './workflow'
 
 const FINAL_PAYLOAD_TIMEOUT_MS = 15000
 
@@ -111,7 +113,7 @@ export async function fetchVaeModels(baseUrl: string): Promise<string[]> {
 export interface WebSocketCallbacks {
   onLoadingChange: (loading: boolean) => void
   onProgressUpdate: (progress: ProgressData) => void
-  onImageReceived: (imageBlob: Blob, isFinal: boolean) => void
+  onImageReceived: (imageBlob: Blob, stage: ImageStage) => void
 }
 
 export function connectWebSocket(
@@ -211,7 +213,7 @@ export function connectWebSocket(
     } else if (event.data instanceof ArrayBuffer) {
       if ((finalNodeActive || lastExecutingNode === finalSaveNodeId) && promptId) {
         const imageBlob = new Blob([event.data.slice(8)], { type: 'image/png' })
-        callbacks.onImageReceived(imageBlob, true)
+        callbacks.onImageReceived(imageBlob, ImageStage.final)
         callbacks.onLoadingChange(false)
         imageReceived = true
         lastExecutingNode = null
@@ -223,7 +225,16 @@ export function connectWebSocket(
         promptId
       ) {
         const imageBlob = new Blob([event.data.slice(8)], { type: 'image/png' })
-        callbacks.onImageReceived(imageBlob, false)
+
+        // Determine which stage based on the node
+        let stage = ImageStage.base
+        if (lastExecutingNode === INTERMEDIATE_SAVE_NODE_ID_2) {
+          stage = ImageStage.after_refine
+        } else if (lastExecutingNode === INTERMEDIATE_SAVE_NODE_ID) {
+          stage = ImageStage.base
+        }
+
+        callbacks.onImageReceived(imageBlob, stage)
       }
     }
   }

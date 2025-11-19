@@ -39,7 +39,8 @@ export const DEFAULT_UPSCALE_SETTINGS = {
   sampler: 'euler_ancestral',
   scheduler: 'simple',
   denoise: 0.35,
-  selectedVae: '__embedded__'
+  selectedVae: '__embedded__',
+  saveUpscaleImages: false
 } as const
 
 // Model type specific defaults

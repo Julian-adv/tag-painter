@@ -15,6 +15,7 @@ import {
   INTERMEDIATE_SAVE_NODE_ID_2
 } from './workflow'
 import type { Settings, ProgressData, ComfyUIWorkflow, ModelSettings } from '$lib/types'
+import { ImageStage } from '$lib/types'
 
 export function generateClientId(): string {
   const cryptoObj = typeof globalThis !== 'undefined' ? globalThis.crypto : undefined
@@ -137,7 +138,9 @@ export async function submitToComfyUI(
     onLoadingChange: (loading: boolean) => void
     onProgressUpdate: (progress: ProgressData) => void
     onImageReceived: (imageBlob: Blob, filePath: string) => void
-  }
+  },
+  saveBaseImages = false,
+  saveUpscaleImages = false
 ) {
   const payload = {
     prompt: workflow,
@@ -182,7 +185,23 @@ export async function submitToComfyUI(
   const wsCallbacks: WebSocketCallbacks = {
     onLoadingChange: callbacks.onLoadingChange,
     onProgressUpdate: callbacks.onProgressUpdate,
-    onImageReceived: async (imageBlob: Blob, isFinal: boolean) => {
+    onImageReceived: async (imageBlob: Blob, stage: ImageStage) => {
+      // Determine if we should save based on stage and settings
+      let shouldSave = false
+      if (stage === ImageStage.final) {
+        shouldSave = true // Always save final images
+      } else if (stage === ImageStage.base && saveBaseImages) {
+        shouldSave = true // Save base images if setting is enabled
+      } else if (stage === ImageStage.after_refine && saveUpscaleImages) {
+        shouldSave = true // Save upscale images if setting is enabled
+      }
+
+      if (!shouldSave) {
+        // Just show the image to the user without saving
+        callbacks.onImageReceived(imageBlob, '')
+        return
+      }
+
       const filePath =
         (await saveImage(imageBlob, prompts, settings.outputDirectory, workflow, seed)) ||
         `unsaved_${Date.now()}.png`

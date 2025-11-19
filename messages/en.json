@@ -116,6 +116,8 @@
   "settingsDialog.upscaleScheduler": "Scheduler:",
   "settingsDialog.upscaleDenoise": "Denoise:",
   "settingsDialog.upscaleVae": "VAE:",
+  "settingsDialog.saveBaseImages": "Save Base Images",
+  "settingsDialog.saveUpscaleImages": "Save Upscale Images",
   "wildcardsEditor.title": "Wildcards Editor",
   "wildcardsEditor.closeAria": "Close dialog",
   "wildcardsEditor.loading": "Loading wildcards...",

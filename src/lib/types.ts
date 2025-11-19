@@ -29,6 +29,12 @@ export interface LoraWithWeight {
 
 export type ModelType = 'sdxl' | 'qwen' | 'qwen_nunchaku' | 'chroma' | 'flux1_krea'
 
+export enum ImageStage {
+  base = 'base',
+  after_refine = 'after_refine',
+  final = 'final'
+}
+
 export enum RefineMode {
   none = 1,
   upscale_only = 2,
@@ -63,6 +69,7 @@ export interface UpscaleSettings {
   scheduler: string
   denoise: number
   selectedVae: string
+  saveUpscaleImages: boolean
 }
 
 export interface ModelSettings {
@@ -82,6 +89,8 @@ export interface ModelSettings {
   customWorkflowPath?: string
   // Custom wildcards file path (optional, defaults to model type specific file)
   wildcardsFile?: string
+  // Save base images during generation
+  saveBaseImages?: boolean
 }
 
 export interface Settings {
