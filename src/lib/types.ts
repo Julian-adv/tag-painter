@@ -115,6 +115,34 @@ export interface Settings {
   customWorkflowPath?: string
 }
 
+export interface BaseGenerationMetadata {
+  steps: number
+  sampler: string
+  scheduler: string
+  cfgScale: number
+  seed: number
+  width: number
+  height: number
+  model: string
+  clipSkip: number
+}
+
+export interface SecondaryGenerationMetadata {
+  steps: number
+  sampler: string
+  scheduler: string
+  cfgScale: number
+  model: string
+  scale: number
+  denoise: number
+}
+
+export interface GenerationMetadataPayload {
+  base: BaseGenerationMetadata
+  upscale: SecondaryGenerationMetadata | null
+  faceDetailer: SecondaryGenerationMetadata | null
+}
+
 export interface PromptCategory {
   id: string
   name: string

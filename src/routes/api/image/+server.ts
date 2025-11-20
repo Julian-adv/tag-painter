@@ -10,7 +10,12 @@ import textChunk from 'png-chunk-text'
 import { DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
 import { getTodayDate, getFormattedTime } from '$lib/utils/date'
 import { findNodeByTitle } from '$lib/generation/workflowMapping'
-import type { ComfyUIWorkflow } from '$lib/types'
+import {
+  FaceDetailerMode,
+  RefineMode,
+  type ComfyUIWorkflow,
+  type GenerationMetadataPayload
+} from '$lib/types'
 
 interface PngChunk {
   name: string
@@ -135,6 +140,7 @@ export async function POST({ request }) {
     let promptText = ''
     let outputDirectory = DEFAULT_OUTPUT_DIRECTORY
     let workflowData: ComfyUIWorkflow | null = null
+    let metadataPayload: GenerationMetadataPayload | null = null
     const prompts: {
       all: string
       zone1: string
@@ -159,6 +165,7 @@ export async function POST({ request }) {
       const outputDir = formData.get('outputDirectory') as string
       const workflow = formData.get('workflow') as string
       const lorasData = formData.get('loras') as string
+      const metadataRaw = formData.get('metadata') as string
 
       // Parse LoRA data if provided
       if (lorasData) {
@@ -166,6 +173,15 @@ export async function POST({ request }) {
           loras = JSON.parse(lorasData)
         } catch (e) {
           console.warn('Failed to parse loras data:', e)
+        }
+      }
+
+      // Parse metadata snapshot first so we can avoid workflow parsing when present
+      if (metadataRaw) {
+        try {
+          metadataPayload = JSON.parse(metadataRaw) as GenerationMetadataPayload
+        } catch (e) {
+          console.warn('Failed to parse metadata payload:', e)
         }
       }
 
@@ -180,11 +196,13 @@ export async function POST({ request }) {
 
         outputDirectory = outputDir || DEFAULT_OUTPUT_DIRECTORY
 
-        // Parse workflow data
-        try {
-          workflowData = workflow ? JSON.parse(workflow) : null
-        } catch (e) {
-          console.warn('Failed to parse workflow data:', e)
+        if (!metadataPayload) {
+          // Parse workflow data as fallback
+          try {
+            workflowData = workflow ? JSON.parse(workflow) : null
+          } catch (e) {
+            console.warn('Failed to parse workflow data:', e)
+          }
         }
       } else {
         throw new Error('No image file found in form data')
@@ -215,120 +233,125 @@ export async function POST({ request }) {
     const fileName = `${getFormattedTime()}.png`
     const filePath = path.join(finalOutputDir, fileName)
 
+    const schedulerMap: Record<string, string> = {
+      simple: 'Simple',
+      sgm_uniform: 'SGM Uniform',
+      karras: 'Karras',
+      exponential: 'Exponential',
+      ddim_uniform: 'DDIM Uniform',
+      beta: 'Beta',
+      normal: 'Normal',
+      linear_quadratic: 'Linear Quadratic',
+      kl_optimal: 'KL Optimal'
+    }
+
+    const samplerMap: Record<string, string> = {
+      euler_ancestral: 'Euler a',
+      dpmpp_2m_sde: 'DPM++ 2M SDE',
+      dpmpp_2m: 'DPM++ 2M',
+      euler: 'Euler',
+      heun: 'Heun',
+      lms: 'LMS'
+    }
+
+    const normalizeScheduler = (value: string): string => {
+      if (!value) return 'Simple'
+      return schedulerMap[value] || value
+    }
+
+    const normalizeSampler = (value: string): string => {
+      if (!value) return ''
+      return samplerMap[value] || value
+    }
+
+    const normalizeModelName = (value: string): string => {
+      if (!value) return ''
+      return value.replace(/\.(safetensors|ckpt)$/, '')
+    }
+
     // Add metadata to PNG if prompt is provided
-    if (promptText && workflowData) {
-      // Extract parameters from workflow and settings using node titles
-      // Support multiple workflow types: SD, Qwen, Chroma, Flux1 Krea
-
-      // Scheduler nodes (SD uses BasicScheduler, others use KSampler directly)
-      const basicSchedulerNode = findNodeByTitle(workflowData, 'BasicScheduler')
-      const samplerCustomNode = findNodeByTitle(workflowData, 'SamplerCustom')
-      const ksamplerSelectNode = findNodeByTitle(workflowData, 'KSamplerSelect')
-      const ksamplerInpaintingNode = findNodeByTitle(workflowData, 'KSampler (inpainting)')
-      const ksamplerNode = findNodeByTitle(workflowData, 'KSampler') // Qwen/Chroma/Flux1
-      const emptyLatentNode = findNodeByTitle(workflowData, 'Empty Latent Image')
-
-      // Checkpoint nodes (different for each model type)
-      const sdCheckpointNode = findNodeByTitle(workflowData, 'Load Checkpoint') // SD/SDXL/Chroma
-      const qwenUnetNode = findNodeByTitle(workflowData, 'Load Qwen UNet') // Qwen
-      const qwenNunchakuNode = findNodeByTitle(workflowData, 'Nunchaku Qwen-Image DiT Loader') // Qwen (alternative)
-      const flux1UnetNode = findNodeByTitle(workflowData, 'Load Diffusion Model') // Flux1 Krea
-
-      // Helper to safely get input value as number
-      const getInputNumber = (nodeId: string | undefined, key: string, defaultValue: number): number => {
-        if (!nodeId || !workflowData[nodeId]) return defaultValue
-        const value = workflowData[nodeId].inputs[key]
-        return typeof value === 'number' ? value : defaultValue
-      }
-
-      // Helper to safely get input value as string
-      const getInputString = (nodeId: string | undefined, key: string, defaultValue: string): string => {
-        if (!nodeId || !workflowData[nodeId]) return defaultValue
-        const value = workflowData[nodeId].inputs[key]
-        return typeof value === 'string' ? value : defaultValue
-      }
-
-      const steps =
-        getInputNumber(basicSchedulerNode?.nodeId, 'steps', 0) ||
-        getInputNumber(ksamplerNode?.nodeId, 'steps', 0) ||
-        getInputNumber(ksamplerInpaintingNode?.nodeId, 'steps', 0) ||
-        28
-      const sampler =
-        getInputString(ksamplerSelectNode?.nodeId, 'sampler_name', '') ||
-        getInputString(ksamplerNode?.nodeId, 'sampler_name', '') ||
-        getInputString(ksamplerInpaintingNode?.nodeId, 'sampler_name', '') ||
-        'euler_ancestral'
-      const scheduler =
-        getInputString(basicSchedulerNode?.nodeId, 'scheduler', '') ||
-        getInputString(ksamplerNode?.nodeId, 'scheduler', '') ||
-        getInputString(ksamplerInpaintingNode?.nodeId, 'scheduler', '') ||
-        'simple'
-      const cfg =
-        getInputNumber(samplerCustomNode?.nodeId, 'cfg', 0) ||
-        getInputNumber(ksamplerNode?.nodeId, 'cfg', 0) ||
-        getInputNumber(ksamplerInpaintingNode?.nodeId, 'cfg', 0) ||
-        5
-      const workflowSeed =
-        getInputNumber(samplerCustomNode?.nodeId, 'noise_seed', 0) ||
-        getInputNumber(ksamplerNode?.nodeId, 'seed', 0) ||
-        getInputNumber(ksamplerInpaintingNode?.nodeId, 'seed', 0) ||
-        seed
-      const width = getInputNumber(emptyLatentNode?.nodeId, 'width', 832)
-      const height = getInputNumber(emptyLatentNode?.nodeId, 'height', 1216)
-
-      // Get model name from the appropriate checkpoint node based on model type
-      const model =
-        getInputString(sdCheckpointNode?.nodeId, 'ckpt_name', '') ||
-        getInputString(qwenUnetNode?.nodeId, 'unet_name', '') ||
-        getInputString(qwenNunchakuNode?.nodeId, 'model_name', '') ||
-        getInputString(flux1UnetNode?.nodeId, 'unet_name', '') ||
-        'unknown'
-
-      // Convert scheduler to proper format
-      const schedulerMap: Record<string, string> = {
-        simple: 'Simple',
-        sgm_uniform: 'SGM Uniform',
-        karras: 'Karras',
-        exponential: 'Exponential',
-        ddim_uniform: 'DDIM Uniform',
-        beta: 'Beta',
-        normal: 'Normal',
-        linear_quadratic: 'Linear Quadratic',
-        kl_optimal: 'KL Optimal'
-      }
-      const scheduleType = schedulerMap[scheduler] || 'Simple'
-
-      // Convert sampler name to proper format
-      const samplerMap: Record<string, string> = {
-        euler_ancestral: 'Euler a',
-        dpmpp_2m_sde: 'DPM++ 2M SDE',
-        dpmpp_2m: 'DPM++ 2M',
-        euler: 'Euler',
-        heun: 'Heun',
-        lms: 'LMS'
-      }
-      const samplerName = samplerMap[sampler] || sampler
-
-      // Extract model name without extension
-      const modelName = model.replace(/\.(safetensors|ckpt)$/, '')
-
-      // Format prompt in WebUI style with parameters
+    if (promptText && (metadataPayload || workflowData)) {
+      // Extract parameters from metadata snapshot if available; fall back to workflow parsing
       const zoneLines = []
       if (prompts.all) zoneLines.push(`All: ${prompts.all}`)
       if (prompts.zone1) zoneLines.push(`First Zone: ${prompts.zone1}`)
       if (prompts.zone2) zoneLines.push(`Second Zone: ${prompts.zone2}`)
+      let parametersText = ''
 
-      // Format LoRA information
-      let loraText = ''
-      if (loras && loras.length > 0) {
-        const loraStrings = loras.map((lora) => `${lora.name}:${lora.weight}`)
-        loraText = `, Lora: ${loraStrings.join(', ')}`
+      const buildParameterLine = (
+        label: string,
+        params: {
+          steps: number | string | null
+          sampler: string | null
+          scheduler: string | null
+          cfgScale: number | string | null
+          model: string | null
+          scale: number | string | null
+          denoise: number | string | null
+        }
+      ): string => {
+        const stepsText = params.steps ?? '-'
+        const samplerText = params.sampler ? normalizeSampler(params.sampler) : '-'
+        const schedulerText = params.scheduler ? normalizeScheduler(params.scheduler) : '-'
+        const cfgText = params.cfgScale ?? '-'
+        const modelText = params.model ? normalizeModelName(params.model) : '-'
+        const scaleText = params.scale ?? '-'
+        const denoiseText = params.denoise ?? '-'
+        return `${label}: Steps: ${stepsText}, Sampler: ${samplerText}, Schedule type: ${schedulerText}, CFG scale: ${cfgText}, Scale: ${scaleText}, Denoise: ${denoiseText}, Model: ${modelText}`
       }
 
-      const parametersText = `${promptText}
-${zoneLines.join('\n')}
-Negative prompt: ${prompts.negative}
-Steps: ${steps}, Sampler: ${samplerName}, Schedule type: ${scheduleType}, CFG scale: ${cfg}, Seed: ${workflowSeed}, Size: ${width}x${height}, Model: ${modelName}${loraText}`
+      if (metadataPayload) {
+        const loraText =
+          loras && loras.length > 0
+            ? `, Lora: ${loras.map((lora) => `${lora.name}:${lora.weight}`).join(', ')}`
+            : ''
+
+        const baseLine = `Steps: ${metadataPayload.base.steps || '-'}, Sampler: ${normalizeSampler(
+          metadataPayload.base.sampler
+        )}, Schedule type: ${normalizeScheduler(
+          metadataPayload.base.scheduler
+        )}, CFG scale: ${metadataPayload.base.cfgScale || '-'}, Seed: ${
+          metadataPayload.base.seed
+        }, Size: ${metadataPayload.base.width}x${metadataPayload.base.height}, CLIP skip: ${
+          metadataPayload.base.clipSkip
+        }, Model: ${normalizeModelName(metadataPayload.base.model)}${loraText}`
+
+        const parameterLines = [promptText]
+        if (zoneLines.length > 0) {
+          parameterLines.push(zoneLines.join('\n'))
+        }
+        parameterLines.push(`Negative prompt: ${prompts.negative}`, baseLine)
+
+        if (metadataPayload.upscale) {
+          parameterLines.push(
+            buildParameterLine('Upscale', {
+              steps: metadataPayload.upscale.steps,
+              sampler: metadataPayload.upscale.sampler,
+              scheduler: metadataPayload.upscale.scheduler,
+              cfgScale: metadataPayload.upscale.cfgScale,
+              model: metadataPayload.upscale.model,
+              scale: metadataPayload.upscale.scale,
+              denoise: metadataPayload.upscale.denoise
+            })
+          )
+        }
+
+        if (metadataPayload.faceDetailer) {
+          parameterLines.push(
+            buildParameterLine('Face detailer', {
+              steps: metadataPayload.faceDetailer.steps,
+              sampler: metadataPayload.faceDetailer.sampler,
+              scheduler: metadataPayload.faceDetailer.scheduler,
+              cfgScale: metadataPayload.faceDetailer.cfgScale,
+              model: metadataPayload.faceDetailer.model,
+              scale: metadataPayload.faceDetailer.scale,
+              denoise: metadataPayload.faceDetailer.denoise
+            })
+          )
+        }
+
+        parametersText = parameterLines.filter((line) => line !== '').join('\n')
+      }
 
       try {
         // First process the image with Sharp

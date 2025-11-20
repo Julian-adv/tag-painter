@@ -14,7 +14,13 @@ import {
   INTERMEDIATE_SAVE_NODE_ID,
   INTERMEDIATE_SAVE_NODE_ID_2
 } from './workflow'
-import type { Settings, ProgressData, ComfyUIWorkflow, ModelSettings } from '$lib/types'
+import type {
+  Settings,
+  ProgressData,
+  ComfyUIWorkflow,
+  ModelSettings,
+  GenerationMetadataPayload
+} from '$lib/types'
 import { ImageStage } from '$lib/types'
 
 export function generateClientId(): string {
@@ -141,7 +147,8 @@ export async function submitToComfyUI(
   },
   saveBaseImages = false,
   saveUpscaleImages = false,
-  loras?: { name: string; weight: number }[]
+  loras?: { name: string; weight: number }[],
+  metadata: GenerationMetadataPayload | null = null
 ) {
   const payload = {
     prompt: workflow,
@@ -204,8 +211,15 @@ export async function submitToComfyUI(
       }
 
       const filePath =
-        (await saveImage(imageBlob, prompts, settings.outputDirectory, workflow, seed, loras)) ||
-        `unsaved_${Date.now()}.png`
+        (await saveImage(
+          imageBlob,
+          prompts,
+          settings.outputDirectory,
+          workflow,
+          seed,
+          loras,
+          metadata
+        )) || `unsaved_${Date.now()}.png`
       callbacks.onImageReceived(imageBlob, filePath)
     }
   }

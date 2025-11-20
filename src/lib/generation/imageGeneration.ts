@@ -7,7 +7,8 @@ import type {
   Settings,
   ProgressData,
   ComfyUIWorkflow,
-  ModelSettings
+  ModelSettings,
+  GenerationMetadataPayload
 } from '$lib/types'
 import { RefineMode, FaceDetailerMode } from '$lib/types'
 import { findNodeByTitle } from './workflowMapping'
@@ -258,6 +259,48 @@ export async function generateImage(
     // Build workflow using universal workflow builder
     const appliedSettings = applyPerModelOverrides(settings, promptsData.selectedCheckpoint)
 
+    const clipSkipValue = appliedSettings.clipSkip ?? 0
+    const checkpointName = promptsData.selectedCheckpoint || ''
+    const metadataPayload: GenerationMetadataPayload | null = modelSettings
+      ? {
+          base: {
+            steps: modelSettings.steps,
+            sampler: modelSettings.sampler,
+            scheduler: modelSettings.scheduler,
+            cfgScale: modelSettings.cfgScale,
+            seed: appliedSeed,
+            width: appliedSettings.imageWidth,
+            height: appliedSettings.imageHeight,
+            model: checkpointName,
+            clipSkip: clipSkipValue
+          },
+          upscale:
+            refineMode === RefineMode.none
+              ? null
+              : {
+                  steps: modelSettings.upscale.steps,
+                  sampler: modelSettings.upscale.sampler,
+                  scheduler: modelSettings.upscale.scheduler,
+                  cfgScale: modelSettings.upscale.cfgScale,
+                  model: modelSettings.upscale.checkpoint,
+                  scale: modelSettings.upscale.scale,
+                  denoise: modelSettings.upscale.denoise
+                },
+          faceDetailer:
+            faceDetailerMode === FaceDetailerMode.none
+              ? null
+              : {
+                  steps: modelSettings.faceDetailer.steps,
+                  sampler: modelSettings.faceDetailer.sampler,
+                  scheduler: modelSettings.faceDetailer.scheduler,
+                  cfgScale: modelSettings.faceDetailer.cfgScale,
+                  model: modelSettings.faceDetailer.checkpoint,
+                  scale: 1,
+                  denoise: modelSettings.faceDetailer.denoise
+                }
+        }
+      : null
+
     const workflow = await buildWorkflow(
       allTagsText,
       zone1TagsText,
@@ -294,7 +337,8 @@ export async function generateImage(
       },
       modelSettings?.saveBaseImages ?? false,
       modelSettings?.upscale?.saveUpscaleImages ?? false,
-      modelSettings?.loras ?? []
+      modelSettings?.loras ?? [],
+      metadataPayload
     )
 
     return {

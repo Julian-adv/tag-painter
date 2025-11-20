@@ -6,7 +6,7 @@
 // - Settings management
 // - Image list retrieval
 
-import type { Settings, PromptsData } from '$lib/types'
+import type { Settings, PromptsData, GenerationMetadataPayload } from '$lib/types'
 import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
 
 export async function savePrompts(data: PromptsData): Promise<void> {
@@ -48,7 +48,8 @@ export async function saveImage(
   outputDirectory: string,
   workflow: unknown,
   seed: number,
-  loras?: { name: string; weight: number }[]
+  loras?: { name: string; weight: number }[],
+  metadata: GenerationMetadataPayload | null = null
 ): Promise<string | null> {
   try {
     // Send as form data with prompt metadata and output directory
@@ -70,6 +71,11 @@ export async function saveImage(
     // Add LoRA information if provided
     if (loras && loras.length > 0) {
       formData.append('loras', JSON.stringify(loras))
+    }
+
+    // Add generation metadata snapshot to avoid workflow parsing
+    if (metadata) {
+      formData.append('metadata', JSON.stringify(metadata))
     }
 
     const response = await fetch('/api/image', {
