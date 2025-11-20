@@ -142,6 +142,7 @@ export async function POST({ request }) {
       negative: string
     } = { all: '', zone1: '', zone2: '', negative: '' }
     let seed = 0
+    let loras: { name: string; weight: number }[] = []
 
     if (contentType?.includes('multipart/form-data')) {
       // Handle form data with prompt metadata and output directory
@@ -157,6 +158,16 @@ export async function POST({ request }) {
 
       const outputDir = formData.get('outputDirectory') as string
       const workflow = formData.get('workflow') as string
+      const lorasData = formData.get('loras') as string
+
+      // Parse LoRA data if provided
+      if (lorasData) {
+        try {
+          loras = JSON.parse(lorasData)
+        } catch (e) {
+          console.warn('Failed to parse loras data:', e)
+        }
+      }
 
       if (imageFile) {
         imageBuffer = Buffer.from(await imageFile.arrayBuffer())
@@ -307,10 +318,17 @@ export async function POST({ request }) {
       if (prompts.zone1) zoneLines.push(`First Zone: ${prompts.zone1}`)
       if (prompts.zone2) zoneLines.push(`Second Zone: ${prompts.zone2}`)
 
+      // Format LoRA information
+      let loraText = ''
+      if (loras && loras.length > 0) {
+        const loraStrings = loras.map((lora) => `${lora.name}:${lora.weight}`)
+        loraText = `, Lora: ${loraStrings.join(', ')}`
+      }
+
       const parametersText = `${promptText}
 ${zoneLines.join('\n')}
 Negative prompt: ${prompts.negative}
-Steps: ${steps}, Sampler: ${samplerName}, Schedule type: ${scheduleType}, CFG scale: ${cfg}, Seed: ${workflowSeed}, Size: ${width}x${height}, Model: ${modelName}`
+Steps: ${steps}, Sampler: ${samplerName}, Schedule type: ${scheduleType}, CFG scale: ${cfg}, Seed: ${workflowSeed}, Size: ${width}x${height}, Model: ${modelName}${loraText}`
 
       try {
         // First process the image with Sharp

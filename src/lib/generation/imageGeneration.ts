@@ -293,7 +293,8 @@ export async function generateImage(
         onImageReceived
       },
       modelSettings?.saveBaseImages ?? false,
-      modelSettings?.upscale?.saveUpscaleImages ?? false
+      modelSettings?.upscale?.saveUpscaleImages ?? false,
+      modelSettings?.loras ?? []
     )
 
     return {

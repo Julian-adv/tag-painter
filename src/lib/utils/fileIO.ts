@@ -47,7 +47,8 @@ export async function saveImage(
   },
   outputDirectory: string,
   workflow: unknown,
-  seed: number
+  seed: number,
+  loras?: { name: string; weight: number }[]
 ): Promise<string | null> {
   try {
     // Send as form data with prompt metadata and output directory
@@ -65,6 +66,11 @@ export async function saveImage(
 
     // Add workflow data for metadata generation
     formData.append('workflow', JSON.stringify(workflow))
+
+    // Add LoRA information if provided
+    if (loras && loras.length > 0) {
+      formData.append('loras', JSON.stringify(loras))
+    }
 
     const response = await fetch('/api/image', {
       method: 'POST',

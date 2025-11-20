@@ -140,7 +140,8 @@ export async function submitToComfyUI(
     onImageReceived: (imageBlob: Blob, filePath: string) => void
   },
   saveBaseImages = false,
-  saveUpscaleImages = false
+  saveUpscaleImages = false,
+  loras?: { name: string; weight: number }[]
 ) {
   const payload = {
     prompt: workflow,
@@ -203,7 +204,7 @@ export async function submitToComfyUI(
       }
 
       const filePath =
-        (await saveImage(imageBlob, prompts, settings.outputDirectory, workflow, seed)) ||
+        (await saveImage(imageBlob, prompts, settings.outputDirectory, workflow, seed, loras)) ||
         `unsaved_${Date.now()}.png`
       callbacks.onImageReceived(imageBlob, filePath)
     }

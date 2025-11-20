@@ -1,6 +1,6 @@
 <!-- Component for displaying PNG metadata information -->
 <script lang="ts">
-  import ClipboardDocument from 'svelte-heros-v2/ClipboardDocument.svelte'
+  import CopyButton from './CopyButton.svelte'
 
   interface Props {
     metadata: Record<string, unknown> | null
@@ -21,6 +21,7 @@
     seed?: string
     size?: string
     model?: string
+    loras?: { name: string; weight: number }[]
   }
 
   function parseParameters(parametersText: string): ParsedParameters {
@@ -49,7 +50,8 @@
         const cfgMatch = settingsLine.match(/CFG scale: ([^,]+)/)
         const seedMatch = settingsLine.match(/Seed: ([^,]+)/)
         const sizeMatch = settingsLine.match(/Size: ([^,]+)/)
-        const modelMatch = settingsLine.match(/Model: (.+)$/)
+        const modelMatch = settingsLine.match(/Model: ([^,]+?)(?:, Lora:|$)/)
+        const loraMatch = settingsLine.match(/Lora: (.+)$/)
 
         if (stepsMatch) result.steps = stepsMatch[1]
         if (samplerMatch) result.sampler = samplerMatch[1].trim()
@@ -58,6 +60,24 @@
         if (seedMatch) result.seed = seedMatch[1].trim()
         if (sizeMatch) result.size = sizeMatch[1].trim()
         if (modelMatch) result.model = modelMatch[1].trim()
+
+        // Parse LoRA information
+        if (loraMatch) {
+          const loraString = loraMatch[1].trim()
+          const loraItems = loraString.split(', ')
+          result.loras = loraItems
+            .map((item) => {
+              const parts = item.split(':')
+              if (parts.length === 2) {
+                return {
+                  name: parts[0].trim(),
+                  weight: parseFloat(parts[1].trim())
+                }
+              }
+              return null
+            })
+            .filter((lora): lora is { name: string; weight: number } => lora !== null)
+        }
       } else if (!foundNegativePrompt && line.trim()) {
         promptLines.push(line)
       }
@@ -87,43 +107,6 @@
     }
     return Object.entries(data)
   }
-
-  let copiedField = $state<string | null>(null)
-
-  async function copyToClipboard(text: string, fieldName: string) {
-    try {
-      // Try using the modern clipboard API
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text)
-        copiedField = fieldName
-        setTimeout(() => {
-          copiedField = null
-        }, 300)
-      } else {
-        // Fallback for older browsers or insecure contexts
-        const textArea = document.createElement('textarea')
-        textArea.value = text
-        textArea.style.position = 'fixed'
-        textArea.style.left = '-999999px'
-        document.body.appendChild(textArea)
-        textArea.select()
-        try {
-          document.execCommand('copy')
-          copiedField = fieldName
-          setTimeout(() => {
-            copiedField = null
-          }, 300)
-        } catch (fallbackErr) {
-          console.error('Fallback copy failed:', fallbackErr)
-          alert('Failed to copy to clipboard')
-        }
-        document.body.removeChild(textArea)
-      }
-    } catch (err) {
-      console.error('Failed to copy to clipboard:', err)
-      alert('Failed to copy to clipboard')
-    }
-  }
 </script>
 
 <div class="flex h-full flex-col border-gray-300 bg-white p-0 shadow-sm">
@@ -131,7 +114,7 @@
     {#if !metadata}
       <p class="text-sm text-gray-500">No metadata available</p>
     {:else}
-      <table class="w-full border-collapse text-sm">
+      <table class="w-full border-collapse text-sm max-w-full" style="table-layout: fixed;">
         <thead>
           <tr class="border-b border-gray-300 bg-gray-50">
             <th class="px-3 py-2 text-left font-semibold text-gray-700">Key</th>
@@ -150,15 +133,7 @@
                 <tr class="border-b-0 hover:bg-gray-50">
                   <td class="px-3 py-2 text-left font-medium text-gray-800">Prompt</td>
                   <td class="px-3 py-2 text-right">
-                    <button
-                      onclick={() => copyToClipboard(parsed.prompt, 'prompt')}
-                      class="rounded p-1 {copiedField === 'prompt'
-                        ? 'bg-green-500 text-white'
-                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'}"
-                      title={copiedField === 'prompt' ? 'Copied!' : 'Copy to clipboard'}
-                    >
-                      <ClipboardDocument class="h-4 w-4" />
-                    </button>
+                    <CopyButton text={parsed.prompt} />
                   </td>
                 </tr>
                 <tr class="border-b border-gray-200 hover:bg-gray-50">
@@ -174,15 +149,7 @@
                 <tr class="border-b-0 hover:bg-gray-50">
                   <td class="px-3 py-2 text-left font-medium text-gray-800">All</td>
                   <td class="px-3 py-2 text-right">
-                    <button
-                      onclick={() => copyToClipboard(parsed.all ?? '', 'all')}
-                      class="rounded p-1 {copiedField === 'all'
-                        ? 'bg-green-500 text-white'
-                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'}"
-                      title={copiedField === 'all' ? 'Copied!' : 'Copy to clipboard'}
-                    >
-                      <ClipboardDocument class="h-4 w-4" />
-                    </button>
+                    <CopyButton text={parsed.all ?? ''} />
                   </td>
                 </tr>
                 <tr class="border-b border-gray-200 hover:bg-gray-50">
@@ -198,15 +165,7 @@
                 <tr class="border-b-0 hover:bg-gray-50">
                   <td class="px-3 py-2 text-left font-medium text-gray-800">First Zone</td>
                   <td class="px-3 py-2 text-right">
-                    <button
-                      onclick={() => copyToClipboard(parsed.firstZone ?? '', 'firstZone')}
-                      class="rounded p-1 {copiedField === 'firstZone'
-                        ? 'bg-green-500 text-white'
-                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'}"
-                      title={copiedField === 'firstZone' ? 'Copied!' : 'Copy to clipboard'}
-                    >
-                      <ClipboardDocument class="h-4 w-4" />
-                    </button>
+                    <CopyButton text={parsed.firstZone ?? ''} />
                   </td>
                 </tr>
                 <tr class="border-b border-gray-200 hover:bg-gray-50">
@@ -222,15 +181,7 @@
                 <tr class="border-b-0 hover:bg-gray-50">
                   <td class="px-3 py-2 text-left font-medium text-gray-800">Second Zone</td>
                   <td class="px-3 py-2 text-right">
-                    <button
-                      onclick={() => copyToClipboard(parsed.secondZone ?? '', 'secondZone')}
-                      class="rounded p-1 {copiedField === 'secondZone'
-                        ? 'bg-green-500 text-white'
-                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'}"
-                      title={copiedField === 'secondZone' ? 'Copied!' : 'Copy to clipboard'}
-                    >
-                      <ClipboardDocument class="h-4 w-4" />
-                    </button>
+                    <CopyButton text={parsed.secondZone ?? ''} />
                   </td>
                 </tr>
                 <tr class="border-b border-gray-200 hover:bg-gray-50">
@@ -246,15 +197,7 @@
                 <tr class="border-b-0 hover:bg-gray-50">
                   <td class="px-3 py-2 text-left font-medium text-gray-800">Negative Prompt</td>
                   <td class="px-3 py-2 text-right">
-                    <button
-                      onclick={() => copyToClipboard(parsed.negativePrompt ?? '', 'negativePrompt')}
-                      class="rounded p-1 {copiedField === 'negativePrompt'
-                        ? 'bg-green-500 text-white'
-                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'}"
-                      title={copiedField === 'negativePrompt' ? 'Copied!' : 'Copy to clipboard'}
-                    >
-                      <ClipboardDocument class="h-4 w-4" />
-                    </button>
+                    <CopyButton text={parsed.negativePrompt ?? ''} />
                   </td>
                 </tr>
                 <tr class="border-b border-gray-200 hover:bg-gray-50">
@@ -306,6 +249,30 @@
                 <tr class="border-b border-gray-200 hover:bg-gray-50">
                   <td class="px-3 py-2 text-left font-medium text-gray-800">Model</td>
                   <td class="px-3 py-2 text-left text-gray-600">{parsed.model}</td>
+                </tr>
+              {/if}
+              {#if parsed.loras && parsed.loras.length > 0}
+                <tr class="border-b-0 hover:bg-gray-50">
+                  <td class="px-3 py-2 text-left font-medium text-gray-800">LoRAs</td>
+                  <td class="px-3 py-2 text-right">
+                    <CopyButton
+                      text={parsed.loras?.map((l) => `${l.name}:${l.weight}`).join(', ') ?? ''}
+                    />
+                  </td>
+                </tr>
+                <tr class="border-b border-gray-200 hover:bg-gray-50">
+                  <td colspan="2" class="px-3 py-2">
+                    <div class="flex flex-col gap-1">
+                      {#each parsed.loras as lora}
+                        <div class="flex items-center gap-4 text-sm min-w-0">
+                          <span class="text-gray-700 truncate flex-1 text-left" title={lora.name}
+                            >{lora.name}</span
+                          >
+                          <span class="text-gray-500 flex-shrink-0">{lora.weight}</span>
+                        </div>
+                      {/each}
+                    </div>
+                  </td>
                 </tr>
               {/if}
             {:else}
