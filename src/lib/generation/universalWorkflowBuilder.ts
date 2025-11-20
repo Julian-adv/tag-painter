@@ -115,7 +115,9 @@ export async function buildWorkflow(
     )
   }
 
+  const faceDetailerPrompt = `[ASC] ${zone1TagsText} [SEP] ${zone2TagsText} [SEP]`
   if (faceDetailerMode === FaceDetailerMode.face_detail) {
+    setRequiredNodeInput(workflow, 'Detailer (SEGS)', 'seed', seed)
     setRequiredNodeInput(workflow, 'Detailer (SEGS)', 'steps', modelSettings.faceDetailer.steps)
     setRequiredNodeInput(workflow, 'Detailer (SEGS)', 'cfg', modelSettings.faceDetailer.cfgScale)
     setRequiredNodeInput(
@@ -131,6 +133,7 @@ export async function buildWorkflow(
       modelSettings.faceDetailer.scheduler
     )
     setRequiredNodeInput(workflow, 'Detailer (SEGS)', 'denoise', modelSettings.faceDetailer.denoise)
+    setRequiredNodeInput(workflow, 'Detailer (SEGS)', 'wildcard', faceDetailerPrompt)
   } else if (faceDetailerMode === FaceDetailerMode.face_detail_sdxl) {
     setRequiredNodeInput(
       workflow,
@@ -138,6 +141,7 @@ export async function buildWorkflow(
       'ckpt_name',
       modelSettings.faceDetailer.checkpoint
     )
+    setRequiredNodeInput(workflow, 'Detailer (SEGS) (sdxl)', 'seed', seed)
     setRequiredNodeInput(
       workflow,
       'Detailer (SEGS) (sdxl)',
@@ -168,6 +172,7 @@ export async function buildWorkflow(
       'denoise',
       modelSettings.faceDetailer.denoise
     )
+    setRequiredNodeInput(workflow, 'Detailer (SEGS) (sdxl)', 'wildcard', faceDetailerPrompt)
   }
 
   // Set film grain mode
@@ -192,8 +197,6 @@ export async function buildWorkflow(
   }
   setRequiredNodeInput(workflow, 'Negative prompt', 'value', negativeText)
 
-  setRequiredNodeInput(workflow, 'Detailer (SEGS)', 'seed', seed)
-  setRequiredNodeInput(workflow, 'Detailer (SEGS) (sdxl)', 'seed', seed)
   setRequiredNodeInput(workflow, 'KSampler (base)', 'seed', seed)
   setRequiredNodeInput(workflow, 'KSampler (refine)', 'seed', seed)
   setRequiredNodeInput(workflow, 'KSampler (refine sdxl)', 'seed', seed)
