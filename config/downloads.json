@@ -108,16 +108,6 @@
       "category": "sam"
     },
     {
-      "label": "ControlNet OpenPose XL2",
-      "filename": "OpenPoseXL2.safetensors",
-      "urls": [
-        "https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0/resolve/main/OpenPoseXL2.safetensors",
-        "https://huggingface.co/SteezyAI/ControlNet-OpenPose-SDXL/resolve/main/OpenPoseXL2.safetensors"
-      ],
-      "destRelativeToComfy": "models/controlnet/OpenPoseXL2.safetensors",
-      "category": "controlnet"
-    },
-    {
       "label": "ControlNet Aux body_pose_model.pth",
       "filename": "body_pose_model.pth",
       "urls": ["https://huggingface.co/lllyasviel/Annotators/resolve/main/body_pose_model.pth"],
@@ -137,15 +127,6 @@
       "urls": ["https://huggingface.co/lllyasviel/Annotators/resolve/main/facenet.pth"],
       "destRelativeToComfy": "custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators/facenet.pth",
       "category": "annotator"
-    },
-    {
-      "label": "Zeniji Mix Qwen V1 FP8 Diffusion Model",
-      "filename": "Zeniji_mix_qwen_v1_fp8.safetensors",
-      "urls": [
-        "https://huggingface.co/zeniji/Zeniji_mix_Qwen_v1_fp8/resolve/main/Zeniji_mix_qwen_v1_fp8.safetensors?download=true"
-      ],
-      "destRelativeToComfy": "models/diffusion_models/Zeniji_mix_qwen_v1_fp8.safetensors",
-      "category": "diffusion"
     },
     {
       "label": "Perfect Deliberate v2.0",
@@ -242,6 +223,33 @@
       "filename": "ComfyUI-Easy-Use",
       "urls": ["https://github.com/yolain/ComfyUI-Easy-Use.git"],
       "destRelativeToComfy": "custom_nodes/ComfyUI-Easy-Use",
+      "category": "custom-node",
+      "kind": "git",
+      "branch": "main"
+    },
+    {
+      "label": "rgthree-comfy",
+      "filename": "rgthree-comfy",
+      "urls": ["https://github.com/rgthree/rgthree-comfy.git"],
+      "destRelativeToComfy": "custom_nodes/rgthree-comfy",
+      "category": "custom-node",
+      "kind": "git",
+      "branch": "main"
+    },
+    {
+      "label": "comfyui-vrgamedevgirl",
+      "filename": "comfyui-vrgamedevgirl",
+      "urls": ["https://github.com/vrgamegirl19/comfyui-vrgamedevgirl.git"],
+      "destRelativeToComfy": "custom_nodes/comfyui-vrgamedevgirl",
+      "category": "custom-node",
+      "kind": "git",
+      "branch": "main"
+    },
+    {
+      "label": "ComfyUI-GGUF",
+      "filename": "ComfyUI-GGUF",
+      "urls": ["https://github.com/city96/ComfyUI-GGUF.git"],
+      "destRelativeToComfy": "custom_nodes/ComfyUI-GGUF",
       "category": "custom-node",
       "kind": "git",
       "branch": "main"

@@ -78,11 +78,13 @@ try {
     "settings.json",
     "wildcards.yaml",
     "wildcards.qwen.yaml",
+    "wildcards.new.yaml",
     "Vision2.1.yaml",
     "system_prompt.qwen.json",
     "system_prompt.qwen.txt",
     "system_prompt.sdxl.json",
-    "system_prompt.sdxl.txt"
+    "system_prompt.sdxl.txt",
+    "install_wheel.api.json"
   )
   foreach ($file in $dataFiles) {
     $srcPath = Join-Path "data" $file

@@ -162,20 +162,45 @@ async function findGitExecutable(): Promise<string> {
 async function installRequirementsIfPresent(destDir: string): Promise<void> {
   const requirementsPath = path.join(destDir, 'requirements.txt')
   if (!(await fileExists(requirementsPath))) return
+
+  // Wait for filesystem to sync after git clone
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+
   const python = await findComfyPython()
   if (!python) {
     throw new Error('Python environment not found (expected vendor/comfy-venv)')
   }
-  await new Promise<void>((resolve, reject) => {
-    const proc = spawn(python, ['-m', 'pip', 'install', '-r', requirementsPath], {
-      stdio: 'inherit'
+
+  try {
+    // Try to use pip directly first (more reliable)
+    const pipPath = python.replace(/python(\.exe)?$/i, process.platform === 'win32' ? 'pip.exe' : 'pip')
+    const usePipDirect = await fileExists(pipPath)
+
+    const command = usePipDirect ? pipPath : python
+    const args = usePipDirect
+      ? ['install', '--no-warn-conflicts', '-r', requirementsPath]
+      : ['-m', 'pip', 'install', '--no-warn-conflicts', '-r', requirementsPath]
+
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn(command, args, {
+        stdio: 'inherit',
+        shell: false
+      })
+      proc.on('error', (err) => reject(err))
+      proc.on('close', (code) => {
+        if (code === 0) resolve()
+        else reject(new Error(`pip exited with code ${code}`))
+      })
     })
-    proc.on('error', (err) => reject(err))
-    proc.on('close', (code) => {
-      if (code === 0) resolve()
-      else reject(new Error(`pip exited with code ${code}`))
-    })
-  })
+  } catch (err) {
+    // Log warning but don't fail the entire installation
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn(`Warning: Failed to install requirements for ${destDir}: ${message}`)
+    console.warn('Continuing with installation...')
+  }
+
+  // Wait after installation to prevent race conditions with next installation
+  await new Promise((resolve) => setTimeout(resolve, 500))
 }
 
 async function cloneGitRepository(
@@ -489,7 +514,7 @@ export async function handlePostDownloads(request: Request): Promise<Response> {
 
           send({
             type: 'all-complete',
-            success: failed.length === 0,
+            success: ok.length > 0,
             ok,
             failed
           })

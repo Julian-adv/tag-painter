@@ -243,14 +243,18 @@
         })
       }
 
-      const finalResult = summary ?? { success: failed.length === 0, ok, failed }
+      const finalResult = summary ?? { success: ok.length > 0, ok, failed }
       result = finalResult
-      if (finalResult.success) {
+      if (finalResult.ok.length > 0) {
         status = 'completed'
         await loadItems()
+        if (finalResult.failed.length > 0) {
+          const message = `Warning: ${finalResult.failed.length} file(s) failed to download (${finalResult.ok.length} succeeded)`
+          downloadError = message
+        }
       } else {
         status = 'error'
-        const message = `Failed to download ${finalResult.failed.length} file(s)`
+        const message = `Failed to download all ${finalResult.failed.length} file(s)`
         downloadError = message
       }
     } catch (err) {
