@@ -1,6 +1,6 @@
 param(
   [int]$Port = 3000,
-  [switch]$OpenBrowser,
+  [switch]$OpenBrowser = $true,
   [switch]$Help
 )
 
