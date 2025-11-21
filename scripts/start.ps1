@@ -54,9 +54,49 @@ if ($Help) {
 
 Push-Location (Resolve-Path (Join-Path $PSScriptRoot ".."))
 try {
+  # Check if Node is missing
+  $needsBootstrap = $false
+
+  if (-not (Test-Path "vendor\\node\\node.exe")) {
+    Write-Host "Node.js not found in vendor directory. Bootstrap required." -ForegroundColor Yellow
+    $needsBootstrap = $true
+  }
+
+  if ($needsBootstrap) {
+    Write-Host "Running bootstrap..." -ForegroundColor Yellow
+    & pwsh -File "scripts\\bootstrap.ps1"
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "Bootstrap failed. Please run 'pwsh -File scripts\\bootstrap.ps1' manually." -ForegroundColor Red
+      exit 1
+    }
+    # Wait for file system to settle after bootstrap
+    Write-Host "Waiting for bootstrap to complete..." -ForegroundColor DarkCyan
+    Start-Sleep -Seconds 2
+    # After bootstrap, open browser automatically
+    $OpenBrowser = $true
+  }
+
   if (-not (Test-Path "node_modules")) {
     Write-Host "Installing Node dependencies (npm ci)..." -ForegroundColor DarkCyan
-    npm ci
+
+    # Set up PATH to use vendor node
+    if (Test-Path "vendor\\node\\node.exe") {
+      $vendorNodePath = Resolve-Path "vendor\\node"
+      $env:PATH = "$vendorNodePath;" + $env:PATH
+      Write-Host "Using vendor Node.js" -ForegroundColor DarkCyan
+    }
+
+    $npm = "npm"
+    if (Test-Path "vendor\\node\\npm.cmd") {
+      $npm = Join-Path (Resolve-Path "vendor\\node") "npm.cmd"
+    }
+
+    & $npm ci
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "npm ci failed. Please check the error messages above." -ForegroundColor Red
+      exit 1
+    }
+    Write-Host "Node dependencies installed successfully." -ForegroundColor Green
   }
 
   $server = Start-NodeServer -port $Port

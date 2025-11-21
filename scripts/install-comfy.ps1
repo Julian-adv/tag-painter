@@ -184,9 +184,12 @@ function Install-ComfyUISource($vendorDir, $comfyDir) {
   } else {
     git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git $comfyDir
   }
-  if ($LASTEXITCODE -ne 0) {
-    throw "Failed to clone ComfyUI repository"
+
+  # Check if clone was successful by verifying main.py exists
+  if (-not (Test-Path (Join-Path $comfyDir "main.py"))) {
+    throw "ComfyUI clone failed - main.py not found in $comfyDir"
   }
+
   Write-Host "ComfyUI cloned to: $comfyDir" -ForegroundColor Green
 }
 
@@ -194,41 +197,59 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
   $uv = Install-Uv $vendorDir
   $venvDir = Join-Path $vendorDir "comfy-venv"
   Write-Header "Python venv"
-  & $uv python install $pythonVersion
+
+  # Always recreate venv to avoid corruption issues
   if (Test-Path $venvDir) {
-    try {
-      $pyExisting = Join-Path $venvDir "Scripts\python.exe"
-      $verOut = & $pyExisting -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')"
-      if ($verOut.Trim() -ne $pythonVersion) {
-        Write-Host "Recreating venv with Python $pythonVersion (was $verOut)." -ForegroundColor Yellow
-        Remove-Item -Recurse -Force $venvDir
-      }
-    } catch {}
+    Write-Host "Removing existing venv..." -ForegroundColor Yellow
+    Remove-Item -Recurse -Force $venvDir -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
   }
-  if (-not (Test-Path $venvDir)) {
-    & $uv venv -p $pythonVersion $venvDir
+
+  Write-Host "Installing Python $pythonVersion..." -ForegroundColor DarkCyan
+  try {
+    & $uv python install $pythonVersion 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "uv python install failed, will try using system Python" -ForegroundColor Yellow
+    }
+  } catch {
+    Write-Host "uv python install crashed, will use system Python" -ForegroundColor Yellow
   }
+
+  Write-Host "Creating virtual environment..." -ForegroundColor DarkCyan
+  & $uv venv $venvDir
+  if ($LASTEXITCODE -ne 0) {
+    throw "Failed to create virtual environment"
+  }
+
   $py = Join-Path $venvDir "Scripts\python.exe"
   if (-not (Test-Path $py)) { throw "Failed to create Python venv at $venvDir" }
 
+  # Verify venv is working
+  Write-Host "Verifying Python environment..." -ForegroundColor DarkCyan
+  $pyVersion = & $py --version 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    throw "Python venv verification failed"
+  }
+  Write-Host "Python venv created successfully: $pyVersion" -ForegroundColor Green
+
+  # Install pip in the venv for ComfyUI-Manager compatibility
+  Write-Host "Installing pip in venv..." -ForegroundColor DarkCyan
+  & $uv pip install -p $py pip setuptools wheel | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "Warning: Failed to install pip" -ForegroundColor Yellow
+  }
+
   Write-Header "ComfyUI requirements"
-  try { & $py -m ensurepip --upgrade } catch {}
-  $pipOk = $false
-  try { & $py -m pip --version; if ($LASTEXITCODE -eq 0) { $pipOk = $true } } catch {}
-  if ($pipOk) {
-    & $py -m pip install --upgrade pip
-    & $py -m pip install -r (Join-Path $comfyDir "requirements.txt")
-  } else {
-    & $uv pip install -p $py -r (Join-Path $comfyDir "requirements.txt")
+  # Use uv for package installation (more reliable than pip in virtual environments)
+  Write-Host "Installing ComfyUI requirements via uv..." -ForegroundColor DarkCyan
+  & $uv pip install -p $py -r (Join-Path $comfyDir "requirements.txt")
+  if ($LASTEXITCODE -ne 0) {
+    throw "Failed to install ComfyUI requirements"
   }
 
   Write-Header "PyTorch"
   Write-Host "Uninstalling existing PyTorch packages..." -ForegroundColor DarkCyan
-  if ($pipOk) {
-    & $py -m pip uninstall -y torch torchvision torchaudio 2>$null
-  } else {
-    & $uv pip uninstall -p $py torch torchvision torchaudio 2>$null
-  }
+  & $uv pip uninstall -p $py torch torchvision torchaudio 2>$null
 
   $hasNvidia = $false
   try { Get-Command nvidia-smi -ErrorAction SilentlyContinue | Out-Null; $hasNvidia = $true } catch {}
@@ -242,55 +263,32 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
     )
     foreach ($ix in $indexes) {
       Write-Host "Trying CUDA wheel index: $ix" -ForegroundColor DarkCyan
-      if ($pipOk) {
-        & $py -m pip install torch torchvision torchaudio --index-url $ix
-        if ($LASTEXITCODE -eq 0) { $gpuInstalled = $true; break }
-      } else {
-        & $uv pip install -p $py --no-cache torch torchvision torchaudio --index-url $ix
-        if ($LASTEXITCODE -eq 0) { $gpuInstalled = $true; break }
-      }
+      & $uv pip install -p $py --no-cache torch torchvision torchaudio --index-url $ix
+      if ($LASTEXITCODE -eq 0) { $gpuInstalled = $true; break }
     }
     if (-not $gpuInstalled) {
       Write-Host "CUDA Torch wheel not available. Installing CPU Torch instead." -ForegroundColor Yellow
-      if ($pipOk) {
-        & $py -m pip install --upgrade --force-reinstall --no-cache-dir torch torchvision torchaudio
-      } else {
-        & $uv pip install -p $py --reinstall --no-cache torch torchvision torchaudio
-      }
+      & $uv pip install -p $py --reinstall --no-cache torch torchvision torchaudio
     }
   } else {
-    if ($pipOk) {
-      & $py -m pip install torch torchvision torchaudio
-    } else {
-      & $uv pip install -p $py torch torchvision torchaudio
-    }
+    & $uv pip install -p $py torch torchvision torchaudio
   }
 
   if ($ForceCpuMode) {
     Write-Host "CPU mode requested. CUDA packages were not installed." -ForegroundColor Yellow
   }
 
-  return @{ PythonPath = $py; UvPath = $uv; PipAvailable = $pipOk }
+  Write-Host "Python environment setup complete." -ForegroundColor Green
+  $result = @{ PythonPath = $py; UvPath = $uv }
+  return $result
 }
 
-function Install-PythonPackages($py, $uv, [bool]$pipOk, [string[]]$packages) {
-  try { & $py -m ensurepip --upgrade } catch {}
+function Install-PythonPackages($py, $uv, [string[]]$packages) {
   foreach ($pkg in $packages) {
-    $ok = $false
-    $code = @"
-import importlib, sys
-m = """$pkg"""
-try:
-    importlib.import_module(m)
-except Exception:
-    sys.exit(1)
-else:
-    sys.exit(0)
-"@
-    try { & $py -c $code | Out-Null; if ($LASTEXITCODE -eq 0) { $ok = $true } } catch { $ok = $false }
-    if (-not $ok) {
-      Write-Host "Installing Python package: $pkg" -ForegroundColor DarkCyan
-      if ($pipOk) { & $py -m pip install $pkg } else { & $uv pip install -p $py $pkg }
+    Write-Host "Installing Python package: $pkg" -ForegroundColor DarkCyan
+    & $uv pip install -p $py $pkg | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "Warning: Failed to install $pkg" -ForegroundColor Yellow
     }
   }
 }
@@ -331,13 +329,23 @@ try {
   Install-ComfyUISource -vendorDir $vendorDir -comfyDir $ComfyDir
 
   $envInfo = Initialize-PythonVenv -vendorDir $vendorDir -comfyDir $ComfyDir -pythonVersion $PythonVersion -ForceCpuMode:$ForceCPU
+
+  # If envInfo is an array (due to function output), take the last element (the hashtable)
+  if ($envInfo -is [Array]) {
+    $envInfo = $envInfo[-1]
+  }
+
+  if (-not $envInfo -or -not $envInfo.PythonPath) {
+    throw "Failed to initialize Python environment"
+  }
+
   $extraPkgs = @('matplotlib', 'pandas')
   if ($ForceCPU) {
     $extraPkgs += 'onnxruntime'
   } else {
     $extraPkgs += 'onnxruntime-gpu'
   }
-  Install-PythonPackages -py $envInfo.PythonPath -uv $envInfo.UvPath -pipOk $envInfo.PipAvailable -packages $extraPkgs
+  Install-PythonPackages -py $envInfo.PythonPath -uv $envInfo.UvPath -packages $extraPkgs
 
   if ($modelsBackup) {
     Restore-Models -backupDir $modelsBackup -comfyDir $ComfyDir

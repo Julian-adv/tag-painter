@@ -94,7 +94,7 @@ function Get-LatestGitMinGitUrl() {
   return 'https://github.com/git-for-windows/git/releases/latest/download/MinGit-64-bit.zip'
 }
 
-# Ensure a portable Git is available under vendor\git when system git is missing.
+# Always install portable Git to vendor\git for reliability (system git may have issues)
 function Install-Git($vendorDir) {
   Write-Header "Git"
 
@@ -104,7 +104,7 @@ function Install-Git($vendorDir) {
   $gitHome = Join-Path $vendorDir "git"
 
   if (-not (Test-Path (Join-Path $gitHome "cmd\git.exe"))) {
-    Write-Host "Installing portable Git to $gitHome" -ForegroundColor DarkCyan
+    Write-Host "Installing portable Git to $gitHome (avoiding system git issues)" -ForegroundColor DarkCyan
     Save-UrlIfMissing $gitZipUrl $gitZip
     # If the download appears invalid (very small), retry via API-selected URL
     try {
@@ -399,11 +399,6 @@ try {
   New-DirectoryIfMissing "vendor"
 
   $nodeHome = Install-Node -vendorDir (Resolve-Path "vendor")
-  # Ensure Git availability (installs portable MinGit under vendor if system Git not found)
-  Install-Git -vendorDir (Resolve-Path "vendor") | Out-Null
-
-  Write-Host "ComfyUI installation has moved to scripts/install-comfy.ps1 (or the in-app setup dialog)." -ForegroundColor Yellow
-  Write-Host "Run that script separately to prepare the ComfyUI runtime." -ForegroundColor Yellow
 } finally {
   Pop-Location
 }
