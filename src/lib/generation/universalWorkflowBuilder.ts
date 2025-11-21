@@ -70,6 +70,12 @@ export async function buildWorkflow(
   setRequiredNodeInput(workflow, 'KSampler (base)', 'scheduler', modelSettings.scheduler)
   setRequiredNodeInput(workflow, 'KSampler (base)', 'steps', modelSettings.steps)
   setRequiredNodeInput(workflow, 'KSampler (base)', 'cfg', modelSettings.cfgScale)
+  setRequiredNodeInput(
+    workflow,
+    'Load Checkpoint (Refine)',
+    'ckpt_name',
+    modelSettings.upscale.checkpoint
+  )
   if (refineMode === RefineMode.refine) {
     setRequiredNodeInput(
       workflow,
@@ -201,6 +207,14 @@ export async function buildWorkflow(
   setRequiredNodeInput(workflow, 'KSampler (refine)', 'seed', seed)
   setRequiredNodeInput(workflow, 'KSampler (refine sdxl)', 'seed', seed)
 
+  setRequiredNodeInput(workflow, 'SolidMask', 'width', settings.imageWidth)
+  setRequiredNodeInput(workflow, 'SolidMask', 'height', settings.imageHeight)
+  setRequiredNodeInput(workflow, 'SolidMask (h-base)', 'width', settings.imageWidth)
+  setRequiredNodeInput(workflow, 'SolidMask (h-base)', 'height', settings.imageHeight)
+  setRequiredNodeInput(workflow, 'SolidMask (h-half)', 'width', settings.imageWidth / 2)
+  setRequiredNodeInput(workflow, 'SolidMask (h-half)', 'height', settings.imageHeight)
+  setRequiredNodeInput(workflow, 'MaskComposite', 'x', settings.imageWidth / 2)
+  setRequiredNodeInput(workflow, 'MaskComposite', 'y', 0)
   setRequiredNodeInput(workflow, 'Empty Latent Image', 'width', settings.imageWidth)
   setRequiredNodeInput(workflow, 'Empty Latent Image', 'height', settings.imageHeight)
   if (refineMode !== RefineMode.none) {

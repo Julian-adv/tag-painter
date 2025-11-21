@@ -17,6 +17,13 @@
       "category": "upscale"
     },
     {
+      "label": "4xPurePhoto-RealPLSKR (ESRGAN)",
+      "filename": "4xPurePhoto-RealPLSKR.pth",
+      "urls": ["https://huggingface.co/mp3pintyo/upscale/resolve/main/4xPurePhoto-RealPLSKR.pth?download=true"],
+      "destRelativeToComfy": "models/upscale_models/4xPurePhoto-RealPLSKR.pth",
+      "category": "upscale"
+    },
+    {
       "label": "ADetailer person_yolov8m-seg.pt",
       "filename": "person_yolov8m-seg.pt",
       "urls": ["https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt"],
