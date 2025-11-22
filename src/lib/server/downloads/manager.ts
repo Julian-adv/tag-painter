@@ -209,6 +209,7 @@ async function cloneGitRepository(
   send: (event: StreamEvent) => void
 ): Promise<void> {
   const git = await findGitExecutable()
+  const targetRef = await resolveGitRef(item, repoUrl, git, send)
   await rm(item.dest, { recursive: true, force: true })
   await ensureParentDir(item.dest)
   send({
@@ -216,11 +217,11 @@ async function cloneGitRepository(
     filename: item.filename,
     receivedBytes: 0,
     totalBytes: null,
-    message: `Cloning ${repoUrl}`
+    message: `Cloning ${repoUrl}${targetRef ? ` (${targetRef})` : ''}`
   })
   const args = ['clone', '--depth', '1']
-  if (item.branch) {
-    args.push('--branch', item.branch)
+  if (targetRef) {
+    args.push('--branch', targetRef)
   }
   args.push(repoUrl, item.dest)
   await new Promise<void>((resolve, reject) => {
@@ -232,6 +233,77 @@ async function cloneGitRepository(
     })
   })
   await installRequirementsIfPresent(item.dest)
+}
+
+async function resolveGitRef(
+  item: DownloadItem,
+  repoUrl: string,
+  git: string,
+  send: (event: StreamEvent) => void
+): Promise<string | null> {
+  if (!item.branch) {
+    return null
+  }
+  if (item.branch.toLowerCase() !== 'latest') {
+    return item.branch
+  }
+
+  send({
+    type: 'file-progress',
+    filename: item.filename,
+    receivedBytes: 0,
+    totalBytes: null,
+    message: 'Resolving latest tag'
+  })
+
+  const latestTag = await findLatestTag(repoUrl, git)
+  if (latestTag) {
+    return latestTag
+  }
+
+  console.warn(`No tags found for ${repoUrl}; falling back to default branch.`)
+  return null
+}
+
+async function findLatestTag(repoUrl: string, git: string): Promise<string | null> {
+  try {
+    const output = await new Promise<string>((resolve, reject) => {
+      const proc = spawn(git, ['ls-remote', '--tags', '--sort=-v:refname', repoUrl])
+      let stdout = ''
+      let stderr = ''
+      proc.stdout?.on('data', (chunk) => {
+        stdout += chunk.toString()
+      })
+      proc.stderr?.on('data', (chunk) => {
+        stderr += chunk.toString()
+      })
+      proc.on('error', reject)
+      proc.on('close', (code) => {
+        if (code === 0) resolve(stdout)
+        else reject(new Error(stderr || `git ls-remote exited with code ${code}`))
+      })
+    })
+
+    const lines = output
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+
+    for (const line of lines) {
+      const parts = line.split(/\s+/)
+      if (parts.length < 2) continue
+      const ref = parts[1]
+      if (!ref.startsWith('refs/tags/')) continue
+      const tagName = ref.replace('refs/tags/', '').replace(/\^\{\}$/, '')
+      if (tagName) {
+        return tagName
+      }
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn(`Failed to resolve latest tag for ${repoUrl}: ${message}`)
+  }
+  return null
 }
 
 async function downloadAndHandle(

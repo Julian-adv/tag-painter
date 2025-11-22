@@ -31,6 +31,7 @@ function Start-NodeServer($port) {
 
   if (-not $env:PORT) { $env:PORT = "$port" }
   if (-not $env:NODE_ENV) { $env:NODE_ENV = "production" }
+  if (-not $env:BODY_SIZE_LIMIT) { $env:BODY_SIZE_LIMIT = "50M" }
 
   $node = "node"
   if (Test-Path "vendor\\node\\node.exe") { $node = (Resolve-Path "vendor\\node\\node.exe") }

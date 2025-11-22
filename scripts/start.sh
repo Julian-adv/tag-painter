@@ -38,6 +38,10 @@ if [[ ! -f build/index.js ]]; then
   exit 1
 fi
 
+if [[ -z "${BODY_SIZE_LIMIT:-}" ]]; then
+  export BODY_SIZE_LIMIT=50M
+fi
+
 echo "Starting Tag Painter on http://127.0.0.1:$PORT ..."
 PORT="$PORT" NODE_ENV=production node build/index.js &
 SERVER_PID=$!
