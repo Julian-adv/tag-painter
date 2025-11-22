@@ -177,8 +177,7 @@
       "urls": ["https://github.com/ltdrdata/ComfyUI-Impact-Pack.git"],
       "destRelativeToComfy": "custom_nodes/ComfyUI-Impact-Pack",
       "category": "custom-node",
-      "kind": "git",
-      "branch": "Main"
+      "kind": "git"
     },
     {
       "label": "ComfyUI-Impact-Subpack",

@@ -216,7 +216,7 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
   }
 
   Write-Host "Creating virtual environment..." -ForegroundColor DarkCyan
-  & $uv venv $venvDir
+  & $uv venv -p $pythonVersion $venvDir
   if ($LASTEXITCODE -ne 0) {
     throw "Failed to create virtual environment"
   }
