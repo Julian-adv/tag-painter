@@ -185,8 +185,10 @@ export async function buildWorkflow(
   setRequiredNodeInput(workflow, 'Film grain mode', 'value', useFilmgrain)
 
   // Set prompts
+  let positivePromptValue = ''
   if (modelSettings.modelType === 'sdxl') {
-    setRequiredNodeInput(workflow, 'Positive prompt', 'value', allTagsText)
+    positivePromptValue = allTagsText
+    setRequiredNodeInput(workflow, 'Positive prompt', 'value', positivePromptValue)
     const zone1Text = disabledZones.has('zone1') ? '' : zone1TagsText
     const zone2Text = disabledZones.has('zone2') ? '' : zone2TagsText
     setRequiredNodeInput(workflow, 'CLIP Text Encode (Left)', 'text', zone1Text)
@@ -197,9 +199,11 @@ export async function buildWorkflow(
       disabledZones.has('zone1') ? '' : zone1TagsText,
       disabledZones.has('zone2') ? '' : zone2TagsText
     ]
-    const promptText = promptParts.filter((text) => text && text.trim().length > 0).join(' BREAK ')
+    positivePromptValue = promptParts
+      .filter((text) => text && text.trim().length > 0)
+      .join(' BREAK ')
 
-    setRequiredNodeInput(workflow, 'Positive prompt', 'value', promptText)
+    setRequiredNodeInput(workflow, 'Positive prompt', 'value', positivePromptValue)
   }
   setRequiredNodeInput(workflow, 'Negative prompt', 'value', negativeText)
 
@@ -246,21 +250,25 @@ export async function buildWorkflow(
     }
   }
 
-  if (modelSettings.loras.length > 0) {
+  const availableLoras = await fetchAvailableLorasSafe()
+  const promptLoras = extractLorasFromPrompt(positivePromptValue, availableLoras)
+  const effectiveLoras = mergeLoras(modelSettings.loras, promptLoras)
+
+  if (effectiveLoras.length > 0) {
     if (modelSettings.modelType === 'qwen') {
-      configureQwenPowerLoraLoader(workflow, modelSettings.loras)
+      configureQwenPowerLoraLoader(workflow, effectiveLoras)
     } else if (modelSettings.modelType === 'qwen_nunchaku') {
       const loraStackNode = 'Nunchaku Qwen Image LoRA Stack'
-      setRequiredNodeInput(workflow, loraStackNode, 'lora_count', modelSettings.loras.length)
+      setRequiredNodeInput(workflow, loraStackNode, 'lora_count', effectiveLoras.length)
 
-      modelSettings.loras.forEach((lora, index) => {
+      effectiveLoras.forEach((lora, index) => {
         const loraIndex = index + 1
         setRequiredNodeInput(workflow, loraStackNode, `lora_name_${loraIndex}`, lora.name)
         setRequiredNodeInput(workflow, loraStackNode, `lora_strength_${loraIndex}`, lora.weight)
       })
 
       // Set remaining LoRA slots to None (up to 10 total slots)
-      for (let i = modelSettings.loras.length + 1; i <= 10; i++) {
+      for (let i = effectiveLoras.length + 1; i <= 10; i++) {
         setRequiredNodeInput(workflow, loraStackNode, `lora_name_${i}`, 'None')
       }
     }
@@ -364,4 +372,52 @@ function configureQwenPowerLoraLoader(workflow: ComfyUIWorkflow, loras: LoraWith
   // Update the node inputs
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   workflow[nodeId].inputs = inputs as any
+}
+
+function extractLorasFromPrompt(prompt: string, availableLoras: Set<string>): LoraWithWeight[] {
+  const results: LoraWithWeight[] = []
+  const availableList = Array.from(availableLoras).map((value) => ({
+    original: value,
+    lower: value.toLowerCase()
+  }))
+  const regex = /<lora:([^:>]+):([0-9]*\.?[0-9]+)>/gi
+  let match: RegExpExecArray | null = null
+  while ((match = regex.exec(prompt)) !== null) {
+    const name = match[1].trim()
+    const weight = Number.parseFloat(match[2])
+    if (!name || Number.isNaN(weight)) {
+      continue
+    }
+    const nameLower = name.toLowerCase()
+    const matched = availableList.find((entry) => entry.lower.includes(nameLower))
+    if (!matched) {
+      continue
+    }
+    results.push({ name: matched.original, weight })
+  }
+  return results
+}
+
+async function fetchAvailableLorasSafe(): Promise<Set<string>> {
+  try {
+    const res = await fetch('/api/loras')
+    if (!res.ok) {
+      return new Set<string>()
+    }
+    const data = (await res.json()) as { loras?: unknown }
+    if (Array.isArray(data.loras)) {
+      const names = data.loras.filter((value): value is string => typeof value === 'string')
+      return new Set(names)
+    }
+  } catch {
+    // Ignore and return empty
+  }
+  return new Set<string>()
+}
+
+function mergeLoras(base: LoraWithWeight[], extra: LoraWithWeight[]): LoraWithWeight[] {
+  const merged = new Map<string, LoraWithWeight>()
+  base.forEach((lora) => merged.set(lora.name, lora))
+  extra.forEach((lora) => merged.set(lora.name, lora))
+  return Array.from(merged.values())
 }
