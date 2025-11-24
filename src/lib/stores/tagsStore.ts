@@ -11,6 +11,7 @@ let tags: string[] = []
 let wildcardNameSet: Set<string> = new Set()
 // Keep parsed TreeModel to query node kinds directly (for advanced features)
 let wildcardModel: TreeModel = fromYAML('')
+let loraTags: string[] = []
 // Track the currently loaded wildcard model type
 let currentWildcardModelType: string | undefined = undefined
 export const combinedTags = writable<string[]>([])
@@ -32,9 +33,10 @@ export async function initTags(filename?: string): Promise<void> {
   initPromise = (async () => {
     try {
       // Load both danbooru tags and wildcards file
-      const [tagsRes, wcRes] = await Promise.allSettled([
+      const [tagsRes, wcRes, loraRes] = await Promise.allSettled([
         fetch('/api/tags'),
-        fetchWildcardsText(filename)
+        fetchWildcardsText(filename),
+        fetch('/api/loras')
       ])
 
       if (tagsRes.status === 'fulfilled' && tagsRes.value.ok) {
@@ -70,6 +72,32 @@ export async function initTags(filename?: string): Promise<void> {
         console.error('Failed to load wildcards file:', wcRes.reason)
       }
 
+      if (loraRes.status === 'fulfilled' && loraRes.value.ok) {
+        try {
+          const payload = await loraRes.value.json()
+          if (Array.isArray(payload?.loras)) {
+            loraTags = payload.loras
+              .filter((value: unknown): value is string => typeof value === 'string')
+              .map((value: string) => {
+                const segments = value.split('/')
+                const base = segments.length > 0 ? segments[segments.length - 1] : value
+                return `lora:${base}`
+              })
+          } else {
+            loraTags = []
+          }
+        } catch (e) {
+          console.error('Failed to parse /api/loras response as JSON:', e)
+          loraTags = []
+        }
+      } else {
+        console.error(
+          'Failed to load loras:',
+          loraRes.status === 'rejected' ? loraRes.reason : loraRes.value.status
+        )
+        loraTags = []
+      }
+
       updateCombinedTags()
     } catch (error) {
       console.error('Failed to initialize tags:', error)
@@ -85,7 +113,7 @@ export async function initTags(filename?: string): Promise<void> {
 export function updateCombinedTags(): string[] {
   // Build combined tags from wildcard names + danbooru tags
   // Allow duplicates: concatenate wildcards and danbooru tags
-  const newCombinedTags = [...wildcardNameSet, ...(tags || [])]
+  const newCombinedTags = [...wildcardNameSet, ...(tags || []), ...(loraTags || [])]
 
   // Update the store and notify subscribers
   combinedTags.set(newCombinedTags)

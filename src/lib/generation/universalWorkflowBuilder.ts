@@ -380,11 +380,12 @@ function extractLorasFromPrompt(prompt: string, availableLoras: Set<string>): Lo
     original: value,
     lower: value.toLowerCase()
   }))
-  const regex = /<lora:([^:>]+):([0-9]*\.?[0-9]+)>/gi
+  const regex = /<lora:([^:>]+)(?::([0-9]*\.?[0-9]+))?>/gi
   let match: RegExpExecArray | null = null
   while ((match = regex.exec(prompt)) !== null) {
     const name = match[1].trim()
-    const weight = Number.parseFloat(match[2])
+    const weightValue = match[2]
+    const weight = weightValue !== undefined ? Number.parseFloat(weightValue) : 1
     if (!name || Number.isNaN(weight)) {
       continue
     }

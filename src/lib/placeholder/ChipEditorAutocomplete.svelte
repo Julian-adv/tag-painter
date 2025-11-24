@@ -141,7 +141,9 @@
       char === '}' ||
       char === '(' ||
       char === ')' ||
-      char === ':' ||
+      char === '<' ||
+      char === '>' ||
+      // Allow colon so tokens like <lora:...> stay intact for autocomplete
       char === '.' ||
       char === '|'
     )
@@ -385,7 +387,11 @@
     if (!selection) return
 
     const isChipNameSuggestion = isCustomTag(suggestion)
-    const processed = isChipNameSuggestion ? suggestion : suggestion.replace(/_/g, ' ')
+    const isLoraSuggestion = suggestion.startsWith('lora:')
+    const processed =
+      isChipNameSuggestion || isLoraSuggestion
+        ? suggestion.replace(/\.safetensors$/i, '>')
+        : suggestion.replace(/_/g, ' ')
     let replacement = processed
 
     if (!currentContext.isChipName && currentContext.usingSpecial && specialTriggerPrefix) {
