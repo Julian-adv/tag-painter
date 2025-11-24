@@ -144,7 +144,6 @@
     width: 100%;
   }
   .input-wrapper {
-    border: 1px solid #d1d5db;
     border-radius: 0.375rem;
     padding: 0.125rem;
     background: #ffffff;

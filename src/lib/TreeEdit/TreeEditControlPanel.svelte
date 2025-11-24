@@ -25,6 +25,7 @@
   import { getParentOf, isConsistentRandomArray } from './utils'
   import { renameNode } from './model'
   import DisablesEditor from './DisablesEditor.svelte'
+  import LoraSelector from './LoraSelector.svelte'
   import { m } from '$lib/paraglide/messages'
 
   let {
@@ -428,6 +429,7 @@
             }}
           />
         </div>
+        <LoraSelector {model} {selectedIds} {onModelChanged} />
       </fieldset>
     </div>
   {/if}
