@@ -304,6 +304,7 @@ export async function writeWildcardZones(
     // Always refresh from the correct file to ensure we have the right model
     await refreshWildcardsFromServer(filename)
     const wildcardModel = getWildcardModel()
+    const originalYaml = toYAML(wildcardModel)
 
     // Clone the current model to modify it
     const updatedModel = { ...wildcardModel }
@@ -381,6 +382,10 @@ export async function writeWildcardZones(
 
     // Convert back to YAML and save
     const yamlText = toYAML(updatedModel)
+
+    if (yamlText === originalYaml) {
+      return
+    }
 
     // Save to server
     await saveWildcardsText(yamlText, filename)

@@ -17,12 +17,31 @@ async function ensureDir() {
   }
 }
 
+async function backupFileIfExists(filePath: string) {
+  try {
+    await fs.stat(filePath)
+  } catch (err) {
+    return
+  }
+  const backupPath = `${filePath}.bak`
+  try {
+    await fs.copyFile(filePath, backupPath)
+  } catch (error) {
+    console.warn(`Failed to create backup for ${filePath}:`, error)
+  }
+}
+
 export async function POST({ request, url }: RequestEvent) {
   await ensureDir()
   try {
     const filename = url.searchParams.get('filename') || undefined
     const filePath = getWildcardsFilePath(filename)
     const text = await request.text()
+    const trimmed = text.trim()
+    if (trimmed === '{}' || trimmed === '{ }') {
+      return json({ success: false, error: 'Rejected empty wildcards content.' }, { status: 400 })
+    }
+    await backupFileIfExists(filePath)
     await fs.writeFile(filePath, text, 'utf-8')
     return json({ success: true })
   } catch (error) {
