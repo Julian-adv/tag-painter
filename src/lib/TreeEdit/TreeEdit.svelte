@@ -297,10 +297,7 @@
   }
 
   // Allow descendants to request auto-editing of a specific child id
-  function setAutoEditChildId(
-    id: string | null,
-    behavior: 'selectAll' | 'caretEnd' = 'caretEnd'
-  ) {
+  function setAutoEditChildId(id: string | null, behavior: 'selectAll' | 'caretEnd' = 'caretEnd') {
     autoEditChildId = id
     autoEditBehavior = behavior
   }

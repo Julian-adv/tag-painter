@@ -44,6 +44,7 @@ export function treeKeyboard(node: HTMLElement, options: Options) {
     // Ctrl+Enter: add child (or sibling if leaf)
     if (e.ctrlKey && e.key === 'Enter') {
       e.preventDefault()
+      e.stopPropagation()
       options.addChildForSelection()
       return
     }
