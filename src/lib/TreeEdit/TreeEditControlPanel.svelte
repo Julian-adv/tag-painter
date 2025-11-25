@@ -39,6 +39,7 @@
     groupSelected,
     duplicateBySelection,
     addBySelection,
+    addSiblingBySelection,
     deleteBySelection,
     onModelChanged,
     setAutoEditChildId,
@@ -55,6 +56,7 @@
     groupSelected: () => void
     duplicateBySelection: () => void
     addBySelection: () => void
+    addSiblingBySelection: () => void
     deleteBySelection: () => void
     onModelChanged?: () => void
     setAutoEditChildId?: (id: string | null, behavior?: 'selectAll' | 'caretEnd') => void
@@ -148,6 +150,17 @@
 
   function canDuplicateSelected(): boolean {
     return selectedIds.length === 1 && !selectedIds.includes(model.rootId)
+  }
+
+  function canAddSibling(): boolean {
+    if (selectedIds.length !== 1) return false
+    const selectedId = selectedIds[0]
+    // Cannot add sibling to root
+    if (selectedId === model.rootId) return false
+    const node = model.nodes[selectedId]
+    if (!node) return false
+    // Must have a parent
+    return !!node.parentId
   }
 
   function getSelectedLeafComposition(): string | null {
@@ -554,6 +567,16 @@
       disabled={isAddDisabled()}
     >
       {selectedIds.length === 1 ? m['treeEdit.addChild']() : m['treeEdit.addTopLevel']()}
+    </ActionButton>
+    <ActionButton
+      onclick={addSiblingBySelection}
+      variant="green"
+      size="md"
+      icon={Plus}
+      title="Add a sibling node next to the selected node"
+      disabled={!canAddSibling()}
+    >
+      Add Sibling
     </ActionButton>
     <ActionButton
       onclick={deleteBySelection}

@@ -28,7 +28,7 @@
   import { tick } from 'svelte'
   import { CONSISTENT_RANDOM_MARKER } from '$lib/constants'
   import { isConsistentRandomArray } from './utils'
-  import { addBySelectionAction } from './addBySelection'
+  import { addBySelectionAction, addSiblingBySelectionAction } from './addBySelection'
   import { m } from '$lib/paraglide/messages'
 
   let {
@@ -158,23 +158,14 @@
       return
     }
 
-    // Container: add a child
+    // Array node: add a sibling instead of a child
     if (n.kind === 'array') {
-      const child: LeafNode = {
-        id: uid(),
-        name: String(n.children.length),
-        kind: 'leaf',
-        parentId: n.id,
-        value: ''
-      }
-      addChild(model, n.id, child)
-      setAutoEditChildId(child.id)
-      selectedIds = [child.id]
-      lastSelectedId = child.id
-      hasUnsavedChanges = true
-      focusSelectedSoon()
+      addSiblingBySelection()
       return
     }
+
+    // Container: add a child (only for object nodes now)
+    /* Removed array handling - now handled above */
 
     if (n.kind === 'object') {
       const arrId = uid()
@@ -491,6 +482,22 @@
     tick().then(() => scrollSelectedIntoView())
   }
 
+  function addSiblingBySelection() {
+    const result = addSiblingBySelectionAction(model, selectedIds)
+    if (!result.changed) return
+
+    autoEditBehavior = result.autoEditBehavior
+    if (result.autoEditChildId) setAutoEditChildId(result.autoEditChildId, result.autoEditBehavior)
+
+    if (result.selectedId) {
+      selectedIds = [result.selectedId]
+      lastSelectedId = result.selectedId
+    }
+
+    hasUnsavedChanges = true
+    tick().then(() => scrollSelectedIntoView())
+  }
+
   function deleteBySelection() {
     if (selectedIds.length === 0 || selectedIds.includes(model.rootId)) return
     const validIds = selectedIds.filter((id) => id !== model.rootId)
@@ -679,6 +686,7 @@
       {groupSelected}
       {duplicateBySelection}
       {addBySelection}
+      {addSiblingBySelection}
       {deleteBySelection}
       onModelChanged={() => (hasUnsavedChanges = true)}
       {setAutoEditChildId}
