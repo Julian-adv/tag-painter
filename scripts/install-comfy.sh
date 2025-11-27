@@ -59,15 +59,7 @@ fi
 
 if [[ ! -d "$COMFY_DIR" ]]; then
   echo "Cloning ComfyUI..."
-  latest_tag=""
-  if command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
-    latest_tag="$(curl -fsSL https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest | jq -r '.tag_name // empty' || true)"
-  fi
-  if [[ -n "$latest_tag" && "$latest_tag" != "null" ]]; then
-    git clone --depth 1 --branch "$latest_tag" https://github.com/comfyanonymous/ComfyUI.git "$COMFY_DIR"
-  else
-    git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git "$COMFY_DIR"
-  fi
+  git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git "$COMFY_DIR"
 else
   echo "ComfyUI directory already exists; skipping clone."
 fi

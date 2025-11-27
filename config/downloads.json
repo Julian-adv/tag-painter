@@ -195,7 +195,7 @@
       "destRelativeToComfy": "custom_nodes/ComfyUI-nunchaku",
       "category": "custom-node",
       "kind": "git",
-      "branch": "latest"
+      "branch": "main"
     },
     {
       "label": "ComfyUI_essentials",
