@@ -27,7 +27,7 @@ export interface LoraWithWeight {
   weight: number
 }
 
-export type ModelType = 'sdxl' | 'qwen' | 'qwen_nunchaku' | 'chroma' | 'flux1_krea'
+export type ModelType = 'sdxl' | 'qwen' | 'qwen_nunchaku' | 'chroma' | 'flux1_krea' | 'z_image'
 
 export enum ImageStage {
   base = 'base',

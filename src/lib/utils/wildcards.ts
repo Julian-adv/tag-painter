@@ -7,14 +7,18 @@ import { fromYAML } from '$lib/TreeEdit/yaml-io'
  * Get the appropriate wildcards filename based on model type
  */
 export function getWildcardsFileName(modelType?: string): string {
-  return modelType === 'qwen' || modelType === 'chroma' ? 'wildcards.qwen.yaml' : 'wildcards.yaml'
+  return modelType === 'qwen' || modelType === 'chroma' || modelType === 'z_image'
+    ? 'wildcards.new.yaml'
+    : 'wildcards.yaml'
 }
 
 /**
  * Get a display-friendly name for the wildcards file
  */
 export function getWildcardsDisplayName(modelType?: string): string {
-  return modelType === 'qwen' || modelType === 'chroma' ? 'Qwen wildcards' : 'wildcards'
+  return modelType === 'qwen' || modelType === 'chroma' || modelType === 'z_image'
+    ? 'new wildcards'
+    : 'wildcards'
 }
 
 // --- Wildcard file caching (module-level) ---

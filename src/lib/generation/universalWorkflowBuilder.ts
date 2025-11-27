@@ -24,7 +24,8 @@ const MODEL_TYPE_MAP: Record<ModelType, number> = {
   qwen: 2,
   qwen_nunchaku: 3,
   flux1_krea: 4,
-  chroma: 5
+  chroma: 5,
+  z_image: 2
 }
 
 export async function buildWorkflow(
@@ -55,11 +56,27 @@ export async function buildWorkflow(
     qwen: { node: 'Load Diffusion Model', key: 'unet_name' },
     qwen_nunchaku: { node: 'Nunchaku Qwen-Image DiT Loader', key: 'model_name' },
     chroma: { node: 'Load Qwen Checkpoint', key: 'ckpt_name' },
-    flux1_krea: { node: 'Load Diffusion Model (flux1-krea)', key: 'unet_name' }
+    flux1_krea: { node: 'Load Diffusion Model (flux1-krea)', key: 'unet_name' },
+    z_image: { node: 'Load Diffusion Model', key: 'unet_name' }
   }
 
   const checkpointLoader = checkpointLoaderMap[modelSettings.modelType]
   setRequiredNodeInput(workflow, checkpointLoader.node, checkpointLoader.key, checkpoint)
+
+  if (modelSettings.modelType === 'z_image') {
+    setRequiredNodeInput(workflow, 'Load CLIP (qwen)', 'clip_name', 'qwen_3_4b.safetensors')
+    setRequiredNodeInput(workflow, 'Load CLIP (qwen)', 'type', 'lumina2')
+    setRequiredNodeInput(workflow, 'Load Qwen VAE', 'vae_name', 'ae.safetensors')
+  } else {
+    setRequiredNodeInput(
+      workflow,
+      'Load CLIP (qwen)',
+      'clip_name',
+      'qwen_2.5_vl_7b_fp8_scaled.safetensors'
+    )
+    setRequiredNodeInput(workflow, 'Load CLIP (qwen)', 'type', 'qwen_image')
+    setRequiredNodeInput(workflow, 'Load Qwen VAE', 'vae_name', 'qwen_image_vae.safetensors')
+  }
 
   // Set refine mode
   setRequiredNodeInput(workflow, 'Refine mode', 'value', refineMode)
@@ -219,15 +236,9 @@ export async function buildWorkflow(
   setRequiredNodeInput(workflow, 'SolidMask (h-half)', 'height', settings.imageHeight)
   setRequiredNodeInput(workflow, 'MaskComposite', 'x', settings.imageWidth / 2)
   setRequiredNodeInput(workflow, 'MaskComposite', 'y', 0)
-  setRequiredNodeInput(workflow, 'Empty Latent Image', 'width', settings.imageWidth)
-  setRequiredNodeInput(workflow, 'Empty Latent Image', 'height', settings.imageHeight)
-  if (refineMode !== RefineMode.none) {
-    const upscaleScale = modelSettings.upscale.scale
-    const upscaleWidth = Math.round(settings.imageWidth * upscaleScale)
-    const upscaleHeight = Math.round(settings.imageHeight * upscaleScale)
-    setRequiredNodeInput(workflow, 'Upscale Image', 'width', upscaleWidth)
-    setRequiredNodeInput(workflow, 'Upscale Image', 'height', upscaleHeight)
-  }
+  setRequiredNodeInput(workflow, 'width', 'value', settings.imageWidth)
+  setRequiredNodeInput(workflow, 'height', 'value', settings.imageHeight)
+  setRequiredNodeInput(workflow, 'scale', 'value', modelSettings.upscale.scale)
 
   // Handle embedded VAE for SDXL models
   if (modelSettings.modelType === 'sdxl') {

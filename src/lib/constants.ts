@@ -117,6 +117,18 @@ export const MODEL_TYPE_DEFAULTS = {
     wildcardsFile: 'wildcards.qwen.yaml',
     customWorkflowPath: 'flux1_krea.api.workflow.json',
     selectedVae: 'ae.safetensors'
+  },
+  z_image: {
+    cfgScale: 1.0,
+    steps: 9,
+    sampler: 'euler',
+    scheduler: 'simple',
+    clipSkip: 1,
+    qualityPrefix: '',
+    negativePrefix: 'blurry ugly bad',
+    wildcardsFile: 'wildcards.new.yaml',
+    customWorkflowPath: 'universal.api.workflow.json',
+    selectedVae: 'ae.safetensors'
   }
 } as const
 

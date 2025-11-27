@@ -485,7 +485,8 @@
               { value: 'qwen', label: 'Qwen' },
               { value: 'qwen_nunchaku', label: 'Qwen Nunchaku' },
               { value: 'chroma', label: 'Chroma' },
-              { value: 'flux1_krea', label: 'Flux1 Krea' }
+              { value: 'flux1_krea', label: 'Flux1 Krea' },
+              { value: 'z_image', label: 'Z Image' }
             ]}
           />
 
@@ -643,7 +644,8 @@
               options={[
                 { value: 'sdxl', label: 'SDXL' },
                 { value: 'qwen', label: 'Qwen' },
-                { value: 'chroma', label: 'Chroma' }
+                { value: 'chroma', label: 'Chroma' },
+                { value: 'z_image', label: 'Z Image' }
               ]}
             />
 
