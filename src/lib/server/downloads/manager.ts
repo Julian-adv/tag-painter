@@ -209,29 +209,69 @@ async function cloneGitRepository(
   send: (event: StreamEvent) => void
 ): Promise<void> {
   const git = await findGitExecutable()
-  const targetRef = await resolveGitRef(item, repoUrl, git, send)
-  await rm(item.dest, { recursive: true, force: true })
-  await ensureParentDir(item.dest)
-  send({
-    type: 'file-progress',
-    filename: item.filename,
-    receivedBytes: 0,
-    totalBytes: null,
-    message: `Cloning ${repoUrl}${targetRef ? ` (${targetRef})` : ''}`
-  })
-  const args = ['clone', '--depth', '1']
-  if (targetRef) {
-    args.push('--branch', targetRef)
-  }
-  args.push(repoUrl, item.dest)
-  await new Promise<void>((resolve, reject) => {
-    const proc = spawn(git, args, { stdio: 'inherit' })
-    proc.on('error', reject)
-    proc.on('close', (code) => {
-      if (code === 0) resolve()
-      else reject(new Error(`git clone exited with code ${code}`))
+  const exists = await fileExists(item.dest)
+
+  if (exists) {
+    // If repository already exists, pull latest changes
+    send({
+      type: 'file-progress',
+      filename: item.filename,
+      receivedBytes: 0,
+      totalBytes: null,
+      message: `Updating ${item.filename} from ${repoUrl}`
     })
-  })
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const proc = spawn(git, ['pull'], {
+          cwd: item.dest,
+          stdio: 'inherit'
+        })
+        proc.on('error', reject)
+        proc.on('close', (code) => {
+          if (code === 0) resolve()
+          else reject(new Error(`git pull exited with code ${code}`))
+        })
+      })
+    } catch (err) {
+      // If pull fails, log warning but continue with requirements installation
+      const message = err instanceof Error ? err.message : String(err)
+      console.warn(`Warning: git pull failed for ${item.filename}: ${message}`)
+      send({
+        type: 'file-progress',
+        filename: item.filename,
+        receivedBytes: 0,
+        totalBytes: null,
+        message: `Warning: Failed to update ${item.filename}, using existing version`
+      })
+    }
+  } else {
+    // Clone repository if it doesn't exist
+    const targetRef = await resolveGitRef(item, repoUrl, git, send)
+    await ensureParentDir(item.dest)
+    send({
+      type: 'file-progress',
+      filename: item.filename,
+      receivedBytes: 0,
+      totalBytes: null,
+      message: `Cloning ${repoUrl}${targetRef ? ` (${targetRef})` : ''}`
+    })
+    const args = ['clone', '--depth', '1']
+    if (targetRef) {
+      args.push('--branch', targetRef)
+    }
+    args.push(repoUrl, item.dest)
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn(git, args, { stdio: 'inherit' })
+      proc.on('error', reject)
+      proc.on('close', (code) => {
+        if (code === 0) resolve()
+        else reject(new Error(`git clone exited with code ${code}`))
+      })
+    })
+  }
+
+  // Always install requirements (whether cloned or pulled)
   await installRequirementsIfPresent(item.dest)
 }
 
@@ -507,7 +547,9 @@ export async function handlePostDownloads(request: Request): Promise<Response> {
           for (const item of targets) {
             send({ type: 'file-start', filename: item.filename, label: item.label, kind: item.kind })
 
-            if (onlyMissing && (await fileExists(item.dest))) {
+            // Skip only if onlyMissing is true, file exists, and it's not a git repository
+            // Git repositories should always be updated (pull) even if they exist
+            if (onlyMissing && (await fileExists(item.dest)) && item.kind !== 'git') {
               ok.push({ filename: item.filename, ok: true, url: null, error: null })
               send({ type: 'file-complete', filename: item.filename, url: null })
               completed += 1

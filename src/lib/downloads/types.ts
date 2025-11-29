@@ -4,6 +4,7 @@ export type CustomNodeItem = {
   urls: string[]
   dest: string
   branch: string | null
+  exists?: boolean
 }
 
 export type DownloadItem = {

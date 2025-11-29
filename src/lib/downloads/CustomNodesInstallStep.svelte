@@ -93,7 +93,8 @@
   async function loadCustomNodes() {
     loading = true
     try {
-      const res = await fetch('/api/downloads?category=custom-node&onlyMissing=1')
+      // Load all custom nodes (not just missing ones) so we can update them
+      const res = await fetch('/api/downloads?category=custom-node')
       const data = await res.json()
       if (Array.isArray(data?.items)) {
         const parsed: CustomNodeItem[] = []
@@ -107,24 +108,17 @@
             filename: typeof record['filename'] === 'string' ? (record['filename'] as string) : '',
             urls: cleanUrls,
             dest: typeof record['dest'] === 'string' ? (record['dest'] as string) : '',
-            branch: typeof record['branch'] === 'string' ? (record['branch'] as string) : null
+            branch: typeof record['branch'] === 'string' ? (record['branch'] as string) : null,
+            exists: typeof record['exists'] === 'boolean' ? record['exists'] : false
           })
         }
         items = parsed
-
-        // If no custom nodes needed, auto-complete
-        if (items.length === 0) {
-          status = 'completed'
-        }
+        // Don't auto-complete - let user execute to install/update
       } else {
         items = []
-        // Auto-complete if no items
-        status = 'completed'
       }
     } catch (err) {
       items = []
-      // Auto-complete even on error if no items
-      status = 'completed'
       console.error('Failed to load custom nodes:', err)
     } finally {
       loading = false
@@ -233,7 +227,7 @@
 
   $effect(() => {
     if (result?.success && !loggedSuccess) {
-      const message = `[Custom Nodes] Successfully installed ${result.ok.length} custom node(s).`
+      const message = `[Custom Nodes] Successfully processed ${result.ok.length} custom node(s).`
       console.log(message)
       sendClientLog('log', message)
       loggedSuccess = true
@@ -251,25 +245,26 @@
   </div>
 
   <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">
-    Install required ComfyUI custom nodes for advanced functionality.
+    Install or update required ComfyUI custom nodes for advanced functionality.
   </p>
 
   {#if loading}
-    <div class="text-sm text-gray-500">Checking for required custom nodes…</div>
+    <div class="text-sm text-gray-500">Checking for custom nodes…</div>
   {:else if items.length === 0 && !installing}
-    <div class="rounded border border-green-300 bg-green-50 p-3 text-sm text-green-800 dark:border-green-600/40 dark:bg-green-900/40 dark:text-green-100">
-      All required custom nodes are already installed.
+    <div class="rounded border border-gray-300 bg-gray-50 p-3 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
+      No custom nodes configured.
     </div>
   {:else if items.length > 0 && !installing}
     <div class="mb-3">
       <div class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">
-        Custom nodes to install ({items.length}):
+        Custom nodes ({items.length}):
       </div>
       <div class="max-h-64 overflow-auto rounded border border-gray-200 dark:border-gray-700">
         <table class="w-full text-left text-xs">
           <thead class="bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
             <tr>
               <th class="px-3 py-2 font-semibold">Name</th>
+              <th class="px-3 py-2 font-semibold">Status</th>
               <th class="px-3 py-2 font-semibold">Source URL</th>
             </tr>
           </thead>
@@ -278,6 +273,13 @@
               <tr class="border-t border-gray-200 dark:border-gray-700">
                 <td class="px-3 py-2 font-medium text-gray-900 dark:text-gray-100">
                   {item.label || item.filename}
+                </td>
+                <td class="px-3 py-2">
+                  {#if item.exists}
+                    <span class="text-green-600 dark:text-green-400">Installed</span>
+                  {:else}
+                    <span class="text-yellow-600 dark:text-yellow-400">Missing</span>
+                  {/if}
                 </td>
                 <td class="px-3 py-2 font-mono text-[11px] text-gray-600 dark:text-gray-300">
                   {item.urls[0] || item.dest}
@@ -312,7 +314,7 @@
   {#if result}
     {#if result.success}
       <div class="mt-3 rounded border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-500/30 dark:bg-green-900/30 dark:text-green-100">
-        <div class="font-medium">Successfully installed {result.ok.length} custom node(s)</div>
+        <div class="font-medium">Successfully processed {result.ok.length} custom node(s)</div>
         {#if result.ok.length > 0}
           <ul class="ml-4 mt-1 list-disc">
             {#each result.ok as item}
@@ -343,7 +345,7 @@
 
   {#if !loading && items.length > 0 && !installing && !result}
     <div class="mt-2 text-xs text-gray-600 dark:text-gray-400">
-      Click "Execute" to install required custom nodes.
+      Click "Execute" to install missing nodes and update existing ones.
     </div>
   {/if}
 </div>

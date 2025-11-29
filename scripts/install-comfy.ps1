@@ -158,11 +158,23 @@ function Install-Uv($vendorDir) {
 }
 
 function Install-ComfyUISource($vendorDir, $comfyDir) {
+  Write-Header "ComfyUI"
+
   if (Test-Path $comfyDir) {
-    Write-Host "ComfyUI already present at $comfyDir" -ForegroundColor Green
+    Write-Host "ComfyUI already present at $comfyDir, updating..." -ForegroundColor Green
+    Push-Location $comfyDir
+    try {
+      git pull
+      if ($LASTEXITCODE -ne 0) {
+        Write-Host "Warning: git pull failed, continuing with existing version." -ForegroundColor Yellow
+      }
+    } catch {
+      Write-Host "Warning: git pull failed, continuing with existing version." -ForegroundColor Yellow
+    } finally {
+      Pop-Location
+    }
     return
   }
-  Write-Header "ComfyUI"
 
   $latestTag = $null
   try {

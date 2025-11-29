@@ -1,13 +1,11 @@
 import type { RequestHandler } from '@sveltejs/kit'
-import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
-import { fileExists, findComfyPython, getComfyDir } from '$lib/server/comfy'
+import { findComfyPython, getComfyDir } from '$lib/server/comfy'
 import { isComfyAvailable, stopComfyProcess } from '$lib/server/comfyProcess'
 
 const STARTUP_WAIT_SECONDS = 60
 const MAX_RETRY_ATTEMPTS = 2
-const NUNCHAKU_REQUIREMENTS_RELATIVE = path.join('custom_nodes', 'ComfyUI-nunchaku', 'requirements.txt')
 
 function buildArgs(): string[] {
   const args: string[] = [
@@ -68,28 +66,6 @@ async function startComfyProcess(python: string, comfyDir: string): Promise<bool
   return false
 }
 
-async function installNunchakuDependencies(python: string, comfyDir: string): Promise<void> {
-  const requirementsPath = path.join(comfyDir, NUNCHAKU_REQUIREMENTS_RELATIVE)
-  const exists = await fileExists(requirementsPath)
-  if (!exists) {
-    return
-  }
-
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(python, ['-m', 'pip', 'install', '-r', requirementsPath], {
-      cwd: path.dirname(requirementsPath),
-      stdio: ['ignore', 'inherit', 'inherit']
-    })
-    child.once('error', (err) => reject(err))
-    child.once('close', (code) => {
-      if (code === 0) {
-        resolve()
-      } else {
-        reject(new Error(`pip install exited with code ${code}`))
-      }
-    })
-  })
-}
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
@@ -134,15 +110,8 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     const comfyDir = getComfyDir()
-    try {
-      await installNunchakuDependencies(python, comfyDir)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      return new Response(JSON.stringify({ error: `Failed to install Nunchaku dependencies: ${message}` }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      })
-    }
+    // Note: Nunchaku dependencies will be installed automatically by ComfyUI when it starts
+    // No need to install them here
 
     const started = await startComfyProcess(python, comfyDir)
     if (!started) {

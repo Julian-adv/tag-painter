@@ -61,7 +61,10 @@ if [[ ! -d "$COMFY_DIR" ]]; then
   echo "Cloning ComfyUI..."
   git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git "$COMFY_DIR"
 else
-  echo "ComfyUI directory already exists; skipping clone."
+  echo "ComfyUI directory already exists; updating..."
+  cd "$COMFY_DIR"
+  git pull || echo "Warning: git pull failed, continuing with existing version."
+  cd "$REPO_ROOT"
 fi
 
 echo "Preparing Python $PY_VERSION environment..."
