@@ -96,6 +96,8 @@
   let enableFaceDetailer = $state(false)
   let refineCheckpoint = $state('')
   let faceDetailerCheckpoint = $state('')
+  let generationStartTime = $state<number | null>(null)
+  let lastGenerationTime = $state<number | null>(null)
 
   // Toasts component ref for showing messages
   type ToastType = 'success' | 'error' | 'info'
@@ -435,6 +437,9 @@
       return
     }
 
+    // Record generation start time
+    generationStartTime = Date.now()
+
     // Save tag zones immediately before generating
     if (tagZonesRef) {
       await tagZonesRef.saveTags()
@@ -478,6 +483,11 @@
           progressData = progress
         },
         onImageReceived: async (imageBlob, filePath) => {
+          // Calculate generation time
+          if (generationStartTime) {
+            lastGenerationTime = Date.now() - generationStartTime
+          }
+
           // Create blob URL for immediate display
           if (imageUrl && imageUrl.startsWith('blob:')) {
             URL.revokeObjectURL(imageUrl)
@@ -531,6 +541,9 @@
 
   async function handleInpaintGeneration(denoiseStrength: number) {
     toastsRef?.clear()
+
+    // Record generation start time
+    generationStartTime = Date.now()
 
     // Save tag zones immediately before generating
     if (tagZonesRef) {
@@ -593,6 +606,11 @@
           progressData = progress
         },
         onImageReceived: async (imageBlob, filePath) => {
+          // Calculate generation time
+          if (generationStartTime) {
+            lastGenerationTime = Date.now() - generationStartTime
+          }
+
           // Create blob URL for immediate display
           if (imageUrl && imageUrl.startsWith('blob:')) {
             URL.revokeObjectURL(imageUrl)
@@ -725,6 +743,8 @@
       negative: negativePrompt
     }
     try {
+      // Record generation start time
+      generationStartTime = Date.now()
       isLoading = true
       progressData = { value: 0, max: 100, currentNode: '' }
       const submission = await submitWorkflowForPrompts(
@@ -750,6 +770,11 @@
             progressData = progress
           },
           onImageReceived: async (imageBlob: Blob) => {
+            // Calculate generation time
+            if (generationStartTime) {
+              lastGenerationTime = Date.now() - generationStartTime
+            }
+
             const filePath =
               (await saveImage(
                 imageBlob,
@@ -878,6 +903,7 @@
               {settings}
               {isGeneratingForever}
               {lastSeed}
+              {lastGenerationTime}
               {toastsRef}
               onGenerate={() => handleGenerate(null)}
               onInpaint={handleInpaint}

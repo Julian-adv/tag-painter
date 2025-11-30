@@ -19,6 +19,7 @@
   "generationControls.regenTooltip": "Regenerate with seed: {seed}",
   "generationControls.regenTooltipMissing": "No previous seed available",
   "generationControls.settings": "Settings",
+  "generationControls.generationTime": "Generation time",
   "imageGenerator.checkpointLabel": "Checkpoint",
   "imageGenerator.devShowDialog": "Show No Checkpoints Dialog",
   "imageGenerator.showSetupDialog": "Open Required Setup",

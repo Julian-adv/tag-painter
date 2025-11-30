@@ -19,6 +19,7 @@
   "generationControls.regenTooltip": "시드 {seed}(으)로 다시 생성",
   "generationControls.regenTooltipMissing": "이전 시드가 없습니다",
   "generationControls.settings": "설정",
+  "generationControls.generationTime": "생성 시간",
   "imageGenerator.checkpointLabel": "체크포인트",
   "imageGenerator.devShowDialog": "체크포인트 없음 대화상자 열기",
   "imageGenerator.showSetupDialog": "필수 설정 열기",

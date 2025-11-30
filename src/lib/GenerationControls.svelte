@@ -17,6 +17,7 @@
     isGeneratingForever: boolean
     onSettingsChange: (settings: Settings) => void
     lastSeed: number | null
+    lastGenerationTime: number | null
     disableInpaint?: boolean
     toastsRef?: any
     showOnlyProgress?: boolean
@@ -34,6 +35,7 @@
     isGeneratingForever,
     onSettingsChange,
     lastSeed,
+    lastGenerationTime,
     disableInpaint = false,
     toastsRef,
     showOnlyProgress = false
@@ -132,6 +134,13 @@
   >
     {progressData.currentNode || m['generationControls.ready']()}
   </div>
+
+  <!-- Generation time display -->
+  {#if lastGenerationTime !== null && !isLoading}
+    <div class="text-center text-xs text-gray-600">
+      {m['generationControls.generationTime']()}: {(lastGenerationTime / 1000).toFixed(1)}s
+    </div>
+  {/if}
 </div>
 
 <SettingsDialog
