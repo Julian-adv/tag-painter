@@ -25,7 +25,7 @@ const MODEL_TYPE_MAP: Record<ModelType, number> = {
   qwen_nunchaku: 3,
   flux1_krea: 4,
   chroma: 5,
-  z_image: 2
+  z_image: 6
 }
 
 export async function buildWorkflow(
@@ -57,26 +57,11 @@ export async function buildWorkflow(
     qwen_nunchaku: { node: 'Nunchaku Qwen-Image DiT Loader', key: 'model_name' },
     chroma: { node: 'Load Qwen Checkpoint', key: 'ckpt_name' },
     flux1_krea: { node: 'Load Diffusion Model (flux1-krea)', key: 'unet_name' },
-    z_image: { node: 'Load Diffusion Model', key: 'unet_name' }
+    z_image: { node: 'Load Diffusion Model (z image)', key: 'unet_name' }
   }
 
   const checkpointLoader = checkpointLoaderMap[modelSettings.modelType]
   setRequiredNodeInput(workflow, checkpointLoader.node, checkpointLoader.key, checkpoint)
-
-  if (modelSettings.modelType === 'z_image') {
-    setRequiredNodeInput(workflow, 'Load CLIP (qwen)', 'clip_name', 'qwen_3_4b.safetensors')
-    setRequiredNodeInput(workflow, 'Load CLIP (qwen)', 'type', 'lumina2')
-    setRequiredNodeInput(workflow, 'Load Qwen VAE', 'vae_name', 'ae.safetensors')
-  } else {
-    setRequiredNodeInput(
-      workflow,
-      'Load CLIP (qwen)',
-      'clip_name',
-      'qwen_2.5_vl_7b_fp8_scaled.safetensors'
-    )
-    setRequiredNodeInput(workflow, 'Load CLIP (qwen)', 'type', 'qwen_image')
-    setRequiredNodeInput(workflow, 'Load Qwen VAE', 'vae_name', 'qwen_image_vae.safetensors')
-  }
 
   // Set refine mode
   setRequiredNodeInput(workflow, 'Refine mode', 'value', refineMode)
@@ -232,9 +217,9 @@ export async function buildWorkflow(
   setRequiredNodeInput(workflow, 'SolidMask', 'height', settings.imageHeight)
   setRequiredNodeInput(workflow, 'SolidMask (h-base)', 'width', settings.imageWidth)
   setRequiredNodeInput(workflow, 'SolidMask (h-base)', 'height', settings.imageHeight)
-  setRequiredNodeInput(workflow, 'SolidMask (h-half)', 'width', settings.imageWidth / 2)
+  setRequiredNodeInput(workflow, 'SolidMask (h-half)', 'width', Math.floor(settings.imageWidth / 2))
   setRequiredNodeInput(workflow, 'SolidMask (h-half)', 'height', settings.imageHeight)
-  setRequiredNodeInput(workflow, 'MaskComposite', 'x', settings.imageWidth / 2)
+  setRequiredNodeInput(workflow, 'MaskComposite', 'x', Math.floor(settings.imageWidth / 2))
   setRequiredNodeInput(workflow, 'MaskComposite', 'y', 0)
   setRequiredNodeInput(workflow, 'width', 'value', settings.imageWidth)
   setRequiredNodeInput(workflow, 'height', 'value', settings.imageHeight)
@@ -267,7 +252,13 @@ export async function buildWorkflow(
 
   if (effectiveLoras.length > 0) {
     if (modelSettings.modelType === 'qwen') {
-      configureQwenPowerLoraLoader(workflow, effectiveLoras)
+      configureQwenPowerLoraLoader(workflow, 'Power Lora Loader (rgthree)', effectiveLoras)
+    } else if (modelSettings.modelType === 'z_image') {
+      configureQwenPowerLoraLoader(
+        workflow,
+        'Power Lora Loader (rgthree) (z image)',
+        effectiveLoras
+      )
     } else if (modelSettings.modelType === 'qwen_nunchaku') {
       const loraStackNode = 'Nunchaku Qwen Image LoRA Stack'
       setRequiredNodeInput(workflow, loraStackNode, 'lora_count', effectiveLoras.length)
@@ -340,10 +331,14 @@ export async function buildWorkflow(
   return workflow
 }
 
-function configureQwenPowerLoraLoader(workflow: ComfyUIWorkflow, loras: LoraWithWeight[]): void {
-  const powerLoraLoaderNode = findNodeByTitle(workflow, 'Power Lora Loader (rgthree)')
+function configureQwenPowerLoraLoader(
+  workflow: ComfyUIWorkflow,
+  loraLoader: string,
+  loras: LoraWithWeight[]
+): void {
+  const powerLoraLoaderNode = findNodeByTitle(workflow, loraLoader)
   if (!powerLoraLoaderNode) {
-    throw new Error('Workflow must contain "Power Lora Loader (rgthree)" node')
+    throw new Error(`Workflow must contain "${loraLoader}" node`)
   }
 
   const { nodeId } = powerLoraLoaderNode
