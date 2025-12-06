@@ -696,7 +696,7 @@ function expandObjectNode(
     if (child.kind === 'array') arrays.push(child)
     else if (child.kind === 'object') stack.push(...(child.children || []))
   }
-  if (arrays.length === 0) return { expandedTags: [tag], resolution: tag }
+  if (arrays.length === 0) return { expandedTags: [], resolution: '' }
   // Prefer descendant arrays whose full path has an explicit override/pin.
   // If multiple, choose among them using weights.
   const pinnedArrays = arrays
@@ -723,7 +723,7 @@ function expandObjectNode(
       }
     }
   }
-  if (arrays.length === 0) return { expandedTags: [tag], resolution: tag }
+  if (arrays.length === 0) return { expandedTags: [], resolution: '' }
 
   // Use weighted selection for object children
   const options: { array: AnyNode; path: string; weight: number }[] = []

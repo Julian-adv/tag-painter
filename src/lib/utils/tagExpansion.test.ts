@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { expandCustomTags } from './tagExpansion'
 import type { TreeModel } from '$lib/TreeEdit/model'
+import { fromYAML } from '$lib/TreeEdit/yaml-io'
 
 // Mock the testModeStore
 vi.mock('../stores/testModeStore.svelte', () => ({
@@ -506,6 +509,46 @@ describe('tagExpansion utilities', () => {
       // Should return empty string when all choice options are disabled
       const expandedTag = result.expandedText
       expect(expandedTag).toBe('')
+    })
+
+    it('expands placeholders using real wildcards file nodes', () => {
+      const wildcardsPath = path.resolve(process.cwd(), 'data/wildcards.new.yaml')
+      const yaml = readFileSync(wildcardsPath, 'utf-8')
+      const model = fromYAML(yaml)
+
+      const topId = model.symbols['top']
+      expect(topId).toBeDefined()
+
+      const leaves: string[] = []
+      const collectLeaves = (nodeId: string) => {
+        const node = model.nodes[nodeId]
+        if (!node) return
+        if (node.kind === 'leaf') {
+          leaves.push(String(node.value))
+          return
+        }
+        if (node.kind === 'array' || node.kind === 'object') {
+          for (const childId of node.children) {
+            collectLeaves(childId)
+          }
+        }
+      }
+      collectLeaves(topId)
+
+      const { expandedText } = expandCustomTags('__top__', model)
+      expect(leaves).toContain(expandedText)
+    })
+
+    it('drops object placeholders when the container is disabled', () => {
+      const model = fromYAML(`
+top:
+  outfit:
+    - option-a
+`)
+      const disabledContext = { names: new Set<string>(['top']), patterns: [] as string[] }
+
+      const { expandedText } = expandCustomTags('__top__', model, new Set(), {}, {}, disabledContext)
+      expect(expandedText).toBe('')
     })
   })
 })
