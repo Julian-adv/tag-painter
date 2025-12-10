@@ -40,7 +40,14 @@ export async function GET() {
 
     return json({ loras })
   } catch (error) {
-    console.error(`Failed to fetch LoRAs from ${endpoint || comfyUrl}:`, error)
+    // Only log if it's not a connection refused error (ComfyUI not running yet)
+    const isConnectionRefused =
+      error instanceof Error &&
+      error.cause instanceof Error &&
+      (error.cause as NodeJS.ErrnoException).code === 'ECONNREFUSED'
+    if (!isConnectionRefused) {
+      console.error(`Failed to fetch LoRAs from ${endpoint || comfyUrl}:`, error)
+    }
     return json({ loras: [], error: 'Failed to fetch LoRA models' }, { status: 500 })
   }
 }

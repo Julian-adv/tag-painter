@@ -45,37 +45,10 @@ function Save-UrlIfMissing($url, $destPath) {
   throw "Failed to download $url"
 }
 
-function Get-7ZipPath() {
-  try {
-    $cmd = Get-Command 7z -ErrorAction Stop
-    return $cmd.Path
-  } catch {
-    $c1 = "C:\\Program Files\\7-Zip\\7z.exe"
-    $c2 = "C:\\Program Files (x86)\\7-Zip\\7z.exe"
-    if (Test-Path $c1) { return $c1 }
-    if (Test-Path $c2) { return $c2 }
-  }
-  return $null
-}
-
 function Expand-Zip-To($archivePath, $destDir) {
   Write-Host "Extracting: $archivePath -> $destDir" -ForegroundColor DarkCyan
   if (Test-Path $destDir) { Remove-Item -Recurse -Force $destDir }
-
-  $ext = [System.IO.Path]::GetExtension($archivePath).ToLowerInvariant()
-  if ($ext -eq '.zip') {
-    Expand-Archive -Path $archivePath -DestinationPath $destDir -Force
-    return
-  }
-  if ($ext -eq '.7z') {
-    $sevenZip = Get-7ZipPath
-    if (-not $sevenZip) {
-      throw "7-Zip is required to extract .7z archives. Install 7-Zip or provide a .zip archive."
-    }
-    & $sevenZip x -y -o"$destDir" "$archivePath" | Out-Null
-    return
-  }
-  throw "Unsupported archive extension: $ext"
+  Expand-Archive -Path $archivePath -DestinationPath $destDir -Force
 }
 
 function Get-LatestGitMinGitUrl() {

@@ -6,7 +6,7 @@ param(
 
 <#!
   Simplified start script.
-  - Installs Node dependencies if missing
+  - Installs production dependencies if missing (for native modules like sharp)
   - Starts the built Tag Painter server (build/index.js)
   - ComfyUI is now managed inside the application via the Setup dialog
 #>
@@ -77,8 +77,9 @@ try {
     $OpenBrowser = $true
   }
 
+  # Install production dependencies if missing (required for native modules like sharp)
   if (-not (Test-Path "node_modules")) {
-    Write-Host "Installing Node dependencies (npm ci)..." -ForegroundColor DarkCyan
+    Write-Host "Installing production dependencies (npm ci --omit=dev)..." -ForegroundColor DarkCyan
 
     # Set up PATH to use vendor node
     if (Test-Path "vendor\\node\\node.exe") {
@@ -92,12 +93,12 @@ try {
       $npm = Join-Path (Resolve-Path "vendor\\node") "npm.cmd"
     }
 
-    & $npm ci
+    & $npm ci --omit=dev --ignore-scripts
     if ($LASTEXITCODE -ne 0) {
       Write-Host "npm ci failed. Please check the error messages above." -ForegroundColor Red
       exit 1
     }
-    Write-Host "Node dependencies installed successfully." -ForegroundColor Green
+    Write-Host "Production dependencies installed successfully." -ForegroundColor Green
   }
 
   $server = Start-NodeServer -port $Port

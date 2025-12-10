@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-NODE_REQUIRED="v22.19.0"
+NODE_REQUIRED="v24.11.1"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}" )/.." && pwd)"
 
 echo "=== Bootstrap (macOS/Linux) ==="
