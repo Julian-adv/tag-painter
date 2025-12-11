@@ -1,6 +1,7 @@
 import type { RequestHandler } from '@sveltejs/kit'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
 
 type InstallOptions = {
   reinstall: boolean
@@ -14,13 +15,66 @@ function resolveCommand(options: InstallOptions) {
     const args = ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath]
     if (options.reinstall) args.push('-Reinstall')
     if (options.forceCpu) args.push('-ForceCPU')
-    return { command: 'pwsh', args, fallback: ['powershell', '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath] }
+    return {
+      command: 'pwsh',
+      args,
+      fallback: [
+        'powershell',
+        '-NoLogo',
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        scriptPath
+      ]
+    }
   }
   const scriptPath = path.resolve(root, 'scripts', 'install-comfy.sh')
   const args = [scriptPath]
   if (options.reinstall) args.push('--reinstall')
   if (options.forceCpu) args.push('--force-cpu')
   return { command: 'bash', args, fallback: null }
+}
+
+function startInstaller(command: ReturnType<typeof resolveCommand>): {
+  child: ChildProcess | null
+  error: string | null
+} {
+  try {
+    const child = spawn(command.command, command.args, {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: ['inherit', 'pipe', 'pipe']
+    })
+    return { child, error: null }
+  } catch (err) {
+    if (process.platform === 'win32' && command.fallback) {
+      try {
+        const child = spawn(command.fallback[0], command.fallback.slice(1), {
+          cwd: process.cwd(),
+          env: process.env,
+          stdio: ['ignore', 'pipe', 'pipe']
+        })
+        return { child, error: null }
+      } catch (fallbackErr) {
+        const message =
+          fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
+        return { child: null, error: message }
+      }
+    }
+    const message = err instanceof Error ? err.message : String(err)
+    return { child: null, error: message }
+  }
+}
+
+type StreamEvent =
+  | { type: 'stdout'; message: string }
+  | { type: 'stderr'; message: string }
+  | { type: 'error'; error: string }
+  | { type: 'exit'; code: number }
+
+function encodeLine(event: StreamEvent, encoder: TextEncoder): Uint8Array {
+  return encoder.encode(`${JSON.stringify(event)}\n`)
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -31,106 +85,61 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   const command = resolveCommand(options)
-
-  const spawnWithFallback = () => {
-    try {
-      return spawn(command.command, command.args, {
-        cwd: process.cwd(),
-        env: process.env,
-        stdio: ['inherit', 'pipe', 'pipe']
-      })
-    } catch (err) {
-      if (process.platform === 'win32' && command.fallback) {
-        return spawn(command.fallback[0], command.fallback.slice(1), {
-          cwd: process.cwd(),
-          env: process.env,
-          stdio: ['inherit', 'pipe', 'pipe']
-        })
-      }
-      throw err
-    }
-  }
-
-  let child: ReturnType<typeof spawn>
-  try {
-    child = spawnWithFallback()
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    const errorStream = new ReadableStream({
-      start(controller) {
-        const encoder = new TextEncoder()
-        controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'error', message })}\n`))
-        controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'complete', success: false })}\n`))
-        controller.close()
-      }
+  const { child, error } = startInstaller(command)
+  if (!child) {
+    const message = error ?? 'Failed to start installer'
+    return new Response(JSON.stringify({ success: false, error: message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
     })
-    return new Response(errorStream, { headers: { 'Content-Type': 'application/x-ndjson' } })
   }
+
+  const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
     start(controller) {
-      const encoder = new TextEncoder()
-      const send = (payload: Record<string, unknown>) => {
-        controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`))
+      const send = (event: StreamEvent) => controller.enqueue(encodeLine(event, encoder))
+
+      const handleStdout = (chunk: Buffer) => {
+        const text = chunk.toString()
+        process.stdout.write(text)
+        send({ type: 'stdout', message: text })
       }
 
-      let needsRestart = false
-
-      const pipeOutput = (source: NodeJS.ReadableStream, level: 'info' | 'error') => {
-        let buffer = ''
-        source.on('data', (chunk) => {
-          buffer += chunk.toString()
-          let idx = buffer.indexOf('\n')
-          while (idx !== -1) {
-            const line = buffer.slice(0, idx).trim()
-            buffer = buffer.slice(idx + 1)
-            if (line) {
-              if (line === 'COMFYUI_NEEDS_RESTART') {
-                needsRestart = true
-              }
-              send({ type: 'log', level, message: line })
-            }
-            idx = buffer.indexOf('\n')
-          }
-        })
-        source.on('end', () => {
-          if (buffer.trim().length > 0) {
-            send({ type: 'log', level, message: buffer.trim() })
-          }
-        })
+      const handleStderr = (chunk: Buffer) => {
+        const text = chunk.toString()
+        process.stderr.write(text)
+        send({ type: 'stderr', message: text })
       }
 
-      if (child.stdout) pipeOutput(child.stdout, 'info')
-      if (child.stderr) pipeOutput(child.stderr, 'error')
+      if (child.stdout) {
+        child.stdout.on('data', handleStdout)
+      }
+      if (child.stderr) {
+        child.stderr.on('data', handleStderr)
+      }
 
       child.on('error', (err) => {
-        send({ type: 'error', message: err.message })
-      })
-
-      child.on('close', (code) => {
-        send({ type: 'complete', success: code === 0, needsRestart })
+        const message = err instanceof Error ? err.message : String(err)
+        send({ type: 'error', error: message })
         controller.close()
       })
 
-      request.signal.addEventListener(
-        'abort',
-        () => {
-          if (process.platform === 'win32') {
-            child.kill('SIGTERM')
-          } else {
-            child.kill('SIGINT')
-          }
-          controller.close()
-        },
-        { once: true }
-      )
-    },
-    cancel() {
-      if (process.platform === 'win32') {
-        child.kill('SIGTERM')
-      } else {
-        child.kill('SIGINT')
+      child.on('close', (code) => {
+        const exitCode = typeof code === 'number' ? code : -1
+        send({ type: 'exit', code: exitCode })
+        controller.close()
+      })
+
+      const abortHandler = () => {
+        if (process.platform === 'win32') {
+          child.kill('SIGTERM')
+        } else {
+          child.kill('SIGINT')
+        }
       }
+
+      request.signal.addEventListener('abort', abortHandler, { once: true })
     }
   })
 

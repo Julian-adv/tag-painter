@@ -29,20 +29,31 @@ function New-DirectoryIfMissing($path) {
   if (-not (Test-Path $path)) { New-Item -ItemType Directory -Path $path | Out-Null }
 }
 
-function Save-UrlIfMissing($url, $destPath) {
-  if (Test-Path $destPath) { return }
+function Save-UrlIfMissing($url, $destPath, $minSize = 100000) {
+  if (Test-Path $destPath) {
+    $existingSize = (Get-Item $destPath).Length
+    if ($existingSize -ge $minSize) { return }
+    Write-Host "Existing file too small ($existingSize bytes), re-downloading..." -ForegroundColor Yellow
+    Remove-Item $destPath -Force
+  }
   Write-Host "Downloading: $url" -ForegroundColor DarkCyan
   try {
     Invoke-WebRequest -Uri $url -OutFile $destPath -Headers @{ 'User-Agent' = 'Mozilla/5.0' } -MaximumRedirection 10
-    if ((Test-Path $destPath) -and (Get-Item $destPath).Length -gt 0) { return }
-  } catch {}
+    if ((Test-Path $destPath) -and (Get-Item $destPath).Length -ge $minSize) { return }
+    if (Test-Path $destPath) { Remove-Item $destPath -Force }
+  } catch {
+    if (Test-Path $destPath) { Remove-Item $destPath -Force -ErrorAction SilentlyContinue }
+  }
   try {
     if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-      & curl.exe -A "Mozilla/5.0" -L "$url" -o "$destPath"
-      if ((Test-Path $destPath) -and (Get-Item $destPath).Length -gt 0) { return }
+      & curl.exe -A "Mozilla/5.0" -L --fail "$url" -o "$destPath"
+      if ((Test-Path $destPath) -and (Get-Item $destPath).Length -ge $minSize) { return }
+      if (Test-Path $destPath) { Remove-Item $destPath -Force }
     }
-  } catch {}
-  throw "Failed to download $url"
+  } catch {
+    if (Test-Path $destPath) { Remove-Item $destPath -Force -ErrorAction SilentlyContinue }
+  }
+  throw "Failed to download $url (file too small or download failed)"
 }
 
 function Expand-Zip-To($archivePath, $destDir) {
@@ -98,34 +109,27 @@ function Install-Uv($vendorDir) {
   Write-Header "uv (Python manager)"
   $uvZip = Join-Path $vendorDir "uv.zip"
   $uvZipUrl = 'https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip'
-  $uvExeUrl = 'https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.exe'
-  try {
-    Save-UrlIfMissing $uvZipUrl $uvZip
-    $tmpDir = Join-Path $vendorDir "uv-extract"
-    Expand-Zip-To $uvZip $tmpDir
-    $found = Get-ChildItem -Path $tmpDir -Recurse -Filter "uv.exe" | Select-Object -First 1
-    if ($found) {
-      Copy-Item $found.FullName $uvPath -Force
-      Remove-Item -Recurse -Force $tmpDir, $uvZip -ErrorAction SilentlyContinue
-      return $uvPath
+  $tmpDir = Join-Path $vendorDir "uv-extract"
+  $retryDelaySeconds = 3
+  for ($attempt = 1; $attempt -le 2; $attempt++) {
+    try {
+      if (Test-Path $uvZip) { Remove-Item $uvZip -Force -ErrorAction SilentlyContinue }
+      if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue }
+      Save-UrlIfMissing $uvZipUrl $uvZip
+      Expand-Zip-To $uvZip $tmpDir
+      $found = Get-ChildItem -Path $tmpDir -Recurse -Filter "uv.exe" | Select-Object -First 1
+      if ($found) {
+        Copy-Item $found.FullName $uvPath -Force
+        Remove-Item -Recurse -Force $tmpDir, $uvZip -ErrorAction SilentlyContinue
+        return $uvPath
+      }
+    } catch {
+      if ($attempt -lt 2) {
+        Write-Host "uv download attempt $attempt failed, retrying in $retryDelaySeconds seconds..." -ForegroundColor Yellow
+        Start-Sleep -Seconds $retryDelaySeconds
+      }
     }
-  } catch {}
-  try {
-    Save-UrlIfMissing $uvExeUrl $uvPath
-    if (Test-Path $uvPath) { return $uvPath }
-  } catch {}
-  $installPs1 = Join-Path $vendorDir "uv-install.ps1"
-  try {
-    Save-UrlIfMissing 'https://astral.sh/uv/install.ps1' $installPs1
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $installPs1 -y | Out-Null
-    $candidates = @(
-      "$env:USERPROFILE\.local\bin\uv.exe",
-      "$env:LOCALAPPDATA\Programs\uv\uv.exe"
-    )
-    foreach ($c in $candidates) {
-      if (Test-Path $c) { Copy-Item $c $uvPath -Force; break }
-    }
-  } catch {}
+  }
   if (-not (Test-Path $uvPath)) { throw "Failed to install uv" }
   return $uvPath
 }
@@ -214,11 +218,15 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
 
   Write-Header "ComfyUI requirements"
   # Use pip for package installation (uv has issues with PyTorch wheels in requirements.txt)
-  Write-Host "Installing ComfyUI requirements via pip..." -ForegroundColor DarkCyan
+  Write-Host "Installing ComfyUI requirements via pip (this may take a while)..." -ForegroundColor DarkCyan
   $reqFile = Join-Path $comfyDir "requirements.txt"
   Write-Host "Requirements file: $reqFile" -ForegroundColor DarkCyan
-  & $py -m pip install -r $reqFile 2>&1 | ForEach-Object { Write-Host $_ }
-  if ($LASTEXITCODE -ne 0) {
+  # Disable output buffering and increase pip verbosity
+  $pipArgs = @('-m', 'pip', 'install', '-vvv', '-r', $reqFile)
+  & $py @pipArgs
+  
+  $pipExitCode = $LASTEXITCODE
+  if ($pipExitCode -ne 0) {
     Write-Host "pip install failed with exit code: $LASTEXITCODE" -ForegroundColor Red
     throw "Failed to install ComfyUI requirements"
   }

@@ -91,7 +91,10 @@ else
 fi
 
 "$VENV_PY" -m pip install --upgrade pip
-"$VENV_PY" -m pip install -r "$COMFY_DIR/requirements.txt"
+echo "Installing ComfyUI requirements (pip output below)..."
+if ! "$VENV_PY" -m pip install -v -r "$COMFY_DIR/requirements.txt"; then
+  exit 1
+fi
 
 echo "Installing PyTorch..."
 echo "Uninstalling existing PyTorch packages..."
