@@ -69,25 +69,25 @@ function Install-Git($vendorDir) {
 
   $gitZipUrl = Get-LatestGitMinGitUrl
   $gitZip = Join-Path $vendorDir "git.zip"
-  $gitExtractDir = Join-Path $vendorDir "git-extract"
   $gitHome = Join-Path $vendorDir "git"
 
   if (-not (Test-Path (Join-Path $gitHome "cmd\git.exe"))) {
     Write-Host "Installing portable Git to $gitHome" -ForegroundColor DarkCyan
     Save-UrlIfMissing $gitZipUrl $gitZip
-    Expand-Zip-To $gitZip $gitExtractDir
 
+    # MinGit extracts directly without a subfolder, so extract directly to gitHome
     if (Test-Path $gitHome) { Remove-Item -Recurse -Force $gitHome }
-    $sub = Get-ChildItem -Path $gitExtractDir | Where-Object { $_.PSIsContainer } | Select-Object -First 1
-    if (-not $sub) { throw "Could not locate extracted Git folder under $gitExtractDir" }
-    Move-Item -Path $sub.FullName -Destination $gitHome
-    Remove-Item -Recurse -Force $gitExtractDir -ErrorAction SilentlyContinue
+    Expand-Archive -Path $gitZip -DestinationPath $gitHome -Force
     Remove-Item $gitZip -ErrorAction SilentlyContinue
+
+    if (-not (Test-Path (Join-Path $gitHome "cmd\git.exe"))) {
+      throw "Git installation failed - git.exe not found in $gitHome"
+    }
   } else {
     Write-Host "Using vendor Git at $gitHome" -ForegroundColor Green
   }
 
-  $env:PATH = (Join-Path $gitHome 'cmd') + ';' + (Join-Path $gitHome 'bin') + ';' + (Join-Path $gitHome 'usr\\bin') + ';' + $env:PATH
+  $env:PATH = (Join-Path $gitHome 'cmd') + ';' + (Join-Path $gitHome 'bin') + ';' + (Join-Path $gitHome 'usr\bin') + ';' + $env:PATH
   Write-Host "Vendor Git ready." -ForegroundColor Green
   return $gitHome
 }
@@ -133,11 +133,17 @@ function Install-Uv($vendorDir) {
 function Install-ComfyUISource($vendorDir, $comfyDir) {
   Write-Header "ComfyUI"
 
+  # Use vendor git explicitly
+  $git = Join-Path $vendorDir "git\cmd\git.exe"
+  if (-not (Test-Path $git)) {
+    throw "Git not found at $git. Run Install-Git first."
+  }
+
   if (Test-Path $comfyDir) {
     Write-Host "ComfyUI already present at $comfyDir, updating..." -ForegroundColor Green
     Push-Location $comfyDir
     try {
-      git pull
+      & $git pull
       if ($LASTEXITCODE -ne 0) {
         Write-Host "Warning: git pull failed, continuing with existing version." -ForegroundColor Yellow
       }
@@ -149,26 +155,8 @@ function Install-ComfyUISource($vendorDir, $comfyDir) {
     return
   }
 
-  $latestTag = $null
-  try {
-    Write-Host "Fetching latest release tag..." -ForegroundColor DarkCyan
-    $api = 'https://api.github.com/repos/comfyanonymous/ComfyUI/releases/latest'
-    $resp = Invoke-WebRequest -Uri $api -Headers @{ 'User-Agent' = 'pwsh' } -UseBasicParsing
-    $json = $resp.Content | ConvertFrom-Json
-    if ($json.tag_name) {
-      $latestTag = $json.tag_name
-      Write-Host "Latest release tag: $latestTag" -ForegroundColor Green
-    }
-  } catch {
-    Write-Host "Failed to fetch latest release tag, falling back to master branch" -ForegroundColor Yellow
-  }
-
-  Write-Host "Cloning ComfyUI repository..." -ForegroundColor DarkCyan
-  if ($latestTag) {
-    git clone --depth 1 --branch $latestTag https://github.com/comfyanonymous/ComfyUI.git $comfyDir
-  } else {
-    git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git $comfyDir
-  }
+  Write-Host "Cloning ComfyUI repository (master branch)..." -ForegroundColor DarkCyan
+  & $git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git $comfyDir
 
   # Check if clone was successful by verifying main.py exists
   if (-not (Test-Path (Join-Path $comfyDir "main.py"))) {
@@ -225,16 +213,19 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
   }
 
   Write-Header "ComfyUI requirements"
-  # Use uv for package installation (more reliable than pip in virtual environments)
-  Write-Host "Installing ComfyUI requirements via uv..." -ForegroundColor DarkCyan
-  & $uv pip install -p $py -r (Join-Path $comfyDir "requirements.txt")
+  # Use pip for package installation (uv has issues with PyTorch wheels in requirements.txt)
+  Write-Host "Installing ComfyUI requirements via pip..." -ForegroundColor DarkCyan
+  $reqFile = Join-Path $comfyDir "requirements.txt"
+  Write-Host "Requirements file: $reqFile" -ForegroundColor DarkCyan
+  & $py -m pip install -r $reqFile 2>&1 | ForEach-Object { Write-Host $_ }
   if ($LASTEXITCODE -ne 0) {
+    Write-Host "pip install failed with exit code: $LASTEXITCODE" -ForegroundColor Red
     throw "Failed to install ComfyUI requirements"
   }
 
   Write-Header "PyTorch"
   Write-Host "Uninstalling existing PyTorch packages..." -ForegroundColor DarkCyan
-  & $uv pip uninstall -p $py torch torchvision torchaudio 2>$null
+  & $py -m pip uninstall -y torch torchvision torchaudio 2>$null
 
   $hasNvidia = $false
   try { Get-Command nvidia-smi -ErrorAction SilentlyContinue | Out-Null; $hasNvidia = $true } catch {}
@@ -248,15 +239,16 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
     )
     foreach ($ix in $indexes) {
       Write-Host "Trying CUDA wheel index: $ix" -ForegroundColor DarkCyan
-      & $uv pip install -p $py --no-cache torch torchvision torchaudio --index-url $ix
+      # Use pip for PyTorch installation (uv has issues with PyTorch wheels)
+      & $py -m pip install --no-cache-dir torch torchvision torchaudio --index-url $ix
       if ($LASTEXITCODE -eq 0) { $gpuInstalled = $true; break }
     }
     if (-not $gpuInstalled) {
       Write-Host "CUDA Torch wheel not available. Installing CPU Torch instead." -ForegroundColor Yellow
-      & $uv pip install -p $py --reinstall --no-cache torch torchvision torchaudio
+      & $py -m pip install --no-cache-dir torch torchvision torchaudio
     }
   } else {
-    & $uv pip install -p $py torch torchvision torchaudio
+    & $py -m pip install torch torchvision torchaudio
   }
 
   if ($ForceCpuMode) {

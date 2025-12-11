@@ -1,6 +1,8 @@
 import type { RequestHandler } from '@sveltejs/kit'
 import { spawn } from 'node:child_process'
 import { setTimeout as delay } from 'node:timers/promises'
+import path from 'node:path'
+import fs from 'node:fs'
 import { findComfyPython, getComfyDir } from '$lib/server/comfy'
 import { isComfyAvailable, stopComfyProcess } from '$lib/server/comfyProcess'
 
@@ -34,12 +36,32 @@ async function waitForComfyToStart(): Promise<boolean> {
   return false
 }
 
+function getVendorGitPath(): string | undefined {
+  const vendorGit = path.join(process.cwd(), 'vendor', 'git', 'cmd', 'git.exe')
+  if (fs.existsSync(vendorGit)) {
+    return vendorGit
+  }
+  return undefined
+}
+
 async function startComfyProcess(python: string, comfyDir: string): Promise<boolean> {
   for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
     const args = buildArgs()
+
+    // Set up environment with vendor git for ComfyUI Manager
+    const env = { ...process.env }
+    const vendorGit = getVendorGitPath()
+    if (vendorGit) {
+      env.GIT_PYTHON_GIT_EXECUTABLE = vendorGit
+      // Also add git to PATH for any subprocess that might need it
+      const gitDir = path.dirname(path.dirname(vendorGit))
+      env.PATH = `${path.join(gitDir, 'cmd')};${path.join(gitDir, 'bin')};${env.PATH || ''}`
+    }
+
     const child = spawn(python, args, {
       cwd: comfyDir,
-      stdio: ['ignore', 'inherit', 'inherit']
+      stdio: ['ignore', 'inherit', 'inherit'],
+      env
     })
 
     await new Promise<void>((resolve, reject) => {
