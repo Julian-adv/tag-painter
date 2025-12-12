@@ -181,10 +181,38 @@ async function installRequirementsIfPresent(destDir: string): Promise<void> {
       ? ['install', '--no-warn-conflicts', '-r', requirementsPath]
       : ['-m', 'pip', 'install', '--no-warn-conflicts', '-r', requirementsPath]
 
+    const env = { ...process.env }
+    const vendorGitDir = path.resolve(process.cwd(), 'vendor', 'git')
+    const vendorPathSegments =
+      process.platform === 'win32'
+        ? [
+            path.join(vendorGitDir, 'cmd'),
+            path.join(vendorGitDir, 'bin'),
+            path.join(vendorGitDir, 'usr', 'bin')
+          ]
+        : [path.join(vendorGitDir, 'bin'), path.join(vendorGitDir, 'usr', 'bin')]
+    const vendorPath = vendorPathSegments.join(path.delimiter)
+    if (vendorPath.length > 0) {
+      env.PATH = env.PATH ? `${vendorPath}${path.delimiter}${env.PATH}` : vendorPath
+    }
+
+    let gitExecutable: string | null = null
+    try {
+      gitExecutable = await findGitExecutable()
+    } catch {
+      gitExecutable = null
+    }
+    if (gitExecutable) {
+      env.GIT_PYTHON_GIT_EXECUTABLE = gitExecutable
+      const gitDir = path.dirname(gitExecutable)
+      env.PATH = env.PATH ? `${gitDir}${path.delimiter}${env.PATH}` : gitDir
+    }
+
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(command, args, {
         stdio: 'inherit',
-        shell: false
+        shell: false,
+        env
       })
       proc.on('error', (err) => reject(err))
       proc.on('close', (code) => {
