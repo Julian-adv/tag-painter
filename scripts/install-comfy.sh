@@ -13,6 +13,7 @@ VENV_DIR="$VENDOR_DIR/comfy-venv"
 PY_VERSION="3.12"
 REINSTALL=0
 FORCE_CPU=0
+HAS_NVIDIA=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -37,6 +38,10 @@ EOF
   esac
   shift
 done
+
+if command -v nvidia-smi >/dev/null 2>&1; then
+  HAS_NVIDIA=1
+fi
 
 echo "=== Install ComfyUI (macOS/Linux) ==="
 
@@ -69,10 +74,12 @@ fi
 
 echo "Preparing Python $PY_VERSION environment..."
 VENV_PY=""
+UV_BIN=""
 if command -v uv >/dev/null 2>&1; then
-  uv python install "$PY_VERSION"
+  UV_BIN="$(command -v uv)"
+  "$UV_BIN" python install "$PY_VERSION"
   if [[ ! -d "$VENV_DIR" ]]; then
-    uv venv -p "$PY_VERSION" "$VENV_DIR"
+    "$UV_BIN" venv -p "$PY_VERSION" "$VENV_DIR"
   fi
   VENV_PY="$VENV_DIR/bin/python"
 else
@@ -92,15 +99,50 @@ fi
 
 "$VENV_PY" -m pip install --upgrade pip
 echo "Installing ComfyUI requirements (pip output below)..."
-if ! "$VENV_PY" -m pip install -v -r "$COMFY_DIR/requirements.txt"; then
-  exit 1
+if [[ -n "$UV_BIN" ]]; then
+  UV_ARGS=(pip install -p "$VENV_PY" -r "$COMFY_DIR/requirements.txt")
+  if [[ $HAS_NVIDIA -eq 1 && $FORCE_CPU -eq 0 ]]; then
+    UV_ARGS+=("--extra-index-url" "https://download.pytorch.org/whl/cu128")
+  fi
+
+	  attempt=0
+	  max_attempts=2
+	  pip_ok=0
+	  while [[ $attempt -lt $max_attempts ]]; do
+	    attempt=$((attempt + 1))
+	    echo "uv pip install attempt #${attempt}..."
+	    if "$UV_BIN" "${UV_ARGS[@]}"; then
+	      pip_ok=1
+	      break
+	    fi
+	    echo "uv pip attempt #${attempt} failed. Retrying..." >&2
+	    sleep 2
+	  done
+	  if [[ $pip_ok -eq 0 ]]; then
+	    echo "uv pip failed after $max_attempts attempts. Falling back to python -m pip..." >&2
+	    PIP_ARGS=(-m pip install -v -r "$COMFY_DIR/requirements.txt")
+	    if [[ $HAS_NVIDIA -eq 1 && $FORCE_CPU -eq 0 ]]; then
+	      PIP_ARGS+=("--extra-index-url" "https://download.pytorch.org/whl/cu128")
+    fi
+    if ! "$VENV_PY" "${PIP_ARGS[@]}"; then
+      exit 1
+    fi
+  fi
+else
+  PIP_ARGS=(-m pip install -v -r "$COMFY_DIR/requirements.txt")
+  if [[ $HAS_NVIDIA -eq 1 && $FORCE_CPU -eq 0 ]]; then
+    PIP_ARGS+=("--extra-index-url" "https://download.pytorch.org/whl/cu128")
+  fi
+  if ! "$VENV_PY" "${PIP_ARGS[@]}"; then
+    exit 1
+  fi
 fi
 
 echo "Installing PyTorch..."
 echo "Uninstalling existing PyTorch packages..."
 "$VENV_PY" -m pip uninstall -y torch torchvision torchaudio 2>/dev/null || true
 
-if command -v nvidia-smi >/dev/null 2>&1 && [[ $FORCE_CPU -eq 0 ]]; then
+if [[ $HAS_NVIDIA -eq 1 && $FORCE_CPU -eq 0 ]]; then
   if ! "$VENV_PY" -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128; then
     echo "Falling back to CPU PyTorch." >&2
     "$VENV_PY" -m pip install torch torchvision torchaudio
@@ -110,7 +152,7 @@ else
 fi
 
 echo "Installing helper Python packages..."
-if command -v nvidia-smi >/dev/null 2>&1 && [[ $FORCE_CPU -eq 0 ]]; then
+if [[ $HAS_NVIDIA -eq 1 && $FORCE_CPU -eq 0 ]]; then
   "$VENV_PY" -m pip install --upgrade onnxruntime-gpu || "$VENV_PY" -m pip install --upgrade onnxruntime
 else
   "$VENV_PY" -m pip install --upgrade onnxruntime

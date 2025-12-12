@@ -111,7 +111,7 @@ function Install-Uv($vendorDir) {
   $uvZipUrl = 'https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip'
   $tmpDir = Join-Path $vendorDir "uv-extract"
   $retryDelaySeconds = 3
-  for ($attempt = 1; $attempt -le 2; $attempt++) {
+  for ($attempt = 1; $attempt -le 10; $attempt++) {
     try {
       if (Test-Path $uvZip) { Remove-Item $uvZip -Force -ErrorAction SilentlyContinue }
       if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue }
@@ -124,7 +124,7 @@ function Install-Uv($vendorDir) {
         return $uvPath
       }
     } catch {
-      if ($attempt -lt 2) {
+      if ($attempt -lt 10) {
         Write-Host "uv download attempt $attempt failed, retrying in $retryDelaySeconds seconds..." -ForegroundColor Yellow
         Start-Sleep -Seconds $retryDelaySeconds
       }
@@ -209,6 +209,10 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
   }
   Write-Host "Python venv created successfully: $pyVersion" -ForegroundColor Green
 
+  # Detect NVIDIA GPU availability once (used for requirements and PyTorch installs)
+  $hasNvidia = $false
+  try { Get-Command nvidia-smi -ErrorAction SilentlyContinue | Out-Null; $hasNvidia = $true } catch {}
+
   # Install pip in the venv for ComfyUI-Manager compatibility
   Write-Host "Installing pip in venv..." -ForegroundColor DarkCyan
   & $uv pip install -p $py pip setuptools wheel | Out-Null
@@ -217,26 +221,45 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
   }
 
   Write-Header "ComfyUI requirements"
-  # Use pip for package installation (uv has issues with PyTorch wheels in requirements.txt)
-  Write-Host "Installing ComfyUI requirements via pip (this may take a while)..." -ForegroundColor DarkCyan
+  # Use uv pip for better progress output during requirements installation
+  Write-Host "Installing ComfyUI requirements via uv pip (this may take a while)..." -ForegroundColor DarkCyan
   $reqFile = Join-Path $comfyDir "requirements.txt"
   Write-Host "Requirements file: $reqFile" -ForegroundColor DarkCyan
-  # Disable output buffering and increase pip verbosity
-  $pipArgs = @('-m', 'pip', 'install', '-vvv', '-r', $reqFile)
-  & $py @pipArgs
-  
-  $pipExitCode = $LASTEXITCODE
+
+  $pipArgs = @('pip', 'install', '-p', $py, '-r', $reqFile)
+  if ($hasNvidia -and -not $ForceCpuMode) {
+  $pipArgs += @('--extra-index-url', 'https://download.pytorch.org/whl/cu128')
+  }
+  $uvAttempts = 0
+  $maxUvAttempts = 2
+  $pipExitCode = 1
+  while ($uvAttempts -lt $maxUvAttempts) {
+    $uvAttempts++
+    Write-Host "uv pip install attempt #$uvAttempts..." -ForegroundColor DarkCyan
+    & $uv @pipArgs
+    $pipExitCode = $LASTEXITCODE
+    if ($pipExitCode -eq 0) { break }
+    Write-Host "uv pip attempt #$uvAttempts failed with exit code: $pipExitCode." -ForegroundColor Yellow
+    Start-Sleep -Seconds 2
+  }
   if ($pipExitCode -ne 0) {
-    Write-Host "pip install failed with exit code: $LASTEXITCODE" -ForegroundColor Red
-    throw "Failed to install ComfyUI requirements"
+    Write-Host "uv pip failed after $maxUvAttempts attempts, falling back to python -m pip..." -ForegroundColor Yellow
+    $fallbackArgs = @('-m', 'pip', 'install', '-v', '-r', $reqFile)
+    if ($hasNvidia -and -not $ForceCpuMode) {
+      $fallbackArgs += @('--extra-index-url', 'https://download.pytorch.org/whl/cu128')
+    }
+    & $py @fallbackArgs
+    $pipExitCode = $LASTEXITCODE
+    if ($pipExitCode -ne 0) {
+      Write-Host "pip install failed with exit code: $LASTEXITCODE" -ForegroundColor Red
+      throw "Failed to install ComfyUI requirements"
+    }
   }
 
   Write-Header "PyTorch"
   Write-Host "Uninstalling existing PyTorch packages..." -ForegroundColor DarkCyan
   & $py -m pip uninstall -y torch torchvision torchaudio 2>$null
 
-  $hasNvidia = $false
-  try { Get-Command nvidia-smi -ErrorAction SilentlyContinue | Out-Null; $hasNvidia = $true } catch {}
   if ($hasNvidia -and -not $ForceCpuMode) {
     $gpuInstalled = $false
     $indexes = @(
