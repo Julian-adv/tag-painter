@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ModelSettings, LoraWithWeight } from '$lib/types'
-  import LoraSelector from '$lib/LoraSelector.svelte'
+  import LoraSelector from './LoraSelector.svelte'
   import AutoCompleteTextarea from '$lib/AutoCompleteTextarea.svelte'
   import SamplerSelector from '$lib/SamplerSelector.svelte'
   import SchedulerSelector from '$lib/SchedulerSelector.svelte'
