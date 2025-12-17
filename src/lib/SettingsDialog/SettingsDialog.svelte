@@ -1,12 +1,8 @@
 <script lang="ts">
-  import type { Settings, LoraWithWeight, ModelType } from '$lib/types'
-  import { fetchVaeModels, fetchCheckpoints } from './generation/comfyui'
-  import LoraSelector from './LoraSelector.svelte'
-  import { promptsData } from './stores/promptsStore'
-  import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
-  import SamplerSelector from './SamplerSelector.svelte'
-  import SchedulerSelector from './SchedulerSelector.svelte'
-  import CustomSelect from './CustomSelect.svelte'
+  import type { Settings, ModelType } from '$lib/types'
+  import { fetchVaeModels, fetchCheckpoints } from '$lib/generation/comfyui'
+  import { promptsData } from '$lib/stores/promptsStore'
+  import CustomSelect from '$lib/CustomSelect.svelte'
   import { m } from '$lib/paraglide/messages'
   import { locales, baseLocale } from '$lib/paraglide/runtime.js'
   import {
@@ -14,6 +10,9 @@
     DEFAULT_UPSCALE_SETTINGS,
     MODEL_TYPE_DEFAULTS
   } from '$lib/constants'
+  import PerModelSettings from './PerModelSettings.svelte'
+  import UpscaleSettings from './UpscaleSettings.svelte'
+  import FaceDetailerSettings from './FaceDetailerSettings.svelte'
 
   interface Props {
     show: boolean
@@ -475,367 +474,23 @@
         />
 
         {#if localSettings.perModel[selectedModelKey]}
-          <label for="pm-model-type" class="two-col-label">{m['settingsDialog.modelType']()}</label>
-          <CustomSelect
-            id="pm-model-type"
-            class="two-col-input"
-            bind:value={localSettings.perModel[selectedModelKey].modelType}
-            options={[
-              { value: 'sdxl', label: 'SDXL' },
-              { value: 'qwen', label: 'Qwen' },
-              { value: 'qwen_nunchaku', label: 'Qwen Nunchaku' },
-              { value: 'chroma', label: 'Chroma' },
-              { value: 'flux1_krea', label: 'Flux1 Krea' },
-              { value: 'z_image', label: 'Z Image' }
-            ]}
+          <PerModelSettings
+            bind:modelSettings={localSettings.perModel[selectedModelKey]}
+            {availableVaes}
+            {availableWorkflows}
           />
 
-          <label for="pm-cfg" class="two-col-label">{m['settingsDialog.cfgScale']()}</label>
-          <input
-            id="pm-cfg"
-            type="number"
-            bind:value={localSettings.perModel[selectedModelKey].cfgScale}
-            min="1"
-            max="20"
-            step="0.5"
-            class="two-col-input"
+          <UpscaleSettings
+            bind:upscaleSettings={localSettings.perModel[selectedModelKey].upscale}
+            {availableCheckpoints}
+            {availableVaes}
           />
 
-          <label for="pm-steps" class="two-col-label">{m['settingsDialog.steps']()}</label>
-          <input
-            id="pm-steps"
-            type="number"
-            bind:value={localSettings.perModel[selectedModelKey].steps}
-            min="1"
-            max="100"
-            step="1"
-            class="two-col-input"
+          <FaceDetailerSettings
+            bind:faceDetailerSettings={localSettings.perModel[selectedModelKey].faceDetailer}
+            {availableCheckpoints}
+            {availableVaes}
           />
-
-          <label for="pm-sampler" class="two-col-label">{m['settingsDialog.sampler']()}</label>
-          <SamplerSelector
-            id="pm-sampler"
-            bind:value={localSettings.perModel[selectedModelKey].sampler}
-            class="two-col-input"
-          />
-
-          <label for="pm-scheduler" class="two-col-label">{m['settingsDialog.scheduler']()}</label>
-          <SchedulerSelector
-            id="pm-scheduler"
-            bind:value={localSettings.perModel[selectedModelKey].scheduler}
-            class="two-col-input"
-          />
-
-          <label for="pm-vae" class="two-col-label">{m['settingsDialog.vae']()}</label>
-          <CustomSelect
-            id="pm-vae"
-            bind:value={localSettings.perModel[selectedModelKey].selectedVae}
-            class="two-col-input-wide"
-            options={[
-              { value: '__embedded__', label: m['settingsDialog.useEmbeddedVae']() },
-              ...availableVaes.map((vae) => ({ value: vae, label: vae }))
-            ]}
-          />
-
-          <label for="pm-clipskip" class="two-col-label">{m['settingsDialog.clipSkip']()}</label>
-          <input
-            id="pm-clipskip"
-            type="number"
-            bind:value={localSettings.perModel[selectedModelKey].clipSkip}
-            min="1"
-            max="12"
-            step="1"
-            class="two-col-input"
-          />
-
-          <label for="pm-workflow" class="two-col-label">Workflow</label>
-          <CustomSelect
-            id="pm-workflow"
-            value={localSettings.perModel[selectedModelKey].customWorkflowPath || ''}
-            class="two-col-input-wide"
-            options={[
-              { value: '', label: 'None (Use global or default)' },
-              ...availableWorkflows.map((w) => ({ value: w, label: w }))
-            ]}
-            onchange={(v) => (localSettings.perModel[selectedModelKey].customWorkflowPath = v)}
-          />
-
-          <label for="pm-wildcards-file" class="two-col-label">Wildcards File</label>
-          <input
-            id="pm-wildcards-file"
-            type="text"
-            bind:value={localSettings.perModel[selectedModelKey].wildcardsFile}
-            placeholder="wildcards.yaml"
-            class="two-col-input-wide"
-          />
-
-          <label for="pm-quality" class="two-col-label">{m['settingsDialog.qualityPrefix']()}</label
-          >
-          <div class="two-col-input-wide">
-            <AutoCompleteTextarea
-              id="pm-quality"
-              value={localSettings.perModel[selectedModelKey].qualityPrefix}
-              onValueChange={(v) => (localSettings.perModel[selectedModelKey].qualityPrefix = v)}
-              placeholder={m['settingsDialog.qualityPlaceholder']()}
-              rows={3}
-            />
-          </div>
-
-          <label for="pm-negative" class="two-col-label"
-            >{m['settingsDialog.negativePrefix']()}</label
-          >
-          <div class="two-col-input-wide">
-            <AutoCompleteTextarea
-              id="pm-negative"
-              value={localSettings.perModel[selectedModelKey].negativePrefix}
-              onValueChange={(v) => (localSettings.perModel[selectedModelKey].negativePrefix = v)}
-              placeholder={m['settingsDialog.negativePlaceholder']()}
-              rows={3}
-            />
-          </div>
-
-          <label for="lora-selector" class="two-col-label">
-            {m['settingsDialog.loraModels']()}
-          </label>
-          <div class="two-col-input-wide lora-embed">
-            <LoraSelector
-              selectedLoras={localSettings.perModel[selectedModelKey].loras as LoraWithWeight[]}
-              onLoraChange={(loras) => (localSettings.perModel[selectedModelKey].loras = loras)}
-            />
-          </div>
-
-          <label for="pm-save-base" class="two-col-label"
-            >{m['settingsDialog.saveBaseImages']()}</label
-          >
-          <div class="two-col-input checkbox-container">
-            <input
-              id="pm-save-base"
-              type="checkbox"
-              bind:checked={localSettings.perModel[selectedModelKey].saveBaseImages}
-            />
-          </div>
-
-          <!-- Upscale Settings -->
-          <div
-            class="section-title"
-            style="grid-column: 1 / 4; font-weight: 600; color: #333; text-align: left; justify-self: start; margin-top: 16px;"
-          >
-            {m['settingsDialog.upscaleTitle']()}
-          </div>
-
-          {#if localSettings.perModel[selectedModelKey]}
-            <label for="us-checkpoint" class="two-col-label"
-              >{m['settingsDialog.upscaleCheckpoint']()}</label
-            >
-            <CustomSelect
-              id="us-checkpoint"
-              class="two-col-input-wide"
-              bind:value={localSettings.perModel[selectedModelKey].upscale.checkpoint}
-              options={availableCheckpoints.map((cp) => ({ value: cp, label: cp }))}
-            />
-
-            <label for="us-model-type" class="two-col-label"
-              >{m['settingsDialog.upscaleModelType']()}</label
-            >
-            <CustomSelect
-              id="us-model-type"
-              class="two-col-input"
-              bind:value={localSettings.perModel[selectedModelKey].upscale.modelType}
-              options={[
-                { value: 'sdxl', label: 'SDXL' },
-                { value: 'qwen', label: 'Qwen' },
-                { value: 'chroma', label: 'Chroma' },
-                { value: 'z_image', label: 'Z Image' }
-              ]}
-            />
-
-            <label for="us-scale" class="two-col-label">{m['settingsDialog.upscaleScale']()}</label>
-            <input
-              id="us-scale"
-              type="number"
-              bind:value={localSettings.perModel[selectedModelKey].upscale.scale}
-              min="1.0"
-              max="4.0"
-              step="0.1"
-              class="two-col-input"
-            />
-
-            <label for="us-steps" class="two-col-label">{m['settingsDialog.upscaleSteps']()}</label>
-            <input
-              id="us-steps"
-              type="number"
-              bind:value={localSettings.perModel[selectedModelKey].upscale.steps}
-              min="1"
-              max="150"
-              class="two-col-input"
-            />
-
-            <label for="us-cfg" class="two-col-label">{m['settingsDialog.upscaleCfgScale']()}</label
-            >
-            <input
-              id="us-cfg"
-              type="number"
-              bind:value={localSettings.perModel[selectedModelKey].upscale.cfgScale}
-              min="1"
-              max="20"
-              step="0.1"
-              class="two-col-input"
-            />
-
-            <label for="us-sampler" class="two-col-label"
-              >{m['settingsDialog.upscaleSampler']()}</label
-            >
-            <SamplerSelector
-              id="us-sampler"
-              bind:value={localSettings.perModel[selectedModelKey].upscale.sampler}
-              class="two-col-input-wide"
-            />
-
-            <label for="us-scheduler" class="two-col-label"
-              >{m['settingsDialog.upscaleScheduler']()}</label
-            >
-            <SchedulerSelector
-              id="us-scheduler"
-              bind:value={localSettings.perModel[selectedModelKey].upscale.scheduler}
-              class="two-col-input-wide"
-            />
-
-            <label for="us-denoise" class="two-col-label"
-              >{m['settingsDialog.upscaleDenoise']()}</label
-            >
-            <input
-              id="us-denoise"
-              type="number"
-              bind:value={localSettings.perModel[selectedModelKey].upscale.denoise}
-              min="0"
-              max="1"
-              step="0.05"
-              class="two-col-input"
-            />
-
-            <label for="us-vae" class="two-col-label">{m['settingsDialog.upscaleVae']()}</label>
-            <CustomSelect
-              id="us-vae"
-              bind:value={localSettings.perModel[selectedModelKey].upscale.selectedVae}
-              class="two-col-input-wide"
-              options={[
-                { value: '__embedded__', label: m['settingsDialog.useEmbeddedVae']() },
-                ...availableVaes.map((vae) => ({ value: vae, label: vae }))
-              ]}
-            />
-
-            <label for="us-save-upscale" class="two-col-label"
-              >{m['settingsDialog.saveUpscaleImages']()}</label
-            >
-            <div class="two-col-input checkbox-container">
-              <input
-                id="us-save-upscale"
-                type="checkbox"
-                bind:checked={localSettings.perModel[selectedModelKey].upscale.saveUpscaleImages}
-              />
-            </div>
-
-            <!-- FaceDetailer Settings -->
-            <div
-              class="section-title"
-              style="grid-column: 1 / 4; font-weight: 600; color: #333; text-align: left; justify-self: start; margin-top: 16px;"
-            >
-              {m['settingsDialog.faceDetailerTitle']()}
-            </div>
-
-            <label for="fd-checkpoint" class="two-col-label"
-              >{m['settingsDialog.faceDetailerCheckpoint']()}</label
-            >
-            <CustomSelect
-              id="fd-checkpoint"
-              class="two-col-input-wide"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.checkpoint}
-              options={availableCheckpoints.map((cp) => ({ value: cp, label: cp }))}
-            />
-
-            <label for="fd-model-type" class="two-col-label"
-              >{m['settingsDialog.faceDetailerModelType']()}</label
-            >
-            <CustomSelect
-              id="fd-model-type"
-              class="two-col-input"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.modelType}
-              options={[
-                { value: 'sdxl', label: 'SDXL' },
-                { value: 'qwen', label: 'Qwen' },
-                { value: 'chroma', label: 'Chroma' }
-              ]}
-            />
-
-            <label for="fd-steps" class="two-col-label"
-              >{m['settingsDialog.faceDetailerSteps']()}</label
-            >
-            <input
-              id="fd-steps"
-              type="number"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.steps}
-              min="1"
-              max="100"
-              step="1"
-              class="two-col-input"
-            />
-
-            <label for="fd-cfg" class="two-col-label"
-              >{m['settingsDialog.faceDetailerCfgScale']()}</label
-            >
-            <input
-              id="fd-cfg"
-              type="number"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.cfgScale}
-              min="1"
-              max="20"
-              step="0.5"
-              class="two-col-input"
-            />
-
-            <label for="fd-sampler" class="two-col-label"
-              >{m['settingsDialog.faceDetailerSampler']()}</label
-            >
-            <SamplerSelector
-              id="fd-sampler"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.sampler}
-              class="two-col-input"
-            />
-
-            <label for="fd-scheduler" class="two-col-label"
-              >{m['settingsDialog.faceDetailerScheduler']()}</label
-            >
-            <SchedulerSelector
-              id="fd-scheduler"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.scheduler}
-              class="two-col-input"
-            />
-
-            <label for="fd-denoise" class="two-col-label"
-              >{m['settingsDialog.faceDetailerDenoise']()}</label
-            >
-            <input
-              id="fd-denoise"
-              type="number"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.denoise}
-              min="0"
-              max="1"
-              step="0.05"
-              class="two-col-input"
-            />
-
-            <label for="fd-vae" class="two-col-label">{m['settingsDialog.faceDetailerVae']()}</label
-            >
-            <CustomSelect
-              id="fd-vae"
-              bind:value={localSettings.perModel[selectedModelKey].faceDetailer.selectedVae}
-              class="two-col-input-wide"
-              options={[
-                { value: '__embedded__', label: m['settingsDialog.useEmbeddedVae']() },
-                ...availableVaes.map((vae) => ({ value: vae, label: vae }))
-              ]}
-            />
-          {/if}
         {/if}
       </div>
 
@@ -962,10 +617,6 @@
     grid-column: 2;
   }
 
-  .two-col-input-wide {
-    grid-column: 2 / 4;
-  }
-
   .output-dir-label {
     grid-column: 1;
     text-align: right;
@@ -984,48 +635,5 @@
     justify-content: flex-end;
     padding: 12px 16px 14px 16px;
     border-top: 1px solid #eee;
-  }
-
-  .primary-button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-  }
-
-  .primary-button:hover {
-    background-color: #0056b3;
-  }
-
-  .secondary-button {
-    background-color: #6c757d;
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-  }
-
-  .secondary-button:hover {
-    background-color: #545b62;
-  }
-
-  /* Hide embedded LoRA header inside settings */
-  .lora-embed :global(.lora-selector h3) {
-    display: none;
-  }
-
-  .checkbox-container {
-    display: flex;
-    align-items: center;
-  }
-
-  .checkbox-container input[type='checkbox'] {
-    width: auto;
-    cursor: pointer;
   }
 </style>

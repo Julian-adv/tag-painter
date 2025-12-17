@@ -1,6 +1,6 @@
 <!-- Component for generation controls, progress bar, and loading state -->
 <script lang="ts">
-  import SettingsDialog from './SettingsDialog.svelte'
+  import { SettingsDialog } from './SettingsDialog'
   import { Cog8Tooth, Play, Stop, ArrowPath, PaintBrush } from 'svelte-heros-v2'
   import { m } from '$lib/paraglide/messages'
   import type { Settings, ProgressData } from '$lib/types'

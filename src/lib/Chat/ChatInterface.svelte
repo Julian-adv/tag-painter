@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { Cog8Tooth, ArrowPath } from 'svelte-heros-v2'
-  import SettingsDialog from '$lib/SettingsDialog.svelte'
+  import { SettingsDialog } from '$lib/SettingsDialog'
   import CharacterManagerDialog from './CharacterManagerDialog.svelte'
   import { getEffectiveModelSettings } from '$lib/generation/generationCommon'
   import { promptsData } from '$lib/stores/promptsStore'
