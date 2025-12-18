@@ -22,6 +22,13 @@
     loraPresets,
     onLoraPresetsChange
   }: Props = $props()
+
+  let loraSelectorRef: LoraSelector | undefined = $state()
+
+  // Expose sync function to parent
+  export function syncLoraPresetSelection() {
+    loraSelectorRef?.syncPresetSelection()
+  }
 </script>
 
 <label for="pm-model-type" class="two-col-label">{m['settingsDialog.modelType']()}</label>
@@ -137,6 +144,7 @@
 </label>
 <div class="two-col-input-wide lora-embed">
   <LoraSelector
+    bind:this={loraSelectorRef}
     selectedLoras={modelSettings.loras as LoraWithWeight[]}
     onLoraChange={(loras) => (modelSettings.loras = loras)}
     presets={loraPresets}

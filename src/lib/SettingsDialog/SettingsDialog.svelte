@@ -75,6 +75,7 @@
   let selectedModelDirty: boolean = $state(false)
   let lastSelectedModelKey: string = $state('Default')
   let previousModelType: ModelType | null = $state(null)
+  let perModelSettingsRef: PerModelSettings | undefined = $state()
 
   function deepClone<T>(obj: T): T {
     return JSON.parse(JSON.stringify(obj))
@@ -129,6 +130,10 @@
       selectedModelDirty = false
       lastSelectedModelKey = keyToEnsure
       sessionInitialized = true
+      // Sync LoRA preset selection after dialog is fully initialized
+      setTimeout(() => {
+        perModelSettingsRef?.syncLoraPresetSelection()
+      }, 0)
     }
     if (!show && sessionInitialized) {
       sessionInitialized = false
@@ -477,6 +482,7 @@
 
         {#if localSettings.perModel[selectedModelKey]}
           <PerModelSettings
+            bind:this={perModelSettingsRef}
             bind:modelSettings={localSettings.perModel[selectedModelKey]}
             {availableVaes}
             {availableWorkflows}

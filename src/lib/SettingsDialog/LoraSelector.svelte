@@ -30,7 +30,37 @@
   let presetNameInput: string = $state('')
   let isDeleteConfirmModalOpen = $state(false)
 
-  // selectedLoras already contains LoraWithWeight objects
+  // Check if current loras match a preset
+  function findMatchingPreset(): string {
+    if (selectedLoras.length === 0) {
+      return ''
+    }
+
+    for (const preset of presets) {
+      if (preset.loras.length !== selectedLoras.length) {
+        continue
+      }
+
+      // Check if all loras match (same name and weight)
+      const allMatch = preset.loras.every((presetLora) =>
+        selectedLoras.some(
+          (selectedLora) =>
+            selectedLora.name === presetLora.name && selectedLora.weight === presetLora.weight
+        )
+      )
+
+      if (allMatch) {
+        return preset.name
+      }
+    }
+
+    return ''
+  }
+
+  // Initialize preset selection on mount
+  function initializePresetSelection() {
+    selectedPresetName = findMatchingPreset()
+  }
 
   async function fetchLoras() {
     try {
@@ -163,11 +193,17 @@
 
   onMount(() => {
     fetchLoras()
+    initializePresetSelection()
   })
 
   // Expose a refresh method to parent components
   export function refresh() {
     fetchLoras()
+  }
+
+  // Expose preset initialization for when dialog opens
+  export function syncPresetSelection() {
+    selectedPresetName = findMatchingPreset()
   }
 </script>
 
