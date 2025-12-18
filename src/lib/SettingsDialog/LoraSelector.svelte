@@ -2,9 +2,10 @@
   import { onMount } from 'svelte'
   import LoraItem from './LoraItem.svelte'
   import LoraSelectionModal from './LoraSelectionModal.svelte'
-  import { Plus } from 'svelte-heros-v2'
+  import { Plus, Trash } from 'svelte-heros-v2'
   import { m } from '$lib/paraglide/messages'
   import { normalizeLoraNameForDisplay } from '$lib/utils/loraPath'
+  import type { LoraPreset } from '$lib/types'
 
   interface LoraWithWeight {
     name: string
@@ -14,14 +15,20 @@
   interface Props {
     selectedLoras: LoraWithWeight[]
     onLoraChange: (loras: LoraWithWeight[]) => void
+    presets: LoraPreset[]
+    onPresetsChange: (presets: LoraPreset[]) => void
   }
 
-  let { selectedLoras, onLoraChange }: Props = $props()
+  let { selectedLoras, onLoraChange, presets = [], onPresetsChange }: Props = $props()
 
   let availableLoras: string[] = $state([])
   let loading = $state(true)
   let error = $state('')
   let isModalOpen = $state(false)
+  let selectedPresetName: string = $state('')
+  let isPresetNameModalOpen = $state(false)
+  let presetNameInput: string = $state('')
+  let isDeleteConfirmModalOpen = $state(false)
 
   // selectedLoras already contains LoraWithWeight objects
 
@@ -52,16 +59,22 @@
     const newSelectedLoras = [...selectedLoras, { name: lora, weight: 1.0 }]
     onLoraChange(newSelectedLoras)
     isModalOpen = false
+    // Clear preset selection when manually adding
+    selectedPresetName = ''
   }
 
   function handleLoraRemove(loraName: string) {
     const newSelectedLoras = selectedLoras.filter((l) => l.name !== loraName)
     onLoraChange(newSelectedLoras)
+    // Clear preset selection when manually removing
+    selectedPresetName = ''
   }
 
   function handleLoraWeightChange(loraName: string, weight: number) {
     const newSelectedLoras = selectedLoras.map((l) => (l.name === loraName ? { ...l, weight } : l))
     onLoraChange(newSelectedLoras)
+    // Clear preset selection when modifying weights
+    selectedPresetName = ''
   }
 
   function openModal() {
@@ -70,6 +83,82 @@
 
   function closeModal() {
     isModalOpen = false
+  }
+
+  function handlePresetChange(e: Event) {
+    const target = e.target as HTMLSelectElement
+    const presetName = target.value
+    selectedPresetName = presetName
+
+    if (presetName === '') {
+      // "None" selected - clear loras
+      onLoraChange([])
+      return
+    }
+
+    const preset = presets.find((p) => p.name === presetName)
+    if (preset) {
+      // Deep copy loras to avoid reference issues
+      const lorasCopy = preset.loras.map((l) => ({ ...l }))
+      onLoraChange(lorasCopy)
+    }
+  }
+
+  function openPresetNameModal() {
+    if (selectedLoras.length === 0) {
+      return
+    }
+    presetNameInput = ''
+    isPresetNameModalOpen = true
+  }
+
+  function closePresetNameModal() {
+    isPresetNameModalOpen = false
+    presetNameInput = ''
+  }
+
+  function confirmSavePreset() {
+    if (!presetNameInput.trim()) {
+      return
+    }
+
+    const trimmedName = presetNameInput.trim()
+    const existingIndex = presets.findIndex((p) => p.name === trimmedName)
+    const newPreset: LoraPreset = {
+      name: trimmedName,
+      loras: selectedLoras.map((l) => ({ ...l }))
+    }
+
+    let newPresets: LoraPreset[]
+    if (existingIndex >= 0) {
+      // Update existing preset
+      newPresets = presets.map((p, i) => (i === existingIndex ? newPreset : p))
+    } else {
+      // Add new preset
+      newPresets = [...presets, newPreset]
+    }
+
+    onPresetsChange(newPresets)
+    selectedPresetName = trimmedName
+    closePresetNameModal()
+  }
+
+  function openDeleteConfirmModal() {
+    if (!selectedPresetName) {
+      return
+    }
+    isDeleteConfirmModalOpen = true
+  }
+
+  function closeDeleteConfirmModal() {
+    isDeleteConfirmModalOpen = false
+  }
+
+  function confirmDeletePreset() {
+    const newPresets = presets.filter((p) => p.name !== selectedPresetName)
+    onPresetsChange(newPresets)
+    selectedPresetName = ''
+    closeDeleteConfirmModal()
   }
 
   onMount(() => {
@@ -84,6 +173,40 @@
 
 <div class="lora-selector">
   <h3 class="mb-2 pt-1 text-left text-sm font-bold text-gray-700">{m['loraSelector.title']()}</h3>
+
+  <!-- Preset selector -->
+  <div class="mb-2 flex items-center gap-2">
+    <label for="lora-preset" class="text-xs text-gray-600">{m['loraSelector.preset']()}:</label>
+    <select
+      id="lora-preset"
+      class="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
+      value={selectedPresetName}
+      onchange={handlePresetChange}
+    >
+      <option value="">{m['loraSelector.presetNone']()}</option>
+      {#each presets as preset (preset.name)}
+        <option value={preset.name}>{preset.name}</option>
+      {/each}
+    </select>
+    <button
+      type="button"
+      onclick={openPresetNameModal}
+      class="rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs text-blue-600 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+      disabled={selectedLoras.length === 0}
+      title={m['loraSelector.savePreset']()}
+    >
+      {m['loraSelector.savePreset']()}
+    </button>
+    <button
+      type="button"
+      onclick={openDeleteConfirmModal}
+      class="rounded border border-red-300 bg-red-50 p-1 text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+      disabled={!selectedPresetName}
+      title={m['loraSelector.deletePreset']()}
+    >
+      <Trash class="h-3 w-3" />
+    </button>
+  </div>
 
   <!-- Stable-height container prevents layout jump during refresh -->
   <div
@@ -131,6 +254,80 @@
   onClose={closeModal}
   onLoraSelect={handleLoraAdd}
 />
+
+<!-- Preset Name Input Modal -->
+{#if isPresetNameModalOpen}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50"
+    onclick={closePresetNameModal}
+    onkeydown={(e) => e.key === 'Escape' && closePresetNameModal()}
+  >
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <div class="w-80 rounded-lg bg-white p-4 shadow-xl" onclick={(e) => e.stopPropagation()}>
+      <h3 class="mb-3 text-sm font-semibold text-gray-800">
+        {m['loraSelector.presetNamePrompt']()}
+      </h3>
+      <input
+        type="text"
+        bind:value={presetNameInput}
+        class="mb-4 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        placeholder="Preset name"
+        onkeydown={(e) => e.key === 'Enter' && confirmSavePreset()}
+      />
+      <div class="flex justify-end gap-2">
+        <button
+          type="button"
+          onclick={closePresetNameModal}
+          class="rounded bg-gray-200 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-300"
+        >
+          {m['loraSelector.cancel']()}
+        </button>
+        <button
+          type="button"
+          onclick={confirmSavePreset}
+          class="rounded bg-blue-500 px-3 py-1.5 text-xs text-white hover:bg-blue-600 disabled:opacity-50"
+          disabled={!presetNameInput.trim()}
+        >
+          {m['loraSelector.savePreset']()}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Delete Confirm Modal -->
+{#if isDeleteConfirmModalOpen}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50"
+    onclick={closeDeleteConfirmModal}
+    onkeydown={(e) => e.key === 'Escape' && closeDeleteConfirmModal()}
+  >
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <div class="w-80 rounded-lg bg-white p-4 shadow-xl" onclick={(e) => e.stopPropagation()}>
+      <h3 class="mb-3 text-sm font-semibold text-gray-800">
+        {m['loraSelector.presetDeleteConfirm']({ name: selectedPresetName })}
+      </h3>
+      <div class="flex justify-end gap-2">
+        <button
+          type="button"
+          onclick={closeDeleteConfirmModal}
+          class="rounded bg-gray-200 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-300"
+        >
+          {m['loraSelector.cancel']()}
+        </button>
+        <button
+          type="button"
+          onclick={confirmDeletePreset}
+          class="rounded bg-red-500 px-3 py-1.5 text-xs text-white hover:bg-red-600"
+        >
+          {m['loraSelector.deletePreset']()}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .lora-display-area {

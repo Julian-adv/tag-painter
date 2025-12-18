@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Settings, ModelType } from '$lib/types'
+  import type { Settings, ModelType, LoraPreset } from '$lib/types'
   import { fetchVaeModels, fetchCheckpoints } from '$lib/generation/comfyui'
   import { promptsData } from '$lib/stores/promptsStore'
   import CustomSelect from '$lib/CustomSelect.svelte'
@@ -41,7 +41,8 @@
     selectedVae: settings.selectedVae,
     clipSkip: settings.clipSkip,
     locale: settings.locale || baseLocale,
-    perModel: settings.perModel || {}
+    perModel: settings.perModel || {},
+    loraPresets: settings.loraPresets || []
   })
 
   // Track original state to enable/disable Save when changed
@@ -61,7 +62,8 @@
     selectedVae: '',
     clipSkip: 0,
     locale: baseLocale,
-    perModel: {}
+    perModel: {},
+    loraPresets: []
   })
   let hasUnsavedChanges: boolean = $state(false)
   let sessionInitialized: boolean = $state(false)
@@ -478,6 +480,8 @@
             bind:modelSettings={localSettings.perModel[selectedModelKey]}
             {availableVaes}
             {availableWorkflows}
+            loraPresets={localSettings.loraPresets || []}
+            onLoraPresetsChange={(presets) => (localSettings.loraPresets = presets)}
           />
 
           <UpscaleSettings

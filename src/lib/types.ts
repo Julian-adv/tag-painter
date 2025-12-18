@@ -27,6 +27,11 @@ export interface LoraWithWeight {
   weight: number
 }
 
+export interface LoraPreset {
+  name: string
+  loras: LoraWithWeight[]
+}
+
 export type ModelType = 'sdxl' | 'qwen' | 'qwen_nunchaku' | 'chroma' | 'flux1_krea' | 'z_image'
 
 export enum ImageStage {
@@ -113,6 +118,8 @@ export interface Settings {
   perModel: Record<string, ModelSettings>
   // Custom workflow file path (optional, relative to data folder)
   customWorkflowPath?: string
+  // LoRA presets for quick selection
+  loraPresets?: LoraPreset[]
 }
 
 export interface BaseGenerationMetadata {

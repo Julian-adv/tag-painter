@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ModelSettings, LoraWithWeight } from '$lib/types'
+  import type { ModelSettings, LoraWithWeight, LoraPreset } from '$lib/types'
   import LoraSelector from './LoraSelector.svelte'
   import AutoCompleteTextarea from '$lib/AutoCompleteTextarea.svelte'
   import SamplerSelector from '$lib/SamplerSelector.svelte'
@@ -11,9 +11,17 @@
     modelSettings: ModelSettings
     availableVaes: string[]
     availableWorkflows: string[]
+    loraPresets: LoraPreset[]
+    onLoraPresetsChange: (presets: LoraPreset[]) => void
   }
 
-  let { modelSettings = $bindable(), availableVaes, availableWorkflows }: Props = $props()
+  let {
+    modelSettings = $bindable(),
+    availableVaes,
+    availableWorkflows,
+    loraPresets,
+    onLoraPresetsChange
+  }: Props = $props()
 </script>
 
 <label for="pm-model-type" class="two-col-label">{m['settingsDialog.modelType']()}</label>
@@ -131,6 +139,8 @@
   <LoraSelector
     selectedLoras={modelSettings.loras as LoraWithWeight[]}
     onLoraChange={(loras) => (modelSettings.loras = loras)}
+    presets={loraPresets}
+    onPresetsChange={onLoraPresetsChange}
   />
 </div>
 
