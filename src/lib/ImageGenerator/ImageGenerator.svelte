@@ -12,7 +12,6 @@
   import ModelControls from './ModelControls.svelte'
   import PostProcessingControls from './PostProcessingControls.svelte'
   import { m } from '$lib/paraglide/messages'
-  import InstallWizardDialog from '$lib/downloads/InstallWizardDialog.svelte'
   import type { Settings, ProgressData, PromptsData } from '$lib/types'
   import { RefineMode, FaceDetailerMode } from '$lib/types'
   import {
@@ -40,7 +39,7 @@
     updateEnableFaceDetailer
   } from '$lib/stores/promptsStore'
   import { detectPlatform } from '$lib/utils/loraPath'
-  import { Bolt, ArrowPath } from 'svelte-heros-v2'
+  import { ArrowPath } from 'svelte-heros-v2'
 
   // Component state
   let isLoading = $state(false)
@@ -64,9 +63,6 @@
   let isGeneratingForever = $state(false)
   let shouldStopGeneration = $state(false)
   let lastSeed: number | null = $state(null)
-  let showDownloadsDialog = $state(false)
-  let missingStep1Filenames = $state<string[]>([])
-  let customNodePromptChecked = $state(false)
   let localeVersion = $state(0)
   let isQwenModel = $state(false)
   let currentRandomTagResolutions: {
@@ -126,27 +122,6 @@
   // Tab state for left section
   let activeTabId = $state('generator')
 
-  // Show dialog when no checkpoints are found
-  async function openDownloadsDialog(forceOpen = false) {
-    // Check which Step 1 files are missing
-    try {
-      const res = await fetch('/api/downloads-check')
-      const data = await res.json()
-      if (data.allExist && !forceOpen) {
-        // All Step 1 files exist, no need to show dialog
-        return
-      }
-      // Store missing filenames to filter downloads dialog
-      missingStep1Filenames = data.missingFilenames || []
-    } catch (err) {
-      console.error('Failed to check Step 1 files:', err)
-      // On error, show dialog with all files
-      missingStep1Filenames = []
-    }
-
-    showDownloadsDialog = true
-  }
-
   async function startComfyUI(forceRestart = false) {
     try {
       if (forceRestart) {
@@ -193,23 +168,6 @@
     }
   }
 
-  async function checkMissingCustomNodes() {
-    if (customNodePromptChecked) return
-    customNodePromptChecked = true
-    try {
-      const res = await fetch('/api/downloads?category=custom-node&onlyMissing=1')
-      const data = await res.json()
-      if (Array.isArray(data?.items) && data.items.length > 0) {
-        await openDownloadsDialog(true)
-      } else {
-        // All custom nodes are installed, start ComfyUI
-        await startComfyUI()
-      }
-    } catch (err) {
-      console.debug('Failed to check custom nodes', err)
-    }
-  }
-
   // Reload model list from ComfyUI and refresh UI options
   async function refreshModels(event: MouseEvent) {
     event.stopPropagation()
@@ -234,16 +192,10 @@
         }
       } else {
         availableCheckpoints = []
-        openDownloadsDialog()
       }
     } catch (e) {
       console.error('Failed to reload checkpoint list', e)
     }
-  }
-
-  function handleDownloadsDialogClosed() {
-    // Simple wizard always reloads checkpoints when closed
-    void reloadCheckpoints()
   }
 
   // Settings state
@@ -337,12 +289,10 @@
         }
         return data
       })
-    } else {
-      // Show dialog when no checkpoints are found
-      openDownloadsDialog()
     }
 
-    await checkMissingCustomNodes()
+    // Start ComfyUI if not already running
+    await startComfyUI()
   })
 
   let wasQwenModel = false
@@ -433,7 +383,7 @@
 
     // Check if checkpoints are available before generating
     if (!availableCheckpoints || availableCheckpoints.length === 0) {
-      openDownloadsDialog()
+      showToast('error', 'No checkpoints available. Please run bootstrap script to install models.')
       return
     }
 
@@ -918,15 +868,6 @@
             <div class="flex gap-2 self-start">
               <button
                 type="button"
-                class="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-500 shadow-sm transition hover:border-gray-400 hover:text-gray-700"
-                onclick={() => openDownloadsDialog(true)}
-                aria-label={m['imageGenerator.showSetupDialog']()}
-                title={m['imageGenerator.showSetupDialog']()}
-              >
-                <Bolt class="h-4 w-4" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
                 class={`flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-500 shadow-sm transition ${restartingComfyUI ? 'cursor-wait opacity-70' : 'hover:border-gray-400 hover:text-gray-700'}`}
                 onclick={() => startComfyUI(true)}
                 aria-label={m['imageGenerator.restartComfy']()}
@@ -959,9 +900,6 @@
 </main>
 
 <Toasts bind:this={toastsRef} />
-
-<!-- No Checkpoints Dialog -->
-<InstallWizardDialog bind:isOpen={showDownloadsDialog} onClose={handleDownloadsDialogClosed} />
 
 <style>
   :global(html, body) {
