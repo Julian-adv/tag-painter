@@ -56,54 +56,31 @@
       "category": "vae"
     },
     {
-      "label": "Qwen 2.5 VL 7B Text Encoder (FP8 scaled)",
-      "filename": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "label": "Z-Image Turbo VAE (ae)",
+      "filename": "ae.safetensors",
       "urls": [
-        "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors"
+        "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors"
       ],
-      "destRelativeToComfy": "models/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "destRelativeToComfy": "models/vae/ae.safetensors",
+      "category": "vae"
+    },
+    {
+      "label": "Qwen 3 4B Text Encoder",
+      "filename": "qwen_3_4b.safetensors",
+      "urls": [
+        "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors"
+      ],
+      "destRelativeToComfy": "models/text_encoders/qwen_3_4b.safetensors",
       "category": "text-encoder"
     },
     {
-      "label": "LoRA MoriiMee Gothic Niji Style r1",
-      "filename": "MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors",
+      "label": "Z Image Turbo BF16 Diffusion Model",
+      "filename": "z_image_turbo_bf16.safetensors",
       "urls": [
-        "https://huggingface.co/NeigeSnowflake/neigeworkflow/resolve/main/MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors"
+        "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors"
       ],
-      "destRelativeToComfy": "models/loras/MoriiMee_Gothic_Niji_Style_Illustrious_r1.safetensors",
-      "category": "lora"
-    },
-    {
-      "label": "LoRA spo_sdxl_10ep_4k-data_lora_webui",
-      "filename": "spo_sdxl_10ep_4k-data_lora_webui.safetensors",
-      "urls": ["https://civitai.com/api/download/models/567119"],
-      "destRelativeToComfy": "models/loras/spo_sdxl_10ep_4k-data_lora_webui.safetensors",
-      "category": "lora"
-    },
-    {
-      "label": "LoRA Sinozick Style XL Pony",
-      "filename": "Sinozick_Style_XL_Pony.safetensors",
-      "urls": ["https://civitai.com/api/download/models/481798"],
-      "destRelativeToComfy": "models/loras/Sinozick_Style_XL_Pony.safetensors",
-      "category": "lora"
-    },
-    {
-      "label": "Qwen Image Lightning 8steps V1.1 LoRA",
-      "filename": "Qwen-Image-Lightning-8steps-V1.1.safetensors",
-      "urls": [
-        "https://huggingface.co/lightx2v/Qwen-Image-Lightning/resolve/main/Qwen-Image-Lightning-8steps-V1.1.safetensors"
-      ],
-      "destRelativeToComfy": "models/loras/qwen/Qwen-Image-Lightning-8steps-V1.1.safetensors",
-      "category": "lora"
-    },
-    {
-      "label": "LoRA Fant5yP0ny",
-      "filename": "Fant5yP0ny.safetensors",
-      "urls": [
-        "https://huggingface.co/LyliaEngine/Fant5yP0ny/resolve/main/Fant5yP0ny.safetensors?download=true"
-      ],
-      "destRelativeToComfy": "models/loras/Fant5yP0ny.safetensors",
-      "category": "lora"
+      "destRelativeToComfy": "models/diffusion_models/z_image_turbo_bf16.safetensors",
+      "category": "diffusion-model"
     },
     {
       "label": "SAM ViT-B checkpoint",
@@ -134,15 +111,6 @@
       "urls": ["https://huggingface.co/lllyasviel/Annotators/resolve/main/facenet.pth"],
       "destRelativeToComfy": "custom_nodes/comfyui_controlnet_aux/ckpts/lllyasviel/Annotators/facenet.pth",
       "category": "annotator"
-    },
-    {
-      "label": "Perfect Deliberate v2.0",
-      "filename": "perfectdeliberate_v20.safetensors",
-      "urls": [
-        "https://huggingface.co/Wanton/perfectdeliberate_v20/resolve/main/perfectdeliberate_v20.safetensors?download=true"
-      ],
-      "destRelativeToComfy": "models/checkpoints/perfectdeliberate_v20.safetensors",
-      "category": "checkpoint"
     },
     {
       "label": "cgem156-ComfyUI",
@@ -259,6 +227,38 @@
       "category": "custom-node",
       "kind": "git",
       "branch": "main"
+    },
+    {
+      "label": "ZulyV2 LoRA (for Z-Image)",
+      "filename": "ZulyV2.safetensors",
+      "urls": ["https://civitai.com/api/download/models/2499197?type=Model&format=SafeTensor"],
+      "pageUrl": "https://civitai.com/models/2499197",
+      "destRelativeToComfy": "models/loras/zimage/ZulyV2.safetensors",
+      "category": "manual"
+    },
+    {
+      "label": "ZIT Shimohira Reika LoRA (for Z-Image)",
+      "filename": "ZIT Shimohira Reika.safetensors",
+      "urls": ["https://civitai.com/api/download/models/2475832?type=Model&format=SafeTensor"],
+      "pageUrl": "https://civitai.com/models/2475832",
+      "destRelativeToComfy": "models/loras/zimage/ZIT Shimohira Reika.safetensors",
+      "category": "manual"
+    },
+    {
+      "label": "ZiTSR3alV1 LoRA (for Z-Image)",
+      "filename": "ZiTSR3alV1.safetensors",
+      "urls": ["https://civitai.com/api/download/models/2517229?type=Model&format=SafeTensor"],
+      "pageUrl": "https://civitai.com/models/2517229",
+      "destRelativeToComfy": "models/loras/zimage/ZiTSR3alV1.safetensors",
+      "category": "manual"
+    },
+    {
+      "label": "Mystic-XXX-ZIT-V4 LoRA (for Z-Image)",
+      "filename": "Mystic-XXX-ZIT-V4.safetensors",
+      "urls": ["https://civitai.com/api/download/models/2556433?type=Model&format=SafeTensor"],
+      "pageUrl": "https://civitai.com/models/2556433",
+      "destRelativeToComfy": "models/loras/zimage/Mystic-XXX-ZIT-V4.safetensors",
+      "category": "manual"
     }
   ]
 }

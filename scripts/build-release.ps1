@@ -79,6 +79,7 @@ try {
     "wildcards.yaml",
     "wildcards.qwen.yaml",
     "wildcards.new.yaml",
+    "wildcards.zi.yaml",
     "Vision2.1.yaml",
     "system_prompt.qwen.json",
     "system_prompt.qwen.txt",

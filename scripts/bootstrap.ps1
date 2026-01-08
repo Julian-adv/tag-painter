@@ -227,6 +227,9 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
   $venvDir = Join-Path $vendorDir "comfy-venv"
   Write-Header "Python venv"
 
+  # Suppress uv hardlink warning when cache and target are on different filesystems
+  $env:UV_LINK_MODE = "copy"
+
   # Always recreate venv to avoid corruption issues
   if (Test-Path $venvDir) {
     Write-Host "Removing existing venv..." -ForegroundColor Yellow
@@ -261,6 +264,13 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
   }
   Write-Host "Python venv created successfully: $pyVersion" -ForegroundColor Green
 
+  # Activate the virtual environment to set up environment variables
+  $activateScript = Join-Path $venvDir "Scripts\Activate.ps1"
+  if (Test-Path $activateScript) {
+    Write-Host "Activating virtual environment..." -ForegroundColor DarkCyan
+    . $activateScript
+  }
+
   # Detect NVIDIA GPU availability once (used for requirements and PyTorch installs)
   $hasNvidia = $false
   try { Get-Command nvidia-smi -ErrorAction SilentlyContinue | Out-Null; $hasNvidia = $true } catch {}
@@ -273,65 +283,19 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
   }
 
   Write-Header "ComfyUI requirements"
-  # Use uv pip for better progress output during requirements installation
-  Write-Host "Installing ComfyUI requirements via uv pip (this may take a while)..." -ForegroundColor DarkCyan
+  # Use pip for requirements installation
+  Write-Host "Installing ComfyUI requirements via pip (this may take a while)..." -ForegroundColor DarkCyan
   $reqFile = Join-Path $comfyDir "requirements.txt"
   Write-Host "Requirements file: $reqFile" -ForegroundColor DarkCyan
 
-  $pipArgs = @('pip', 'install', '-p', $py, '-r', $reqFile)
+  $pipArgs = @('pip', 'install', '-p', $py, '-r', $reqFile, '--no-cache')
   if ($hasNvidia -and -not $ForceCpuMode) {
     $pipArgs += @('--extra-index-url', 'https://download.pytorch.org/whl/cu128')
   }
-  $uvAttempts = 0
-  $maxUvAttempts = 2
-  $pipExitCode = 1
-  while ($uvAttempts -lt $maxUvAttempts) {
-    $uvAttempts++
-    Write-Host "uv pip install attempt #$uvAttempts..." -ForegroundColor DarkCyan
-    & $uvPath @pipArgs
-    $pipExitCode = $LASTEXITCODE
-    if ($pipExitCode -eq 0) { break }
-    Write-Host "uv pip attempt #$uvAttempts failed with exit code: $pipExitCode." -ForegroundColor Yellow
-    Start-Sleep -Seconds 2
-  }
-  if ($pipExitCode -ne 0) {
-    Write-Host "uv pip failed after $maxUvAttempts attempts, falling back to python -m pip..." -ForegroundColor Yellow
-    $fallbackArgs = @('-m', 'pip', 'install', '-v', '-r', $reqFile)
-    if ($hasNvidia -and -not $ForceCpuMode) {
-      $fallbackArgs += @('--extra-index-url', 'https://download.pytorch.org/whl/cu128')
-    }
-    & $py @fallbackArgs
-    $pipExitCode = $LASTEXITCODE
-    if ($pipExitCode -ne 0) {
-      Write-Host "pip install failed with exit code: $LASTEXITCODE" -ForegroundColor Red
-      throw "Failed to install ComfyUI requirements"
-    }
-  }
-
-  Write-Header "PyTorch"
-  Write-Host "Uninstalling existing PyTorch packages..." -ForegroundColor DarkCyan
-  & $py -m pip uninstall -y torch torchvision torchaudio 2>$null
-
-  if ($hasNvidia -and -not $ForceCpuMode) {
-    $gpuInstalled = $false
-    $indexes = @(
-      'https://download.pytorch.org/whl/cu128',
-      'https://download.pytorch.org/whl/cu126',
-      'https://download.pytorch.org/whl/cu124',
-      'https://download.pytorch.org/whl/cu121'
-    )
-    foreach ($ix in $indexes) {
-      Write-Host "Trying CUDA wheel index: $ix" -ForegroundColor DarkCyan
-      # Use pip for PyTorch installation (uv has issues with PyTorch wheels)
-      & $py -m pip install --no-cache-dir torch torchvision torchaudio --index-url $ix
-      if ($LASTEXITCODE -eq 0) { $gpuInstalled = $true; break }
-    }
-    if (-not $gpuInstalled) {
-      Write-Host "CUDA Torch wheel not available. Installing CPU Torch instead." -ForegroundColor Yellow
-      & $py -m pip install --no-cache-dir torch torchvision torchaudio
-    }
-  } else {
-    & $py -m pip install torch torchvision torchaudio
+  & $uvPath @pipArgs
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "pip install failed with exit code: $LASTEXITCODE" -ForegroundColor Red
+    throw "Failed to install ComfyUI requirements"
   }
 
   if ($ForceCpuMode) {
@@ -404,7 +368,7 @@ function Install-CustomNodes($vendorDir, $comfyDir, $gitHome, $envInfo) {
       # Clone new node
       Write-Host "  Cloning $nodeName..." -ForegroundColor DarkCyan
       $cloneArgs = @('clone', '--depth', '1')
-      if ($node.branch) {
+      if ($node.PSObject.Properties['branch'] -and $node.branch) {
         $cloneArgs += @('--branch', $node.branch)
       }
       $cloneArgs += @($nodeUrl, $nodeDest)
@@ -419,9 +383,16 @@ function Install-CustomNodes($vendorDir, $comfyDir, $gitHome, $envInfo) {
     $reqPath = Join-Path $nodeDest "requirements.txt"
     if (Test-Path $reqPath) {
       Write-Host "  Installing requirements for $nodeName..." -ForegroundColor DarkCyan
-      & $envInfo.UvPath pip install -p $envInfo.PythonPath -r $reqPath 2>&1 | Out-Null
+      # Pre-install insightface from prebuilt wheel (no official Windows wheel on PyPI)
+      $reqContent = Get-Content $reqPath -Raw
+      if ($reqContent -match 'insightface') {
+        Write-Host "  Pre-installing insightface from prebuilt wheel..." -ForegroundColor DarkCyan
+        & $envInfo.UvPath pip install -p $envInfo.PythonPath "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp312-cp312-win_amd64.whl" 2>&1 | Out-Null
+      }
+      $output = & $envInfo.UvPath pip install -p $envInfo.PythonPath -r $reqPath --no-cache 2>&1
       if ($LASTEXITCODE -ne 0) {
         Write-Host "  Warning: Failed to install requirements for $nodeName" -ForegroundColor Yellow
+        Write-Host "  Error: $output" -ForegroundColor Red
       }
     }
   }
@@ -502,6 +473,51 @@ function Download-AllFiles($vendorDir, $comfyDir) {
   }
 
   Write-Host "File downloads complete." -ForegroundColor Green
+
+  # Manual download required for files that need login
+  Show-ManualDownloadInstructions -comfyDir $comfyDir
+}
+
+function Show-ManualDownloadInstructions($comfyDir) {
+  $configPath = Join-Path (Get-Location) "config\downloads.json"
+  if (-not (Test-Path $configPath)) { return }
+
+  $config = Get-Content -Path $configPath -Raw | ConvertFrom-Json
+  $manualItems = $config.items | Where-Object { $_.category -eq "manual" }
+
+  if ($manualItems.Count -eq 0) { return }
+
+  $missing = @()
+  foreach ($item in $manualItems) {
+    $destPath = Join-Path $comfyDir $item.destRelativeToComfy
+    if (-not (Test-Path $destPath)) {
+      $missing += $item
+    }
+  }
+
+  if ($missing.Count -eq 0) { return }
+
+  Write-Header "Manual Downloads Required"
+  Write-Host "The following files require a CivitAI account to download:" -ForegroundColor Yellow
+  Write-Host ""
+
+  foreach ($item in $missing) {
+    $destPath = Join-Path $comfyDir $item.destRelativeToComfy
+    Write-Host "  - $($item.label)" -ForegroundColor Cyan
+    Write-Host "    File: $($item.filename)" -ForegroundColor DarkCyan
+    Write-Host "    Save to: $destPath" -ForegroundColor DarkCyan
+    Write-Host ""
+  }
+
+  Write-Host "Opening download page in browser..." -ForegroundColor Yellow
+  foreach ($item in $missing) {
+    Start-Process $item.pageUrl
+  }
+
+  Write-Host ""
+  Write-Host "Please download the file(s) and place them in the specified location." -ForegroundColor Yellow
+  Write-Host "Press any key to continue after downloading..." -ForegroundColor Yellow
+  $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
 
 function Install-Nunchaku($vendorDir, $comfyDir, $envInfo) {
@@ -690,8 +706,8 @@ try {
   # Step 7: Download all files
   Download-AllFiles -vendorDir $vendorDir -comfyDir $comfyDir
 
-  # Step 8-9: Nunchaku (starts ComfyUI, installs, stops)
-  Install-Nunchaku -vendorDir $vendorDir -comfyDir $comfyDir -envInfo $envInfo
+  # Step 8-9: Nunchaku (disabled - uncomment to enable)
+  # Install-Nunchaku -vendorDir $vendorDir -comfyDir $comfyDir -envInfo $envInfo
 
   Write-Host "`n========================================" -ForegroundColor Green
   Write-Host "  Bootstrap Complete!" -ForegroundColor Green
