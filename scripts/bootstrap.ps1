@@ -283,27 +283,89 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
   }
 
   Write-Header "ComfyUI requirements"
-  # Use pip for requirements installation
+  # Use pip directly for better dependency resolution (uv has issues with transitive dependencies)
   Write-Host "Installing ComfyUI requirements via pip (this may take a while)..." -ForegroundColor DarkCyan
   $reqFile = Join-Path $comfyDir "requirements.txt"
   Write-Host "Requirements file: $reqFile" -ForegroundColor DarkCyan
 
-  $pipArgs = @('pip', 'install', '-p', $py, '-r', $reqFile, '--no-cache')
+  $pip = Join-Path $venvDir "Scripts\pip.exe"
+  if (-not (Test-Path $pip)) {
+    Write-Host "Error: pip not found at $pip" -ForegroundColor Red
+    throw "pip.exe not found in venv"
+  }
+
+  $pipArgs = @('install', '-r', $reqFile)
   if ($hasNvidia -and -not $ForceCpuMode) {
     $pipArgs += @('--extra-index-url', 'https://download.pytorch.org/whl/cu128')
   }
-  & $uvPath @pipArgs
+  Write-Host "pip path: $pip" -ForegroundColor Magenta
+  Write-Host "Requirements file exists: $(Test-Path $reqFile)" -ForegroundColor Magenta
+  Write-Host "Running: $pip $($pipArgs -join ' ')" -ForegroundColor DarkCyan
+  & $pip @pipArgs
   if ($LASTEXITCODE -ne 0) {
     Write-Host "pip install failed with exit code: $LASTEXITCODE" -ForegroundColor Red
     throw "Failed to install ComfyUI requirements"
+  }
+
+  # Install critical dependencies first (these are often missed by pip's resolver)
+  Write-Host "Installing critical dependencies..." -ForegroundColor DarkCyan
+  $criticalPkgs = @(
+    'typing_extensions',
+    'certifi',
+    'urllib3',
+    'requests',
+    'packaging',
+    'pyyaml',
+    'scipy',
+    'pydantic',
+    'annotated-types',
+    'tqdm',
+    'easydict',
+    'contourpy',
+    'lazy-loader',
+    'opencv-python-headless',
+    'tifffile',
+    'scikit-image'
+  )
+  & $pip install @criticalPkgs
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "Warning: Some critical packages may have failed to install" -ForegroundColor Yellow
+  }
+
+  # Verify key packages are installed and fix missing dependencies
+  Write-Host "Verifying installation..." -ForegroundColor DarkCyan
+  $verifyPkgs = @(
+    @{name='torch'; module='torch'},
+    @{name='urllib3'; module='urllib3'},
+    @{name='pyyaml'; module='yaml'},
+    @{name='packaging'; module='packaging'},
+    @{name='typing_extensions'; module='typing_extensions'},
+    @{name='scipy'; module='scipy'},
+    @{name='contourpy'; module='contourpy'},
+    @{name='lazy-loader'; module='lazy_loader'},
+    @{name='pydantic'; module='pydantic'},
+    @{name='certifi'; module='certifi'},
+    @{name='requests'; module='requests'}
+  )
+  foreach ($pkg in $verifyPkgs) {
+    $result = & $py -c "import $($pkg.module)" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "Warning: $($pkg.name) not properly installed, installing..." -ForegroundColor Yellow
+      & $pip install $($pkg.name)
+      if ($LASTEXITCODE -ne 0) {
+        Write-Host "Error: Failed to install $($pkg.name)" -ForegroundColor Red
+      }
+    } else {
+      Write-Host "  $($pkg.name) OK" -ForegroundColor Green
+    }
   }
 
   if ($ForceCpuMode) {
     Write-Host "CPU mode requested. CUDA packages were not installed." -ForegroundColor Yellow
   }
 
-  # Install extra packages
-  $extraPkgs = @('matplotlib', 'pandas')
+  # Install extra packages (urllib3 should be auto-installed but adding as fallback)
+  $extraPkgs = @('matplotlib', 'pandas', 'urllib3')
   if ($ForceCpuMode) {
     $extraPkgs += 'onnxruntime'
   } else {
@@ -311,7 +373,7 @@ function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$For
   }
   foreach ($pkg in $extraPkgs) {
     Write-Host "Installing Python package: $pkg" -ForegroundColor DarkCyan
-    & $uvPath pip install -p $py $pkg | Out-Null
+    & $pip install $pkg | Out-Null
     if ($LASTEXITCODE -ne 0) {
       Write-Host "Warning: Failed to install $pkg" -ForegroundColor Yellow
     }
@@ -344,7 +406,7 @@ function Install-CustomNodes($vendorDir, $comfyDir, $gitHome, $envInfo) {
   New-DirectoryIfMissing $customNodesDir
 
   foreach ($node in $customNodes) {
-    $nodeDest = Join-Path (Get-Location) $node.destRelativeToComfy
+    $nodeDest = Join-Path $comfyDir $node.destRelativeToComfy
     $nodeUrl = $node.urls[0]
     $nodeName = $node.filename
 
@@ -411,8 +473,8 @@ function Download-AllFiles($vendorDir, $comfyDir) {
   }
 
   $config = Get-Content -Path $configPath -Raw | ConvertFrom-Json
-  # Get all non-custom-node items
-  $files = $config.items | Where-Object { $_.category -ne "custom-node" }
+  # Get all non-custom-node and non-manual items (manual items require CivitAI login)
+  $files = $config.items | Where-Object { $_.category -ne "custom-node" -and $_.category -ne "manual" }
 
   if ($files.Count -eq 0) {
     Write-Host "No files to download." -ForegroundColor Green
@@ -439,36 +501,54 @@ function Download-AllFiles($vendorDir, $comfyDir) {
     $parentDir = Split-Path -Parent $destPath
     New-DirectoryIfMissing $parentDir
 
-    # Try each URL until one succeeds
+    # Try each URL until one succeeds, with retries
     $downloaded = $false
+    $maxRetries = 3
     foreach ($url in $file.urls) {
-      try {
-        Write-Host "  Downloading from: $url" -ForegroundColor DarkCyan
+      for ($retry = 1; $retry -le $maxRetries; $retry++) {
+        try {
+          if ($retry -eq 1) {
+            Write-Host "  Downloading from: $url" -ForegroundColor DarkCyan
+          } else {
+            Write-Host "  Retry $retry/$maxRetries..." -ForegroundColor Yellow
+          }
 
-        # Use curl for large files (better progress)
-        if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-          & curl.exe -A "Mozilla/5.0" -L --fail --progress-bar "$url" -o "$destPath"
-          if ($LASTEXITCODE -eq 0 -and (Test-Path $destPath)) {
-            $downloaded = $true
-            break
+          # Clean up partial download
+          if (Test-Path $destPath) { Remove-Item $destPath -Force -ErrorAction SilentlyContinue }
+
+          # Use curl for large files (better progress, supports resume)
+          if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+            & curl.exe -A "Mozilla/5.0" -L --fail --progress-bar --retry 2 --retry-delay 3 "$url" -o "$destPath"
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $destPath)) {
+              $downloaded = $true
+              break
+            }
+          } else {
+            Invoke-WebRequest -Uri $url -OutFile $destPath -Headers @{ 'User-Agent' = 'Mozilla/5.0' } -MaximumRedirection 10
+            if (Test-Path $destPath) {
+              $downloaded = $true
+              break
+            }
           }
-        } else {
-          Invoke-WebRequest -Uri $url -OutFile $destPath -Headers @{ 'User-Agent' = 'Mozilla/5.0' } -MaximumRedirection 10
-          if (Test-Path $destPath) {
-            $downloaded = $true
-            break
-          }
+        } catch {
+          Write-Host "  Download failed: $_" -ForegroundColor Yellow
+          if (Test-Path $destPath) { Remove-Item $destPath -Force -ErrorAction SilentlyContinue }
         }
-      } catch {
-        Write-Host "  Failed from $url, trying next..." -ForegroundColor Yellow
-        if (Test-Path $destPath) { Remove-Item $destPath -Force -ErrorAction SilentlyContinue }
+
+        if (-not $downloaded -and $retry -lt $maxRetries) {
+          Write-Host "  Waiting 5 seconds before retry..." -ForegroundColor Yellow
+          Start-Sleep -Seconds 5
+        }
       }
+
+      if ($downloaded) { break }
+      Write-Host "  Failed from $url, trying next URL..." -ForegroundColor Yellow
     }
 
     if ($downloaded) {
       Write-Host "  Downloaded successfully." -ForegroundColor Green
     } else {
-      Write-Host "  Warning: Failed to download $filename" -ForegroundColor Yellow
+      Write-Host "  Warning: Failed to download $filename after $maxRetries retries" -ForegroundColor Yellow
     }
   }
 
@@ -504,18 +584,13 @@ function Show-ManualDownloadInstructions($comfyDir) {
   foreach ($item in $missing) {
     $destPath = Join-Path $comfyDir $item.destRelativeToComfy
     Write-Host "  - $($item.label)" -ForegroundColor Cyan
+    Write-Host "    URL: $($item.pageUrl)" -ForegroundColor Yellow
     Write-Host "    File: $($item.filename)" -ForegroundColor DarkCyan
     Write-Host "    Save to: $destPath" -ForegroundColor DarkCyan
     Write-Host ""
   }
 
-  Write-Host "Opening download page in browser..." -ForegroundColor Yellow
-  foreach ($item in $missing) {
-    Start-Process $item.pageUrl
-  }
-
-  Write-Host ""
-  Write-Host "Please download the file(s) and place them in the specified location." -ForegroundColor Yellow
+  Write-Host "Please download the file(s) from the URLs above and place them in the specified location." -ForegroundColor Yellow
   Write-Host "Press any key to continue after downloading..." -ForegroundColor Yellow
   $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
@@ -523,142 +598,34 @@ function Show-ManualDownloadInstructions($comfyDir) {
 function Install-Nunchaku($vendorDir, $comfyDir, $envInfo) {
   Write-Header "Nunchaku"
 
-  $workflowPath = Join-Path (Get-Location) "data\install_wheel.api.json"
-  if (-not (Test-Path $workflowPath)) {
-    Write-Host "Warning: install_wheel.api.json not found, skipping Nunchaku installation." -ForegroundColor Yellow
-    return
-  }
-
   $py = $envInfo.PythonPath
-  $mainPy = Join-Path $comfyDir "main.py"
+  $uv = $envInfo.UvPath
 
-  if (-not (Test-Path $mainPy)) {
-    Write-Host "Warning: ComfyUI main.py not found, skipping Nunchaku installation." -ForegroundColor Yellow
-    return
-  }
+  # Install nunchaku from GitHub releases (not available on PyPI due to file size)
+  # Use v1.0.1 + torch2.8 for compatibility with ComfyUI (torch 2.9.1)
+  $nunchakuVersion = "1.0.1"
+  $wheelUrl = "https://github.com/mit-han-lab/nunchaku/releases/download/v1.0.1/nunchaku-1.0.1%2Btorch2.8-cp312-cp312-win_amd64.whl"
 
-  Write-Host "Starting ComfyUI for Nunchaku installation..." -ForegroundColor DarkCyan
-
-  # Start ComfyUI in background
-  $proc = Start-Process -FilePath $py -ArgumentList @(
-    $mainPy, "--disable-auto-launch", "--port", "8188"
-  ) -PassThru -NoNewWindow
-
-  # Wait for server to be ready
-  $maxWait = 120
-  $waited = 0
-  $serverReady = $false
-  while ($waited -lt $maxWait) {
-    try {
-      $res = Invoke-WebRequest -Uri "http://127.0.0.1:8188/history" -TimeoutSec 2 -ErrorAction SilentlyContinue
-      if ($res.StatusCode -eq 200) {
-        $serverReady = $true
-        break
-      }
-    } catch { }
-    Start-Sleep -Seconds 2
-    $waited += 2
-    Write-Host "  Waiting for ComfyUI to start... ($waited/$maxWait seconds)" -ForegroundColor DarkCyan
-  }
-
-  if (-not $serverReady) {
-    Write-Host "Warning: ComfyUI did not start in time, skipping Nunchaku installation." -ForegroundColor Yellow
-    try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {}
-    return
-  }
-
-  Write-Host "ComfyUI is running. Installing Nunchaku..." -ForegroundColor DarkCyan
+  Write-Host "Installing Nunchaku runtime v$nunchakuVersion from GitHub releases..." -ForegroundColor DarkCyan
+  Write-Host "  URL: $wheelUrl" -ForegroundColor DarkCyan
 
   try {
-    # Load workflow
-    $workflow = Get-Content -Path $workflowPath -Raw | ConvertFrom-Json
+    $output = & $uv pip install -p $py $wheelUrl 2>&1
+    if ($LASTEXITCODE -eq 0) {
+      Write-Host "Nunchaku v$nunchakuVersion installed successfully." -ForegroundColor Green
 
-    # Step 1: Update version list
-    Write-Host "  Step 1: Updating Nunchaku version list..." -ForegroundColor DarkCyan
-    $workflow.'1'.inputs.mode = "update node"
-    $workflow.'1'.inputs.version = "none"
-
-    $updatePayload = @{
-      prompt = $workflow
-      client_id = [guid]::NewGuid().ToString()
-    } | ConvertTo-Json -Depth 10
-
-    $updateRes = Invoke-WebRequest -Uri "http://127.0.0.1:8188/prompt" `
-      -Method POST -ContentType "application/json" `
-      -Body $updatePayload -ErrorAction Stop
-
-    # Wait for update to complete
-    Start-Sleep -Seconds 10
-
-    # Step 2: Install Nunchaku
-    Write-Host "  Step 2: Installing Nunchaku runtime (this may take a few minutes)..." -ForegroundColor DarkCyan
-
-    # Reload workflow for install
-    $workflow = Get-Content -Path $workflowPath -Raw | ConvertFrom-Json
-    $workflow.'1'.inputs.mode = "install"
-
-    # Try to get latest version from nunchaku_versions.json
-    $versionsPath = Join-Path $comfyDir "custom_nodes\ComfyUI-nunchaku\nunchaku_versions.json"
-    if (Test-Path $versionsPath) {
-      $versions = Get-Content -Path $versionsPath -Raw | ConvertFrom-Json
-      if ($versions.versions -and $versions.versions.Count -gt 0) {
-        $workflow.'1'.inputs.version = $versions.versions[0]
-        Write-Host "  Using Nunchaku version: $($versions.versions[0])" -ForegroundColor DarkCyan
+      # Reinstall insightface to fix numpy binary compatibility issue
+      Write-Host "Reinstalling insightface to fix numpy compatibility..." -ForegroundColor DarkCyan
+      & $uv pip install -p $py --force-reinstall "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp312-cp312-win_amd64.whl" 2>&1 | Out-Null
+      if ($LASTEXITCODE -eq 0) {
+        Write-Host "Insightface reinstalled successfully." -ForegroundColor Green
       }
-    }
-
-    $installPayload = @{
-      prompt = $workflow
-      client_id = [guid]::NewGuid().ToString()
-    } | ConvertTo-Json -Depth 10
-
-    $installRes = Invoke-WebRequest -Uri "http://127.0.0.1:8188/prompt" `
-      -Method POST -ContentType "application/json" `
-      -Body $installPayload -ErrorAction Stop
-
-    $promptData = $installRes.Content | ConvertFrom-Json
-    $promptId = $promptData.prompt_id
-
-    # Wait for installation to complete
-    $maxInstallWait = 300  # 5 minutes
-    $installWaited = 0
-    $installComplete = $false
-
-    while ($installWaited -lt $maxInstallWait) {
-      Start-Sleep -Seconds 5
-      $installWaited += 5
-
-      try {
-        $historyRes = Invoke-WebRequest -Uri "http://127.0.0.1:8188/history/$promptId" -TimeoutSec 5 -ErrorAction SilentlyContinue
-        if ($historyRes.StatusCode -eq 200) {
-          $history = $historyRes.Content | ConvertFrom-Json
-          if ($history.$promptId) {
-            $entry = $history.$promptId
-            # Check if completed
-            if ($entry.outputs -or $entry.status -eq 'completed' -or $entry.status.completed) {
-              $installComplete = $true
-              break
-            }
-          }
-        }
-      } catch { }
-
-      Write-Host "  Waiting for Nunchaku installation... ($installWaited/$maxInstallWait seconds)" -ForegroundColor DarkCyan
-    }
-
-    if ($installComplete) {
-      Write-Host "Nunchaku installation complete." -ForegroundColor Green
     } else {
-      Write-Host "Warning: Nunchaku installation may not have completed. Please verify in the app." -ForegroundColor Yellow
+      Write-Host "Warning: Failed to install nunchaku v$nunchakuVersion" -ForegroundColor Yellow
+      Write-Host "Error: $output" -ForegroundColor Red
     }
-
   } catch {
     Write-Host "Warning: Nunchaku installation failed: $_" -ForegroundColor Yellow
-  } finally {
-    # Stop ComfyUI
-    Write-Host "Stopping ComfyUI..." -ForegroundColor DarkCyan
-    try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {}
-    Start-Sleep -Seconds 2
   }
 }
 
@@ -672,9 +639,16 @@ try {
   Write-Host "  Tag Painter Bootstrap Installation" -ForegroundColor Cyan
   Write-Host "========================================`n" -ForegroundColor Cyan
 
+  # Debug: Show working directory
+  Write-Host "Working directory: $(Get-Location)" -ForegroundColor Magenta
+  Write-Host "PSScriptRoot: $PSScriptRoot" -ForegroundColor Magenta
+
   New-DirectoryIfMissing "vendor"
   $vendorDir = Resolve-Path "vendor"
   $comfyDir = Join-Path (Get-Location) $ComfyDir
+
+  Write-Host "Vendor dir: $vendorDir" -ForegroundColor Magenta
+  Write-Host "ComfyUI dir: $comfyDir" -ForegroundColor Magenta
 
   # Step 1: Node.js
   $nodeHome = Install-Node -vendorDir $vendorDir
@@ -706,8 +680,8 @@ try {
   # Step 7: Download all files
   Download-AllFiles -vendorDir $vendorDir -comfyDir $comfyDir
 
-  # Step 8-9: Nunchaku (disabled - uncomment to enable)
-  # Install-Nunchaku -vendorDir $vendorDir -comfyDir $comfyDir -envInfo $envInfo
+  # Step 8: Nunchaku runtime installation
+  Install-Nunchaku -vendorDir $vendorDir -comfyDir $comfyDir -envInfo $envInfo
 
   Write-Host "`n========================================" -ForegroundColor Green
   Write-Host "  Bootstrap Complete!" -ForegroundColor Green

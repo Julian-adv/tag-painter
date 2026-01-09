@@ -159,7 +159,7 @@
     {
       "label": "ComfyUI-nunchaku",
       "filename": "ComfyUI-nunchaku",
-      "urls": ["https://github.com/nunchaku-tech/ComfyUI-nunchaku.git"],
+      "urls": ["https://github.com/mit-han-lab/ComfyUI-nunchaku.git"],
       "destRelativeToComfy": "custom_nodes/ComfyUI-nunchaku",
       "category": "custom-node",
       "kind": "git",
@@ -231,32 +231,32 @@
     {
       "label": "ZulyV2 LoRA (for Z-Image)",
       "filename": "ZulyV2.safetensors",
-      "urls": ["https://civitai.com/api/download/models/2499197?type=Model&format=SafeTensor"],
-      "pageUrl": "https://civitai.com/models/2499197",
+      "urls": ["https://civitai.com/models/2196619/zuly"],
+      "pageUrl": "https://civitai.com/models/2196619/zuly",
       "destRelativeToComfy": "models/loras/zimage/ZulyV2.safetensors",
       "category": "manual"
     },
     {
       "label": "ZIT Shimohira Reika LoRA (for Z-Image)",
       "filename": "ZIT Shimohira Reika.safetensors",
-      "urls": ["https://civitai.com/api/download/models/2475832?type=Model&format=SafeTensor"],
-      "pageUrl": "https://civitai.com/models/2475832",
+      "urls": ["https://civitai.com/models/2093423/zit-and-il-and-flux-gantz-shimohira-reika"],
+      "pageUrl": "https://civitai.com/models/2093423/zit-and-il-and-flux-gantz-shimohira-reika",
       "destRelativeToComfy": "models/loras/zimage/ZIT Shimohira Reika.safetensors",
       "category": "manual"
     },
     {
       "label": "ZiTSR3alV1 LoRA (for Z-Image)",
       "filename": "ZiTSR3alV1.safetensors",
-      "urls": ["https://civitai.com/api/download/models/2517229?type=Model&format=SafeTensor"],
-      "pageUrl": "https://civitai.com/models/2517229",
+      "urls": ["https://civitai.com/models/1801618/wanderers-semi-realistic-portraits-or-flux"],
+      "pageUrl": "https://civitai.com/models/1801618/wanderers-semi-realistic-portraits-or-flux",
       "destRelativeToComfy": "models/loras/zimage/ZiTSR3alV1.safetensors",
       "category": "manual"
     },
     {
       "label": "Mystic-XXX-ZIT-V4 LoRA (for Z-Image)",
       "filename": "Mystic-XXX-ZIT-V4.safetensors",
-      "urls": ["https://civitai.com/api/download/models/2556433?type=Model&format=SafeTensor"],
-      "pageUrl": "https://civitai.com/models/2556433",
+      "urls": ["https://civitai.com/models/2206377/zit-mystic-xxx"],
+      "pageUrl": "https://civitai.com/models/2206377/zit-mystic-xxx",
       "destRelativeToComfy": "models/loras/zimage/Mystic-XXX-ZIT-V4.safetensors",
       "category": "manual"
     }

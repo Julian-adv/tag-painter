@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import { findComfyPython, getComfyDir } from '$lib/server/comfy'
 import { isComfyAvailable, stopComfyProcess } from '$lib/server/comfyProcess'
 
-const STARTUP_WAIT_SECONDS = 60
+const STARTUP_WAIT_SECONDS = 120
 const MAX_RETRY_ATTEMPTS = 2
 
 function buildArgs(): string[] {
