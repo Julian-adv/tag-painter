@@ -28,12 +28,12 @@
 
     event.preventDefault()
 
-    const delta = event.deltaY > 0 ? -0.1 : 0.1 // Scroll down = decrease, scroll up = increase
+    const delta = event.deltaY > 0 ? -0.05 : 0.05 // Scroll down = decrease, scroll up = increase
     const currentWeight = lora.weight ?? 1.0
-    const newWeight = Math.max(0.1, Math.min(2.0, currentWeight + delta)) // Clamp between 0.1 and 2.0
+    const newWeight = Math.max(-2.0, Math.min(2.0, currentWeight + delta)) // Clamp between -2.0 and 2.0
 
-    // Round to 1 decimal place
-    const roundedWeight = Math.round(newWeight * 10) / 10
+    // Round to 2 decimal places
+    const roundedWeight = Math.round(newWeight * 100) / 100
 
     // Notify parent of weight change
     onWeightChange(lora.name, roundedWeight)
