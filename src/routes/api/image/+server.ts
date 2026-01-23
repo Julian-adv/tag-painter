@@ -9,13 +9,8 @@ import encodeChunks from 'png-chunks-encode'
 import textChunk from 'png-chunk-text'
 import { DEFAULT_OUTPUT_DIRECTORY } from '$lib/constants'
 import { getTodayDate, getFormattedTime } from '$lib/utils/date'
-import { findNodeByTitle } from '$lib/generation/workflowMapping'
-import {
-  FaceDetailerMode,
-  RefineMode,
-  type ComfyUIWorkflow,
-  type GenerationMetadataPayload
-} from '$lib/types'
+import { getCheckpointHash, getLoraHashes } from '$lib/server/modelHash'
+import { type ComfyUIWorkflow, type GenerationMetadataPayload } from '$lib/types'
 
 interface PngChunk {
   name: string
@@ -278,77 +273,83 @@ export async function POST({ request }) {
       if (prompts.zone2) zoneLines.push(`Second Zone: ${prompts.zone2}`)
       let parametersText = ''
 
-      const buildParameterLine = (
-        label: string,
-        params: {
-          steps: number | string | null
-          sampler: string | null
-          scheduler: string | null
-          cfgScale: number | string | null
-          model: string | null
-          scale: number | string | null
-          denoise: number | string | null
-        }
-      ): string => {
-        const stepsText = params.steps ?? '-'
-        const samplerText = params.sampler ? normalizeSampler(params.sampler) : '-'
-        const schedulerText = params.scheduler ? normalizeScheduler(params.scheduler) : '-'
-        const cfgText = params.cfgScale ?? '-'
-        const modelText = params.model ? normalizeModelName(params.model) : '-'
-        const scaleText = params.scale ?? '-'
-        const denoiseText = params.denoise ?? '-'
-        return `${label}: Steps: ${stepsText}, Sampler: ${samplerText}, Schedule type: ${schedulerText}, CFG scale: ${cfgText}, Scale: ${scaleText}, Denoise: ${denoiseText}, Model: ${modelText}`
-      }
-
       if (metadataPayload) {
-        const loraText =
+        // Build A1111 style LoRA tags for prompt (civit.ai resource detection)
+        const loraTagsForPrompt =
           loras && loras.length > 0
-            ? `, Lora: ${loras.map((lora) => `${lora.name}:${lora.weight}`).join(', ')}`
+            ? ' ' + loras.map((lora) => `<lora:${normalizeModelName(lora.name)}:${lora.weight}>`).join(' ')
             : ''
 
-        const baseLine = `Steps: ${metadataPayload.base.steps || '-'}, Sampler: ${normalizeSampler(
-          metadataPayload.base.sampler
-        )}, Schedule type: ${normalizeScheduler(
-          metadataPayload.base.scheduler
-        )}, CFG scale: ${metadataPayload.base.cfgScale || '-'}, Seed: ${
-          metadataPayload.base.seed
-        }, Size: ${metadataPayload.base.width}x${metadataPayload.base.height}, CLIP skip: ${
-          metadataPayload.base.clipSkip
-        }, Model: ${normalizeModelName(metadataPayload.base.model)}${loraText}`
+        // Get model and LoRA hashes for civit.ai resource detection
+        const modelHash = await getCheckpointHash(metadataPayload.base.model)
+        const loraHashMap = loras && loras.length > 0 ? await getLoraHashes(loras) : {}
 
-        const parameterLines = [promptText]
+        // Build base parameters line (A1111 compatible format)
+        const baseParams: string[] = [
+          `Steps: ${metadataPayload.base.steps || '-'}`,
+          `Sampler: ${normalizeSampler(metadataPayload.base.sampler)}`,
+          `Schedule type: ${normalizeScheduler(metadataPayload.base.scheduler)}`,
+          `CFG scale: ${metadataPayload.base.cfgScale || '-'}`,
+          `Seed: ${metadataPayload.base.seed}`,
+          `Size: ${metadataPayload.base.width}x${metadataPayload.base.height}`,
+          `CLIP skip: ${metadataPayload.base.clipSkip}`
+        ]
+
+        // Add model hash (civit.ai resource detection)
+        if (modelHash) {
+          baseParams.push(`Model hash: ${modelHash}`)
+        }
+        baseParams.push(`Model: ${normalizeModelName(metadataPayload.base.model)}`)
+
+        // Add LoRA info with hashes (civit.ai resource detection)
+        if (loras && loras.length > 0) {
+          baseParams.push(`Lora: ${loras.map((lora) => `${lora.name}:${lora.weight}`).join(', ')}`)
+
+          // Add Lora hashes in A1111 format: "name: hash, name2: hash2"
+          const loraHashEntries = Object.entries(loraHashMap)
+          if (loraHashEntries.length > 0) {
+            const loraHashStr = loraHashEntries
+              .map(([name, hash]) => `${normalizeModelName(name)}: ${hash}`)
+              .join(', ')
+            baseParams.push(`Lora hashes: "${loraHashStr}"`)
+          }
+        }
+
+        // Add upscale parameters to the same line (A1111 Hires fix style)
+        if (metadataPayload.upscale) {
+          baseParams.push(`Hires upscale: ${metadataPayload.upscale.scale ?? '-'}`)
+          baseParams.push(`Hires steps: ${metadataPayload.upscale.steps ?? '-'}`)
+          baseParams.push(`Hires sampler: ${normalizeSampler(metadataPayload.upscale.sampler || '')}`)
+          baseParams.push(`Hires scheduler: ${normalizeScheduler(metadataPayload.upscale.scheduler || '')}`)
+          baseParams.push(`Hires CFG: ${metadataPayload.upscale.cfgScale ?? '-'}`)
+          baseParams.push(`Denoising strength: ${metadataPayload.upscale.denoise ?? '-'}`)
+          if (metadataPayload.upscale.model) {
+            baseParams.push(`Hires model: ${normalizeModelName(metadataPayload.upscale.model)}`)
+          }
+        }
+
+        // Add face detailer parameters
+        if (metadataPayload.faceDetailer) {
+          baseParams.push(`ADetailer steps: ${metadataPayload.faceDetailer.steps ?? '-'}`)
+          baseParams.push(`ADetailer sampler: ${normalizeSampler(metadataPayload.faceDetailer.sampler || '')}`)
+          baseParams.push(`ADetailer scheduler: ${normalizeScheduler(metadataPayload.faceDetailer.scheduler || '')}`)
+          baseParams.push(`ADetailer CFG: ${metadataPayload.faceDetailer.cfgScale ?? '-'}`)
+          baseParams.push(`ADetailer denoise: ${metadataPayload.faceDetailer.denoise ?? '-'}`)
+          if (metadataPayload.faceDetailer.model) {
+            baseParams.push(`ADetailer model: ${normalizeModelName(metadataPayload.faceDetailer.model)}`)
+          }
+        }
+
+        const baseLine = baseParams.join(', ')
+
+        // Add LoRA tags to prompt text for civit.ai resource detection
+        const promptWithLoras = promptText + loraTagsForPrompt
+
+        const parameterLines = [promptWithLoras]
         if (zoneLines.length > 0) {
           parameterLines.push(zoneLines.join('\n'))
         }
         parameterLines.push(`Negative prompt: ${prompts.negative}`, baseLine)
-
-        if (metadataPayload.upscale) {
-          parameterLines.push(
-            buildParameterLine('Upscale', {
-              steps: metadataPayload.upscale.steps,
-              sampler: metadataPayload.upscale.sampler,
-              scheduler: metadataPayload.upscale.scheduler,
-              cfgScale: metadataPayload.upscale.cfgScale,
-              model: metadataPayload.upscale.model,
-              scale: metadataPayload.upscale.scale,
-              denoise: metadataPayload.upscale.denoise
-            })
-          )
-        }
-
-        if (metadataPayload.faceDetailer) {
-          parameterLines.push(
-            buildParameterLine('Face detailer', {
-              steps: metadataPayload.faceDetailer.steps,
-              sampler: metadataPayload.faceDetailer.sampler,
-              scheduler: metadataPayload.faceDetailer.scheduler,
-              cfgScale: metadataPayload.faceDetailer.cfgScale,
-              model: metadataPayload.faceDetailer.model,
-              scale: metadataPayload.faceDetailer.scale,
-              denoise: metadataPayload.faceDetailer.denoise
-            })
-          )
-        }
 
         parametersText = parameterLines.filter((line) => line !== '').join('\n')
       }
