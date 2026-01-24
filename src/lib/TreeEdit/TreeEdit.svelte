@@ -614,6 +614,83 @@
     hasUnsavedChanges = true
   }
 
+  function pasteAsSibling(clipboardText: string) {
+    if (selectedIds.length !== 1) return
+    const selectedId = selectedIds[0]
+    const node = model.nodes[selectedId]
+    if (!node) return
+
+    // Clear filter to ensure new node is visible
+    filterText = ''
+
+    // Determine parent container
+    let parentId: string | null = null
+    let insertAfterIndex: number = -1
+
+    if (node.kind === 'leaf') {
+      parentId = node.parentId
+      if (parentId) {
+        const parent = model.nodes[parentId]
+        if (parent && isContainer(parent)) {
+          const children = (parent as ObjectNode | ArrayNode).children
+          insertAfterIndex = children.indexOf(selectedId)
+        }
+      }
+    } else if (isContainer(node)) {
+      // For container nodes, add as sibling (same behavior as addSiblingBySelection)
+      parentId = node.parentId
+      if (parentId) {
+        const parent = model.nodes[parentId]
+        if (parent && isContainer(parent)) {
+          const children = (parent as ObjectNode | ArrayNode).children
+          insertAfterIndex = children.indexOf(selectedId)
+        }
+      }
+    }
+
+    if (!parentId) return
+    const parent = model.nodes[parentId]
+    if (!parent || !isContainer(parent)) return
+
+    // Ensure parent is expanded
+    parent.collapsed = false
+
+    const children = (parent as ObjectNode | ArrayNode).children
+    const insertIndex = insertAfterIndex >= 0 ? insertAfterIndex + 1 : children.length
+
+    // Create new leaf with clipboard content
+    const newId = uid()
+    const newLeaf: LeafNode = {
+      id: newId,
+      name: parent.kind === 'array' ? String(children.length) : 'newKey',
+      kind: 'leaf',
+      parentId,
+      value: clipboardText
+    }
+
+    addChild(model, parentId, newLeaf)
+
+    // Move to correct position
+    const appendedIndex = (parent as ObjectNode | ArrayNode).children.length - 1
+    moveChild(
+      model,
+      parentId,
+      appendedIndex,
+      Math.min(insertIndex, (parent as ObjectNode | ArrayNode).children.length - 1)
+    )
+
+    normalizeArrayOrdering(model)
+    rebuildPathSymbols(model)
+    selectedIds = [newId]
+    lastSelectedId = newId
+    hasUnsavedChanges = true
+
+    tick().then(() => {
+      setAutoEditChildId(newId, 'caretEnd')
+      scrollSelectedIntoView()
+    })
+  }
+
   // Expose simple setters for tree keyboard action
   function setTabbingActiveState(v: boolean) {
     tabbingActive = v
@@ -663,6 +740,7 @@
           expandOrFocusFirstChild,
           deleteBySelection,
           duplicateBySelection,
+          pasteAsSibling,
           setTabbingActive: setTabbingActiveState,
           setLastTabWasWithShift: setLastTabWithShiftState
         }}

@@ -9,6 +9,7 @@ type Options = {
   expandOrFocusFirstChild: () => void
   deleteBySelection: () => void
   duplicateBySelection: () => void
+  pasteAsSibling: (text: string) => void
   setTabbingActive: (active: boolean) => void
   setLastTabWasWithShift: (withShift: boolean) => void
 }
@@ -105,15 +106,37 @@ export function treeKeyboard(node: HTMLElement, options: Options) {
     options.setLastTabWasWithShift(false)
   }
 
+  function onPaste(e: ClipboardEvent) {
+    // Skip if the event originated from an input or textarea (editing mode)
+    const target = e.target as HTMLElement
+    if (target) {
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return
+      }
+      const editableHost = target.closest('[contenteditable="true"]') as HTMLElement | null
+      if (editableHost) {
+        return
+      }
+    }
+
+    const text = e.clipboardData?.getData('text/plain')
+    if (text && text.trim()) {
+      e.preventDefault()
+      options.pasteAsSibling(text.trim())
+    }
+  }
+
   node.addEventListener('keydown', onKeyDown)
   node.addEventListener('keyup', onKeyUp)
   node.addEventListener('mousedown', onMouseDown)
+  node.addEventListener('paste', onPaste)
 
   return {
     destroy() {
       node.removeEventListener('keydown', onKeyDown)
       node.removeEventListener('keyup', onKeyUp)
       node.removeEventListener('mousedown', onMouseDown)
+      node.removeEventListener('paste', onPaste)
     }
   }
 }
