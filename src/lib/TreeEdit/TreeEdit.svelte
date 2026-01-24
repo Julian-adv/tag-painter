@@ -141,14 +141,20 @@
     )
     normalizeArrayOrdering(model)
     rebuildPathSymbols(model)
-    setAutoEditChildId(newId)
     selectedIds = [newId]
     lastSelectedId = newId
     hasUnsavedChanges = true
-    focusSelectedSoon()
+    // Wait for DOM to update after filter clear, then trigger editing mode
+    tick().then(() => {
+      setAutoEditChildId(newId)
+      scrollSelectedIntoView()
+    })
   }
 
   function addChildForSelection() {
+    // Clear filter when adding nodes via Ctrl+Enter to ensure new node is visible
+    filterText = ''
+
     if (selectedIds.length !== 1) return
     const sid = selectedIds[0]
     const n = model.nodes[sid]
@@ -186,11 +192,14 @@
         value: ''
       }
       addChild(model, arrId, firstChild)
-      setAutoEditChildId(firstChild.id)
       selectedIds = [firstChild.id]
       lastSelectedId = firstChild.id
       hasUnsavedChanges = true
-      focusSelectedSoon()
+      // Wait for DOM to update after filter clear, then trigger editing mode
+      tick().then(() => {
+        setAutoEditChildId(firstChild.id)
+        scrollSelectedIntoView()
+      })
       return
     }
   }
@@ -480,11 +489,13 @@
   }
 
   function addSiblingBySelection() {
+    // Clear filter when adding sibling to ensure new node is visible
+    filterText = ''
+
     const result = addSiblingBySelectionAction(model, selectedIds)
     if (!result.changed) return
 
     autoEditBehavior = result.autoEditBehavior
-    if (result.autoEditChildId) setAutoEditChildId(result.autoEditChildId, result.autoEditBehavior)
 
     if (result.selectedId) {
       selectedIds = [result.selectedId]
@@ -492,7 +503,11 @@
     }
 
     hasUnsavedChanges = true
-    tick().then(() => scrollSelectedIntoView())
+    // Wait for DOM to update after filter clear, then trigger editing mode
+    tick().then(() => {
+      if (result.autoEditChildId) setAutoEditChildId(result.autoEditChildId, result.autoEditBehavior)
+      scrollSelectedIntoView()
+    })
   }
 
   function deleteBySelection() {
