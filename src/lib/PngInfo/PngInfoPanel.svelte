@@ -62,7 +62,7 @@
     const seedMatch = parametersLine.match(/Seed: ([^,]+)/)
     const sizeMatch = parametersLine.match(/Size: ([^,]+)/)
     const modelMatch = parametersLine.match(/Model: ([^,]+?)(?:, Lora:|$)/)
-    const loraMatch = parametersLine.match(/Lora: (.+)$/)
+    const loraMatch = parametersLine.match(/Lora: (.+?)(?:, Lora hashes:|, Hires |$)/)
     const clipSkipMatch = parametersLine.match(/CLIP skip: ([^,]+)/)
     const scaleMatch = parametersLine.match(/Scale: ([^,]+)/)
     const denoiseMatch = parametersLine.match(/Denoise: ([^,]+)/)

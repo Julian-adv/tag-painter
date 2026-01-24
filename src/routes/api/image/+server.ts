@@ -261,7 +261,9 @@ export async function POST({ request }) {
 
     const normalizeModelName = (value: string): string => {
       if (!value) return ''
-      return value.replace(/\.(safetensors|ckpt)$/, '')
+      // Remove directory path and extension (e.g., "zimage/ZulyV2.safetensors" -> "ZulyV2")
+      const baseName = value.split('/').pop() || value
+      return baseName.replace(/\.(safetensors|ckpt|pt|gguf)$/, '')
     }
 
     // Add metadata to PNG if prompt is provided
