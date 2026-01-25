@@ -564,7 +564,7 @@ Prompt: "${trimmed}"`
                           class="w-full px-3 py-1.5 text-left text-sm text-gray-700 transition hover:bg-blue-50 hover:text-blue-700"
                           onclick={() => handleSubNodeSelect(option)}
                         >
-                          {option.name}
+                          {option.path}
                         </button>
                       {/each}
                     </div>
@@ -595,7 +595,7 @@ Prompt: "${trimmed}"`
         onkeydown={handleKeydown}
         placeholder="Enter image prompt to analyze..."
         class="w-full resize-none rounded-lg border border-gray-300 p-2 text-sm focus:border-blue-500 focus:outline-none"
-        rows="3"
+        rows="10"
         disabled={isLoading}
       ></textarea>
       <div class="flex gap-1">
