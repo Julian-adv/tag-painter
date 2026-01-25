@@ -7,7 +7,7 @@
   import CompositionSelector from './CompositionSelector.svelte'
   import TagZones from './TagZones.svelte'
   import TabNavigation from './TabNavigation.svelte'
-  import ChatInterface from '$lib/Chat/ChatInterface.svelte'
+  import PromptAnalyzer from '$lib/Chat/PromptAnalyzer.svelte'
   import PngInfoPanel from '$lib/PngInfo/PngInfoPanel.svelte'
   import ModelControls from './ModelControls.svelte'
   import PostProcessingControls from './PostProcessingControls.svelte'
@@ -783,7 +783,7 @@
         <TabNavigation
           tabs={[
             { id: 'generator', label: m['tabs.wildcards']() },
-            { id: 'chat', label: m['tabs.chat']() },
+            { id: 'chat', label: 'Analyze' },
             { id: 'pnginfo', label: 'PNG Info' }
           ]}
           bind:activeTabId
@@ -808,13 +808,9 @@
           {:else if activeTabId === 'chat'}
             <div class="flex h-full flex-col gap-2 p-0">
               <div class="flex-1 overflow-auto">
-                <ChatInterface
+                <PromptAnalyzer
                   apiKey={settings.geminiApiKey}
-                  promptLanguage={settings.chatPromptLanguage}
-                  onGeneratePrompt={handleChatGeneratePrompt}
-                  {settings}
-                  onSettingsChange={handleSettingsChange}
-                  currentImagePath={currentImageFileName}
+                  wildcardsFile={getEffectiveModelSettings(settings, $promptsData.selectedCheckpoint)?.wildcardsFile}
                   onShowToast={(message, type) => {
                     if (type === 'success') {
                       showToast('success', message)

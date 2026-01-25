@@ -195,3 +195,19 @@ export interface Toast {
   message: string
   type: 'error' | 'info' | 'success'
 }
+
+// Prompt analysis result from Gemini
+export interface PromptAnalysis {
+  pose: string
+  expression: string
+  composition: string
+  background: string
+  lighting: string
+  hairStyle: string
+  hairColor: string
+  eyes: string
+  outfit: string
+  legwear: string
+  footwear: string
+  accessories: string
+}
