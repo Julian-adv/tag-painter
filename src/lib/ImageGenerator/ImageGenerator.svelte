@@ -790,44 +790,40 @@
         />
 
         <div class="flex flex-1 flex-col gap-2 overflow-auto">
-          {#if activeTabId === 'generator'}
-            <div class="flex h-full flex-col gap-2 p-2">
-              <CompositionSelector bind:this={compositionSelector} />
+          <div class="flex h-full flex-col gap-2 p-2" class:hidden={activeTabId !== 'generator'}>
+            <CompositionSelector bind:this={compositionSelector} />
 
-              <div class="flex min-h-0 flex-1 flex-shrink-1">
-                <TagZones
-                  bind:this={tagZonesRef}
-                  {currentRandomTagResolutions}
-                  {disabledZones}
-                  {settings}
-                  onOpenSettings={openSettingsFromTagZones}
-                  onWildcardsError={(message) => showToast('error', message)}
-                />
-              </div>
+            <div class="flex min-h-0 flex-1 flex-shrink-1">
+              <TagZones
+                bind:this={tagZonesRef}
+                {currentRandomTagResolutions}
+                {disabledZones}
+                {settings}
+                onOpenSettings={openSettingsFromTagZones}
+                onWildcardsError={(message) => showToast('error', message)}
+              />
             </div>
-          {:else if activeTabId === 'chat'}
-            <div class="flex h-full flex-col gap-2 p-0">
-              <div class="flex-1 overflow-auto">
-                <PromptAnalyzer
-                  apiKey={settings.geminiApiKey}
-                  wildcardsFile={getEffectiveModelSettings(settings, $promptsData.selectedCheckpoint)?.wildcardsFile}
-                  onShowToast={(message, type) => {
-                    if (type === 'success') {
-                      showToast('success', message)
-                    } else if (type === 'error') {
-                      showToast('error', message)
-                    } else {
-                      showToast('info', message)
-                    }
-                  }}
-                />
-              </div>
+          </div>
+          <div class="flex h-full flex-col gap-2 p-0" class:hidden={activeTabId !== 'chat'}>
+            <div class="flex-1 overflow-auto">
+              <PromptAnalyzer
+                apiKey={settings.geminiApiKey}
+                wildcardsFile={getEffectiveModelSettings(settings, $promptsData.selectedCheckpoint)?.wildcardsFile}
+                onShowToast={(message, type) => {
+                  if (type === 'success') {
+                    showToast('success', message)
+                  } else if (type === 'error') {
+                    showToast('error', message)
+                  } else {
+                    showToast('info', message)
+                  }
+                }}
+              />
             </div>
-          {:else if activeTabId === 'pnginfo'}
-            <div class="flex h-full flex-col gap-2 p-0">
-              <PngInfoPanel {metadata} />
-            </div>
-          {/if}
+          </div>
+          <div class="flex h-full flex-col gap-2 p-0" class:hidden={activeTabId !== 'pnginfo'}>
+            <PngInfoPanel {metadata} />
+          </div>
         </div>
 
         {#if activeTabId !== 'pnginfo'}
