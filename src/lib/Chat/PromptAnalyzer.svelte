@@ -11,6 +11,7 @@
     type ObjectNode,
     type TreeModel
   } from '$lib/TreeEdit/model'
+  import { togglePinForLeaf } from '$lib/TreeEdit/operations'
   import { refreshWildcardsFromServer } from '$lib/stores/tagsStore'
 
   interface Props {
@@ -127,7 +128,7 @@
 
   // Mapping from analysis fields to YAML node names (can be single name or array of names)
   const FIELD_TO_YAML_NODE: Record<keyof PromptAnalysis, string | string[]> = {
-    pose: ['pose', 'pose2'],
+    pose: ['pose', 'pose2', 'pose3'],
     expression: 'expression',
     composition: 'composition',
     background: 'background',
@@ -193,7 +194,7 @@
     return false
   }
 
-  // Add a leaf value to an array node
+  // Add a leaf value to an array node and pin it for next generation
   function addLeafToArray(model: TreeModel, arrayNodeId: string, value: string): void {
     const arrayNode = model.nodes[arrayNodeId] as ArrayNode
     if (!arrayNode || arrayNode.kind !== 'array') return
@@ -206,6 +207,9 @@
       value: value
     }
     addChild(model, arrayNodeId, newLeaf)
+
+    // Pin the newly added leaf so it will be selected in the next generation
+    togglePinForLeaf(model, newLeaf.id)
   }
 
   // Get container children (arrays or objects) of an object node
@@ -552,7 +556,7 @@ Prompt: "${trimmed}"`
                   </button>
                   {#if pendingAdd && pendingAdd.field === field}
                     <div
-                      class="absolute right-0 top-full z-50 mt-1 max-h-48 min-w-32 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+                      class="absolute right-0 top-full z-50 mt-1 min-w-32 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
                       onclick={(e) => e.stopPropagation()}
                       onkeydown={(e) => e.key === 'Escape' && cancelSubNodeSelect()}
                       role="menu"
