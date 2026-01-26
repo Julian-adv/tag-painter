@@ -6,7 +6,8 @@ import type { AnyNode, TreeModel } from '$lib/TreeEdit/model'
 import {
   CONSISTENT_RANDOM_MARKER,
   DEFAULT_ARRAY_WEIGHT,
-  createPlaceholderRegex
+  createPlaceholderRegex,
+  createChoiceRegex
 } from '$lib/constants'
 import { testModeStore } from '../stores/testModeStore.svelte'
 import { findNodeByName, extractDisablesDirective } from '$lib/TreeEdit/utils'
@@ -778,19 +779,16 @@ function getOptionWeight(ctx: TagExpansionCtx, childNode: AnyNode): number {
 
 /**
  * Expand {a|b|c} patterns in leaf node values by randomly selecting one option
+ * Requires at least one | to be treated as a choice pattern (to avoid matching JSON-like syntax)
  */
 function expandChoicePatterns(text: string, disables?: DisabledContext): string {
-  const choicePattern = /\{([^}]+)\}/g
+  const choicePattern = createChoiceRegex()
 
   return text.replace(choicePattern, (match, choices) => {
     const allOptions = choices.split('|')
 
     if (allOptions.length === 0) {
       return match // Return original if no valid options
-    }
-
-    if (allOptions.length === 1) {
-      return allOptions[0] // Return single option directly
     }
 
     // Filter out disabled options if disables context is provided

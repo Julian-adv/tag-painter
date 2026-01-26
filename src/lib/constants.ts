@@ -139,3 +139,11 @@ export const PLACEHOLDER_RE_FLAGS = 'gu'
 export function createPlaceholderRegex(): RegExp {
   return new RegExp(PLACEHOLDER_RE_SOURCE, PLACEHOLDER_RE_FLAGS)
 }
+
+// Choice pattern used for {a|b|c} style random selection
+// Requires at least one | to distinguish from JSON-like syntax like {key: "value"}
+export const CHOICE_RE_SOURCE = '\\{([^{}]*\\|[^{}]*)\\}'
+export const CHOICE_RE_FLAGS = 'g'
+export function createChoiceRegex(): RegExp {
+  return new RegExp(CHOICE_RE_SOURCE, CHOICE_RE_FLAGS)
+}

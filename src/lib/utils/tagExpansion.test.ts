@@ -317,7 +317,7 @@ describe('tagExpansion utilities', () => {
       expect(result.expandedText).toEqual('{} empty pattern')
     })
 
-    it('should handle single option choice patterns', () => {
+    it('should NOT treat single option without pipe as choice pattern', () => {
       const testModel: TreeModel = {
         ...mockTreeModel,
         nodes: {
@@ -346,8 +346,9 @@ describe('tagExpansion utilities', () => {
 
       const result = expandCustomTags('test-single', testModel)
 
-      // Single option should be selected directly
-      expect(result.expandedText).toEqual('only option')
+      // {only} should remain unchanged because it doesn't contain |
+      // This distinguishes choice patterns from JSON-like syntax like {key: "value"}
+      expect(result.expandedText).toEqual('{only} option')
     })
 
     it('should handle choice patterns with empty options like {a|}', () => {

@@ -4,7 +4,7 @@
   import { getWildcardModel } from '../stores/tagsStore'
   import { findNodeByName, isConsistentRandomArray } from '../TreeEdit/utils'
   import ChipEditorAutocomplete from './ChipEditorAutocomplete.svelte'
-  import { createPlaceholderRegex } from '$lib/constants'
+  import { createPlaceholderRegex, createChoiceRegex } from '$lib/constants'
 
   interface Props {
     id?: string
@@ -40,8 +40,7 @@
 
   // === Pattern Regular Expressions ===
   const placeholderRe = createPlaceholderRegex()
-  // {aaa|bbb|ccc} → Green choice tag
-  const choiceRe = /\{([^{}]+)\}/g
+  const choiceRe = createChoiceRegex()
 
   // === API: Serialize internal text ===
   // Example: "abc __def__ {x|y}"
