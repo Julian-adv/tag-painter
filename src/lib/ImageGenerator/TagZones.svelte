@@ -7,19 +7,13 @@
   import { readWildcardZones, writeWildcardZones } from '$lib/utils/wildcardZones'
   import { testModeStore, clearAllPins as clearAllPinsStore } from '$lib/stores/testModeStore.svelte'
   import { Tag, LockOpen } from 'svelte-heros-v2'
-  import type { Settings } from '$lib/types'
+  import type { Settings, ZoneTagResolutions, TagResolutionMap } from '$lib/types'
   import { m } from '$lib/paraglide/messages'
   import { getEffectiveModelSettings } from '$lib/generation/generationCommon'
   // Use callback prop instead of deprecated createEventDispatcher
 
   interface Props {
-    currentRandomTagResolutions?: {
-      all: Record<string, string>
-      zone1: Record<string, string>
-      zone2: Record<string, string>
-      negative: Record<string, string>
-      inpainting: Record<string, string>
-    }
+    currentRandomTagResolutions?: ZoneTagResolutions
     disabledZones?: Set<string>
     settings: Settings
     onOpenSettings?: (focusField: 'quality' | 'negative') => void
@@ -180,7 +174,7 @@
       const zoneMap = currentRandomTagResolutions[zoneId] || {}
       const resolved = zoneMap[tagName]
       if (resolved) {
-        preselectTargetText = String(resolved)
+        preselectTargetText = resolved.finalText
       }
     }
 

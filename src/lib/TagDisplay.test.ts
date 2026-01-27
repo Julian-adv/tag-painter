@@ -115,7 +115,7 @@ describe('TagDisplay', () => {
       onTagClick: vi.fn()
     }
 
-    const mockResolutions = { tag2: 'resolved-value' }
+    const mockResolutions = { tag2: { finalText: 'resolved-value' } }
     const testOverride = 'test-override'
 
     component = mount(TagDisplay, {

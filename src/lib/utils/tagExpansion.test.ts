@@ -156,6 +156,7 @@ describe('tagExpansion utilities', () => {
 
       expect(['blonde hair', 'brown hair', 'black hair']).toContain(result.expandedText)
       expect(result.randomTagResolutions['hair-color']).toBeDefined()
+      expect(result.randomTagResolutions['hair-color'].finalText).toBeDefined()
     })
 
     it('should expand consistent-random custom tags', () => {
@@ -163,6 +164,7 @@ describe('tagExpansion utilities', () => {
 
       expect(['blue eyes', 'green eyes', 'brown eyes']).toContain(result.expandedText)
       expect(result.randomTagResolutions['eye-color']).toBeDefined()
+      expect(result.randomTagResolutions['eye-color'].finalText).toBeDefined()
     })
 
     it('should handle tags with weights', () => {
@@ -180,20 +182,20 @@ describe('tagExpansion utilities', () => {
     // Sequential weighted expansion removed; no longer applicable.
 
     it('should use existing random resolutions for consistent-random tags', () => {
-      const existingResolutions = { 'eye-color': 'blue eyes' }
+      const existingResolutions = { 'eye-color': { finalText: 'blue eyes' } }
       const result = expandCustomTags('eye-color', mockTreeModel, new Set(), existingResolutions)
 
       expect(result.expandedText).toEqual('blue eyes')
-      expect(result.randomTagResolutions['eye-color']).toBe('blue eyes')
+      expect(result.randomTagResolutions['eye-color'].finalText).toBe('blue eyes')
     })
 
     it('should NOT reuse existing resolutions for random tags across zones', () => {
-      const existingResolutions = { 'hair-color': 'brown hair' }
+      const existingResolutions = { 'hair-color': { finalText: 'brown hair' } }
       const result = expandCustomTags('hair-color', mockTreeModel, new Set(), existingResolutions)
 
       // With mocked crypto returning 0, the first option is chosen deterministically
       expect(result.expandedText).toEqual('blonde hair')
-      expect(result.randomTagResolutions['hair-color']).toBe('blonde hair')
+      expect(result.randomTagResolutions['hair-color'].finalText).toBe('blonde hair')
     })
 
     it('should use previous zone random results during regen', () => {
@@ -201,7 +203,7 @@ describe('tagExpansion utilities', () => {
       const result = expandCustomTags('hair-color', mockTreeModel, new Set(), {}, previousResults)
 
       expect(result.expandedText).toEqual('brown hair')
-      expect(result.randomTagResolutions['hair-color']).toBe('brown hair')
+      expect(result.randomTagResolutions['hair-color'].finalText).toBe('brown hair')
     })
 
     it('should handle nested custom tag expansion', () => {

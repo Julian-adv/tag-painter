@@ -7,7 +7,7 @@
     removeTestModeOverride
   } from './stores/testModeStore.svelte'
   import { LockClosed } from 'svelte-heros-v2'
-  import type { CustomTag } from './types'
+  import type { CustomTag, TagResolutionMap } from './types'
   import { getWildcardModel } from './stores/tagsStore'
   import { createPlaceholderRegex } from '$lib/constants'
   import { m } from '$lib/paraglide/messages'
@@ -57,7 +57,7 @@
     tags: CustomTag[]
     onTagsChange?: (removedTagName?: string) => void
     onCustomTagDoubleClick?: (tagName: string) => void
-    currentRandomTagResolutions?: Record<string, string>
+    currentRandomTagResolutions?: TagResolutionMap
     testOverrideTag?: string
     disabled?: boolean
     parentTagType?: string // Add parent tag type for context menu logic
@@ -179,7 +179,7 @@
     const isForceOverridden = !!(store?.overrideTag || store?.pinnedLeafPath)
 
     // Use current resolution if available, otherwise use the tag name itself
-    const targetTag = currentRandomTagResolutions[tag.name] || tag.name
+    const targetTag = currentRandomTagResolutions[tag.name]?.finalText || tag.name
 
     if (onPinToggle) {
       // Let parent component handle the pin toggle logic
@@ -336,7 +336,7 @@
       {@const tag = tags[contextMenuState.tagIndex]}
       {@const store = testModeStore[tag.name]}
       {@const isForceOverridden = !!(store?.overrideTag || store?.pinnedLeafPath)}
-      {@const displayContent = currentRandomTagResolutions[tag.name]}
+      {@const displayContent = currentRandomTagResolutions[tag.name]?.finalText}
 
       {#if displayContent && !isForceOverridden}
         <div class="border-t border-gray-200 px-3 py-1 text-xs text-gray-500">

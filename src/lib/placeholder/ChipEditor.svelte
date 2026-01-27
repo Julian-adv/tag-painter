@@ -5,13 +5,14 @@
   import { findNodeByName, isConsistentRandomArray } from '../TreeEdit/utils'
   import ChipEditorAutocomplete from './ChipEditorAutocomplete.svelte'
   import { createPlaceholderRegex, createChoiceRegex } from '$lib/constants'
+  import type { TagResolutionMap, TagResolution } from '$lib/types'
 
   interface Props {
     id?: string
     label: string
     value: string
     disabled?: boolean
-    currentRandomTagResolutions?: Record<string, string>
+    currentRandomTagResolutions?: TagResolutionMap
     onTagDoubleClick?: (tagName: string) => void
     specialSuggestions?: string[]
     specialTrigger?: string
@@ -101,6 +102,89 @@
     return 'unknown'
   }
 
+  // === Nested chip rendering helpers ===
+
+  /**
+   * Create a nested chip for display within a parent chip's resolution
+   */
+  function createNestedChip(
+    name: string,
+    resolution: TagResolution
+  ): HTMLSpanElement {
+    const span = document.createElement('span')
+    span.className = 'nested-chip'
+    span.dataset.value = name
+
+    // Chip name
+    const chipName = document.createElement('span')
+    chipName.className = 'nested-chip-name'
+    chipName.textContent = name
+    span.appendChild(chipName)
+
+    // Resolution (recursive if has children)
+    const chipRes = document.createElement('span')
+    chipRes.className = 'nested-chip-resolution'
+
+    if (resolution.children && Object.keys(resolution.children).length > 0) {
+      // Has children - render intermediate text with nested chips
+      const content = createResolutionContent(name, resolution)
+      chipRes.appendChild(content)
+    } else {
+      // Leaf - just show final text
+      chipRes.textContent = resolution.finalText
+    }
+
+    span.appendChild(chipRes)
+    return span
+  }
+
+  /**
+   * Create resolution content with nested chips for placeholders
+   */
+  function createResolutionContent(
+    tagName: string,
+    resolution: TagResolution
+  ): DocumentFragment {
+    const frag = document.createDocumentFragment()
+
+    // Use intermediate text if available, otherwise final text
+    const displayText = resolution.intermediateText || resolution.finalText
+    if (!displayText) return frag
+
+    // Parse display text for nested placeholders
+    const nestedPlaceholderRe = createPlaceholderRegex()
+    let lastIndex = 0
+    let match: RegExpExecArray | null
+
+    nestedPlaceholderRe.lastIndex = 0
+    while ((match = nestedPlaceholderRe.exec(displayText)) !== null) {
+      // Add text before the placeholder
+      if (match.index > lastIndex) {
+        frag.appendChild(document.createTextNode(displayText.slice(lastIndex, match.index)))
+      }
+
+      const childName = match[1]
+      const childResolution = resolution.children?.[childName]
+
+      if (childResolution) {
+        // Create nested chip
+        frag.appendChild(createNestedChip(childName, childResolution))
+      } else {
+        // No resolution - show as plain text
+        frag.appendChild(document.createTextNode(match[0]))
+      }
+
+      lastIndex = match.index + match[0].length
+    }
+
+    // Add remaining text
+    if (lastIndex < displayText.length) {
+      frag.appendChild(document.createTextNode(displayText.slice(lastIndex)))
+    }
+
+    return frag
+  }
+
   // === Tag DOM creation ===
   function createEntityTag(name: string): HTMLSpanElement {
     const tagType = getTagType(name)
@@ -128,12 +212,22 @@
     chipNameHidden.textContent = name
     chipBody.appendChild(chipNameHidden)
 
-    // Resolution text (if available)
+    // Resolution content (if available) - now supports nested chips
     const resolution = currentRandomTagResolutions?.[name]
     if (resolution) {
       const chipResolution = document.createElement('span')
       chipResolution.className = 'chip-resolution'
-      chipResolution.textContent = resolution
+
+      // Check if we should render nested chips (has intermediate text with placeholders)
+      if (resolution.intermediateText && resolution.children && Object.keys(resolution.children).length > 0) {
+        // Render nested chips
+        const content = createResolutionContent(name, resolution)
+        chipResolution.appendChild(content)
+      } else {
+        // Simple text resolution
+        chipResolution.textContent = resolution.finalText
+      }
+
       chipBody.appendChild(chipResolution)
     }
 
@@ -738,5 +832,35 @@
   /* Prevent tags from being focusable */
   :global(.tag):focus {
     outline: none;
+  }
+
+  /* Nested chip styles for hierarchical tag display */
+  :global(.nested-chip) {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.7rem;
+    padding: 0 0.2rem;
+    margin: 0 1px;
+    border-radius: 0.25rem;
+    border: 1px solid currentColor;
+    opacity: 0.9;
+    background-color: rgba(255, 255, 255, 0.4);
+    vertical-align: baseline;
+  }
+
+  :global(.nested-chip-name) {
+    font-weight: 500;
+    padding-right: 0.15rem;
+    border-right: 1px solid currentColor;
+    margin-right: 0.15rem;
+    font-style: normal;
+  }
+
+  :global(.nested-chip-resolution) {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1px;
+    font-style: normal;
   }
 </style>

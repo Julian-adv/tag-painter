@@ -211,3 +211,27 @@ export interface PromptAnalysis {
   footwear: string
   accessories: string
 }
+
+// Tag resolution types for nested chip display
+
+/** Hierarchical tag resolution with intermediate expansion steps */
+export interface TagResolution {
+  /** Final expanded text (e.g., "ponytail blonde") */
+  finalText: string
+  /** Intermediate text before child placeholders were expanded (e.g., "__hair_style__ __hair_color__") */
+  intermediateText?: string
+  /** Child tag resolutions */
+  children?: Record<string, TagResolution>
+}
+
+/** Tag name to resolution map */
+export type TagResolutionMap = Record<string, TagResolution>
+
+/** Zone-based resolution map */
+export type ZoneTagResolutions = {
+  all: TagResolutionMap
+  zone1: TagResolutionMap
+  zone2: TagResolutionMap
+  negative: TagResolutionMap
+  inpainting: TagResolutionMap
+}

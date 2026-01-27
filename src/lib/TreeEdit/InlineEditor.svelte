@@ -3,6 +3,7 @@
   import ChipEditor from '../placeholder/ChipEditor.svelte'
   import PlaceholderChipDisplay from './PlaceholderChipDisplay.svelte'
   import type { TreeModel } from './model'
+  import type { TagResolutionMap } from '$lib/types'
   import { formatCommaSeparatedValues, isCommaSeparated } from '../utils/textFormatting'
 
   interface Props {
@@ -50,7 +51,7 @@
     restoreCaret: (prefix: string) => void
     focusEditor: (mode: 'selectAll' | 'caretEnd') => void
   } | null = $state(null)
-  const EMPTY_RESOLUTIONS: Record<string, string> = {}
+  const EMPTY_RESOLUTIONS: TagResolutionMap = {}
   let wrapperEl: HTMLDivElement | null = $state(null)
 
   // Adjust the weight of the comma-separated token at caret with Ctrl+Wheel

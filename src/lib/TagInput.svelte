@@ -3,7 +3,7 @@
   import AutoCompleteTextarea from './AutoCompleteTextarea.svelte'
   import TagDisplay from './TagDisplay.svelte'
   import { wildcardTagType } from './stores/tagsStore'
-  import type { CustomTag } from './types'
+  import type { CustomTag, TagResolutionMap } from './types'
   import { m } from '$lib/paraglide/messages'
 
   interface Props {
@@ -12,7 +12,7 @@
     tags: CustomTag[]
     onTagsChange?: (removedTagName?: string) => void
     onCustomTagDoubleClick?: (tagName: string) => void
-    currentRandomTagResolutions?: Record<string, string>
+    currentRandomTagResolutions?: TagResolutionMap
     testOverrideTag?: string
     disabled?: boolean
     parentTagType?: string // Add parent tag type for context menu logic

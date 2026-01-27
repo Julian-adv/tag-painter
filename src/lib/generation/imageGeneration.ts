@@ -8,7 +8,9 @@ import type {
   ProgressData,
   ComfyUIWorkflow,
   ModelSettings,
-  GenerationMetadataPayload
+  GenerationMetadataPayload,
+  TagResolutionMap,
+  ZoneTagResolutions
 } from '$lib/types'
 import { RefineMode, FaceDetailerMode } from '$lib/types'
 import { findNodeByTitle } from './workflowMapping'
@@ -27,6 +29,15 @@ import { attachLoraChainBetweenNodes } from './qwenNunchakuLora'
 
 export { buildWorkflowForPrompts } from './workflowBuilder'
 
+/** Convert TagResolutionMap to flat Record<string, string> for previousRunResults */
+function flattenResolutionMap(map: TagResolutionMap): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const [key, value] of Object.entries(map)) {
+    result[key] = value.finalText
+  }
+  return result
+}
+
 export interface GenerationOptions {
   promptsData: PromptsData
   settings: Settings
@@ -35,13 +46,7 @@ export interface GenerationOptions {
   currentImagePath: string | null
   isInpainting: boolean
   inpaintDenoiseStrength?: number
-  previousRandomTagResolutions?: {
-    all: Record<string, string>
-    zone1: Record<string, string>
-    zone2: Record<string, string>
-    negative: Record<string, string>
-    inpainting: Record<string, string>
-  }
+  previousRandomTagResolutions?: ZoneTagResolutions
   onLoadingChange: (loading: boolean) => void
   onProgressUpdate: (progress: ProgressData) => void
   onImageReceived: (imageBlob: Blob, filePath: string) => void
@@ -95,13 +100,7 @@ export async function generateImage(
 ): Promise<{
   error?: string
   seed?: number
-  randomTagResolutions?: {
-    all: Record<string, string>
-    zone1: Record<string, string>
-    zone2: Record<string, string>
-    negative: Record<string, string>
-    inpainting: Record<string, string>
-  }
+  randomTagResolutions?: ZoneTagResolutions
   disabledZones?: Set<string>
 }> {
   const {
@@ -135,10 +134,19 @@ export async function generateImage(
 
     const model = getWildcardModel()
 
-    const previousAll = previousRandomTagResolutions?.all || {}
-    const previousZone1 = previousRandomTagResolutions?.zone1 || {}
-    const previousZone2 = previousRandomTagResolutions?.zone2 || {}
-    const previousNegative = previousRandomTagResolutions?.negative || {}
+    // Convert TagResolutionMap to flat strings for previousRunResults
+    const previousAll = previousRandomTagResolutions?.all
+      ? flattenResolutionMap(previousRandomTagResolutions.all)
+      : {}
+    const previousZone1 = previousRandomTagResolutions?.zone1
+      ? flattenResolutionMap(previousRandomTagResolutions.zone1)
+      : {}
+    const previousZone2 = previousRandomTagResolutions?.zone2
+      ? flattenResolutionMap(previousRandomTagResolutions.zone2)
+      : {}
+    const previousNegative = previousRandomTagResolutions?.negative
+      ? flattenResolutionMap(previousRandomTagResolutions.negative)
+      : {}
 
     await prefetchWildcardFilesFromTexts(model)
 

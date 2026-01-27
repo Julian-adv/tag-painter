@@ -3,6 +3,7 @@
  */
 
 import type { AnyNode, TreeModel } from '$lib/TreeEdit/model'
+import type { TagResolution, TagResolutionMap } from '$lib/types'
 import {
   CONSISTENT_RANDOM_MARKER,
   DEFAULT_ARRAY_WEIGHT,
@@ -24,9 +25,9 @@ type DisabledContext = { names: Set<string>; patterns: string[] }
 type TagExpansionCtx = {
   model: TreeModel
   visitedTags: Set<string>
-  existingRandomResolutions: Record<string, string>
+  existingRandomResolutions: TagResolutionMap
   previousRunResults: Record<string, string>
-  randomTagResolutions: Record<string, string>
+  randomTagResolutions: TagResolutionMap
   disables: DisabledContext
   overrideMap: Record<string, string>
 }
@@ -127,18 +128,25 @@ function processNodeExpansion(
 ): string {
   ctx.visitedTags.add(tag)
   const result = expandFn(ctx, tag)
+
+  // Capture intermediate text BEFORE placeholder expansion
+  const intermediateText = result.expandedTags.join(', ')
+
   // Pass ctx.randomTagResolutions by reference so nested placeholder
   // expansions contribute their resolutions to the shared map.
-  const finalized = expandPlaceholders(
-    ctx,
-    result.expandedTags.join(', '),
-    ctx.randomTagResolutions
-  )
+  // Also pass current tag as parent for child tracking
+  const finalized = expandPlaceholders(ctx, intermediateText, ctx.randomTagResolutions, tag)
+
   // Extract disables info without removing directives
   extractDisablesInfo(ctx, finalized)
 
-  // Store the placeholder-expanded resolution WITH disables directive
-  ctx.randomTagResolutions[tag] = finalized
+  // Store as TagResolution with intermediate text and children
+  ctx.randomTagResolutions[tag] = {
+    finalText: finalized,
+    intermediateText: intermediateText !== finalized ? intermediateText : undefined,
+    children: ctx.randomTagResolutions[tag]?.children
+  }
+
   // Create final text WITHOUT removing disables directive
   const resultText = tagWeight ? applyWeight(finalized, tagWeight) : finalized
   ctx.visitedTags.delete(tag)
@@ -540,7 +548,8 @@ function expandNodeOnce(ctx: TagExpansionCtx, node: AnyNode): string[] {
 function expandPlaceholders(
   ctx: TagExpansionCtx,
   input: string,
-  resolutionsAcc: Record<string, string>
+  resolutionsAcc: TagResolutionMap,
+  parentTag?: string
 ): string {
   // Match placeholders like __name__ using shared factory (non-greedy)
   const placeholderAny = createPlaceholderRegex()
@@ -561,9 +570,23 @@ function expandPlaceholders(
           ctx.previousRunResults,
           ctx.disables
         )
+        // Merge nested resolutions
         for (const [k, v] of Object.entries(nested.randomTagResolutions)) {
           resolutionsAcc[k] = v
         }
+
+        // Track parent-child relationship for nested chip display
+        if (parentTag) {
+          if (!resolutionsAcc[parentTag]) {
+            resolutionsAcc[parentTag] = { finalText: '' }
+          }
+          if (!resolutionsAcc[parentTag].children) {
+            resolutionsAcc[parentTag].children = {}
+          }
+          resolutionsAcc[parentTag].children[name] =
+            nested.randomTagResolutions[name] ?? { finalText: nested.expandedText }
+        }
+
         changed = true
         return nested.expandedText
       })
@@ -659,8 +682,8 @@ function expandArrayNode(
     }
   }
   if (!selected && isConsistent) {
-    if (ctx.existingRandomResolutions[tag]) selected = ctx.existingRandomResolutions[tag]
-    if (!selected && ctx.randomTagResolutions[tag]) selected = ctx.randomTagResolutions[tag]
+    if (ctx.existingRandomResolutions[tag]) selected = ctx.existingRandomResolutions[tag].finalText
+    if (!selected && ctx.randomTagResolutions[tag]) selected = ctx.randomTagResolutions[tag].finalText
   }
   if (!selected) {
     const idx = getWeightedRandomIndex(options)
@@ -885,10 +908,10 @@ export function expandCustomTags(
   text: string,
   model: TreeModel,
   visitedTags: Set<string> = new Set(),
-  existingRandomResolutions: Record<string, string> = {},
+  existingRandomResolutions: TagResolutionMap = {},
   previousRunResults: Record<string, string> = {},
   disabledContext: { names: Set<string>; patterns: string[] } | undefined = undefined
-): { expandedText: string; randomTagResolutions: Record<string, string> } {
+): { expandedText: string; randomTagResolutions: TagResolutionMap } {
   const ctx: TagExpansionCtx = {
     model,
     visitedTags,
@@ -902,7 +925,7 @@ export function expandCustomTags(
   // Extract disables from existingRandomResolutions to handle cross-zone disabling
   if (existingRandomResolutions) {
     Object.values(existingRandomResolutions).forEach((resolution) => {
-      extractDisablesInfo(ctx, resolution)
+      extractDisablesInfo(ctx, resolution.finalText)
     })
   }
 

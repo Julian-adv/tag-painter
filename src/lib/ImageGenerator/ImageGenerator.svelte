@@ -12,7 +12,7 @@
   import ModelControls from './ModelControls.svelte'
   import PostProcessingControls from './PostProcessingControls.svelte'
   import { m } from '$lib/paraglide/messages'
-  import type { Settings, ProgressData, PromptsData } from '$lib/types'
+  import type { Settings, ProgressData, PromptsData, ZoneTagResolutions } from '$lib/types'
   import { RefineMode, FaceDetailerMode } from '$lib/types'
   import {
     loadSettings,
@@ -65,13 +65,7 @@
   let lastSeed: number | null = $state(null)
   let localeVersion = $state(0)
   let isQwenModel = $state(false)
-  let currentRandomTagResolutions: {
-    all: Record<string, string>
-    zone1: Record<string, string>
-    zone2: Record<string, string>
-    negative: Record<string, string>
-    inpainting: Record<string, string>
-  } = $state({
+  let currentRandomTagResolutions: ZoneTagResolutions = $state({
     all: {},
     zone1: {},
     zone2: {},

@@ -2,7 +2,7 @@
 <script lang="ts">
   import { XMark, LockClosed } from 'svelte-heros-v2'
   import { getTagClasses, getTagRemoveButtonClasses } from './utils/tagStyling'
-  import type { CustomTag } from './types'
+  import type { CustomTag, TagResolutionMap } from './types'
   import { m } from '$lib/paraglide/messages'
 
   interface Props {
@@ -10,7 +10,7 @@
     index: number
     draggedIndex: number | null
     dropPosition: number | null
-    currentRandomTagResolutions?: Record<string, string>
+    currentRandomTagResolutions?: TagResolutionMap
     isTestSelected?: boolean
     isForceOverridden?: boolean
     disabled?: boolean
@@ -119,10 +119,10 @@
     const weight = tag.weight ?? 1.0
 
     if (currentRandomTagResolutions[tag.name]) {
-      // For expanded tags, use the resolution directly (no parsing needed)
+      // For expanded tags, use the resolution's finalText (no parsing needed)
       return {
         name: tag.name,
-        content: currentRandomTagResolutions[tag.name],
+        content: currentRandomTagResolutions[tag.name].finalText,
         weight: weight !== 1.0 ? weight.toString() : ''
       }
     }
