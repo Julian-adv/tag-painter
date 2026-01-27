@@ -1,6 +1,6 @@
 ## Agent Contribution Rules
 
-1. Obtain explicit approval before committing any changes.
+1. Commit only when you're told to.
 2. Write commit messages in English.
 3. Write all source code comments in English.
 4. When removing code, do not leave comments noting that it was deleted.
