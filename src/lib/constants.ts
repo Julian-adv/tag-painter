@@ -15,6 +15,8 @@ export const DEFAULT_SETTINGS = {
   scheduler: 'simple',
   clipSkip: 2,
   geminiApiKey: '',
+  openRouterApiKey: '',
+  promptAnalyzerApiProvider: 'gemini',
   chatPromptLanguage: 'english'
 } as const
 

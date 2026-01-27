@@ -196,6 +196,14 @@ export async function loadSettings(): Promise<Settings | null> {
         settings.geminiApiKey = ''
       }
 
+      if (typeof settings.openRouterApiKey !== 'string') {
+        settings.openRouterApiKey = ''
+      }
+
+      if (settings.promptAnalyzerApiProvider !== 'gemini' && settings.promptAnalyzerApiProvider !== 'openrouter') {
+        settings.promptAnalyzerApiProvider = 'gemini'
+      }
+
       if (settings.chatPromptLanguage !== 'english' && settings.chatPromptLanguage !== 'chinese') {
         settings.chatPromptLanguage = 'english'
       }

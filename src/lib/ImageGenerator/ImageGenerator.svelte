@@ -204,6 +204,8 @@
     comfyUrl: DEFAULT_COMFY_URL,
     outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
     geminiApiKey: DEFAULT_SETTINGS.geminiApiKey,
+    openRouterApiKey: DEFAULT_SETTINGS.openRouterApiKey,
+    promptAnalyzerApiProvider: DEFAULT_SETTINGS.promptAnalyzerApiProvider,
     chatPromptLanguage: DEFAULT_SETTINGS.chatPromptLanguage,
     selectedVae: '__embedded__',
     clipSkip: DEFAULT_SETTINGS.clipSkip,
@@ -216,6 +218,8 @@
       ...input,
       comfyUrl: input.comfyUrl || DEFAULT_COMFY_URL,
       geminiApiKey: input.geminiApiKey || '',
+      openRouterApiKey: input.openRouterApiKey || '',
+      promptAnalyzerApiProvider: input.promptAnalyzerApiProvider || 'gemini',
       chatPromptLanguage:
         input.chatPromptLanguage === 'chinese' ? 'chinese' : DEFAULT_SETTINGS.chatPromptLanguage,
       selectedVae: input.selectedVae || '__embedded__',
@@ -802,6 +806,8 @@
             <div class="flex-1 overflow-auto">
               <PromptAnalyzer
                 apiKey={settings.geminiApiKey}
+                openRouterApiKey={settings.openRouterApiKey}
+                apiProvider={settings.promptAnalyzerApiProvider}
                 wildcardsFile={getEffectiveModelSettings(settings, $promptsData.selectedCheckpoint)?.wildcardsFile}
                 onShowToast={(message, type) => {
                   if (type === 'success') {

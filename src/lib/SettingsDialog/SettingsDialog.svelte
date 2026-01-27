@@ -37,6 +37,8 @@
     comfyUrl: settings.comfyUrl,
     outputDirectory: settings.outputDirectory,
     geminiApiKey: settings.geminiApiKey || '',
+    openRouterApiKey: settings.openRouterApiKey || '',
+    promptAnalyzerApiProvider: settings.promptAnalyzerApiProvider || 'gemini',
     chatPromptLanguage: settings.chatPromptLanguage || 'english',
     selectedVae: settings.selectedVae,
     clipSkip: settings.clipSkip,
@@ -58,6 +60,8 @@
     comfyUrl: '',
     outputDirectory: '',
     geminiApiKey: '',
+    openRouterApiKey: '',
+    promptAnalyzerApiProvider: 'gemini',
     chatPromptLanguage: 'english',
     selectedVae: '',
     clipSkip: 0,
@@ -100,6 +104,12 @@
       }
       if (!cloned.geminiApiKey) {
         cloned.geminiApiKey = ''
+      }
+      if (!cloned.openRouterApiKey) {
+        cloned.openRouterApiKey = ''
+      }
+      if (cloned.promptAnalyzerApiProvider !== 'gemini' && cloned.promptAnalyzerApiProvider !== 'openrouter') {
+        cloned.promptAnalyzerApiProvider = 'gemini'
       }
       if (cloned.chatPromptLanguage !== 'english' && cloned.chatPromptLanguage !== 'chinese') {
         cloned.chatPromptLanguage = 'english'
@@ -423,6 +433,19 @@
           class="output-dir-input"
         />
 
+        <label for="prompt-analyzer-api" class="output-dir-label">
+          {m['settingsDialog.promptAnalyzerApi']()}
+        </label>
+        <CustomSelect
+          id="prompt-analyzer-api"
+          class="output-dir-input"
+          bind:value={localSettings.promptAnalyzerApiProvider}
+          options={[
+            { value: 'gemini', label: 'Gemini' },
+            { value: 'openrouter', label: 'OpenRouter' }
+          ]}
+        />
+
         <label for="gemini-api-key" class="output-dir-label">
           {m['settingsDialog.geminiApiKey']()}
         </label>
@@ -431,6 +454,18 @@
           type="password"
           bind:value={localSettings.geminiApiKey}
           placeholder={m['settingsDialog.geminiApiKeyPlaceholder']()}
+          class="output-dir-input"
+          autocomplete="off"
+        />
+
+        <label for="openrouter-api-key" class="output-dir-label">
+          {m['settingsDialog.openRouterApiKey']()}
+        </label>
+        <input
+          id="openrouter-api-key"
+          type="password"
+          bind:value={localSettings.openRouterApiKey}
+          placeholder={m['settingsDialog.openRouterApiKeyPlaceholder']()}
           class="output-dir-input"
           autocomplete="off"
         />

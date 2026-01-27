@@ -286,6 +286,8 @@ describe('fileIO utilities', () => {
         comfyUrl: 'http://127.0.0.1:8188',
         outputDirectory: '/test/output',
         geminiApiKey: '',
+        openRouterApiKey: '',
+        promptAnalyzerApiProvider: 'gemini',
         chatPromptLanguage: 'english',
         selectedVae: '__embedded__',
         clipSkip: 2,
@@ -301,7 +303,11 @@ describe('fileIO utilities', () => {
       const result = await loadSettings()
 
       expect(mockFetch).toHaveBeenCalledWith('/api/settings')
-      expect(result).toEqual(mockSettings)
+      expect(result).toEqual({
+        ...mockSettings,
+        openRouterApiKey: '',
+        promptAnalyzerApiProvider: 'gemini'
+      })
     })
 
     it('should return null when response is not ok', async () => {

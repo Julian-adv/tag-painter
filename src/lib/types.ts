@@ -109,6 +109,8 @@ export interface Settings {
   comfyUrl: string
   outputDirectory: string
   geminiApiKey: string
+  openRouterApiKey: string
+  promptAnalyzerApiProvider: 'gemini' | 'openrouter'
   chatPromptLanguage: 'english' | 'chinese'
   // VAE selection: '__embedded__' means use checkpoint's embedded VAE
   selectedVae: string
@@ -198,6 +200,7 @@ export interface Toast {
 
 // Prompt analysis result from Gemini
 export interface PromptAnalysis {
+  subject: string
   pose: string
   expression: string
   composition: string

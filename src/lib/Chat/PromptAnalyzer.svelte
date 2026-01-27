@@ -16,6 +16,8 @@
 
   interface Props {
     apiKey: string
+    openRouterApiKey: string
+    apiProvider: 'gemini' | 'openrouter'
     wildcardsFile?: string
     onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void
   }
@@ -34,7 +36,7 @@
     options: SubNodeOption[]
   }
 
-  let { apiKey = '', wildcardsFile, onShowToast }: Props = $props()
+  let { apiKey = '', openRouterApiKey = '', apiProvider = 'gemini', wildcardsFile, onShowToast }: Props = $props()
 
   let inputPrompt = $state('')
   let isLoading = $state(false)
@@ -42,10 +44,15 @@
   let pendingAdd: PendingAdd | null = $state(null)
 
   const GEMINI_MODEL_ID = 'gemini-2.5-flash'
+  const OPENROUTER_MODEL_ID = 'z-ai/glm-4.7-flash'
 
   const ANALYSIS_SCHEMA = {
     type: 'OBJECT',
     properties: {
+      subject: {
+        type: 'STRING',
+        description: 'The main subject or character (e.g., 1girl, 2girls, 1boy, couple).'
+      },
       pose: {
         type: 'STRING',
         description: 'The specific physical pose or action of the subject (excluding facial expression).'
@@ -96,6 +103,7 @@
       }
     },
     required: [
+      'subject',
       'pose',
       'expression',
       'composition',
@@ -112,6 +120,7 @@
   }
 
   const FIELD_LABELS: Record<keyof PromptAnalysis, string> = {
+    subject: 'Subject',
     pose: 'Pose',
     expression: 'Expression',
     composition: 'Composition',
@@ -128,6 +137,7 @@
 
   // Mapping from analysis fields to YAML node names (can be single name or array of names)
   const FIELD_TO_YAML_NODE: Record<keyof PromptAnalysis, string | string[]> = {
+    subject: 'subject',
     pose: ['pose', 'pose2', 'pose3', 'pose4', 'pose5'],
     expression: 'expression',
     composition: 'composition',
@@ -143,6 +153,7 @@
   }
 
   const FIELD_ORDER: (keyof PromptAnalysis)[] = [
+    'subject',
     'pose',
     'expression',
     'composition',
@@ -417,13 +428,146 @@
     pendingAdd = null
   }
 
+  const ANALYSIS_PROMPT = `Analyze the following image generation prompt and extract the visual elements.
+If the prompt is in Chinese, translate it to English first before extracting.
+Separate 'hairStyle' (length/texture) and 'hairColor'.
+Separate physical 'pose' from 'expression'.
+If an element is not mentioned, provide "N/A" or "Not specified".`
+
+  const SYSTEM_PROMPT = 'You are a professional prompt engineer. Deconstruct complex prompts into core visual components. Always split hair into separate style and color fields.'
+
+  async function analyzeWithGemini(prompt: string, key: string): Promise<PromptAnalysis> {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_ID}:generateContent?key=${encodeURIComponent(key)}`
+
+    const body = {
+      contents: [
+        {
+          parts: [
+            {
+              text: `${ANALYSIS_PROMPT}
+
+Prompt: "${prompt}"`
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: ANALYSIS_SCHEMA
+      },
+      systemInstruction: {
+        parts: [{ text: SYSTEM_PROMPT }]
+      }
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      throw new Error('Failed to parse Gemini response.')
+    }
+
+    const data = payload as Record<string, unknown>
+
+    if (!response.ok) {
+      const errorData = data?.error as Record<string, unknown> | undefined
+      const message =
+        errorData && typeof errorData.message === 'string'
+          ? errorData.message
+          : 'Gemini request failed.'
+      throw new Error(message)
+    }
+
+    const candidates = Array.isArray(data?.candidates) ? data.candidates : []
+    const firstCandidate = candidates.length > 0 ? (candidates[0] as Record<string, unknown>) : undefined
+    const content = firstCandidate?.content as Record<string, unknown> | undefined
+    const parts = Array.isArray(content?.parts) ? content.parts : []
+
+    if (parts.length > 0) {
+      const part = parts[0] as Record<string, unknown>
+      const text = typeof part?.text === 'string' ? part.text.trim() : ''
+      if (text) {
+        return JSON.parse(text) as PromptAnalysis
+      }
+    }
+
+    throw new Error('Failed to get analysis from Gemini.')
+  }
+
+  async function analyzeWithOpenRouter(prompt: string, key: string): Promise<PromptAnalysis> {
+    const schemaFields = Object.entries(ANALYSIS_SCHEMA.properties)
+      .map(([name, prop]) => `- ${name}: ${(prop as { description: string }).description}`)
+      .join('\n')
+
+    const systemPromptWithSchema = `${SYSTEM_PROMPT}
+
+You must respond with a valid JSON object containing these fields:
+${schemaFields}
+
+Respond ONLY with the JSON object, no other text.`
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: OPENROUTER_MODEL_ID,
+        messages: [
+          { role: 'system', content: systemPromptWithSchema },
+          { role: 'user', content: `${ANALYSIS_PROMPT}\n\nPrompt: "${prompt}"` }
+        ],
+        response_format: { type: 'json_object' }
+      })
+    })
+
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      throw new Error('Failed to parse OpenRouter response.')
+    }
+
+    const data = payload as Record<string, unknown>
+
+    if (!response.ok) {
+      const errorData = data?.error as Record<string, unknown> | undefined
+      const message =
+        errorData && typeof errorData.message === 'string'
+          ? errorData.message
+          : 'OpenRouter request failed.'
+      throw new Error(message)
+    }
+
+    const choices = Array.isArray(data?.choices) ? data.choices : []
+    const firstChoice = choices.length > 0 ? (choices[0] as Record<string, unknown>) : undefined
+    const message = firstChoice?.message as Record<string, unknown> | undefined
+    const content = typeof message?.content === 'string' ? message.content.trim() : ''
+
+    if (content) {
+      return JSON.parse(content) as PromptAnalysis
+    }
+
+    throw new Error('Failed to get analysis from OpenRouter.')
+  }
+
   async function analyzePrompt() {
     const trimmed = inputPrompt.trim()
     if (!trimmed) return
 
-    const trimmedKey = apiKey.trim()
-    if (!trimmedKey) {
-      onShowToast('Add your Gemini API key in Settings to enable analysis.', 'error')
+    const isOpenRouter = apiProvider === 'openrouter'
+    const activeKey = isOpenRouter ? openRouterApiKey.trim() : apiKey.trim()
+
+    if (!activeKey) {
+      const providerName = isOpenRouter ? 'OpenRouter' : 'Gemini'
+      onShowToast(`Add your ${providerName} API key in Settings to enable analysis.`, 'error')
       return
     }
 
@@ -431,75 +575,10 @@
     analysis = null
 
     try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_ID}:generateContent?key=${encodeURIComponent(trimmedKey)}`
-
-      const body = {
-        contents: [
-          {
-            parts: [
-              {
-                text: `Analyze the following image generation prompt and extract the visual elements.
-Separate 'hairStyle' (length/texture) and 'hairColor'.
-Separate physical 'pose' from 'expression'.
-If an element is not mentioned, provide "N/A" or "Not specified".
-
-Prompt: "${trimmed}"`
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: ANALYSIS_SCHEMA
-        },
-        systemInstruction: {
-          parts: [
-            {
-              text: 'You are a professional prompt engineer. Deconstruct complex prompts into core visual components. Always split hair into separate style and color fields.'
-            }
-          ]
-        }
-      }
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      })
-
-      let payload: unknown
-      try {
-        payload = await response.json()
-      } catch {
-        throw new Error('Failed to parse Gemini response.')
-      }
-
-      const data = payload as Record<string, unknown>
-
-      if (!response.ok) {
-        const errorData = data?.error as Record<string, unknown> | undefined
-        const message =
-          errorData && typeof errorData.message === 'string'
-            ? errorData.message
-            : 'Gemini request failed.'
-        throw new Error(message)
-      }
-
-      const candidates = Array.isArray(data?.candidates) ? data.candidates : []
-      const firstCandidate = candidates.length > 0 ? (candidates[0] as Record<string, unknown>) : undefined
-      const content = firstCandidate?.content as Record<string, unknown> | undefined
-      const parts = Array.isArray(content?.parts) ? content.parts : []
-
-      if (parts.length > 0) {
-        const part = parts[0] as Record<string, unknown>
-        const text = typeof part?.text === 'string' ? part.text.trim() : ''
-        if (text) {
-          analysis = JSON.parse(text) as PromptAnalysis
-        }
-      }
-
-      if (!analysis) {
-        throw new Error('Failed to get analysis from Gemini.')
+      if (isOpenRouter) {
+        analysis = await analyzeWithOpenRouter(trimmed, activeKey)
+      } else {
+        analysis = await analyzeWithGemini(trimmed, activeKey)
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Analysis failed.'
