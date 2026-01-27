@@ -128,7 +128,7 @@
 
   // Mapping from analysis fields to YAML node names (can be single name or array of names)
   const FIELD_TO_YAML_NODE: Record<keyof PromptAnalysis, string | string[]> = {
-    pose: ['pose', 'pose2', 'pose3'],
+    pose: ['pose', 'pose2', 'pose3', 'pose4', 'pose5'],
     expression: 'expression',
     composition: 'composition',
     background: 'background',
