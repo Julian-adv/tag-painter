@@ -260,7 +260,7 @@
       value={editingValue}
       disabled={false}
       currentRandomTagResolutions={EMPTY_RESOLUTIONS}
-      onTagDoubleClick={onChipDoubleClick}
+      onTagDoubleClick={(name, _targetText) => onChipDoubleClick?.(name)}
       specialSuggestions={enableAutocomplete ? specialSuggestions : []}
       specialTrigger={enableAutocomplete ? specialTrigger : '__'}
       showLabel={false}

@@ -13,7 +13,7 @@
     value: string
     disabled?: boolean
     currentRandomTagResolutions?: TagResolutionMap
-    onTagDoubleClick?: (tagName: string) => void
+    onTagDoubleClick: (tagName: string, targetText: string) => void
     specialSuggestions?: string[]
     specialTrigger?: string
     showLabel?: boolean
@@ -26,7 +26,7 @@
     value = '',
     disabled = false,
     currentRandomTagResolutions,
-    onTagDoubleClick,
+    onTagDoubleClick = () => {},
     specialSuggestions = [],
     specialTrigger = '__',
     showLabel = true,
@@ -114,6 +114,7 @@
     const span = document.createElement('span')
     span.className = 'nested-chip'
     span.dataset.value = name
+    span.dataset.finalText = resolution.finalText
 
     // Chip name
     const chipName = document.createElement('span')
@@ -580,13 +581,23 @@
   // === Double-click tag callback ===
   function onDblClick(e: MouseEvent) {
     const target = e.target as HTMLElement
+
+    // Check for nested chip first (more specific)
+    const nestedChip = target.closest('.nested-chip') as HTMLElement | null
+    if (nestedChip) {
+      e.stopPropagation()
+      onTagDoubleClick(nestedChip.dataset.value ?? '', nestedChip.dataset.finalText ?? '')
+      return
+    }
+
+    // Then check for main tag
     const tag = target.closest('.tag') as HTMLElement | null
     if (!tag) return
     const type = tag.dataset.type
     if (type === 'entity') {
-      onTagDoubleClick?.(tag.dataset.value ?? '')
+      onTagDoubleClick(tag.dataset.value ?? '', '')
     } else if (type === 'choice') {
-      onTagDoubleClick?.(tag.dataset.values ?? '')
+      onTagDoubleClick(tag.dataset.values ?? '', '')
     }
   }
 
@@ -837,27 +848,30 @@
   /* Nested chip styles for hierarchical tag display */
   :global(.nested-chip) {
     display: inline-flex;
-    align-items: center;
-    font-size: 0.7rem;
-    padding: 0 0.2rem;
-    margin: 0 1px;
+    align-items: stretch;
+    padding: 0 0;
+    margin: 1px 1px;
     border-radius: 0.25rem;
-    border: 1px solid currentColor;
+    border: 1px dashed currentColor;
     opacity: 0.9;
-    background-color: rgba(255, 255, 255, 0.4);
+    background-color: #f8efff;
     vertical-align: baseline;
   }
 
   :global(.nested-chip-name) {
     font-weight: 500;
-    padding-right: 0.15rem;
-    border-right: 1px solid currentColor;
-    margin-right: 0.15rem;
+    padding: 0 0.2rem;
+    background-color: #e9d5ff;
+    border-right: 1px dashed currentColor;
+    border-radius: 0.25rem 0 0 0.25rem;
     font-style: normal;
+    display: flex;
+    align-items: center;
   }
 
   :global(.nested-chip-resolution) {
     display: inline-flex;
+    padding: 0 0.2rem;
     flex-wrap: wrap;
     align-items: center;
     gap: 1px;

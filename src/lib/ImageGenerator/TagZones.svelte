@@ -163,18 +163,24 @@
 
   async function handleCustomTagDoubleClickForZone(
     zoneId: 'all' | 'zone1' | 'zone2' | 'negative' | 'inpainting',
-    tagName: string
+    tagName: string,
+    targetText?: string
   ) {
     preselectTagName = tagName
     preselectTargetText = ''
 
-    const tagType = wildcardTagType(tagName)
+    // Use provided targetText if available (e.g., from nested chip)
+    if (targetText) {
+      preselectTargetText = targetText
+    } else {
+      const tagType = wildcardTagType(tagName)
 
-    if (tagType === 'random' || tagType === 'consistent-random' || tagType === 'sequential') {
-      const zoneMap = currentRandomTagResolutions[zoneId] || {}
-      const resolved = zoneMap[tagName]
-      if (resolved) {
-        preselectTargetText = resolved.finalText
+      if (tagType === 'random' || tagType === 'consistent-random' || tagType === 'sequential') {
+        const zoneMap = currentRandomTagResolutions[zoneId] || {}
+        const resolved = zoneMap[tagName]
+        if (resolved) {
+          preselectTargetText = resolved.finalText
+        }
       }
     }
 
@@ -261,7 +267,7 @@
       id="all-tags"
       label={m['tagZones.allLabel']()}
       value={allTags}
-      onTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('all', name)}
+      onTagDoubleClick={(name, targetText) => handleCustomTagDoubleClickForZone('all', name, targetText)}
       currentRandomTagResolutions={currentRandomTagResolutions.all}
     />
 
@@ -270,7 +276,7 @@
       id="first-zone-tags"
       label={m['tagZones.firstLabel']()}
       value={firstZoneTags}
-      onTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone1', name)}
+      onTagDoubleClick={(name, targetText) => handleCustomTagDoubleClickForZone('zone1', name, targetText)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone1}
       disabled={effectiveDisabledZones.has('zone1')}
     />
@@ -280,7 +286,7 @@
       id="second-zone-tags"
       label={m['tagZones.secondLabel']()}
       value={secondZoneTags}
-      onTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('zone2', name)}
+      onTagDoubleClick={(name, targetText) => handleCustomTagDoubleClickForZone('zone2', name, targetText)}
       currentRandomTagResolutions={currentRandomTagResolutions.zone2}
       disabled={$promptsData.selectedComposition === 'all' || effectiveDisabledZones.has('zone2')}
     />
@@ -290,7 +296,7 @@
       id="negative-tags"
       label={m['tagZones.negativeLabel']()}
       value={negativeTags}
-      onTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('negative', name)}
+      onTagDoubleClick={(name, targetText) => handleCustomTagDoubleClickForZone('negative', name, targetText)}
       currentRandomTagResolutions={currentRandomTagResolutions.negative}
     />
 
@@ -299,7 +305,7 @@
       id="inpainting-tags"
       label={m['tagZones.inpaintingLabel']()}
       value={inpaintingTags}
-      onTagDoubleClick={(name) => handleCustomTagDoubleClickForZone('inpainting', name)}
+      onTagDoubleClick={(name, targetText) => handleCustomTagDoubleClickForZone('inpainting', name, targetText)}
       currentRandomTagResolutions={currentRandomTagResolutions.inpainting}
     />
   </div>
