@@ -82,28 +82,14 @@ function getNodePath(model: TreeModel, id: string): string {
   return parts.join('/')
 }
 
-// Check if a tag/container has any descendant array with an explicit override/pin
-function hasPinnedDescendant(ctx: TagExpansionCtx, tagOrPath: string): boolean {
-  const node = findNodeByName(ctx.model, tagOrPath)
-  if (!node) return false
-  // Only containers can have descendants
-  if (!(node.kind === 'array' || node.kind === 'object')) return false
-  const seen = new Set<string>()
-  const stack: string[] = [...(node.children || [])]
-  while (stack.length) {
-    const cid = stack.pop() as string
-    if (seen.has(cid)) continue
-    seen.add(cid)
-    const child = ctx.model.nodes[cid]
-    if (!child) continue
-    if (child.kind === 'array') {
-      const p = getNodePath(ctx.model, child.id)
-      if (ctx.overrideMap[p]) return true
-    } else if (child.kind === 'object') {
-      stack.push(...(child.children || []))
-    }
-  }
-  return false
+// Check if a tag/container itself is pinned, or has any descendant array with an explicit override/pin.
+// Delegates to checkPlaceholderLeadsToPinned with context's overrideMap.
+function hasPinnedDescendant(
+  ctx: TagExpansionCtx,
+  tagOrPath: string,
+  visited: Set<string> = new Set()
+): boolean {
+  return checkPlaceholderLeadsToPinned(ctx.model, tagOrPath, ctx.overrideMap, visited)
 }
 
 // Check if a tag is disabled by name or path
@@ -159,8 +145,21 @@ function buildOverrideMap(
   model: TreeModel,
   previousRunResults: Record<string, string>
 ): Record<string, string> {
+  const map = buildOverrideMapFromStore(model)
+  // 2) Previous run results (do not override explicit pins)
+  for (const [k, v] of Object.entries(previousRunResults || {})) {
+    if (map[k]) continue
+    if (v && String(v).trim()) map[k] = replaceWildcardsFromCache(String(v))
+  }
+  return map
+}
+
+/**
+ * Build override map from testModeStore only (without previous run results)
+ * Exported for use by wildcardZones.ts
+ */
+export function buildOverrideMapFromStore(model: TreeModel): Record<string, string> {
   const map: Record<string, string> = {}
-  // 1) Path-scoped pins/overrides from test mode
   for (const key of Object.keys(testModeStore)) {
     const s = testModeStore[key]
     if (!s || !s.enabled) {
@@ -177,12 +176,169 @@ function buildOverrideMap(
       map[key] = v
     }
   }
-  // 2) Previous run results (do not override explicit pins)
-  for (const [k, v] of Object.entries(previousRunResults || {})) {
-    if (map[k]) continue
-    if (v && String(v).trim()) map[k] = replaceWildcardsFromCache(String(v))
-  }
   return map
+}
+
+/**
+ * Check if a placeholder name leads to a pinned node (directly or through nested placeholders)
+ * Exported for use by wildcardZones.ts
+ */
+export function checkPlaceholderLeadsToPinned(
+  model: TreeModel,
+  placeholderName: string,
+  overrideMap: Record<string, string>,
+  visited: Set<string> = new Set()
+): boolean {
+  if (visited.has(placeholderName)) return false
+  visited.add(placeholderName)
+
+  const node = findNodeByName(model, placeholderName)
+  if (!node) return false
+
+  // Check if the node itself is a pinned array
+  if (node.kind === 'array') {
+    const path = getNodePath(model, node.id)
+    if (overrideMap[path]) return true
+  }
+
+  // Check children for nested placeholders
+  if (node.kind === 'array' || node.kind === 'object') {
+    const placeholderRegex = createPlaceholderRegex()
+    for (const childId of node.children || []) {
+      const child = model.nodes[childId]
+      if (!child) continue
+
+      if (child.kind === 'array') {
+        const childPath = getNodePath(model, child.id)
+        if (overrideMap[childPath]) return true
+      } else if (child.kind === 'leaf') {
+        const value = String(child.value || '')
+        placeholderRegex.lastIndex = 0
+        let match
+        while ((match = placeholderRegex.exec(value)) !== null) {
+          if (checkPlaceholderLeadsToPinned(model, match[1], overrideMap, visited)) {
+            return true
+          }
+        }
+      }
+    }
+  }
+
+  return false
+}
+
+export type ArraySelectionResult = {
+  index: number
+  content: string
+}
+
+/**
+ * Select a child from an array node, respecting pins, weights, and placeholder-to-pinned detection.
+ * Returns both the selected index and the content string.
+ * Exported for use by wildcardZones.ts
+ */
+export function selectFromArrayNode(
+  model: TreeModel,
+  arrayNodeId: string,
+  overrideMap?: Record<string, string>
+): ArraySelectionResult | null {
+  const node = model.nodes[arrayNodeId]
+  if (!node || node.kind !== 'array') return null
+
+  const children = node.children
+  if (!children || children.length === 0) return null
+
+  // Build override map if not provided
+  const effectiveOverrideMap = overrideMap ?? buildOverrideMapFromStore(model)
+
+  // Check for CONSISTENT_RANDOM_MARKER
+  let startIndex = 0
+  if (children.length > 0) {
+    const first = model.nodes[children[0]]
+    if (first && first.kind === 'leaf') {
+      const v = String(first.value)
+      if (v === CONSISTENT_RANDOM_MARKER || v === '__CONSISTENT_RANDOM_MARKER__') {
+        startIndex = 1
+      }
+    }
+  }
+
+  const arrayPath = getNodePath(model, arrayNodeId)
+  const options: { index: number; weight: number; content: string }[] = []
+  let pinnedMatchIndex: number | null = null
+  let overrideMatchIndex: number | null = null
+  const pinnedLeadingIndices: number[] = []
+
+  const placeholderRegex = createPlaceholderRegex()
+
+  for (let i = startIndex; i < children.length; i++) {
+    const childId = children[i]
+    const childNode = model.nodes[childId]
+    if (!childNode || childNode.kind !== 'leaf') continue
+
+    const value = childNode.value
+    const asString =
+      typeof value === 'string'
+        ? value
+        : value !== null && value !== undefined
+          ? String(value)
+          : ''
+    const weight = parseWeightDirective(asString)
+
+    options.push({ index: i, weight, content: asString })
+
+    // Check if this option contains placeholders that lead to pinned nodes
+    placeholderRegex.lastIndex = 0
+    let match
+    while ((match = placeholderRegex.exec(asString)) !== null) {
+      if (checkPlaceholderLeadsToPinned(model, match[1], effectiveOverrideMap)) {
+        pinnedLeadingIndices.push(i)
+        break
+      }
+    }
+
+    // Check for direct pin match
+    const pinnedValue = effectiveOverrideMap[arrayPath]
+    if (pinnedValue) {
+      const childPath = getNodePath(model, childId)
+      // Check if pinnedLeafPath matches
+      const store = testModeStore[arrayPath]
+      if (store?.enabled && store.pinnedLeafPath === childPath) {
+        pinnedMatchIndex = i
+      }
+      // Check if overrideTag matches
+      if (asString.trim() === pinnedValue.trim()) {
+        overrideMatchIndex = i
+      }
+    }
+  }
+
+  if (options.length === 0) return null
+
+  // Priority 1: Direct pin on this array
+  if (pinnedMatchIndex !== null) {
+    const opt = options.find((o) => o.index === pinnedMatchIndex)!
+    return { index: pinnedMatchIndex, content: opt.content }
+  }
+  if (overrideMatchIndex !== null) {
+    const opt = options.find((o) => o.index === overrideMatchIndex)!
+    return { index: overrideMatchIndex, content: opt.content }
+  }
+
+  // Priority 2: Options that lead to pinned descendants via placeholders
+  if (pinnedLeadingIndices.length > 0) {
+    const pinnedOptions = options.filter((opt) => pinnedLeadingIndices.includes(opt.index))
+    if (pinnedOptions.length > 0) {
+      const selected = getWeightedRandomIndex(pinnedOptions)
+      const chosen = pinnedOptions[selected]
+      return { index: chosen.index, content: chosen.content }
+    }
+  }
+
+  // Priority 3: Weighted random selection
+  const selected = getWeightedRandomIndex(options)
+  const chosen = options[selected]
+  return chosen ? { index: chosen.index, content: chosen.content } : null
 }
 
 function extractDisablesInfo(ctx: TagExpansionCtx, value: string): void {
@@ -611,11 +767,7 @@ function expandArrayNode(
   if (ctx.overrideMap[tag]) {
     selected = ctx.overrideMap[tag]
   }
-  if (!selected && ctx.previousRunResults[tag]) {
-    const previousResult = resolveLeafContent(ctx, ctx.previousRunResults[tag])
-    const previousTags = previousResult.split(', ')
-    return { expandedTags: previousTags, resolution: previousResult }
-  }
+
   const arrNode = findNodeByName(ctx.model, tag)
   if (!arrNode || arrNode.kind !== 'array') return { expandedTags: [tag], resolution: tag }
   const children = arrNode.children
@@ -648,28 +800,33 @@ function expandArrayNode(
   }
   if (options.length === 0) return { expandedTags: [], resolution: '' }
 
-  // If no direct override selected, prefer options that lead to a pinned descendant
-  if (!selected) {
-    const placeholderAny = createPlaceholderRegex()
-
-    function optionLeadsToPinned(content: string): boolean {
-      // Check placeholders within the content
-      if (placeholderAny.test(content)) {
-        placeholderAny.lastIndex = 0
-        let leads = false
-        content.replace(placeholderAny, (full, name: string) => {
-          if (leads) return full
-          if (hasPinnedDescendant(ctx, name)) {
-            leads = true
-          }
-          return full
-        })
-        if (leads) return true
-      }
-      // If content itself is a tag/container name, check it as well
+  // Helper to check if an option leads to a pinned descendant
+  const placeholderAny = createPlaceholderRegex()
+  function optionLeadsToPinned(content: string): boolean {
+    // Check placeholders within the content (e.g., "__whole__")
+    if (placeholderAny.test(content)) {
+      placeholderAny.lastIndex = 0
+      let leads = false
+      content.replace(placeholderAny, (full, name: string) => {
+        if (leads) return full
+        if (hasPinnedDescendant(ctx, name)) {
+          leads = true
+        }
+        return full
+      })
+      if (leads) return true
+    }
+    // Only check content as node name if it looks like a valid node reference (not plain text)
+    // Skip this check for plain text content that contains spaces or commas
+    if (!content.includes(' ') && !content.includes(',') && findNodeByName(ctx.model, content)) {
       return hasPinnedDescendant(ctx, content)
     }
+    return false
+  }
 
+  // If no direct override selected, prefer options that lead to a pinned descendant
+  // This takes priority over previousRunResults to ensure pins are respected
+  if (!selected) {
     const pinnedLeading = options
       .map((opt, idx) => ({ ...opt, idx }))
       .filter((opt) => optionLeadsToPinned(opt.content))
@@ -680,6 +837,13 @@ function expandArrayNode(
       selected = pinnedLeading[idx].content
       return { expandedTags: [selected], resolution: selected }
     }
+  }
+
+  // Use previous run results only if no pinned descendant options exist
+  if (!selected && ctx.previousRunResults[tag]) {
+    const previousResult = resolveLeafContent(ctx, ctx.previousRunResults[tag])
+    const previousTags = previousResult.split(', ')
+    return { expandedTags: previousTags, resolution: previousResult }
   }
   if (!selected && isConsistent) {
     if (ctx.existingRandomResolutions[tag]) selected = ctx.existingRandomResolutions[tag].finalText

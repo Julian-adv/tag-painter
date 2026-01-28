@@ -76,4 +76,56 @@ pose:
     // With mocked crypto=0 and equal weights, the first pinned-leading option is selected
     expect(expandedText).toContain('g2')
   })
+
+  it('prefers option with placeholder referencing a directly pinned array', () => {
+    // This tests the case where:
+    // - all has children: "leaf a" and "leaf b __whole__"
+    // - whole is a separate array with children: "leaf c", "leaf d"
+    // - user pins whole to "leaf c"
+    // - expanding all should select "leaf b __whole__" (which leads to pinned whole)
+    const yaml = `
+all:
+  - leaf a
+  - leaf b __whole__
+whole:
+  - leaf c
+  - leaf d
+`
+    const model = fromYAML(yaml)
+    // Pin the whole array directly
+    testModeStore['whole'] = {
+      enabled: true,
+      overrideTag: 'leaf c',
+      pinnedLeafPath: undefined
+    }
+
+    const { expandedText } = expandCustomTags('all', model)
+    // Should select "leaf b __whole__" and expand __whole__ to "leaf c"
+    expect(expandedText).toBe('leaf b leaf c')
+  })
+
+  it('handles nested placeholders with pinned array at any depth', () => {
+    const yaml = `
+root:
+  - option a
+  - option b __middle__
+middle:
+  - mid a
+  - mid b __inner__
+inner:
+  - inner1
+  - inner2
+`
+    const model = fromYAML(yaml)
+    // Pin the inner array
+    testModeStore['inner'] = {
+      enabled: true,
+      overrideTag: 'inner2',
+      pinnedLeafPath: undefined
+    }
+
+    const { expandedText } = expandCustomTags('root', model)
+    // Should follow: root -> "option b __middle__" -> "mid b __inner__" -> "inner2"
+    expect(expandedText).toContain('inner2')
+  })
 })

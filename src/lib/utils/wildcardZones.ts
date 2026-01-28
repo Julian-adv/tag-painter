@@ -2,12 +2,8 @@
 import { refreshWildcardsFromServer, getWildcardModel } from '../stores/tagsStore'
 import { saveWildcardsText } from '../api/wildcards'
 import { toYAML } from '../TreeEdit/yaml-io'
-import { parseWeightDirective } from './tagExpansion'
-import { getWeightedRandomIndex } from './random'
-import { testModeStore } from '../stores/testModeStore.svelte'
-import type { TreeModel } from '../TreeEdit/model'
+import { selectFromArrayNode } from './tagExpansion'
 import {
-  getNodePath,
   extractCompositionDirective,
   extractDisablesDirective
 } from '../TreeEdit/utils'
@@ -73,74 +69,6 @@ function normalizeZoneName(raw: string): ZoneName | null {
   return null
 }
 
-function selectRandomChildIndex(
-  model: TreeModel,
-  arrayNodeId: string,
-  children: string[] | undefined,
-  nodes: Record<string, { kind: string; value?: unknown }>
-): number | null {
-  if (!children || children.length === 0) {
-    return null
-  }
-
-  const options: { index: number; weight: number }[] = []
-  let pinnedMatchIndex: number | null = null
-  let overrideMatchIndex: number | null = null
-
-  const pinKey = getNodePath(model, arrayNodeId)
-  const store = testModeStore[pinKey]
-  const hasPin = !!store && !!store.enabled
-
-  for (let i = 0; i < children.length; i++) {
-    const childId = children[i]
-    const childNode = nodes[childId]
-    if (!childNode || childNode.kind !== 'leaf') continue
-
-    const value = childNode.value
-    const asString =
-      typeof value === 'string'
-        ? value
-        : value !== null && value !== undefined
-          ? String(value)
-          : ''
-    const weight = parseWeightDirective(asString)
-
-    options.push({ index: i, weight })
-
-    if (!hasPin) continue
-
-    if (store.pinnedLeafPath) {
-      const childPath = getNodePath(model, childId)
-      if (childPath === store.pinnedLeafPath) {
-        pinnedMatchIndex = i
-      }
-    }
-
-    if (store.overrideTag && store.overrideTag.trim()) {
-      const normalizedValue = asString.trim()
-      if (normalizedValue === store.overrideTag.trim()) {
-        overrideMatchIndex = i
-      }
-    }
-  }
-
-  if (options.length === 0) {
-    return null
-  }
-
-  if (hasPin) {
-    if (pinnedMatchIndex !== null) {
-      return pinnedMatchIndex
-    }
-    if (overrideMatchIndex !== null) {
-      return overrideMatchIndex
-    }
-  }
-
-  const selected = getWeightedRandomIndex(options)
-  const chosen = options[selected]
-  return chosen ? chosen.index : null
-}
 
 function resolveChildValue(
   nodes: Record<string, { kind: string; value?: unknown }>,
@@ -249,24 +177,19 @@ export async function readWildcardZones(
       return existingValue
     }
 
-    const chosenIndex = selectRandomChildIndex(wildcardModel, node.id, node.children, nodes)
+    const selection = selectFromArrayNode(wildcardModel, node.id)
 
-    if (chosenIndex === null) {
+    if (selection === null) {
       clearSelection(zoneName)
       return ''
     }
 
-    storeSelection(zoneName, chosenIndex)
+    storeSelection(zoneName, selection.index)
 
-    const value = resolveChildValue(nodes, node.children, chosenIndex)
+    const value = selection.content
 
     if (zoneName === 'all') {
       applyAllZoneDirectives(value)
-    }
-
-    if (value === null) {
-      clearSelection(zoneName)
-      return ''
     }
 
     return value
