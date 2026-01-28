@@ -205,6 +205,8 @@
     outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
     geminiApiKey: DEFAULT_SETTINGS.geminiApiKey,
     openRouterApiKey: DEFAULT_SETTINGS.openRouterApiKey,
+    ollamaBaseUrl: DEFAULT_SETTINGS.ollamaBaseUrl,
+    ollamaModel: DEFAULT_SETTINGS.ollamaModel,
     promptAnalyzerApiProvider: DEFAULT_SETTINGS.promptAnalyzerApiProvider,
     chatPromptLanguage: DEFAULT_SETTINGS.chatPromptLanguage,
     selectedVae: '__embedded__',
@@ -807,6 +809,8 @@
               <PromptAnalyzer
                 apiKey={settings.geminiApiKey}
                 openRouterApiKey={settings.openRouterApiKey}
+                ollamaBaseUrl={settings.ollamaBaseUrl}
+                ollamaModel={settings.ollamaModel}
                 apiProvider={settings.promptAnalyzerApiProvider}
                 wildcardsFile={getEffectiveModelSettings(settings, $promptsData.selectedCheckpoint)?.wildcardsFile}
                 onShowToast={(message, type) => {

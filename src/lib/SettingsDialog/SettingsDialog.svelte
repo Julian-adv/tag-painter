@@ -38,6 +38,8 @@
     outputDirectory: settings.outputDirectory,
     geminiApiKey: settings.geminiApiKey || '',
     openRouterApiKey: settings.openRouterApiKey || '',
+    ollamaBaseUrl: settings.ollamaBaseUrl || 'http://localhost:11434',
+    ollamaModel: settings.ollamaModel || 'llama3.2',
     promptAnalyzerApiProvider: settings.promptAnalyzerApiProvider || 'gemini',
     chatPromptLanguage: settings.chatPromptLanguage || 'english',
     selectedVae: settings.selectedVae,
@@ -61,6 +63,8 @@
     outputDirectory: '',
     geminiApiKey: '',
     openRouterApiKey: '',
+    ollamaBaseUrl: 'http://localhost:11434',
+    ollamaModel: 'llama3.2',
     promptAnalyzerApiProvider: 'gemini',
     chatPromptLanguage: 'english',
     selectedVae: '',
@@ -108,7 +112,13 @@
       if (!cloned.openRouterApiKey) {
         cloned.openRouterApiKey = ''
       }
-      if (cloned.promptAnalyzerApiProvider !== 'gemini' && cloned.promptAnalyzerApiProvider !== 'openrouter') {
+      if (!cloned.ollamaBaseUrl) {
+        cloned.ollamaBaseUrl = 'http://localhost:11434'
+      }
+      if (!cloned.ollamaModel) {
+        cloned.ollamaModel = 'llama3.2'
+      }
+      if (cloned.promptAnalyzerApiProvider !== 'gemini' && cloned.promptAnalyzerApiProvider !== 'openrouter' && cloned.promptAnalyzerApiProvider !== 'ollama') {
         cloned.promptAnalyzerApiProvider = 'gemini'
       }
       if (cloned.chatPromptLanguage !== 'english' && cloned.chatPromptLanguage !== 'chinese') {
@@ -442,7 +452,8 @@
           bind:value={localSettings.promptAnalyzerApiProvider}
           options={[
             { value: 'gemini', label: 'Gemini' },
-            { value: 'openrouter', label: 'OpenRouter' }
+            { value: 'openrouter', label: 'OpenRouter' },
+            { value: 'ollama', label: 'Ollama' }
           ]}
         />
 
@@ -466,6 +477,30 @@
           type="password"
           bind:value={localSettings.openRouterApiKey}
           placeholder={m['settingsDialog.openRouterApiKeyPlaceholder']()}
+          class="output-dir-input"
+          autocomplete="off"
+        />
+
+        <label for="ollama-base-url" class="output-dir-label">
+          {m['settingsDialog.ollamaBaseUrl']()}
+        </label>
+        <input
+          id="ollama-base-url"
+          type="text"
+          bind:value={localSettings.ollamaBaseUrl}
+          placeholder="http://localhost:11434"
+          class="output-dir-input"
+          autocomplete="off"
+        />
+
+        <label for="ollama-model" class="output-dir-label">
+          {m['settingsDialog.ollamaModel']()}
+        </label>
+        <input
+          id="ollama-model"
+          type="text"
+          bind:value={localSettings.ollamaModel}
+          placeholder="llama3.2"
           class="output-dir-input"
           autocomplete="off"
         />

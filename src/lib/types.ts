@@ -110,7 +110,9 @@ export interface Settings {
   outputDirectory: string
   geminiApiKey: string
   openRouterApiKey: string
-  promptAnalyzerApiProvider: 'gemini' | 'openrouter'
+  ollamaBaseUrl: string
+  ollamaModel: string
+  promptAnalyzerApiProvider: 'gemini' | 'openrouter' | 'ollama'
   chatPromptLanguage: 'english' | 'chinese'
   // VAE selection: '__embedded__' means use checkpoint's embedded VAE
   selectedVae: string

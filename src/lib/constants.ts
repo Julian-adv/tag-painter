@@ -16,6 +16,8 @@ export const DEFAULT_SETTINGS = {
   clipSkip: 2,
   geminiApiKey: '',
   openRouterApiKey: '',
+  ollamaBaseUrl: 'http://localhost:11434',
+  ollamaModel: 'llama3.2',
   promptAnalyzerApiProvider: 'gemini',
   chatPromptLanguage: 'english'
 } as const

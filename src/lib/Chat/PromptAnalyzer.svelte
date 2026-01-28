@@ -17,7 +17,9 @@
   interface Props {
     apiKey: string
     openRouterApiKey: string
-    apiProvider: 'gemini' | 'openrouter'
+    ollamaBaseUrl: string
+    ollamaModel: string
+    apiProvider: 'gemini' | 'openrouter' | 'ollama'
     wildcardsFile?: string
     onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void
   }
@@ -36,7 +38,7 @@
     options: SubNodeOption[]
   }
 
-  let { apiKey = '', openRouterApiKey = '', apiProvider = 'gemini', wildcardsFile, onShowToast }: Props = $props()
+  let { apiKey = '', openRouterApiKey = '', ollamaBaseUrl = 'http://localhost:11434', ollamaModel = 'llama3.2', apiProvider = 'gemini', wildcardsFile, onShowToast }: Props = $props()
 
   let inputPrompt = $state('')
   let isLoading = $state(false)
@@ -558,27 +560,86 @@ Respond ONLY with the JSON object, no other text.`
     throw new Error('Failed to get analysis from OpenRouter.')
   }
 
+  async function analyzeWithOllama(prompt: string, baseUrl: string, model: string): Promise<PromptAnalysis> {
+    const schemaFields = Object.entries(ANALYSIS_SCHEMA.properties)
+      .map(([name, prop]) => `- ${name}: ${(prop as { description: string }).description}`)
+      .join('\n')
+
+    const systemPromptWithSchema = `${SYSTEM_PROMPT}
+
+You must respond with a valid JSON object containing these fields:
+${schemaFields}
+
+Respond ONLY with the JSON object, no other text.`
+
+    const endpoint = `${baseUrl.replace(/\/$/, '')}/api/chat`
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: 'system', content: systemPromptWithSchema },
+          { role: 'user', content: `${ANALYSIS_PROMPT}\n\nPrompt: "${prompt}"` }
+        ],
+        format: 'json',
+        stream: false
+      })
+    })
+
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      throw new Error('Failed to parse Ollama response.')
+    }
+
+    const data = payload as Record<string, unknown>
+
+    if (!response.ok) {
+      const errorMsg = typeof data?.error === 'string' ? data.error : 'Ollama request failed.'
+      throw new Error(errorMsg)
+    }
+
+    const message = data?.message as Record<string, unknown> | undefined
+    const content = typeof message?.content === 'string' ? message.content.trim() : ''
+
+    if (content) {
+      return JSON.parse(content) as PromptAnalysis
+    }
+
+    throw new Error('Failed to get analysis from Ollama.')
+  }
+
   async function analyzePrompt() {
     const trimmed = inputPrompt.trim()
     if (!trimmed) return
 
-    const isOpenRouter = apiProvider === 'openrouter'
-    const activeKey = isOpenRouter ? openRouterApiKey.trim() : apiKey.trim()
+    // Ollama doesn't require an API key
+    if (apiProvider !== 'ollama') {
+      const isOpenRouter = apiProvider === 'openrouter'
+      const activeKey = isOpenRouter ? openRouterApiKey.trim() : apiKey.trim()
 
-    if (!activeKey) {
-      const providerName = isOpenRouter ? 'OpenRouter' : 'Gemini'
-      onShowToast(`Add your ${providerName} API key in Settings to enable analysis.`, 'error')
-      return
+      if (!activeKey) {
+        const providerName = isOpenRouter ? 'OpenRouter' : 'Gemini'
+        onShowToast(`Add your ${providerName} API key in Settings to enable analysis.`, 'error')
+        return
+      }
     }
 
     isLoading = true
     analysis = null
 
     try {
-      if (isOpenRouter) {
-        analysis = await analyzeWithOpenRouter(trimmed, activeKey)
+      if (apiProvider === 'ollama') {
+        analysis = await analyzeWithOllama(trimmed, ollamaBaseUrl, ollamaModel)
+      } else if (apiProvider === 'openrouter') {
+        analysis = await analyzeWithOpenRouter(trimmed, openRouterApiKey.trim())
       } else {
-        analysis = await analyzeWithGemini(trimmed, activeKey)
+        analysis = await analyzeWithGemini(trimmed, apiKey.trim())
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Analysis failed.'
