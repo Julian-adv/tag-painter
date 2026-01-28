@@ -7,7 +7,11 @@
 // - Image list retrieval
 
 import type { Settings, PromptsData, GenerationMetadataPayload } from '$lib/types'
-import { DEFAULT_FACE_DETAILER_SETTINGS, DEFAULT_UPSCALE_SETTINGS } from '$lib/constants'
+import {
+  DEFAULT_FACE_DETAILER_SETTINGS,
+  DEFAULT_UPSCALE_SETTINGS,
+  PROMPT_ANALYZER_API_PROVIDERS
+} from '$lib/constants'
 
 export async function savePrompts(data: PromptsData): Promise<void> {
   try {
@@ -200,7 +204,7 @@ export async function loadSettings(): Promise<Settings | null> {
         settings.openRouterApiKey = ''
       }
 
-      if (settings.promptAnalyzerApiProvider !== 'gemini' && settings.promptAnalyzerApiProvider !== 'openrouter') {
+      if (!PROMPT_ANALYZER_API_PROVIDERS.includes(settings.promptAnalyzerApiProvider)) {
         settings.promptAnalyzerApiProvider = 'gemini'
       }
 

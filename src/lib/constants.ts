@@ -1,4 +1,8 @@
 export const CONSISTENT_RANDOM_MARKER = '=consistent-random'
+
+// Valid prompt analyzer API providers
+export const PROMPT_ANALYZER_API_PROVIDERS = ['gemini', 'openrouter', 'ollama'] as const
+export type PromptAnalyzerApiProvider = (typeof PROMPT_ANALYZER_API_PROVIDERS)[number]
 export const DEFAULT_OUTPUT_DIRECTORY = 'data/output'
 export const DEFAULT_ARRAY_WEIGHT = -1 // -1 means no explicit probability set
 export const DEFAULT_COMFY_URL = 'http://127.0.0.1:8188'

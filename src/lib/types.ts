@@ -1,5 +1,7 @@
 // Common type definitions used across the application
 
+import type { PromptAnalyzerApiProvider } from './constants'
+
 // ComfyUI Workflow types
 export interface WorkflowNodeInput {
   [key: string]: string | number | boolean | [string, number] | undefined
@@ -112,7 +114,7 @@ export interface Settings {
   openRouterApiKey: string
   ollamaBaseUrl: string
   ollamaModel: string
-  promptAnalyzerApiProvider: 'gemini' | 'openrouter' | 'ollama'
+  promptAnalyzerApiProvider: PromptAnalyzerApiProvider
   chatPromptLanguage: 'english' | 'chinese'
   // VAE selection: '__embedded__' means use checkpoint's embedded VAE
   selectedVae: string
