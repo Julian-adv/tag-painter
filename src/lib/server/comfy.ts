@@ -16,6 +16,14 @@ export async function fileExists(p: string): Promise<boolean> {
 
 export async function findComfyPython(): Promise<string | null> {
   const vendorDir = path.resolve(process.cwd(), 'vendor')
+
+  // Check for embedded Python from ComfyUI portable (preferred)
+  const embeddedPath = path.join(vendorDir, 'python_embeded', 'python.exe')
+  if (await fileExists(embeddedPath)) {
+    return embeddedPath
+  }
+
+  // Fallback: Check for venv Python (legacy)
   const winPath = path.join(vendorDir, 'comfy-venv', 'Scripts', 'python.exe')
   if (await fileExists(winPath)) {
     return winPath
@@ -24,5 +32,6 @@ export async function findComfyPython(): Promise<string | null> {
   if (await fileExists(unixPath)) {
     return unixPath
   }
+
   return null
 }

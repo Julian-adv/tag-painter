@@ -2,26 +2,22 @@ param(
   [string]$NodeVersion = "24.11.1",
   [string]$NodeZipUrl = "https://nodejs.org/dist/v24.11.1/node-v24.11.1-win-x64.zip",
   [string]$ComfyDir = "vendor\ComfyUI",
-  [string]$PythonVersion = "3.12",
-  [switch]$SkipNode,
-  [switch]$ForceCPU
+  [string]$ComfyPortableUrl = "https://github.com/Comfy-Org/ComfyUI/releases/download/v0.11.0/ComfyUI_windows_portable_nvidia_cu128.7z",
+  [switch]$SkipNode
 )
 
 <#
   Windows bootstrap script - Complete installation
   - Installs portable Git (MinGit) if system Git is not available
   - Installs Node v$NodeVersion locally (portable) if not available
-  - Installs uv (Python manager)
-  - Clones ComfyUI repository
-  - Sets up Python virtual environment with all dependencies
+  - Downloads and extracts ComfyUI portable version (includes embedded Python)
   - Installs all custom nodes from config/downloads.json
   - Downloads all required files (models, VAEs, etc.)
-  - Installs Nunchaku runtime via ComfyUI workflow
+  - Installs Nunchaku runtime
 
   Usage examples:
     pwsh -File scripts/bootstrap.ps1
     pwsh -File scripts/bootstrap.ps1 -SkipNode
-    pwsh -File scripts/bootstrap.ps1 -ForceCPU
 #>
 
 Set-StrictMode -Version Latest
@@ -70,6 +66,52 @@ function Expand-Zip-To($archivePath, $destDir) {
   Write-Host "Extracting: $archivePath -> $destDir" -ForegroundColor DarkCyan
   if (Test-Path $destDir) { Remove-Item -Recurse -Force $destDir }
   Expand-Archive -Path $archivePath -DestinationPath $destDir -Force
+}
+
+function Get-7ZipPath($vendorDir) {
+  # Check for system-installed 7-Zip
+  $systemPaths = @(
+    "${env:ProgramFiles}\7-Zip\7z.exe",
+    "${env:ProgramFiles(x86)}\7-Zip\7z.exe"
+  )
+  foreach ($path in $systemPaths) {
+    if (Test-Path $path) { return $path }
+  }
+
+  # Use portable 7-Zip
+  $sevenZipDir = Join-Path $vendorDir "7zip"
+  $sevenZipExe = Join-Path $sevenZipDir "7za.exe"
+
+  if (-not (Test-Path $sevenZipExe)) {
+    Write-Host "Installing portable 7-Zip..." -ForegroundColor DarkCyan
+    New-DirectoryIfMissing $sevenZipDir
+
+    # Download 7-Zip standalone console version
+    $sevenZipUrl = "https://www.7-zip.org/a/7za920.zip"
+    $sevenZipZip = Join-Path $vendorDir "7za.zip"
+
+    Save-UrlIfMissing $sevenZipUrl $sevenZipZip
+    Expand-Archive -Path $sevenZipZip -DestinationPath $sevenZipDir -Force
+    Remove-Item $sevenZipZip -ErrorAction SilentlyContinue
+
+    if (-not (Test-Path $sevenZipExe)) {
+      throw "Failed to install 7-Zip"
+    }
+  }
+
+  return $sevenZipExe
+}
+
+function Expand-7z-To($archivePath, $destDir, $vendorDir) {
+  Write-Host "Extracting 7z: $archivePath -> $destDir" -ForegroundColor DarkCyan
+  if (Test-Path $destDir) { Remove-Item -Recurse -Force $destDir }
+  New-DirectoryIfMissing $destDir
+
+  $sevenZip = Get-7ZipPath $vendorDir
+  & $sevenZip x "$archivePath" -o"$destDir" -y
+  if ($LASTEXITCODE -ne 0) {
+    throw "Failed to extract $archivePath"
+  }
 }
 
 function Get-LatestGitMinGitUrl() {
@@ -153,240 +195,130 @@ function Install-Git($vendorDir) {
   return $gitHome
 }
 
-function Install-Uv($vendorDir) {
-  $uvPath = Join-Path $vendorDir "uv.exe"
-  if (Test-Path $uvPath) {
-    Write-Host "Using existing uv at $uvPath" -ForegroundColor Green
-    return $uvPath
-  }
-  Write-Header "uv (Python manager)"
-  $uvZip = Join-Path $vendorDir "uv.zip"
-  $uvZipUrl = 'https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip'
-  $tmpDir = Join-Path $vendorDir "uv-extract"
-  $retryDelaySeconds = 3
-  for ($attempt = 1; $attempt -le 10; $attempt++) {
-    try {
-      if (Test-Path $uvZip) { Remove-Item $uvZip -Force -ErrorAction SilentlyContinue }
-      if (Test-Path $tmpDir) { Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue }
-      Save-UrlIfMissing $uvZipUrl $uvZip
-      Expand-Zip-To $uvZip $tmpDir
-      $found = Get-ChildItem -Path $tmpDir -Recurse -Filter "uv.exe" | Select-Object -First 1
-      if ($found) {
-        Copy-Item $found.FullName $uvPath -Force
-        Remove-Item -Recurse -Force $tmpDir, $uvZip -ErrorAction SilentlyContinue
-        return $uvPath
-      }
-    } catch {
-      if ($attempt -lt 10) {
-        Write-Host "uv download attempt $attempt failed, retrying in $retryDelaySeconds seconds..." -ForegroundColor Yellow
-        Start-Sleep -Seconds $retryDelaySeconds
-      }
-    }
-  }
-  if (-not (Test-Path $uvPath)) { throw "Failed to install uv" }
-  return $uvPath
-}
+function Install-ComfyUIPortable($vendorDir, $comfyDir, $portableUrl) {
+  Write-Header "ComfyUI Portable"
 
-function Install-ComfyUISource($vendorDir, $comfyDir, $gitHome) {
-  Write-Header "ComfyUI"
+  $pythonDir = Join-Path $vendorDir "python_embeded"
 
-  # Use vendor git explicitly
-  $git = Join-Path $gitHome "cmd\git.exe"
-  if (-not (Test-Path $git)) {
-    throw "Git not found at $git. Run Install-Git first."
-  }
-
-  if (Test-Path $comfyDir) {
-    Write-Host "ComfyUI already present at $comfyDir, updating..." -ForegroundColor Green
-    Push-Location $comfyDir
-    try {
-      & $git pull
-      if ($LASTEXITCODE -ne 0) {
-        Write-Host "Warning: git pull failed, continuing with existing version." -ForegroundColor Yellow
-      }
-    } catch {
-      Write-Host "Warning: git pull failed, continuing with existing version." -ForegroundColor Yellow
-    } finally {
-      Pop-Location
-    }
+  if ((Test-Path $comfyDir) -and (Test-Path $pythonDir)) {
+    Write-Host "ComfyUI portable already present, skipping download." -ForegroundColor Green
     return
   }
 
-  Write-Host "Cloning ComfyUI repository (master branch)..." -ForegroundColor DarkCyan
-  & $git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git $comfyDir
+  Write-Host "Downloading ComfyUI portable version..." -ForegroundColor DarkCyan
+  Write-Host "  URL: $portableUrl" -ForegroundColor DarkCyan
 
-  # Check if clone was successful by verifying main.py exists
-  if (-not (Test-Path (Join-Path $comfyDir "main.py"))) {
-    throw "ComfyUI clone failed - main.py not found in $comfyDir"
+  $archivePath = Join-Path $vendorDir "ComfyUI_portable.7z"
+  $extractDir = Join-Path $vendorDir "ComfyUI_portable_extract"
+
+  # Download the portable archive
+  Save-UrlIfMissing $portableUrl $archivePath (100 * 1024 * 1024)  # Minimum 100MB expected
+
+  # Extract the archive
+  Expand-7z-To $archivePath $extractDir $vendorDir
+
+  # The portable version extracts to ComfyUI_windows_portable/
+  $portableRoot = Join-Path $extractDir "ComfyUI_windows_portable"
+  if (-not (Test-Path $portableRoot)) {
+    # Try to find the root folder
+    $portableRoot = Get-ChildItem -Path $extractDir -Directory | Where-Object {
+      (Test-Path (Join-Path $_.FullName "ComfyUI")) -and (Test-Path (Join-Path $_.FullName "python_embeded"))
+    } | Select-Object -First 1
+    if ($portableRoot) {
+      $portableRoot = $portableRoot.FullName
+    }
   }
 
-  Write-Host "ComfyUI cloned to: $comfyDir" -ForegroundColor Green
+  if (-not $portableRoot -or -not (Test-Path $portableRoot)) {
+    throw "Could not find ComfyUI portable root folder in extracted archive"
+  }
+
+  $portableComfyDir = Join-Path $portableRoot "ComfyUI"
+  $portablePythonDir = Join-Path $portableRoot "python_embeded"
+
+  if (-not (Test-Path $portableComfyDir)) {
+    throw "Could not find ComfyUI folder in extracted archive"
+  }
+  if (-not (Test-Path $portablePythonDir)) {
+    throw "Could not find python_embeded folder in extracted archive"
+  }
+
+  # Move ComfyUI to the expected location
+  Write-Host "Moving ComfyUI to $comfyDir..." -ForegroundColor DarkCyan
+  if (Test-Path $comfyDir) { Remove-Item -Recurse -Force $comfyDir }
+  Move-Item -Path $portableComfyDir -Destination $comfyDir
+
+  # Move python_embeded to vendor folder
+  Write-Host "Moving python_embeded to $pythonDir..." -ForegroundColor DarkCyan
+  if (Test-Path $pythonDir) { Remove-Item -Recurse -Force $pythonDir }
+  Move-Item -Path $portablePythonDir -Destination $pythonDir
+
+  # Cleanup
+  Remove-Item -Recurse -Force $extractDir -ErrorAction SilentlyContinue
+  Remove-Item $archivePath -ErrorAction SilentlyContinue
+
+  # Verify installation
+  if (-not (Test-Path (Join-Path $comfyDir "main.py"))) {
+    throw "ComfyUI installation failed - main.py not found in $comfyDir"
+  }
+  if (-not (Test-Path (Join-Path $pythonDir "python.exe"))) {
+    throw "Python installation failed - python.exe not found in $pythonDir"
+  }
+
+  Write-Host "ComfyUI portable installed successfully." -ForegroundColor Green
+  Write-Host "  ComfyUI: $comfyDir" -ForegroundColor Green
+  Write-Host "  Python: $pythonDir" -ForegroundColor Green
 }
 
-function Initialize-PythonVenv($vendorDir, $comfyDir, $pythonVersion, [bool]$ForceCpuMode, $uvPath) {
-  $venvDir = Join-Path $vendorDir "comfy-venv"
-  Write-Header "Python venv"
+function Get-EmbeddedPythonEnv($vendorDir) {
+  Write-Header "Python Environment"
 
-  # Suppress uv hardlink warning when cache and target are on different filesystems
-  $env:UV_LINK_MODE = "copy"
+  $pythonDir = Join-Path $vendorDir "python_embeded"
+  $py = Join-Path $pythonDir "python.exe"
 
-  # Always recreate venv to avoid corruption issues
-  if (Test-Path $venvDir) {
-    Write-Host "Removing existing venv..." -ForegroundColor Yellow
-    Remove-Item -Recurse -Force $venvDir -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 1
+  if (-not (Test-Path $py)) {
+    throw "Embedded Python not found at $py"
   }
 
-  Write-Host "Installing Python $pythonVersion..." -ForegroundColor DarkCyan
-  try {
-    & $uvPath python install $pythonVersion 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-      Write-Host "uv python install failed, will try using system Python" -ForegroundColor Yellow
-    }
-  } catch {
-    Write-Host "uv python install crashed, will use system Python" -ForegroundColor Yellow
-  }
-
-  Write-Host "Creating virtual environment..." -ForegroundColor DarkCyan
-  & $uvPath venv -p $pythonVersion $venvDir
-  if ($LASTEXITCODE -ne 0) {
-    throw "Failed to create virtual environment"
-  }
-
-  $py = Join-Path $venvDir "Scripts\python.exe"
-  if (-not (Test-Path $py)) { throw "Failed to create Python venv at $venvDir" }
-
-  # Verify venv is working
-  Write-Host "Verifying Python environment..." -ForegroundColor DarkCyan
+  # Verify Python is working
+  Write-Host "Verifying embedded Python..." -ForegroundColor DarkCyan
   $pyVersion = & $py --version 2>&1
   if ($LASTEXITCODE -ne 0) {
-    throw "Python venv verification failed"
+    throw "Embedded Python verification failed"
   }
-  Write-Host "Python venv created successfully: $pyVersion" -ForegroundColor Green
+  Write-Host "Embedded Python: $pyVersion" -ForegroundColor Green
 
-  # Activate the virtual environment to set up environment variables
-  $activateScript = Join-Path $venvDir "Scripts\Activate.ps1"
-  if (Test-Path $activateScript) {
-    Write-Host "Activating virtual environment..." -ForegroundColor DarkCyan
-    . $activateScript
-  }
-
-  # Detect NVIDIA GPU availability once (used for requirements and PyTorch installs)
-  $hasNvidia = $false
-  try { Get-Command nvidia-smi -ErrorAction SilentlyContinue | Out-Null; $hasNvidia = $true } catch {}
-
-  # Install pip in the venv for ComfyUI-Manager compatibility
-  Write-Host "Installing pip in venv..." -ForegroundColor DarkCyan
-  & $uvPath pip install -p $py pip setuptools wheel | Out-Null
+  # Verify pip is available via python -m pip
+  Write-Host "Verifying pip..." -ForegroundColor DarkCyan
+  $pipVersion = & $py -m pip --version 2>&1
   if ($LASTEXITCODE -ne 0) {
-    Write-Host "Warning: Failed to install pip" -ForegroundColor Yellow
-  }
-
-  Write-Header "ComfyUI requirements"
-  # Use pip directly for better dependency resolution (uv has issues with transitive dependencies)
-  Write-Host "Installing ComfyUI requirements via pip (this may take a while)..." -ForegroundColor DarkCyan
-  $reqFile = Join-Path $comfyDir "requirements.txt"
-  Write-Host "Requirements file: $reqFile" -ForegroundColor DarkCyan
-
-  $pip = Join-Path $venvDir "Scripts\pip.exe"
-  if (-not (Test-Path $pip)) {
-    Write-Host "Error: pip not found at $pip" -ForegroundColor Red
-    throw "pip.exe not found in venv"
-  }
-
-  $pipArgs = @('install', '-r', $reqFile)
-  if ($hasNvidia -and -not $ForceCpuMode) {
-    $pipArgs += @('--extra-index-url', 'https://download.pytorch.org/whl/cu128')
-  }
-  Write-Host "pip path: $pip" -ForegroundColor Magenta
-  Write-Host "Requirements file exists: $(Test-Path $reqFile)" -ForegroundColor Magenta
-  Write-Host "Running: $pip $($pipArgs -join ' ')" -ForegroundColor DarkCyan
-  & $pip @pipArgs
-  if ($LASTEXITCODE -ne 0) {
-    Write-Host "pip install failed with exit code: $LASTEXITCODE" -ForegroundColor Red
-    throw "Failed to install ComfyUI requirements"
-  }
-
-  # Install critical dependencies first (these are often missed by pip's resolver)
-  Write-Host "Installing critical dependencies..." -ForegroundColor DarkCyan
-  $criticalPkgs = @(
-    'typing_extensions',
-    'certifi',
-    'urllib3',
-    'requests',
-    'packaging',
-    'pyyaml',
-    'scipy',
-    'pydantic',
-    'annotated-types',
-    'tqdm',
-    'easydict',
-    'contourpy',
-    'lazy-loader',
-    'opencv-python-headless',
-    'tifffile',
-    'scikit-image'
-  )
-  & $pip install @criticalPkgs
-  if ($LASTEXITCODE -ne 0) {
-    Write-Host "Warning: Some critical packages may have failed to install" -ForegroundColor Yellow
-  }
-
-  # Verify key packages are installed and fix missing dependencies
-  Write-Host "Verifying installation..." -ForegroundColor DarkCyan
-  $verifyPkgs = @(
-    @{name='torch'; module='torch'},
-    @{name='urllib3'; module='urllib3'},
-    @{name='pyyaml'; module='yaml'},
-    @{name='packaging'; module='packaging'},
-    @{name='typing_extensions'; module='typing_extensions'},
-    @{name='scipy'; module='scipy'},
-    @{name='contourpy'; module='contourpy'},
-    @{name='lazy-loader'; module='lazy_loader'},
-    @{name='pydantic'; module='pydantic'},
-    @{name='certifi'; module='certifi'},
-    @{name='requests'; module='requests'}
-  )
-  foreach ($pkg in $verifyPkgs) {
-    $result = & $py -c "import $($pkg.module)" 2>&1
+    Write-Host "pip not available, installing..." -ForegroundColor Yellow
+    & $py -m ensurepip --upgrade 2>&1 | Out-Null
+    $pipVersion = & $py -m pip --version 2>&1
     if ($LASTEXITCODE -ne 0) {
-      Write-Host "Warning: $($pkg.name) not properly installed, installing..." -ForegroundColor Yellow
-      & $pip install $($pkg.name)
-      if ($LASTEXITCODE -ne 0) {
-        Write-Host "Error: Failed to install $($pkg.name)" -ForegroundColor Red
-      }
-    } else {
-      Write-Host "  $($pkg.name) OK" -ForegroundColor Green
+      throw "Failed to install pip"
     }
   }
+  Write-Host "Pip: $pipVersion" -ForegroundColor Green
 
-  if ($ForceCpuMode) {
-    Write-Host "CPU mode requested. CUDA packages were not installed." -ForegroundColor Yellow
-  }
+  Write-Host "Python environment ready." -ForegroundColor Green
 
-  # Install extra packages (urllib3 should be auto-installed but adding as fallback)
-  $extraPkgs = @('matplotlib', 'pandas', 'urllib3')
-  if ($ForceCpuMode) {
-    $extraPkgs += 'onnxruntime'
-  } else {
-    $extraPkgs += 'onnxruntime-gpu'
-  }
-  foreach ($pkg in $extraPkgs) {
-    Write-Host "Installing Python package: $pkg" -ForegroundColor DarkCyan
-    & $pip install $pkg | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-      Write-Host "Warning: Failed to install $pkg" -ForegroundColor Yellow
-    }
-  }
+  return @{ PythonPath = $py; PythonDir = $pythonDir }
+}
 
-  Write-Host "Python environment setup complete." -ForegroundColor Green
-  return @{ PythonPath = $py; UvPath = $uvPath }
+function Install-ComfyUIRequirements($comfyDir, $envInfo) {
+  Write-Header "ComfyUI Requirements"
+
+  # ComfyUI portable already includes all dependencies with CUDA-enabled PyTorch
+  # Skip requirements.txt installation to avoid replacing CUDA PyTorch with CPU version
+  Write-Host "ComfyUI portable includes all dependencies, skipping requirements.txt" -ForegroundColor Green
 }
 
 function Install-CustomNodes($vendorDir, $comfyDir, $gitHome, $envInfo) {
   Write-Header "Custom Nodes"
 
   $git = Join-Path $gitHome "cmd\git.exe"
+  $py = $envInfo.PythonPath
   $configPath = Join-Path (Get-Location) "config\downloads.json"
 
   if (-not (Test-Path $configPath)) {
@@ -445,16 +377,31 @@ function Install-CustomNodes($vendorDir, $comfyDir, $gitHome, $envInfo) {
     $reqPath = Join-Path $nodeDest "requirements.txt"
     if (Test-Path $reqPath) {
       Write-Host "  Installing requirements for $nodeName..." -ForegroundColor DarkCyan
-      # Pre-install insightface from prebuilt wheel (no official Windows wheel on PyPI)
-      $reqContent = Get-Content $reqPath -Raw
-      if ($reqContent -match 'insightface') {
-        Write-Host "  Pre-installing insightface from prebuilt wheel..." -ForegroundColor DarkCyan
-        & $envInfo.UvPath pip install -p $envInfo.PythonPath "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp312-cp312-win_amd64.whl" 2>&1 | Out-Null
-      }
-      $output = & $envInfo.UvPath pip install -p $envInfo.PythonPath -r $reqPath --no-cache 2>&1
-      if ($LASTEXITCODE -ne 0) {
-        Write-Host "  Warning: Failed to install requirements for $nodeName" -ForegroundColor Yellow
-        Write-Host "  Error: $output" -ForegroundColor Red
+
+      # Read requirements and filter out torch-related packages to preserve CUDA PyTorch
+      $reqLines = @(Get-Content $reqPath)
+      $filteredReqs = @($reqLines | Where-Object {
+        $line = $_.Trim().ToLower()
+        # Skip empty lines, comments, and torch-related packages
+        -not [string]::IsNullOrWhiteSpace($line) -and
+        -not $line.StartsWith('#') -and
+        -not $line.StartsWith('torch') -and
+        -not $line.StartsWith('insightface')  # Skip insightface (needs special handling)
+      })
+
+      if ($filteredReqs.Count -gt 0) {
+        # Create a temporary filtered requirements file
+        $tempReqPath = Join-Path $nodeDest "requirements_filtered.txt"
+        $filteredReqs | Set-Content $tempReqPath
+
+        $output = & $py -m pip install -r $tempReqPath 2>&1
+        Remove-Item $tempReqPath -ErrorAction SilentlyContinue
+
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "  Warning: Some requirements failed to install for $nodeName" -ForegroundColor Yellow
+        }
+      } else {
+        Write-Host "  No additional requirements needed (torch packages skipped)" -ForegroundColor Green
       }
     }
   }
@@ -595,14 +542,75 @@ function Show-ManualDownloadInstructions($comfyDir) {
   $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
 
+function Repair-PyTorchCuda($envInfo) {
+  Write-Header "PyTorch CUDA Repair"
+
+  $py = $envInfo.PythonPath
+
+  # Check if PyTorch CUDA is working
+  Write-Host "Checking PyTorch CUDA status..." -ForegroundColor DarkCyan
+  $cudaCheck = & $py -c "import torch; print('CUDA' if torch.cuda.is_available() else 'CPU')" 2>&1
+
+  if ($cudaCheck -eq "CUDA") {
+    Write-Host "PyTorch CUDA is working correctly." -ForegroundColor Green
+    return
+  }
+
+  Write-Host "PyTorch CUDA not available, reinstalling with CUDA 12.8 support..." -ForegroundColor Yellow
+
+  # Uninstall existing torch packages
+  Write-Host "Uninstalling existing PyTorch packages..." -ForegroundColor DarkCyan
+  & $py -m pip uninstall torch torchvision torchaudio -y 2>&1 | Out-Null
+
+  # Install PyTorch with CUDA 12.8
+  Write-Host "Installing PyTorch with CUDA 12.8..." -ForegroundColor DarkCyan
+  $output = & $py -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 2>&1
+
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "Warning: PyTorch CUDA installation may have issues" -ForegroundColor Yellow
+    Write-Host "Output: $output" -ForegroundColor Yellow
+  } else {
+    # Verify installation
+    $cudaVerify = & $py -c "import torch; print('CUDA' if torch.cuda.is_available() else 'CPU')" 2>&1
+    if ($cudaVerify -eq "CUDA") {
+      Write-Host "PyTorch CUDA 12.8 installed and verified successfully." -ForegroundColor Green
+    } else {
+      Write-Host "Warning: PyTorch installed but CUDA still not available" -ForegroundColor Yellow
+    }
+  }
+}
+
+function Install-HelperPackages($envInfo) {
+  Write-Header "Helper Packages"
+
+  $py = $envInfo.PythonPath
+
+  Write-Host "Installing helper Python packages (pandas, matplotlib, onnxruntime-gpu)..." -ForegroundColor DarkCyan
+
+  # Install pandas and matplotlib (required by some custom nodes)
+  & $py -m pip install --upgrade pandas matplotlib 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "Warning: Some helper packages may have failed to install" -ForegroundColor Yellow
+  }
+
+  # Try to install onnxruntime-gpu, fallback to CPU version
+  $output = & $py -m pip install --upgrade onnxruntime-gpu 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "onnxruntime-gpu not available, installing CPU version..." -ForegroundColor Yellow
+    & $py -m pip install --upgrade onnxruntime 2>&1 | Out-Null
+  }
+
+  Write-Host "Helper packages installed." -ForegroundColor Green
+}
+
 function Install-Nunchaku($vendorDir, $comfyDir, $envInfo) {
   Write-Header "Nunchaku"
 
   $py = $envInfo.PythonPath
-  $uv = $envInfo.UvPath
 
   # Install nunchaku from GitHub releases (not available on PyPI due to file size)
-  # Use v1.0.1 + torch2.8 for compatibility with ComfyUI (torch 2.9.1)
+  # Use v1.0.1 + torch2.8 for compatibility with ComfyUI portable (torch 2.8)
+  # IMPORTANT: Use --no-deps to avoid replacing CUDA PyTorch with CPU version
   $nunchakuVersion = "1.0.1"
   $wheelUrl = "https://github.com/mit-han-lab/nunchaku/releases/download/v1.0.1/nunchaku-1.0.1%2Btorch2.8-cp312-cp312-win_amd64.whl"
 
@@ -610,16 +618,10 @@ function Install-Nunchaku($vendorDir, $comfyDir, $envInfo) {
   Write-Host "  URL: $wheelUrl" -ForegroundColor DarkCyan
 
   try {
-    $output = & $uv pip install -p $py $wheelUrl 2>&1
+    # Use --no-deps to preserve existing CUDA PyTorch installation
+    $output = & $py -m pip install --no-deps $wheelUrl 2>&1
     if ($LASTEXITCODE -eq 0) {
       Write-Host "Nunchaku v$nunchakuVersion installed successfully." -ForegroundColor Green
-
-      # Reinstall insightface to fix numpy binary compatibility issue
-      Write-Host "Reinstalling insightface to fix numpy compatibility..." -ForegroundColor DarkCyan
-      & $uv pip install -p $py --force-reinstall "https://github.com/Gourieff/Assets/raw/main/Insightface/insightface-0.7.3-cp312-cp312-win_amd64.whl" 2>&1 | Out-Null
-      if ($LASTEXITCODE -eq 0) {
-        Write-Host "Insightface reinstalled successfully." -ForegroundColor Green
-      }
     } else {
       Write-Host "Warning: Failed to install nunchaku v$nunchakuVersion" -ForegroundColor Yellow
       Write-Host "Error: $output" -ForegroundColor Red
@@ -653,17 +655,14 @@ try {
   # Step 1: Node.js
   $nodeHome = Install-Node -vendorDir $vendorDir
 
-  # Step 2: Git
+  # Step 2: Git (needed for custom nodes)
   $gitHome = Install-Git -vendorDir $vendorDir
 
-  # Step 3: uv
-  $uvPath = Install-Uv -vendorDir $vendorDir
+  # Step 3: ComfyUI portable (includes Python)
+  Install-ComfyUIPortable -vendorDir $vendorDir -comfyDir $comfyDir -portableUrl $ComfyPortableUrl
 
-  # Step 4: ComfyUI source
-  Install-ComfyUISource -vendorDir $vendorDir -comfyDir $comfyDir -gitHome $gitHome
-
-  # Step 5: Python venv + dependencies
-  $envInfo = Initialize-PythonVenv -vendorDir $vendorDir -comfyDir $comfyDir -pythonVersion $PythonVersion -ForceCpuMode:$ForceCPU -uvPath $uvPath
+  # Step 4: Get embedded Python environment
+  $envInfo = Get-EmbeddedPythonEnv -vendorDir $vendorDir
 
   # If envInfo is an array (due to function output), take the last element (the hashtable)
   if ($envInfo -is [Array]) {
@@ -674,13 +673,22 @@ try {
     throw "Failed to initialize Python environment"
   }
 
+  # Step 5: Install ComfyUI requirements
+  Install-ComfyUIRequirements -comfyDir $comfyDir -envInfo $envInfo
+
   # Step 6: Custom nodes
   Install-CustomNodes -vendorDir $vendorDir -comfyDir $comfyDir -gitHome $gitHome -envInfo $envInfo
 
-  # Step 7: Download all files
+  # Step 7: Repair PyTorch CUDA (in case custom nodes broke it)
+  Repair-PyTorchCuda -envInfo $envInfo
+
+  # Step 8: Install helper packages (pandas, matplotlib, onnxruntime)
+  Install-HelperPackages -envInfo $envInfo
+
+  # Step 9: Download all files
   Download-AllFiles -vendorDir $vendorDir -comfyDir $comfyDir
 
-  # Step 8: Nunchaku runtime installation
+  # Step 10: Nunchaku runtime installation
   Install-Nunchaku -vendorDir $vendorDir -comfyDir $comfyDir -envInfo $envInfo
 
   Write-Host "`n========================================" -ForegroundColor Green
