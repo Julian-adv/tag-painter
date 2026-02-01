@@ -38,12 +38,27 @@
     options: SubNodeOption[]
   }
 
+  interface SlotMapping {
+    slot: string
+    original: string
+  }
+
+  interface PendingSlotAdd {
+    mapping: SlotMapping
+    model: TreeModel
+    options: SubNodeOption[]
+  }
+
   let { apiKey = '', openRouterApiKey = '', ollamaBaseUrl = 'http://localhost:11434', ollamaModel = 'llama3.2', apiProvider = 'gemini', wildcardsFile, onShowToast }: Props = $props()
 
   let inputPrompt = $state('')
   let isLoading = $state(false)
+  let isGeneralizing = $state(false)
   let analysis: PromptAnalysis | null = $state(null)
+  let generalizedPrompt: string | null = $state(null)
+  let slotMappings: SlotMapping[] = $state([])
   let pendingAdd: PendingAdd | null = $state(null)
+  let pendingSlotAdd: PendingSlotAdd | null = $state(null)
 
   const GEMINI_MODEL_ID = 'gemini-2.5-flash'
   const OPENROUTER_MODEL_ID = 'tngtech/deepseek-r1t2-chimera:free'
@@ -145,6 +160,15 @@
     legwear: 'leg_wear',
     footwear: 'shoes',
     accessories: 'accessories'
+  }
+
+  // Mapping from slot names to YAML node names
+  const SLOT_TO_YAML_NODE: Record<string, string | string[]> = {
+    __subject__: 'subject',
+    __eyes__: 'eyes',
+    __hair__: ['hair_style', 'hair_color', 'hair'],
+    __clothing__: ['clothing_style_with_stockings', 'clothing_style_without_stockings', 'clothing'],
+    __skin__: 'skin'
   }
 
   const FIELD_ORDER: (keyof PromptAnalysis)[] = [
@@ -429,6 +453,61 @@ If an element is not mentioned, provide "N/A" or "Not specified".`
 
   const SYSTEM_PROMPT = 'You are a professional prompt engineer. Deconstruct complex prompts into core visual components.'
 
+  const GENERALIZE_PROMPT = `Given an image generation prompt, replace specific descriptive elements with placeholder slots and report what was replaced.
+
+Replace the following elements with their corresponding placeholders:
+1. Eye descriptions (color, shape, gaze) → __eyes__
+2. Hair descriptions (style, color, length, texture) → __hair__
+3. Subject/person descriptions (age, gender, ethnicity, beauty descriptors) → __subject__
+4. Clothing/outfit descriptions (all clothing items, accessories worn on body) → __clothing__
+   Keep the word "wearing" before __clothing__ if present.
+5. Skin descriptions (texture, tone, condition) → __skin__
+   Example: "clear smooth skin" → "__skin__"
+
+Important rules:
+- Only replace elements that are clearly present in the prompt
+- Keep all other descriptive elements (pose, background, lighting, composition, etc.) unchanged
+- Maintain the original sentence structure and flow as much as possible
+- If the prompt is in Chinese, first translate it to English, then apply the replacements
+
+Prompt to generalize:`
+
+  const GENERALIZE_SYSTEM_PROMPT = 'You are a prompt template generator. Your task is to replace specific visual elements with placeholder slots while preserving the overall structure of the prompt.'
+
+  const GENERALIZE_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+      prompt: {
+        type: 'STRING',
+        description: 'The generalized prompt with placeholders (__subject__, __eyes__, __hair__, __clothing__, __skin__) replacing the original descriptions.'
+      },
+      mappings: {
+        type: 'ARRAY',
+        description: 'List of replacements made. Only include slots that were actually used.',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            slot: {
+              type: 'STRING',
+              description: 'The placeholder slot name (e.g., __subject__, __eyes__, __hair__, __clothing__, __skin__)'
+            },
+            original: {
+              type: 'STRING',
+              description: 'The original text that was replaced by this slot'
+            }
+          },
+          required: ['slot', 'original']
+        }
+      }
+    },
+    required: ['prompt', 'mappings']
+  }
+
+  interface GeneralizeResult {
+    prompt: string
+    mappings: SlotMapping[]
+  }
+
   async function analyzeWithGemini(prompt: string, key: string): Promise<PromptAnalysis> {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_ID}:generateContent?key=${encodeURIComponent(key)}`
 
@@ -640,6 +719,207 @@ Respond ONLY with the JSON object, no other text.`
     }
   }
 
+  async function generalizeWithGemini(prompt: string, key: string): Promise<GeneralizeResult> {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_ID}:generateContent?key=${encodeURIComponent(key)}`
+
+    const body = {
+      contents: [
+        {
+          parts: [
+            {
+              text: `${GENERALIZE_PROMPT}
+
+"${prompt}"`
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: GENERALIZE_SCHEMA
+      },
+      systemInstruction: {
+        parts: [{ text: GENERALIZE_SYSTEM_PROMPT }]
+      }
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      throw new Error('Failed to parse Gemini response.')
+    }
+
+    const data = payload as Record<string, unknown>
+
+    if (!response.ok) {
+      const errorData = data?.error as Record<string, unknown> | undefined
+      const message =
+        errorData && typeof errorData.message === 'string'
+          ? errorData.message
+          : 'Gemini request failed.'
+      throw new Error(message)
+    }
+
+    const candidates = Array.isArray(data?.candidates) ? data.candidates : []
+    const firstCandidate = candidates.length > 0 ? (candidates[0] as Record<string, unknown>) : undefined
+    const content = firstCandidate?.content as Record<string, unknown> | undefined
+    const parts = Array.isArray(content?.parts) ? content.parts : []
+
+    if (parts.length > 0) {
+      const part = parts[0] as Record<string, unknown>
+      const text = typeof part?.text === 'string' ? part.text.trim() : ''
+      if (text) {
+        return JSON.parse(text) as GeneralizeResult
+      }
+    }
+
+    throw new Error('Failed to get generalized prompt from Gemini.')
+  }
+
+  const GENERALIZE_JSON_INSTRUCTION = `
+Respond with a JSON object containing:
+- "prompt": The generalized prompt with placeholders
+- "mappings": Array of {"slot": "__xxx__", "original": "replaced text"} for each replacement made
+
+Example response:
+{"prompt": "A photo of __subject__ with __hair__ and __skin__", "mappings": [{"slot": "__subject__", "original": "a young woman"}, {"slot": "__hair__", "original": "long black hair"}, {"slot": "__skin__", "original": "clear smooth skin"}]}`
+
+  async function generalizeWithOpenRouter(prompt: string, key: string): Promise<GeneralizeResult> {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: OPENROUTER_MODEL_ID,
+        messages: [
+          { role: 'system', content: GENERALIZE_SYSTEM_PROMPT + GENERALIZE_JSON_INSTRUCTION },
+          { role: 'user', content: `${GENERALIZE_PROMPT}\n\n"${prompt}"` }
+        ],
+        response_format: { type: 'json_object' }
+      })
+    })
+
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      throw new Error('Failed to parse OpenRouter response.')
+    }
+
+    const data = payload as Record<string, unknown>
+
+    if (!response.ok) {
+      const errorData = data?.error as Record<string, unknown> | undefined
+      const message =
+        errorData && typeof errorData.message === 'string'
+          ? errorData.message
+          : 'OpenRouter request failed.'
+      throw new Error(message)
+    }
+
+    const choices = Array.isArray(data?.choices) ? data.choices : []
+    const firstChoice = choices.length > 0 ? (choices[0] as Record<string, unknown>) : undefined
+    const message = firstChoice?.message as Record<string, unknown> | undefined
+    const content = typeof message?.content === 'string' ? message.content.trim() : ''
+
+    if (content) {
+      return JSON.parse(content) as GeneralizeResult
+    }
+
+    throw new Error('Failed to get generalized prompt from OpenRouter.')
+  }
+
+  async function generalizeWithOllama(prompt: string, baseUrl: string, model: string): Promise<GeneralizeResult> {
+    const endpoint = `${baseUrl.replace(/\/$/, '')}/api/chat`
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: 'system', content: GENERALIZE_SYSTEM_PROMPT + GENERALIZE_JSON_INSTRUCTION },
+          { role: 'user', content: `${GENERALIZE_PROMPT}\n\n"${prompt}"` }
+        ],
+        format: 'json',
+        stream: false
+      })
+    })
+
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      throw new Error('Failed to parse Ollama response.')
+    }
+
+    const data = payload as Record<string, unknown>
+
+    if (!response.ok) {
+      const errorMsg = typeof data?.error === 'string' ? data.error : 'Ollama request failed.'
+      throw new Error(errorMsg)
+    }
+
+    const message = data?.message as Record<string, unknown> | undefined
+    const content = typeof message?.content === 'string' ? message.content.trim() : ''
+
+    if (content) {
+      return JSON.parse(content) as GeneralizeResult
+    }
+
+    throw new Error('Failed to get generalized prompt from Ollama.')
+  }
+
+  async function generalizePrompt() {
+    const trimmed = inputPrompt.trim()
+    if (!trimmed) return
+
+    // Ollama doesn't require an API key
+    if (apiProvider !== 'ollama') {
+      const isOpenRouter = apiProvider === 'openrouter'
+      const activeKey = isOpenRouter ? openRouterApiKey.trim() : apiKey.trim()
+
+      if (!activeKey) {
+        const providerName = isOpenRouter ? 'OpenRouter' : 'Gemini'
+        onShowToast(`Add your ${providerName} API key in Settings to enable generalization.`, 'error')
+        return
+      }
+    }
+
+    isGeneralizing = true
+    generalizedPrompt = null
+    slotMappings = []
+
+    try {
+      let result: GeneralizeResult
+      if (apiProvider === 'ollama') {
+        result = await generalizeWithOllama(trimmed, ollamaBaseUrl, ollamaModel)
+      } else if (apiProvider === 'openrouter') {
+        result = await generalizeWithOpenRouter(trimmed, openRouterApiKey.trim())
+      } else {
+        result = await generalizeWithGemini(trimmed, apiKey.trim())
+      }
+      generalizedPrompt = result.prompt
+      slotMappings = result.mappings
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Generalization failed.'
+      onShowToast(message, 'error')
+    } finally {
+      isGeneralizing = false
+    }
+  }
+
   function handleKeydown(event: KeyboardEvent) {
     if (event.isComposing) return
     if (isLoading) return
@@ -651,6 +931,8 @@ Respond ONLY with the JSON object, no other text.`
 
   function clearAnalysis() {
     analysis = null
+    generalizedPrompt = null
+    slotMappings = []
     inputPrompt = ''
   }
 
@@ -659,14 +941,269 @@ Respond ONLY with the JSON object, no other text.`
     const lower = value.toLowerCase().trim()
     return lower !== 'n/a' && lower !== 'not specified' && lower !== ''
   }
+
+  function getSlotNodeName(slot: string): string {
+    const node = SLOT_TO_YAML_NODE[slot]
+    if (!node) return slot
+    return Array.isArray(node) ? node.join('/') : node
+  }
+
+  async function addGeneralizedToYaml() {
+    if (!generalizedPrompt) return
+
+    const filename = wildcardsFile
+
+    try {
+      const yamlText = await fetchWildcardsText(filename)
+      const model = fromYAML(yamlText)
+
+      // Find the "all" node
+      const allNodeId = findNodeByName(model, 'all')
+      if (!allNodeId) {
+        onShowToast('Node "all" not found in wildcards.', 'error')
+        return
+      }
+
+      const allNode = model.nodes[allNodeId]
+      if (!allNode) {
+        onShowToast('Node "all" not found in wildcards.', 'error')
+        return
+      }
+
+      if (allNode.kind !== 'array') {
+        onShowToast('"all" node must be an array.', 'error')
+        return
+      }
+
+      const targetArrayId = allNodeId
+
+      // Check if value already exists
+      if (valueExistsInArray(model, targetArrayId, generalizedPrompt)) {
+        onShowToast('This prompt already exists in "all".', 'info')
+        return
+      }
+
+      // Add the generalized prompt
+      addLeafToArray(model, targetArrayId, generalizedPrompt)
+
+      // Save updated YAML
+      const newYamlText = toYAML(model)
+      await saveWildcardsText(newYamlText, filename)
+
+      // Refresh the wildcards in the store
+      await refreshWildcardsFromServer(filename)
+
+      onShowToast('Added to "all" node.', 'success')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to add to YAML.'
+      onShowToast(message, 'error')
+    }
+  }
+
+  async function addSlotMappingToYaml(mapping: SlotMapping) {
+    const nodeNameConfig = SLOT_TO_YAML_NODE[mapping.slot]
+    if (!nodeNameConfig) {
+      onShowToast(`No YAML node configured for ${mapping.slot}.`, 'error')
+      return
+    }
+
+    const nodeNames = Array.isArray(nodeNameConfig) ? nodeNameConfig : [nodeNameConfig]
+    const filename = wildcardsFile
+
+    try {
+      const yamlText = await fetchWildcardsText(filename)
+      const model = fromYAML(yamlText)
+
+      // Collect all container children from all specified nodes
+      const allContainerChildren: SubNodeOption[] = []
+
+      for (const nodeName of nodeNames) {
+        const nodeId = findNodeByName(model, nodeName)
+        if (!nodeId) continue
+
+        const node = model.nodes[nodeId]
+        if (!node) continue
+
+        // If it's an array and single node, add directly
+        if (node.kind === 'array' && nodeNames.length === 1) {
+          await addValueToArrayNode(model, nodeId, mapping.original, nodeName)
+          return
+        }
+
+        // If it's an array and multiple nodes, add it as an option
+        if (node.kind === 'array' && nodeNames.length > 1) {
+          allContainerChildren.push({
+            id: nodeId,
+            name: nodeName,
+            path: nodeName
+          })
+        }
+
+        if (node.kind === 'object') {
+          const containerChildren = getContainerChildren(model, nodeId)
+          allContainerChildren.push(...containerChildren)
+        }
+      }
+
+      // If we have multiple container children, show submenu
+      if (allContainerChildren.length > 1) {
+        pendingSlotAdd = {
+          mapping,
+          model,
+          options: allContainerChildren
+        }
+        return
+      }
+
+      // Single container child - add directly
+      if (allContainerChildren.length === 1) {
+        const option = allContainerChildren[0]
+        const targetArrayId = findTargetArrayNode(model, option.id)
+        if (targetArrayId) {
+          await addValueToArrayNode(model, targetArrayId, mapping.original, option.path)
+          return
+        }
+      }
+
+      // No container children found - try to find or create in first node
+      const firstNodeName = nodeNames[0]
+      const firstNodeId = findNodeByName(model, firstNodeName)
+      if (!firstNodeId) {
+        onShowToast(`Node "${firstNodeName}" not found in wildcards.`, 'error')
+        return
+      }
+
+      let targetArrayId = findTargetArrayNode(model, firstNodeId)
+      if (!targetArrayId) {
+        // Create a new array child called "other"
+        const newArrayId = uid()
+        const newArray: ArrayNode = {
+          id: newArrayId,
+          name: 'other',
+          kind: 'array',
+          parentId: firstNodeId,
+          children: [],
+          collapsed: false
+        }
+        addChild(model, firstNodeId, newArray)
+        targetArrayId = newArrayId
+      }
+
+      await addValueToArrayNode(model, targetArrayId, mapping.original, firstNodeName)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to add to YAML.'
+      onShowToast(message, 'error')
+    }
+  }
+
+  async function handleSlotSubNodeSelect(option: SubNodeOption) {
+    if (!pendingSlotAdd) return
+
+    const { model, mapping } = pendingSlotAdd
+
+    try {
+      let targetArrayId = findTargetArrayNode(model, option.id)
+
+      if (!targetArrayId) {
+        const newArrayId = uid()
+        const newArray: ArrayNode = {
+          id: newArrayId,
+          name: 'other',
+          kind: 'array',
+          parentId: option.id,
+          children: [],
+          collapsed: false
+        }
+        addChild(model, option.id, newArray)
+        targetArrayId = newArrayId
+      }
+
+      await addValueToArrayNode(model, targetArrayId, mapping.original, option.path)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to add to YAML.'
+      onShowToast(message, 'error')
+    } finally {
+      pendingSlotAdd = null
+    }
+  }
+
+  function cancelSlotSubNodeSelect() {
+    pendingSlotAdd = null
+  }
 </script>
 
-<svelte:document onclick={cancelSubNodeSelect} />
+<svelte:document onclick={() => { cancelSubNodeSelect(); cancelSlotSubNodeSelect(); }} />
 
 <div class="flex h-full flex-col bg-white">
   <!-- Analysis result area -->
   <div class="flex-1 overflow-y-auto p-2">
-    {#if analysis}
+    {#if generalizedPrompt}
+      <div class="flex flex-col gap-2">
+        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
+          <div class="mb-2 flex items-center justify-between">
+            <span class="text-xs font-semibold text-blue-600">Generalized Prompt</span>
+            <button
+              type="button"
+              onclick={addGeneralizedToYaml}
+              class="flex h-5 w-5 items-center justify-center rounded border border-blue-300 bg-white text-blue-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600"
+              title="Add to 'all' node"
+            >
+              <Plus size="14" />
+            </button>
+          </div>
+          <div class="whitespace-pre-wrap text-sm text-gray-800">{generalizedPrompt}</div>
+        </div>
+
+        {#if slotMappings.length > 0}
+          <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div class="mb-2 text-xs font-semibold text-gray-500">Slot Mappings</div>
+            <div class="flex flex-col gap-1.5">
+              {#each slotMappings as mapping}
+                <div class="flex items-start gap-2 text-sm">
+                  <span class="shrink-0 rounded bg-purple-100 px-1.5 py-0.5 font-mono text-xs text-purple-700">{mapping.slot}</span>
+                  <span class="text-gray-400">←</span>
+                  <span class="flex-1 text-gray-700">{mapping.original}</span>
+                  {#if SLOT_TO_YAML_NODE[mapping.slot]}
+                    <div class="relative shrink-0">
+                      <button
+                        type="button"
+                        onclick={(e) => {
+                          e.stopPropagation()
+                          addSlotMappingToYaml(mapping)
+                        }}
+                        class="flex h-5 w-5 items-center justify-center rounded border border-gray-300 bg-white text-gray-500 transition hover:border-purple-400 hover:bg-purple-50 hover:text-purple-600"
+                        title="Add to {getSlotNodeName(mapping.slot)}"
+                      >
+                        <Plus size="14" />
+                      </button>
+                      {#if pendingSlotAdd && pendingSlotAdd.mapping.slot === mapping.slot}
+                        <div
+                          class="absolute right-0 top-full z-50 mt-1 min-w-32 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+                          onclick={(e) => e.stopPropagation()}
+                          onkeydown={(e) => e.key === 'Escape' && cancelSlotSubNodeSelect()}
+                          role="menu"
+                          tabindex="-1"
+                        >
+                          {#each pendingSlotAdd.options as option}
+                            <button
+                              type="button"
+                              class="w-full px-3 py-1.5 text-left text-sm text-gray-700 transition hover:bg-purple-50 hover:text-purple-700"
+                              onclick={() => handleSlotSubNodeSelect(option)}
+                            >
+                              {option.path}
+                            </button>
+                          {/each}
+                        </div>
+                      {/if}
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+      </div>
+    {:else if analysis}
       <div class="flex flex-col gap-2">
         {#each FIELD_ORDER as field}
           <div class="rounded-lg border border-gray-200 bg-gray-50 p-2">
@@ -715,9 +1252,13 @@ Respond ONLY with the JSON object, no other text.`
       <div class="flex h-full items-center justify-center text-gray-400">
         <p>Analyzing prompt...</p>
       </div>
+    {:else if isGeneralizing}
+      <div class="flex h-full items-center justify-center text-gray-400">
+        <p>Generalizing prompt...</p>
+      </div>
     {:else}
       <div class="flex h-full items-center justify-center text-gray-400">
-        <p>Enter a prompt to analyze...</p>
+        <p>Enter a prompt to analyze or generalize...</p>
       </div>
     {/if}
   </div>
@@ -744,10 +1285,18 @@ Respond ONLY with the JSON object, no other text.`
         <button
           type="button"
           onclick={analyzePrompt}
-          disabled={!inputPrompt.trim() || isLoading}
+          disabled={!inputPrompt.trim() || isLoading || isGeneralizing}
           class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1 text-sm font-medium text-gray-600 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isLoading ? 'Analyzing...' : 'Analyze'}
+        </button>
+        <button
+          type="button"
+          onclick={generalizePrompt}
+          disabled={!inputPrompt.trim() || isLoading || isGeneralizing}
+          class="rounded-md border border-gray-300 bg-gray-100 px-4 py-1 text-sm font-medium text-gray-600 transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isGeneralizing ? 'Generalizing...' : 'Generalize'}
         </button>
       </div>
     </div>
