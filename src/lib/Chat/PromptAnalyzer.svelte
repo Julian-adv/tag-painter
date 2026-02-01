@@ -13,6 +13,7 @@
   } from '$lib/TreeEdit/model'
   import { togglePinForLeaf } from '$lib/TreeEdit/operations'
   import { refreshWildcardsFromServer } from '$lib/stores/tagsStore'
+  import { clearAllPins } from '$lib/stores/testModeStore.svelte'
 
   interface Props {
     apiKey: string
@@ -456,7 +457,9 @@ If an element is not mentioned, provide "N/A" or "Not specified".`
   const GENERALIZE_PROMPT = `Given an image generation prompt, replace specific descriptive elements with placeholder slots and report what was replaced.
 
 Replace the following elements with their corresponding placeholders:
-1. Eye descriptions (color, shape, gaze) → __eyes__
+1. Eye color with the word "eyes" → __eyes__
+   Example: "natural dark eyes" → "__eyes__"
+   Do NOT replace eye shape or gaze descriptions separately.
 2. Hair descriptions (style, color, length, texture) → __hair__
 3. Subject/person descriptions (age, gender, ethnicity, beauty descriptors) → __subject__
 4. Clothing/outfit descriptions (all clothing items, accessories worn on body) → __clothing__
@@ -934,6 +937,7 @@ Example response:
     generalizedPrompt = null
     slotMappings = []
     inputPrompt = ''
+    clearAllPins()
   }
 
   function isValidValue(value: string | undefined): boolean {
