@@ -210,8 +210,7 @@ export interface PromptAnalysis {
   composition: string
   background: string
   lighting: string
-  hairStyle: string
-  hairColor: string
+  hair: string
   eyes: string
   outfit: string
   legwear: string

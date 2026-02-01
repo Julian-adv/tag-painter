@@ -46,7 +46,7 @@
   let pendingAdd: PendingAdd | null = $state(null)
 
   const GEMINI_MODEL_ID = 'gemini-2.5-flash'
-  const OPENROUTER_MODEL_ID = 'z-ai/glm-4.7-flash'
+  const OPENROUTER_MODEL_ID = 'tngtech/deepseek-r1t2-chimera:free'
 
   const ANALYSIS_SCHEMA = {
     type: 'OBJECT',
@@ -75,13 +75,9 @@
         type: 'STRING',
         description: 'The lighting conditions, color of light, and shadows.'
       },
-      hairStyle: {
+      hair: {
         type: 'STRING',
-        description: 'The shape, length, and texture of the hair (e.g., long wavy, short bob).'
-      },
-      hairColor: {
-        type: 'STRING',
-        description: 'The specific color of the hair (e.g., neon pink, platinum blonde).'
+        description: 'Hair style (shape, length, texture) and color combined (e.g., long wavy blonde hair, short pink bob).'
       },
       eyes: {
         type: 'STRING',
@@ -111,8 +107,7 @@
       'composition',
       'background',
       'lighting',
-      'hairStyle',
-      'hairColor',
+      'hair',
       'eyes',
       'outfit',
       'legwear',
@@ -128,8 +123,7 @@
     composition: 'Composition',
     background: 'Background',
     lighting: 'Lighting',
-    hairStyle: 'Hair Style',
-    hairColor: 'Hair Color',
+    hair: 'Hair',
     eyes: 'Eyes',
     outfit: 'Outfit',
     legwear: 'Legwear',
@@ -145,10 +139,9 @@
     composition: 'composition',
     background: 'background',
     lighting: 'lighting',
-    hairStyle: 'hair_style',
-    hairColor: 'hair_color',
+    hair: ['hair_style', 'hair_color', 'hair'],
     eyes: 'eyes',
-    outfit: ['clothing_style_with_stockings', 'clothing_style_without_stockings'],
+    outfit: ['clothing_style_with_stockings', 'clothing_style_without_stockings', 'clothing'],
     legwear: 'leg_wear',
     footwear: 'shoes',
     accessories: 'accessories'
@@ -161,8 +154,7 @@
     'composition',
     'background',
     'lighting',
-    'hairStyle',
-    'hairColor',
+    'hair',
     'eyes',
     'outfit',
     'legwear',
@@ -432,11 +424,10 @@
 
   const ANALYSIS_PROMPT = `Analyze the following image generation prompt and extract the visual elements.
 If the prompt is in Chinese, translate it to English first before extracting.
-Separate 'hairStyle' (length/texture) and 'hairColor'.
 Separate physical 'pose' from 'expression'.
 If an element is not mentioned, provide "N/A" or "Not specified".`
 
-  const SYSTEM_PROMPT = 'You are a professional prompt engineer. Deconstruct complex prompts into core visual components. Always split hair into separate style and color fields.'
+  const SYSTEM_PROMPT = 'You are a professional prompt engineer. Deconstruct complex prompts into core visual components.'
 
   async function analyzeWithGemini(prompt: string, key: string): Promise<PromptAnalysis> {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_ID}:generateContent?key=${encodeURIComponent(key)}`
