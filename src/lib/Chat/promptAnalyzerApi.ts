@@ -1,7 +1,7 @@
 import type { PromptAnalysis } from '$lib/types'
 import {
   GEMINI_MODEL_ID,
-  OPENROUTER_MODEL_ID,
+  DEFAULT_OPENROUTER_MODEL_ID,
   ANALYSIS_SCHEMA,
   ANALYSIS_PROMPT,
   SYSTEM_PROMPT,
@@ -11,6 +11,29 @@ import {
   GENERALIZE_JSON_INSTRUCTION,
   type GeneralizeResult
 } from './promptAnalyzerTypes'
+
+/**
+ * Attempts to parse JSON from a string, with fallback to extract JSON from text.
+ * Handles cases like ```json { ... } ``` or other text wrapping JSON.
+ */
+function parseJsonWithFallback<T>(content: string): T {
+  // First, try parsing as-is
+  try {
+    return JSON.parse(content) as T
+  } catch {
+    // Try to extract JSON object from text
+    const firstBrace = content.indexOf('{')
+    const lastBrace = content.lastIndexOf('}')
+
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const jsonPart = content.slice(firstBrace, lastBrace + 1)
+      return JSON.parse(jsonPart) as T
+    }
+
+    // If no braces found, throw original error
+    throw new Error('No valid JSON found in response')
+  }
+}
 
 export async function analyzeWithGemini(prompt: string, key: string): Promise<PromptAnalysis> {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_ID}:generateContent?key=${encodeURIComponent(key)}`
@@ -76,7 +99,11 @@ Prompt: "${prompt}"`
   throw new Error('Failed to get analysis from Gemini.')
 }
 
-export async function analyzeWithOpenRouter(prompt: string, key: string): Promise<PromptAnalysis> {
+export async function analyzeWithOpenRouter(
+  prompt: string,
+  key: string,
+  model: string
+): Promise<PromptAnalysis> {
   const schemaFields = Object.entries(ANALYSIS_SCHEMA.properties)
     .map(([name, prop]) => `- ${name}: ${(prop as { description: string }).description}`)
     .join('\n')
@@ -88,6 +115,8 @@ ${schemaFields}
 
 Respond ONLY with the JSON object, no other text.`
 
+  const modelId = model.trim() || DEFAULT_OPENROUTER_MODEL_ID
+
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -95,7 +124,7 @@ Respond ONLY with the JSON object, no other text.`
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: OPENROUTER_MODEL_ID,
+      model: modelId,
       messages: [
         { role: 'system', content: systemPromptWithSchema },
         { role: 'user', content: `${ANALYSIS_PROMPT}\n\nPrompt: "${prompt}"` }
@@ -128,7 +157,7 @@ Respond ONLY with the JSON object, no other text.`
   const content = typeof message?.content === 'string' ? message.content.trim() : ''
 
   if (content) {
-    return JSON.parse(content) as PromptAnalysis
+    return parseJsonWithFallback<PromptAnalysis>(content)
   }
 
   throw new Error('Failed to get analysis from OpenRouter.')
@@ -186,7 +215,7 @@ Respond ONLY with the JSON object, no other text.`
   const content = typeof message?.content === 'string' ? message.content.trim() : ''
 
   if (content) {
-    return JSON.parse(content) as PromptAnalysis
+    return parseJsonWithFallback<PromptAnalysis>(content)
   }
 
   throw new Error('Failed to get analysis from Ollama.')
@@ -258,8 +287,11 @@ export async function generalizeWithGemini(prompt: string, key: string): Promise
 
 export async function generalizeWithOpenRouter(
   prompt: string,
-  key: string
+  key: string,
+  model: string
 ): Promise<GeneralizeResult> {
+  const modelId = model.trim() || DEFAULT_OPENROUTER_MODEL_ID
+
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -267,7 +299,7 @@ export async function generalizeWithOpenRouter(
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: OPENROUTER_MODEL_ID,
+      model: modelId,
       messages: [
         { role: 'system', content: GENERALIZE_SYSTEM_PROMPT + GENERALIZE_JSON_INSTRUCTION },
         { role: 'user', content: `${GENERALIZE_PROMPT}\n\n"${prompt}"` }
@@ -300,7 +332,7 @@ export async function generalizeWithOpenRouter(
   const content = typeof message?.content === 'string' ? message.content.trim() : ''
 
   if (content) {
-    return JSON.parse(content) as GeneralizeResult
+    return parseJsonWithFallback<GeneralizeResult>(content)
   }
 
   throw new Error('Failed to get generalized prompt from OpenRouter.')
@@ -347,7 +379,7 @@ export async function generalizeWithOllama(
   const content = typeof message?.content === 'string' ? message.content.trim() : ''
 
   if (content) {
-    return JSON.parse(content) as GeneralizeResult
+    return parseJsonWithFallback<GeneralizeResult>(content)
   }
 
   throw new Error('Failed to get generalized prompt from Ollama.')
