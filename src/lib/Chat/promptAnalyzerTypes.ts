@@ -29,7 +29,7 @@ export interface GeneralizeResult {
 }
 
 export const GEMINI_MODEL_ID = 'gemini-2.5-flash'
-export const OPENROUTER_MODEL_ID = 'tngtech/deepseek-r1t2-chimera:free'
+export const DEFAULT_OPENROUTER_MODEL_ID = 'tngtech/deepseek-r1t2-chimera:free'
 
 export const ANALYSIS_SCHEMA = {
   type: 'OBJECT',

@@ -38,6 +38,7 @@
     outputDirectory: settings.outputDirectory,
     geminiApiKey: settings.geminiApiKey || '',
     openRouterApiKey: settings.openRouterApiKey || '',
+    openRouterModel: settings.openRouterModel || '',
     ollamaBaseUrl: settings.ollamaBaseUrl || 'http://localhost:11434',
     ollamaModel: settings.ollamaModel || 'llama3.2',
     promptAnalyzerApiProvider: settings.promptAnalyzerApiProvider || 'gemini',
@@ -63,6 +64,7 @@
     outputDirectory: '',
     geminiApiKey: '',
     openRouterApiKey: '',
+    openRouterModel: '',
     ollamaBaseUrl: 'http://localhost:11434',
     ollamaModel: 'llama3.2',
     promptAnalyzerApiProvider: 'gemini',
@@ -111,6 +113,9 @@
       }
       if (!cloned.openRouterApiKey) {
         cloned.openRouterApiKey = ''
+      }
+      if (!cloned.openRouterModel) {
+        cloned.openRouterModel = ''
       }
       if (!cloned.ollamaBaseUrl) {
         cloned.ollamaBaseUrl = 'http://localhost:11434'
@@ -477,6 +482,18 @@
           type="password"
           bind:value={localSettings.openRouterApiKey}
           placeholder={m['settingsDialog.openRouterApiKeyPlaceholder']()}
+          class="output-dir-input"
+          autocomplete="off"
+        />
+
+        <label for="openrouter-model" class="output-dir-label">
+          {m['settingsDialog.openRouterModel']()}
+        </label>
+        <input
+          id="openrouter-model"
+          type="text"
+          bind:value={localSettings.openRouterModel}
+          placeholder={m['settingsDialog.openRouterModelPlaceholder']()}
           class="output-dir-input"
           autocomplete="off"
         />

@@ -17,6 +17,7 @@
   interface Props {
     apiKey: string
     openRouterApiKey: string
+    openRouterModel: string
     ollamaBaseUrl: string
     ollamaModel: string
     apiProvider: 'gemini' | 'openrouter' | 'ollama'
@@ -27,6 +28,7 @@
   let {
     apiKey = '',
     openRouterApiKey = '',
+    openRouterModel = '',
     ollamaBaseUrl = 'http://localhost:11434',
     ollamaModel = 'llama3.2',
     apiProvider = 'gemini',
@@ -63,7 +65,7 @@
       if (apiProvider === 'ollama') {
         analysis = await analyzeWithOllama(trimmed, ollamaBaseUrl, ollamaModel)
       } else if (apiProvider === 'openrouter') {
-        analysis = await analyzeWithOpenRouter(trimmed, openRouterApiKey.trim())
+        analysis = await analyzeWithOpenRouter(trimmed, openRouterApiKey.trim(), openRouterModel)
       } else {
         analysis = await analyzeWithGemini(trimmed, apiKey.trim())
       }
@@ -99,7 +101,7 @@
       if (apiProvider === 'ollama') {
         result = await generalizeWithOllama(trimmed, ollamaBaseUrl, ollamaModel)
       } else if (apiProvider === 'openrouter') {
-        result = await generalizeWithOpenRouter(trimmed, openRouterApiKey.trim())
+        result = await generalizeWithOpenRouter(trimmed, openRouterApiKey.trim(), openRouterModel)
       } else {
         result = await generalizeWithGemini(trimmed, apiKey.trim())
       }

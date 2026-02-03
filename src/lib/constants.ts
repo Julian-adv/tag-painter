@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS = {
   clipSkip: 2,
   geminiApiKey: '',
   openRouterApiKey: '',
+  openRouterModel: '',
   ollamaBaseUrl: 'http://localhost:11434',
   ollamaModel: 'llama3.2',
   promptAnalyzerApiProvider: 'gemini',

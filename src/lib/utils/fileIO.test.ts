@@ -287,6 +287,7 @@ describe('fileIO utilities', () => {
         outputDirectory: '/test/output',
         geminiApiKey: '',
         openRouterApiKey: '',
+        openRouterModel: '',
         ollamaBaseUrl: 'http://localhost:11434',
         ollamaModel: 'llama3.2',
         promptAnalyzerApiProvider: 'gemini',

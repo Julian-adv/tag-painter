@@ -80,6 +80,8 @@
   "settingsDialog.geminiApiKeyPlaceholder": "Paste your Gemini API key",
   "settingsDialog.openRouterApiKey": "OpenRouter API Key:",
   "settingsDialog.openRouterApiKeyPlaceholder": "Paste your OpenRouter API key",
+  "settingsDialog.openRouterModel": "OpenRouter Model:",
+  "settingsDialog.openRouterModelPlaceholder": "e.g., tngtech/deepseek-r1t2-chimera:free",
   "settingsDialog.ollamaBaseUrl": "Ollama Base URL:",
   "settingsDialog.ollamaModel": "Ollama Model:",
   "settingsDialog.chatPromptLanguage": "Chat prompt language:",

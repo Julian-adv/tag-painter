@@ -112,6 +112,7 @@ export interface Settings {
   outputDirectory: string
   geminiApiKey: string
   openRouterApiKey: string
+  openRouterModel: string
   ollamaBaseUrl: string
   ollamaModel: string
   promptAnalyzerApiProvider: PromptAnalyzerApiProvider

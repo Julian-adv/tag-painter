@@ -205,6 +205,7 @@
     outputDirectory: DEFAULT_OUTPUT_DIRECTORY,
     geminiApiKey: DEFAULT_SETTINGS.geminiApiKey,
     openRouterApiKey: DEFAULT_SETTINGS.openRouterApiKey,
+    openRouterModel: DEFAULT_SETTINGS.openRouterModel,
     ollamaBaseUrl: DEFAULT_SETTINGS.ollamaBaseUrl,
     ollamaModel: DEFAULT_SETTINGS.ollamaModel,
     promptAnalyzerApiProvider: DEFAULT_SETTINGS.promptAnalyzerApiProvider,
@@ -809,6 +810,7 @@
               <PromptAnalyzer
                 apiKey={settings.geminiApiKey}
                 openRouterApiKey={settings.openRouterApiKey}
+                openRouterModel={settings.openRouterModel}
                 ollamaBaseUrl={settings.ollamaBaseUrl}
                 ollamaModel={settings.ollamaModel}
                 apiProvider={settings.promptAnalyzerApiProvider}
