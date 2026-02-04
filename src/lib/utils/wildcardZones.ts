@@ -1,6 +1,7 @@
 // Utility functions for reading and writing wildcard zone data
 import { refreshWildcardsFromServer, getWildcardModel } from '../stores/tagsStore'
 import { saveWildcardsText } from '../api/wildcards'
+import { withWildcardsLock } from '../api/wildcardsLock'
 import { toYAML } from '../TreeEdit/yaml-io'
 import { selectFromArrayNode } from './tagExpansion'
 import {
@@ -223,100 +224,103 @@ export async function writeWildcardZones(
   },
   filename?: string
 ): Promise<void> {
-  try {
-    // Always refresh from the correct file to ensure we have the right model
-    await refreshWildcardsFromServer(filename)
-    const wildcardModel = getWildcardModel()
-    const originalYaml = toYAML(wildcardModel)
+  // Use lock to prevent race conditions with concurrent YAML operations
+  return withWildcardsLock(filename, async () => {
+    try {
+      // Always refresh from the correct file to ensure we have the right model
+      await refreshWildcardsFromServer(filename)
+      const wildcardModel = getWildcardModel()
+      const originalYaml = toYAML(wildcardModel)
 
-    // Clone the current model to modify it
-    const updatedModel = { ...wildcardModel }
-    const updatedNodes = { ...updatedModel.nodes }
+      // Clone the current model to modify it
+      const updatedModel = { ...wildcardModel }
+      const updatedNodes = { ...updatedModel.nodes }
 
-    const updateZone = (zoneName: ZoneName, tagsText: string) => {
-      const joinedTags = tagsText
+      const updateZone = (zoneName: ZoneName, tagsText: string) => {
+        const joinedTags = tagsText
 
-      let zoneSymId = updatedModel.symbols[zoneName]
-      let zoneNode = zoneSymId ? updatedNodes[zoneSymId] : undefined
+        let zoneSymId = updatedModel.symbols[zoneName]
+        let zoneNode = zoneSymId ? updatedNodes[zoneSymId] : undefined
 
-      if (!zoneNode || zoneNode.kind !== 'array') {
-        const newZoneNodeId = `array_${zoneName}_${Date.now()}`
-        zoneNode = {
-          id: newZoneNodeId,
-          name: zoneName,
-          kind: 'array',
-          parentId: 'root',
-          children: []
+        if (!zoneNode || zoneNode.kind !== 'array') {
+          const newZoneNodeId = `array_${zoneName}_${Date.now()}`
+          zoneNode = {
+            id: newZoneNodeId,
+            name: zoneName,
+            kind: 'array',
+            parentId: 'root',
+            children: []
+          }
+          updatedNodes[newZoneNodeId] = zoneNode
+          updatedModel.symbols[zoneName] = newZoneNodeId
+
+          const rootNode = updatedNodes['root']
+          if (rootNode && rootNode.kind === 'object') {
+            rootNode.children = [...(rootNode.children || []), newZoneNodeId]
+          }
         }
-        updatedNodes[newZoneNodeId] = zoneNode
-        updatedModel.symbols[zoneName] = newZoneNodeId
 
-        const rootNode = updatedNodes['root']
-        if (rootNode && rootNode.kind === 'object') {
-          rootNode.children = [...(rootNode.children || []), newZoneNodeId]
+        zoneNode.children ||= []
+
+        let selectedIndex = getStoredSelection(zoneName)
+
+        if (typeof selectedIndex !== 'number' || selectedIndex < 0) {
+          selectedIndex = 0
         }
-      }
 
-      zoneNode.children ||= []
-
-      let selectedIndex = getStoredSelection(zoneName)
-
-      if (typeof selectedIndex !== 'number' || selectedIndex < 0) {
-        selectedIndex = 0
-      }
-
-      if (selectedIndex >= zoneNode.children.length) {
-        selectedIndex = zoneNode.children.length === 0 ? 0 : zoneNode.children.length - 1
-      }
-
-      const existingChildId = zoneNode.children[selectedIndex]
-      let childNode = existingChildId ? updatedNodes[existingChildId] : undefined
-
-      if (!childNode || childNode.kind !== 'leaf') {
-        const newLeafId = `leaf_${zoneName}_${selectedIndex}_${Date.now()}`
-        childNode = {
-          id: newLeafId,
-          name: String(selectedIndex),
-          kind: 'leaf',
-          parentId: zoneNode.id,
-          value: joinedTags
+        if (selectedIndex >= zoneNode.children.length) {
+          selectedIndex = zoneNode.children.length === 0 ? 0 : zoneNode.children.length - 1
         }
-        updatedNodes[newLeafId] = childNode
-        const updatedChildren = [...zoneNode.children]
-        if (selectedIndex >= updatedChildren.length) {
-          updatedChildren.push(newLeafId)
+
+        const existingChildId = zoneNode.children[selectedIndex]
+        let childNode = existingChildId ? updatedNodes[existingChildId] : undefined
+
+        if (!childNode || childNode.kind !== 'leaf') {
+          const newLeafId = `leaf_${zoneName}_${selectedIndex}_${Date.now()}`
+          childNode = {
+            id: newLeafId,
+            name: String(selectedIndex),
+            kind: 'leaf',
+            parentId: zoneNode.id,
+            value: joinedTags
+          }
+          updatedNodes[newLeafId] = childNode
+          const updatedChildren = [...zoneNode.children]
+          if (selectedIndex >= updatedChildren.length) {
+            updatedChildren.push(newLeafId)
+          } else {
+            updatedChildren[selectedIndex] = newLeafId
+          }
+          zoneNode.children = updatedChildren
         } else {
-          updatedChildren[selectedIndex] = newLeafId
+          childNode.value = joinedTags
         }
-        zoneNode.children = updatedChildren
-      } else {
-        childNode.value = joinedTags
+
+        storeSelection(zoneName, selectedIndex)
       }
 
-      storeSelection(zoneName, selectedIndex)
+      for (const zoneName of ZONE_NAMES) {
+        updateZone(zoneName, zones[zoneName])
+      }
+
+      // Update the model
+      updatedModel.nodes = updatedNodes
+
+      // Convert back to YAML and save
+      const yamlText = toYAML(updatedModel)
+
+      if (yamlText === originalYaml) {
+        return
+      }
+
+      // Save to server
+      await saveWildcardsText(yamlText, filename)
+
+      // Update local model by refreshing from server
+      await refreshWildcardsFromServer(filename)
+    } catch (error) {
+      // Re-throw error so caller can handle it (will be shown as toast)
+      throw error
     }
-
-    for (const zoneName of ZONE_NAMES) {
-      updateZone(zoneName, zones[zoneName])
-    }
-
-    // Update the model
-    updatedModel.nodes = updatedNodes
-
-    // Convert back to YAML and save
-    const yamlText = toYAML(updatedModel)
-
-    if (yamlText === originalYaml) {
-      return
-    }
-
-    // Save to server
-    await saveWildcardsText(yamlText, filename)
-
-    // Update local model by refreshing from server
-    await refreshWildcardsFromServer(filename)
-  } catch (error) {
-    // Re-throw error so caller can handle it (will be shown as toast)
-    throw error
-  }
+  })
 }

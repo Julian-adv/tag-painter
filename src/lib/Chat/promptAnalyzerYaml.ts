@@ -1,4 +1,5 @@
 import { fetchWildcardsText, saveWildcardsText } from '$lib/api/wildcards'
+import { withWildcardsLock } from '$lib/api/wildcardsLock'
 import { fromYAML, toYAML } from '$lib/TreeEdit/yaml-io'
 import {
   uid,
@@ -164,145 +165,162 @@ export async function addAnalysisFieldToYaml(
   const nodeNameConfig = FIELD_TO_YAML_NODE[field]
   const nodeNames = Array.isArray(nodeNameConfig) ? nodeNameConfig : [nodeNameConfig]
 
-  try {
-    const yamlText = await fetchWildcardsText(wildcardsFile)
-    const model = fromYAML(yamlText)
+  // Use lock to prevent race conditions with concurrent YAML operations
+  return withWildcardsLock(wildcardsFile, async () => {
+    try {
+      const yamlText = await fetchWildcardsText(wildcardsFile)
+      const model = fromYAML(yamlText)
 
-    const allContainerChildren: SubNodeOption[] = []
+      const allContainerChildren: SubNodeOption[] = []
 
-    for (const nodeName of nodeNames) {
-      const nodeId = findNodeByName(model, nodeName)
-      if (!nodeId) continue
+      for (const nodeName of nodeNames) {
+        const nodeId = findNodeByName(model, nodeName)
+        if (!nodeId) continue
 
-      const node = model.nodes[nodeId]
-      if (!node) continue
+        const node = model.nodes[nodeId]
+        if (!node) continue
 
-      if (node.kind === 'array' && nodeNames.length === 1) {
-        const success = await addValueToArrayNode(
-          model,
-          nodeId,
-          value,
-          nodeName,
-          wildcardsFile,
-          onShowToast
-        )
-        return { success, needsSubNodeSelect: false }
+        if (node.kind === 'array' && nodeNames.length === 1) {
+          const success = await addValueToArrayNode(
+            model,
+            nodeId,
+            value,
+            nodeName,
+            wildcardsFile,
+            onShowToast
+          )
+          return { success, needsSubNodeSelect: false }
+        }
+
+        if (node.kind === 'array' && nodeNames.length > 1) {
+          allContainerChildren.push({
+            id: nodeId,
+            name: nodeName,
+            path: nodeName
+          })
+        }
+
+        if (node.kind === 'object') {
+          const containerChildren = getContainerChildren(model, nodeId)
+          allContainerChildren.push(...containerChildren)
+        }
       }
 
-      if (node.kind === 'array' && nodeNames.length > 1) {
-        allContainerChildren.push({
-          id: nodeId,
-          name: nodeName,
-          path: nodeName
-        })
+      if (allContainerChildren.length > 1) {
+        return {
+          success: false,
+          needsSubNodeSelect: true,
+          options: allContainerChildren,
+          model
+        }
       }
 
-      if (node.kind === 'object') {
-        const containerChildren = getContainerChildren(model, nodeId)
-        allContainerChildren.push(...containerChildren)
+      if (allContainerChildren.length === 1) {
+        const option = allContainerChildren[0]
+        const targetArrayId = findTargetArrayNode(model, option.id)
+        if (targetArrayId) {
+          const success = await addValueToArrayNode(
+            model,
+            targetArrayId,
+            value,
+            option.path,
+            wildcardsFile,
+            onShowToast
+          )
+          return { success, needsSubNodeSelect: false }
+        }
       }
-    }
 
-    if (allContainerChildren.length > 1) {
-      return {
-        success: false,
-        needsSubNodeSelect: true,
-        options: allContainerChildren,
-        model
+      const firstNodeName = nodeNames[0]
+      const firstNodeId = findNodeByName(model, firstNodeName)
+      if (!firstNodeId) {
+        onShowToast(`Node "${firstNodeName}" not found in wildcards.`, 'error')
+        return { success: false, needsSubNodeSelect: false }
       }
-    }
 
-    if (allContainerChildren.length === 1) {
-      const option = allContainerChildren[0]
-      const targetArrayId = findTargetArrayNode(model, option.id)
-      if (targetArrayId) {
-        const success = await addValueToArrayNode(
-          model,
-          targetArrayId,
-          value,
-          option.path,
-          wildcardsFile,
-          onShowToast
-        )
-        return { success, needsSubNodeSelect: false }
+      let targetArrayId = findTargetArrayNode(model, firstNodeId)
+      if (!targetArrayId) {
+        const newArrayId = uid()
+        const newArray: ArrayNode = {
+          id: newArrayId,
+          name: 'other',
+          kind: 'array',
+          parentId: firstNodeId,
+          children: [],
+          collapsed: false
+        }
+        addChild(model, firstNodeId, newArray)
+        targetArrayId = newArrayId
       }
-    }
 
-    const firstNodeName = nodeNames[0]
-    const firstNodeId = findNodeByName(model, firstNodeName)
-    if (!firstNodeId) {
-      onShowToast(`Node "${firstNodeName}" not found in wildcards.`, 'error')
+      const success = await addValueToArrayNode(
+        model,
+        targetArrayId,
+        value,
+        firstNodeName,
+        wildcardsFile,
+        onShowToast
+      )
+      return { success, needsSubNodeSelect: false }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to add to YAML.'
+      onShowToast(message, 'error')
       return { success: false, needsSubNodeSelect: false }
     }
-
-    let targetArrayId = findTargetArrayNode(model, firstNodeId)
-    if (!targetArrayId) {
-      const newArrayId = uid()
-      const newArray: ArrayNode = {
-        id: newArrayId,
-        name: 'other',
-        kind: 'array',
-        parentId: firstNodeId,
-        children: [],
-        collapsed: false
-      }
-      addChild(model, firstNodeId, newArray)
-      targetArrayId = newArrayId
-    }
-
-    const success = await addValueToArrayNode(
-      model,
-      targetArrayId,
-      value,
-      firstNodeName,
-      wildcardsFile,
-      onShowToast
-    )
-    return { success, needsSubNodeSelect: false }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to add to YAML.'
-    onShowToast(message, 'error')
-    return { success: false, needsSubNodeSelect: false }
-  }
+  })
 }
 
 export async function handleSubNodeSelectAction(
   option: SubNodeOption,
-  model: TreeModel,
+  _model: TreeModel,
   value: string,
   wildcardsFile: string | undefined,
   onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void
 ): Promise<boolean> {
-  try {
-    let targetArrayId = findTargetArrayNode(model, option.id)
+  // Use lock to prevent race conditions with concurrent YAML operations
+  return withWildcardsLock(wildcardsFile, async () => {
+    try {
+      // Re-fetch the model to get the latest state
+      const yamlText = await fetchWildcardsText(wildcardsFile)
+      const freshModel = fromYAML(yamlText)
 
-    if (!targetArrayId) {
-      const newArrayId = uid()
-      const newArray: ArrayNode = {
-        id: newArrayId,
-        name: 'other',
-        kind: 'array',
-        parentId: option.id,
-        children: [],
-        collapsed: false
+      // Find the option node in the fresh model by path (IDs change on re-parse)
+      const freshNodeId = findNodeByName(freshModel, option.path) || findNodeByName(freshModel, option.name)
+      if (!freshNodeId) {
+        onShowToast(`Node "${option.path}" not found in wildcards.`, 'error')
+        return false
       }
-      addChild(model, option.id, newArray)
-      targetArrayId = newArrayId
-    }
 
-    return await addValueToArrayNode(
-      model,
-      targetArrayId,
-      value,
-      option.path,
-      wildcardsFile,
-      onShowToast
-    )
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to add to YAML.'
-    onShowToast(message, 'error')
-    return false
-  }
+      let targetArrayId = findTargetArrayNode(freshModel, freshNodeId)
+
+      if (!targetArrayId) {
+        const newArrayId = uid()
+        const newArray: ArrayNode = {
+          id: newArrayId,
+          name: 'other',
+          kind: 'array',
+          parentId: freshNodeId,
+          children: [],
+          collapsed: false
+        }
+        addChild(freshModel, freshNodeId, newArray)
+        targetArrayId = newArrayId
+      }
+
+      return await addValueToArrayNode(
+        freshModel,
+        targetArrayId,
+        value,
+        option.path,
+        wildcardsFile,
+        onShowToast
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to add to YAML.'
+      onShowToast(message, 'error')
+      return false
+    }
+  })
 }
 
 export async function addGeneralizedPromptToYaml(
@@ -310,45 +328,48 @@ export async function addGeneralizedPromptToYaml(
   wildcardsFile: string | undefined,
   onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void
 ): Promise<boolean> {
-  try {
-    const yamlText = await fetchWildcardsText(wildcardsFile)
-    const model = fromYAML(yamlText)
+  // Use lock to prevent race conditions with concurrent YAML operations
+  return withWildcardsLock(wildcardsFile, async () => {
+    try {
+      const yamlText = await fetchWildcardsText(wildcardsFile)
+      const model = fromYAML(yamlText)
 
-    const allNodeId = findNodeByName(model, 'all')
-    if (!allNodeId) {
-      onShowToast('Node "all" not found in wildcards.', 'error')
+      const allNodeId = findNodeByName(model, 'all')
+      if (!allNodeId) {
+        onShowToast('Node "all" not found in wildcards.', 'error')
+        return false
+      }
+
+      const allNode = model.nodes[allNodeId]
+      if (!allNode) {
+        onShowToast('Node "all" not found in wildcards.', 'error')
+        return false
+      }
+
+      if (allNode.kind !== 'array') {
+        onShowToast('"all" node must be an array.', 'error')
+        return false
+      }
+
+      if (valueExistsInArray(model, allNodeId, generalizedPrompt)) {
+        onShowToast('This prompt already exists in "all".', 'info')
+        return false
+      }
+
+      addLeafToArray(model, allNodeId, generalizedPrompt)
+
+      const newYamlText = toYAML(model)
+      await saveWildcardsText(newYamlText, wildcardsFile)
+      await refreshWildcardsFromServer(wildcardsFile)
+
+      onShowToast('Added to "all" node.', 'success')
+      return true
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to add to YAML.'
+      onShowToast(message, 'error')
       return false
     }
-
-    const allNode = model.nodes[allNodeId]
-    if (!allNode) {
-      onShowToast('Node "all" not found in wildcards.', 'error')
-      return false
-    }
-
-    if (allNode.kind !== 'array') {
-      onShowToast('"all" node must be an array.', 'error')
-      return false
-    }
-
-    if (valueExistsInArray(model, allNodeId, generalizedPrompt)) {
-      onShowToast('This prompt already exists in "all".', 'info')
-      return false
-    }
-
-    addLeafToArray(model, allNodeId, generalizedPrompt)
-
-    const newYamlText = toYAML(model)
-    await saveWildcardsText(newYamlText, wildcardsFile)
-    await refreshWildcardsFromServer(wildcardsFile)
-
-    onShowToast('Added to "all" node.', 'success')
-    return true
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to add to YAML.'
-    onShowToast(message, 'error')
-    return false
-  }
+  })
 }
 
 export interface AddSlotMappingResult {
@@ -371,104 +392,107 @@ export async function addSlotMappingToYaml(
 
   const nodeNames = Array.isArray(nodeNameConfig) ? nodeNameConfig : [nodeNameConfig]
 
-  try {
-    const yamlText = await fetchWildcardsText(wildcardsFile)
-    const model = fromYAML(yamlText)
+  // Use lock to prevent race conditions with concurrent YAML operations
+  return withWildcardsLock(wildcardsFile, async () => {
+    try {
+      const yamlText = await fetchWildcardsText(wildcardsFile)
+      const model = fromYAML(yamlText)
 
-    const allContainerChildren: SubNodeOption[] = []
+      const allContainerChildren: SubNodeOption[] = []
 
-    for (const nodeName of nodeNames) {
-      const nodeId = findNodeByName(model, nodeName)
-      if (!nodeId) continue
+      for (const nodeName of nodeNames) {
+        const nodeId = findNodeByName(model, nodeName)
+        if (!nodeId) continue
 
-      const node = model.nodes[nodeId]
-      if (!node) continue
+        const node = model.nodes[nodeId]
+        if (!node) continue
 
-      if (node.kind === 'array' && nodeNames.length === 1) {
-        const success = await addValueToArrayNode(
-          model,
-          nodeId,
-          mapping.original,
-          nodeName,
-          wildcardsFile,
-          onShowToast
-        )
-        return { success, needsSubNodeSelect: false }
+        if (node.kind === 'array' && nodeNames.length === 1) {
+          const success = await addValueToArrayNode(
+            model,
+            nodeId,
+            mapping.original,
+            nodeName,
+            wildcardsFile,
+            onShowToast
+          )
+          return { success, needsSubNodeSelect: false }
+        }
+
+        if (node.kind === 'array' && nodeNames.length > 1) {
+          allContainerChildren.push({
+            id: nodeId,
+            name: nodeName,
+            path: nodeName
+          })
+        }
+
+        if (node.kind === 'object') {
+          const containerChildren = getContainerChildren(model, nodeId)
+          allContainerChildren.push(...containerChildren)
+        }
       }
 
-      if (node.kind === 'array' && nodeNames.length > 1) {
-        allContainerChildren.push({
-          id: nodeId,
-          name: nodeName,
-          path: nodeName
-        })
+      if (allContainerChildren.length > 1) {
+        return {
+          success: false,
+          needsSubNodeSelect: true,
+          options: allContainerChildren,
+          model
+        }
       }
 
-      if (node.kind === 'object') {
-        const containerChildren = getContainerChildren(model, nodeId)
-        allContainerChildren.push(...containerChildren)
+      if (allContainerChildren.length === 1) {
+        const option = allContainerChildren[0]
+        const targetArrayId = findTargetArrayNode(model, option.id)
+        if (targetArrayId) {
+          const success = await addValueToArrayNode(
+            model,
+            targetArrayId,
+            mapping.original,
+            option.path,
+            wildcardsFile,
+            onShowToast
+          )
+          return { success, needsSubNodeSelect: false }
+        }
       }
-    }
 
-    if (allContainerChildren.length > 1) {
-      return {
-        success: false,
-        needsSubNodeSelect: true,
-        options: allContainerChildren,
-        model
+      const firstNodeName = nodeNames[0]
+      const firstNodeId = findNodeByName(model, firstNodeName)
+      if (!firstNodeId) {
+        onShowToast(`Node "${firstNodeName}" not found in wildcards.`, 'error')
+        return { success: false, needsSubNodeSelect: false }
       }
-    }
 
-    if (allContainerChildren.length === 1) {
-      const option = allContainerChildren[0]
-      const targetArrayId = findTargetArrayNode(model, option.id)
-      if (targetArrayId) {
-        const success = await addValueToArrayNode(
-          model,
-          targetArrayId,
-          mapping.original,
-          option.path,
-          wildcardsFile,
-          onShowToast
-        )
-        return { success, needsSubNodeSelect: false }
+      let targetArrayId = findTargetArrayNode(model, firstNodeId)
+      if (!targetArrayId) {
+        const newArrayId = uid()
+        const newArray: ArrayNode = {
+          id: newArrayId,
+          name: 'other',
+          kind: 'array',
+          parentId: firstNodeId,
+          children: [],
+          collapsed: false
+        }
+        addChild(model, firstNodeId, newArray)
+        targetArrayId = newArrayId
       }
-    }
 
-    const firstNodeName = nodeNames[0]
-    const firstNodeId = findNodeByName(model, firstNodeName)
-    if (!firstNodeId) {
-      onShowToast(`Node "${firstNodeName}" not found in wildcards.`, 'error')
+      const success = await addValueToArrayNode(
+        model,
+        targetArrayId,
+        mapping.original,
+        firstNodeName,
+        wildcardsFile,
+        onShowToast
+      )
+      return { success, needsSubNodeSelect: false }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to add to YAML.'
+      onShowToast(message, 'error')
       return { success: false, needsSubNodeSelect: false }
     }
-
-    let targetArrayId = findTargetArrayNode(model, firstNodeId)
-    if (!targetArrayId) {
-      const newArrayId = uid()
-      const newArray: ArrayNode = {
-        id: newArrayId,
-        name: 'other',
-        kind: 'array',
-        parentId: firstNodeId,
-        children: [],
-        collapsed: false
-      }
-      addChild(model, firstNodeId, newArray)
-      targetArrayId = newArrayId
-    }
-
-    const success = await addValueToArrayNode(
-      model,
-      targetArrayId,
-      mapping.original,
-      firstNodeName,
-      wildcardsFile,
-      onShowToast
-    )
-    return { success, needsSubNodeSelect: false }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to add to YAML.'
-    onShowToast(message, 'error')
-    return { success: false, needsSubNodeSelect: false }
-  }
+  })
 }

@@ -2,6 +2,7 @@
   import TreeEdit from './TreeEdit.svelte'
   import { updateWildcardsFromText, getCurrentWildcardModelType } from '../stores/tagsStore'
   import { fetchWildcardsText, saveWildcardsText } from '../api/wildcards'
+  import { withWildcardsLock } from '../api/wildcardsLock'
   import { m } from '$lib/paraglide/messages'
 
   interface Props {
@@ -145,21 +146,25 @@
   async function onSave() {
     if (!tree) return
     const body = tree.getYaml()
-    try {
-      // Save first to avoid overwriting wrong file
-      await saveWildcardsText(body, filename)
 
-      // Only update the global model if we're saving the same file that's currently loaded
-      const currentlyLoadedFile = getCurrentWildcardModelType()
-      if (currentlyLoadedFile === filename) {
-        updateWildcardsFromText(body)
+    // Use lock to prevent race conditions with concurrent YAML operations
+    await withWildcardsLock(filename, async () => {
+      try {
+        // Save first to avoid overwriting wrong file
+        await saveWildcardsText(body, filename)
+
+        // Only update the global model if we're saving the same file that's currently loaded
+        const currentlyLoadedFile = getCurrentWildcardModelType()
+        if (currentlyLoadedFile === filename) {
+          updateWildcardsFromText(body)
+        }
+
+        tree?.markSaved()
+        onSaved()
+      } catch (err) {
+        console.error('Save failed:', err)
       }
-
-      tree?.markSaved()
-      onSaved()
-    } catch (err) {
-      console.error('Save failed:', err)
-    }
+    })
   }
 </script>
 
